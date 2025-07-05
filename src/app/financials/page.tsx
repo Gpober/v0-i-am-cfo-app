@@ -2031,12 +2031,13 @@ export default function FinancialsPage() {
               </div>
 
               {/* Expense Breakdown */}
+{/* Expense Breakdown */}
 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
   <div className="p-6 border-b border-gray-200">
     <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
   </div>
   <div className="p-6">
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={350}>
       <RechartsPieChart>
         <Tooltip 
           formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']}
@@ -2045,11 +2046,10 @@ export default function FinancialsPage() {
         <Pie
           data={expenseData}
           cx="50%"
-          cy="45%"
-          outerRadius={85}
+          cy="40%"
+          outerRadius={80}
           fill="#8884d8"
           dataKey="value"
-          // Remove labels from pie slices completely
         >
           {expenseData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -2057,8 +2057,12 @@ export default function FinancialsPage() {
         </Pie>
         <Legend 
           verticalAlign="bottom" 
-          height={60}
-          wrapperStyle={{ paddingTop: '20px' }}
+          height={80}
+          wrapperStyle={{ 
+            paddingTop: '30px',
+            fontSize: '14px',
+            lineHeight: '1.6'
+          }}
           formatter={(value, entry) => {
             const percentage = expenseData.find(item => item.name === value);
             const total = expenseData.reduce((sum, item) => sum + item.value, 0);
