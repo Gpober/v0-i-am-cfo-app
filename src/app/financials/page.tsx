@@ -2351,7 +2351,7 @@ const getSelectedBankAccountsText = () => {
                 </div>
               </div>
 
-           {/* Expense Breakdown - Clean Version */}
+           {/* Expense Breakdown - Light Readable Tooltip */}
 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
   <div className="p-6 border-b border-gray-200">
     <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
@@ -2363,10 +2363,20 @@ const getSelectedBankAccountsText = () => {
           formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']}
           labelFormatter={(label) => label}
           contentStyle={{
-            backgroundColor: '#1f2937',
-            border: 'none',
+            backgroundColor: 'white',
+            border: '1px solid #e5e7eb',
             borderRadius: '8px',
-            color: 'white'
+            color: '#374151',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+          }}
+          labelStyle={{
+            color: '#111827',
+            fontWeight: '600',
+            marginBottom: '4px'
+          }}
+          itemStyle={{
+            color: '#374151',
+            fontSize: '14px'
           }}
         />
         <Pie
@@ -2383,7 +2393,6 @@ const getSelectedBankAccountsText = () => {
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>
-        {/* NO LEGEND HERE - Removed the <Legend> component */}
       </RechartsPieChart>
     </ResponsiveContainer>
     
