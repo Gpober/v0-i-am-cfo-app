@@ -543,6 +543,8 @@ export default function FinancialsPage() {
   const [timeViewDropdownOpen, setTimeViewDropdownOpen] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [accountTooltip, setAccountTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
+  const [bankAccountDropdownOpen, setBankAccountDropdownOpen] = useState(false);
+  const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(new Set(['All Accounts']));
   
   // Property filtering state
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
@@ -550,6 +552,7 @@ export default function FinancialsPage() {
 
   // Available properties
   const properties = ['All Properties', 'Downtown Loft', 'Seaside Villa', 'Mountain Cabin', 'City Apartment', 'Suburban House'];
+  const bankAccounts = ['All Accounts', 'Chase Business Checking', 'Wells Fargo Savings', 'Capital One Credit Line', 'PayPal Business', 'Stripe Account'];
 
   const handlePropertyToggle = (property: string) => {
     const newSelected = new Set(selectedProperties);
@@ -571,6 +574,37 @@ export default function FinancialsPage() {
     }
     setSelectedProperties(newSelected);
   };
+
+  const handleBankAccountToggle = (account: string) => {
+  const newSelected = new Set(selectedBankAccounts);
+  
+  if (account === 'All Accounts') {
+    if (newSelected.has('All Accounts')) {
+      newSelected.clear();
+    } else {
+      newSelected.clear();
+      newSelected.add('All Accounts');
+    }
+  } else {
+    newSelected.delete('All Accounts');
+    if (newSelected.has(account)) {
+      newSelected.delete(account);
+    } else {
+      newSelected.add(account);
+    }
+  }
+  setSelectedBankAccounts(newSelected);
+};
+
+const getSelectedBankAccountsText = () => {
+  if (selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0) {
+    return 'All Accounts';
+  }
+  if (selectedBankAccounts.size === 1) {
+    return Array.from(selectedBankAccounts)[0];
+  }
+  return `${selectedBankAccounts.size} Accounts Selected`;
+};
 
   const getSelectedPropertiesText = () => {
     if (selectedProperties.has('All Properties') || selectedProperties.size === 0) {
@@ -1352,227 +1386,272 @@ export default function FinancialsPage() {
                 )}
 
                 {/* Cash Flow Content - IAMCFO Style */}
-                {activeTab === 'cash-flow' && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Account
-                          </th>
-                          {renderColumnHeaders()}
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            % of Total Cash
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {/* Cash In-Flow Section */}
-                        <tr className="bg-green-50">
-                          <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
-                            💰 CASH IN-FLOW
-                          </td>
-                        </tr>
-                        {filteredCashFlowData.inFlow.map((item) => {
-                          const isExpandable = isCashFlowExpandableAccount(item.name);
-                          const isExpanded = expandedAccounts.has(item.name);
-                          const totalCash = Math.abs(filteredCashFlowData.totalCashFlow);
-                          const percentOfCash = totalCash ? calculatePercentage(item.total, totalCash) : '0%';
+{activeTab === 'cash-flow' && (
+  <div>
+    {/* Bank Account Selector - Only show on Cash Flow tab */}
+    <div className="p-4 bg-gray-50 border-b border-gray-200">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-gray-700">Select Bank Accounts:</h4>
+        <div className="relative">
+          <button
+            onClick={() => setBankAccountDropdownOpen(!bankAccountDropdownOpen)}
+            className="flex items-center justify-between w-64 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+            style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+          >
+            <span className="truncate">{getSelectedBankAccountsText()}</span>
+            <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${bankAccountDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {bankAccountDropdownOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+              {bankAccounts.map((account) => (
+                <div
+                  key={account}
+                  className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                  onClick={() => handleBankAccountToggle(account)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedBankAccounts.has(account)}
+                    onChange={() => {}} // Handled by onClick above
+                    className="mr-3 h-4 w-4 border-gray-300 rounded"
+                    style={{ accentColor: BRAND_COLORS.primary }}
+                  />
+                  <span className={account === 'All Accounts' ? 'font-medium text-gray-900' : 'text-gray-700'}>
+                    {account}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="mt-2 text-xs text-gray-500">
+        Viewing cash flow for: {getSelectedBankAccountsText()}
+      </div>
+    </div>
 
-                          return (
-                            <React.Fragment key={`inflow-${item.name}`}>
-                              <tr className="hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                  <div className="flex items-center">
-                                    {isExpandable && (
-                                      <button
-                                        onClick={() => toggleAccountExpansion(item.name)}
-                                        className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
-                                      >
-                                        {isExpanded ? (
-                                          <ChevronDown className="w-4 h-4 text-gray-500" />
-                                        ) : (
-                                          <ChevronRight className="w-4 h-4 text-gray-500" />
-                                        )}
-                                      </button>
-                                    )}
-                                    <span className="ml-4">{item.name}</span>
-                                  </div>
-                                </td>
-                                {renderCashFlowDataCells(item)}
-                                <td className="px-4 py-3 text-right text-sm text-green-600">
-                                  {percentOfCash}
-                                </td>
-                              </tr>
-                              {/* Expanded Detail Rows for Cash In-Flow */}
-                              {isExpandable && isExpanded && cashFlowDetails[item.name] && 
-                                cashFlowDetails[item.name].map((subItem) => {
-                                  const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
-                                  return (
-                                    <tr key={`${item.name}-${subItem.name}`} className="bg-green-25 hover:bg-green-50 transition-colors">
-                                      <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
-                                        <div className="flex items-center">
-                                          <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                                          {subItem.name}
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-2 text-right text-sm text-green-600">
-                                        <span 
-                                          className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
-                                          onMouseEnter={hasSubDetails ? (e) => handleAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
-                                          onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
-                                        >
-                                          {formatCurrency(subItem.total)}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                        {totalCash ? calculatePercentage(subItem.total, totalCash) : '0%'}
-                                      </td>
-                                    </tr>
-                                  );
-                                })
-                              }
-                            </React.Fragment>
-                          );
-                        })}
-                        
-                        {/* Total Cash In-Flow */}
-                        <tr className="bg-green-100 font-semibold">
-                          <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
-                            Total Cash In-Flow
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
-                            {formatCurrency(filteredCashFlowData.totalInFlow)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
-                            100%
-                          </td>
-                        </tr>
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Account
+            </th>
+            {renderColumnHeaders()}
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              % of Total Cash
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {/* Cash In-Flow Section */}
+          <tr className="bg-green-50">
+            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
+              💰 CASH IN-FLOW
+            </td>
+          </tr>
+          {filteredCashFlowData.inFlow.map((item) => {
+            const isExpandable = isCashFlowExpandableAccount(item.name);
+            const isExpanded = expandedAccounts.has(item.name);
+            const totalCash = Math.abs(filteredCashFlowData.totalCashFlow);
+            const percentOfCash = totalCash ? calculatePercentage(item.total, totalCash) : '0%';
 
-                        {/* Cash Out-Flow Section */}
-                        <tr className="bg-red-50">
-                          <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
-                            💸 CASH OUT-FLOW
-                          </td>
-                        </tr>
-                        {filteredCashFlowData.outFlow.map((item) => {
-                          const isExpandable = isCashFlowExpandableAccount(item.name);
-                          const isExpanded = expandedAccounts.has(item.name);
-                          const totalCash = Math.abs(filteredCashFlowData.totalCashFlow);
-                          const percentOfCash = totalCash ? calculatePercentage(Math.abs(item.total), totalCash) : '0%';
+            return (
+              <React.Fragment key={`inflow-${item.name}`}>
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 text-left text-sm text-gray-700">
+                    <div className="flex items-center">
+                      {isExpandable && (
+                        <button
+                          onClick={() => toggleAccountExpansion(item.name)}
+                          className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                          )}
+                        </button>
+                      )}
+                      <span className="ml-4">{item.name}</span>
+                    </div>
+                  </td>
+                  {renderCashFlowDataCells(item)}
+                  <td className="px-4 py-3 text-right text-sm text-green-600">
+                    {percentOfCash}
+                  </td>
+                </tr>
+                {/* Expanded Detail Rows for Cash In-Flow */}
+                {isExpandable && isExpanded && cashFlowDetails[item.name] && 
+                  cashFlowDetails[item.name].map((subItem) => {
+                    const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
+                    return (
+                      <tr key={`${item.name}-${subItem.name}`} className="bg-green-25 hover:bg-green-50 transition-colors">
+                        <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                            {subItem.name}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-right text-sm text-green-600">
+                          <span 
+                            className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
+                            onMouseEnter={hasSubDetails ? (e) => handleAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
+                            onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
+                          >
+                            {formatCurrency(subItem.total)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-right text-sm text-gray-500">
+                          {totalCash ? calculatePercentage(subItem.total, totalCash) : '0%'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                }
+              </React.Fragment>
+            );
+          })}
+          
+          {/* Total Cash In-Flow */}
+          <tr className="bg-green-100 font-semibold">
+            <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
+              Total Cash In-Flow
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+              {formatCurrency(filteredCashFlowData.totalInFlow)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+              100%
+            </td>
+          </tr>
 
-                          return (
-                            <React.Fragment key={`outflow-${item.name}`}>
-                              <tr className="hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                  <div className="flex items-center">
-                                    {isExpandable && (
-                                      <button
-                                        onClick={() => toggleAccountExpansion(item.name)}
-                                        className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
-                                      >
-                                        {isExpanded ? (
-                                          <ChevronDown className="w-4 h-4 text-gray-500" />
-                                        ) : (
-                                          <ChevronRight className="w-4 h-4 text-gray-500" />
-                                        )}
-                                      </button>
-                                    )}
-                                    <span className="ml-4">{item.name}</span>
-                                  </div>
-                                </td>
-                                {renderCashFlowDataCells(item)}
-                                <td className="px-4 py-3 text-right text-sm text-red-600">
-                                  {percentOfCash}
-                                </td>
-                              </tr>
-                              {/* Expanded Detail Rows for Cash Out-Flow */}
-                              {isExpandable && isExpanded && cashFlowDetails[item.name] && 
-                                cashFlowDetails[item.name].map((subItem) => {
-                                  const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
-                                  return (
-                                    <tr key={`${item.name}-${subItem.name}`} className="bg-red-25 hover:bg-red-50 transition-colors">
-                                      <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
-                                        <div className="flex items-center">
-                                          <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
-                                          {subItem.name}
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-2 text-right text-sm text-red-600">
-                                        <span 
-                                          className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
-                                          onMouseEnter={hasSubDetails ? (e) => handleAccountMouseEnter(e, subItem.name, Math.abs(subItem.total)) : undefined}
-                                          onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
-                                        >
-                                          ({formatCurrency(Math.abs(subItem.total))})
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                        {totalCash ? calculatePercentage(Math.abs(subItem.total), totalCash) : '0%'}
-                                      </td>
-                                    </tr>
-                                  );
-                                })
-                              }
-                            </React.Fragment>
-                          );
-                        })}
+          {/* Cash Out-Flow Section */}
+          <tr className="bg-red-50">
+            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
+              💸 CASH OUT-FLOW
+            </td>
+          </tr>
+          {filteredCashFlowData.outFlow.map((item) => {
+            const isExpandable = isCashFlowExpandableAccount(item.name);
+            const isExpanded = expandedAccounts.has(item.name);
+            const totalCash = Math.abs(filteredCashFlowData.totalCashFlow);
+            const percentOfCash = totalCash ? calculatePercentage(Math.abs(item.total), totalCash) : '0%';
 
-                        {/* Total Cash Out-Flow */}
-                        <tr className="bg-red-100 font-semibold">
-                          <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
-                            Total Cash Out-Flow
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                            ({formatCurrency(Math.abs(filteredCashFlowData.totalOutFlow))})
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                            100%
-                          </td>
-                        </tr>
+            return (
+              <React.Fragment key={`outflow-${item.name}`}>
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 text-left text-sm text-gray-700">
+                    <div className="flex items-center">
+                      {isExpandable && (
+                        <button
+                          onClick={() => toggleAccountExpansion(item.name)}
+                          className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                          )}
+                        </button>
+                      )}
+                      <span className="ml-4">{item.name}</span>
+                    </div>
+                  </td>
+                  {renderCashFlowDataCells(item)}
+                  <td className="px-4 py-3 text-right text-sm text-red-600">
+                    {percentOfCash}
+                  </td>
+                </tr>
+                {/* Expanded Detail Rows for Cash Out-Flow */}
+                {isExpandable && isExpanded && cashFlowDetails[item.name] && 
+                  cashFlowDetails[item.name].map((subItem) => {
+                    const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
+                    return (
+                      <tr key={`${item.name}-${subItem.name}`} className="bg-red-25 hover:bg-red-50 transition-colors">
+                        <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                            {subItem.name}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-right text-sm text-red-600">
+                          <span 
+                            className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
+                            onMouseEnter={hasSubDetails ? (e) => handleAccountMouseEnter(e, subItem.name, Math.abs(subItem.total)) : undefined}
+                            onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
+                          >
+                            ({formatCurrency(Math.abs(subItem.total))})
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-right text-sm text-gray-500">
+                          {totalCash ? calculatePercentage(Math.abs(subItem.total), totalCash) : '0%'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                }
+              </React.Fragment>
+            );
+          })}
 
-                        {/* Net Cash Flow */}
-                        <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                          <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
-                            🏦 NET CASH FLOW
-                          </td>
-                          <td className={`px-4 py-4 text-right text-lg font-bold ${
-                            filteredCashFlowData.totalCashFlow >= 0 ? 'text-green-700' : 'text-red-700'
-                          }`}>
-                            {formatCurrency(filteredCashFlowData.totalCashFlow)}
-                          </td>
-                          <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
-                            Net Change
-                          </td>
-                        </tr>
+          {/* Total Cash Out-Flow */}
+          <tr className="bg-red-100 font-semibold">
+            <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
+              Total Cash Out-Flow
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+              ({formatCurrency(Math.abs(filteredCashFlowData.totalOutFlow))})
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+              100%
+            </td>
+          </tr>
 
-                        {/* Beginning & Ending Cash Balance */}
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-3 text-left text-sm text-gray-700">
-                            Beginning Cash Balance
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-gray-700">
-                            {formatCurrency(filteredCashFlowData.beginningCash)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-gray-500">
-                            Starting
-                          </td>
-                        </tr>
-                        <tr className="border-t" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                          <td className="px-4 py-3 text-left text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
-                            Ending Cash Balance
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
-                            {formatCurrency(filteredCashFlowData.endingCash)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
-                            Final
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+          {/* Net Cash Flow */}
+          <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
+            <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+              🏦 NET CASH FLOW
+            </td>
+            <td className={`px-4 py-4 text-right text-lg font-bold ${
+              filteredCashFlowData.totalCashFlow >= 0 ? 'text-green-700' : 'text-red-700'
+            }`}>
+              {formatCurrency(filteredCashFlowData.totalCashFlow)}
+            </td>
+            <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
+              Net Change
+            </td>
+          </tr>
+
+          {/* Beginning & Ending Cash Balance */}
+          <tr className="bg-gray-50">
+            <td className="px-4 py-3 text-left text-sm text-gray-700">
+              Beginning Cash Balance
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-gray-700">
+              {formatCurrency(filteredCashFlowData.beginningCash)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-gray-500">
+              Starting
+            </td>
+          </tr>
+          <tr className="border-t" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
+            <td className="px-4 py-3 text-left text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+              Ending Cash Balance
+            </td>
+            <td className="px-4 py-3 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+              {formatCurrency(filteredCashFlowData.endingCash)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
+              Final
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+)}
 
                 {/* Balance Sheet Content */}
 {activeTab === 'balance-sheet' && (
@@ -2103,16 +2182,17 @@ export default function FinancialsPage() {
             </div>
           )}
 
-          {/* Click outside to close dropdowns */}
-          {(timeViewDropdownOpen || propertyDropdownOpen) && (
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => {
-                setTimeViewDropdownOpen(false);
-                setPropertyDropdownOpen(false);
-              }}
-            />
-          )}
+         {/* Click outside to close dropdowns */}
+{(timeViewDropdownOpen || propertyDropdownOpen || bankAccountDropdownOpen) && (
+  <div
+    className="fixed inset-0 z-10"
+    onClick={() => {
+      setTimeViewDropdownOpen(false);
+      setPropertyDropdownOpen(false);
+      setBankAccountDropdownOpen(false);
+    }}
+  />
+)}
         </div>
       </main>
     </div>
