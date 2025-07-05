@@ -2351,13 +2351,13 @@ const getSelectedBankAccountsText = () => {
                 </div>
               </div>
 
-            {/* Expense Breakdown - FIXED VERSION */}
+           {/* Expense Breakdown - Clean Version */}
 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
   <div className="p-6 border-b border-gray-200">
     <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
   </div>
   <div className="p-6">
-    <ResponsiveContainer width="100%" height={400}>
+    <ResponsiveContainer width="100%" height={300}>
       <RechartsPieChart>
         <Tooltip 
           formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']}
@@ -2372,8 +2372,8 @@ const getSelectedBankAccountsText = () => {
         <Pie
           data={expenseData}
           cx="50%"
-          cy="45%"
-          outerRadius={85}
+          cy="50%"
+          outerRadius={90}
           fill="#8884d8"
           dataKey="value"
           label={({name, percent}) => `${(percent * 100).toFixed(1)}%`}
@@ -2383,44 +2383,23 @@ const getSelectedBankAccountsText = () => {
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>
-        <Legend 
-          verticalAlign="bottom" 
-          height={100}
-          wrapperStyle={{ 
-            paddingTop: '20px',
-            fontSize: '13px',
-            lineHeight: '1.8'
-          }}
-          formatter={(value, entry) => {
-            const item = expenseData.find(expense => expense.name === value);
-            const total = expenseData.reduce((sum, expense) => sum + expense.value, 0);
-            const percent = item ? ((item.value / total) * 100).toFixed(1) : '0';
-            return (
-              <span style={{ 
-                color: '#374151',
-                fontWeight: '500'
-              }}>
-                {value} ({percent}%)
-              </span>
-            );
-          }}
-        />
+        {/* NO LEGEND HERE - Removed the <Legend> component */}
       </RechartsPieChart>
     </ResponsiveContainer>
     
-    {/* Alternative: Manual Legend with Better Formatting */}
-    <div className="mt-4 grid grid-cols-2 gap-3">
+    {/* Clean Manual Legend */}
+    <div className="mt-6 grid grid-cols-2 gap-4">
       {expenseData.map((item, index) => {
         const total = expenseData.reduce((sum, expense) => sum + expense.value, 0);
         const percent = ((item.value / total) * 100).toFixed(1);
         return (
           <div key={item.name} className="flex items-center space-x-3">
             <div 
-              className="w-4 h-4 rounded-full"
+              className="w-4 h-4 rounded-full flex-shrink-0"
               style={{ backgroundColor: COLORS[index % COLORS.length] }}
             ></div>
-            <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900">{item.name}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-900 truncate">{item.name}</div>
               <div className="text-xs text-gray-500">
                 {formatCurrency(item.value)} ({percent}%)
               </div>
