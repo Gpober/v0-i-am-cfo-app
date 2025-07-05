@@ -2031,31 +2031,41 @@ export default function FinancialsPage() {
               </div>
 
               {/* Expense Breakdown */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
-                </div>
-                <div className="p-6">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <RechartsPieChart>
-                      <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']} />
-                      <Pie
-                        data={expenseData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {expenseData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+<div className="bg-white rounded-xl shadow-sm overflow-hidden">
+  <div className="p-6 border-b border-gray-200">
+    <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
+  </div>
+  <div className="p-6">
+    <ResponsiveContainer width="100%" height={300}>
+      <RechartsPieChart>
+        <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']} />
+        <Pie
+          data={expenseData}
+          cx="50%"
+          cy="50%"
+          outerRadius={90}
+          fill="#8884d8"
+          dataKey="value"
+          label={({ name, percent }: any) => {
+            // Shorten long names for labels
+            const shortName = name.length > 15 ? name.substring(0, 12) + '...' : name;
+            return `${shortName}: ${(percent * 100).toFixed(0)}%`;
+          }}
+          labelLine={false}
+        >
+          {expenseData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Legend 
+          verticalAlign="bottom" 
+          height={36}
+          formatter={(value) => value.length > 20 ? value.substring(0, 17) + '...' : value}
+        />
+      </RechartsPieChart>
+    </ResponsiveContainer>
+  </div>
+</div>
             </div>
           </div>
 
