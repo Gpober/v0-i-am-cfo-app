@@ -351,6 +351,40 @@ interface PropertyCashFlowData {
   };
 }
 
+// Balance Sheet Details - Sub-accounts for each category
+const balanceSheetDetails: Record<string, FinancialDataItem[]> = {
+  'Cash & Cash Equivalents': [
+    { name: 'Chase Business Checking', total: 145000, months: { 'June 2025': 145000 } },
+    { name: 'Wells Fargo Savings', total: 85000, months: { 'June 2025': 85000 } },
+    { name: 'PayPal Business Account', total: 35000, months: { 'June 2025': 35000 } },
+    { name: 'Petty Cash', total: 20000, months: { 'June 2025': 20000 } },
+  ],
+  'Accounts Receivable': [
+    { name: 'Tenant Receivables', total: 95000, months: { 'June 2025': 95000 } },
+    { name: 'Security Deposit Receivables', total: 45000, months: { 'June 2025': 45000 } },
+    { name: 'Management Fee Receivables', total: 25000, months: { 'June 2025': 25000 } },
+  ],
+  'Property, Plant & Equipment': [
+    { name: 'Downtown Loft Property', total: 650000, months: { 'June 2025': 650000 } },
+    { name: 'Seaside Villa Property', total: 450000, months: { 'June 2025': 450000 } },
+    { name: 'Mountain Cabin Property', total: 250000, months: { 'June 2025': 250000 } },
+    { name: 'Office Equipment', total: 75000, months: { 'June 2025': 75000 } },
+    { name: 'Vehicles', total: 25000, months: { 'June 2025': 25000 } },
+  ],
+  'Accounts Payable': [
+    { name: 'Maintenance Contractors', total: 85000, months: { 'June 2025': 85000 } },
+    { name: 'Utility Companies', total: 45000, months: { 'June 2025': 45000 } },
+    { name: 'Insurance Premiums', total: 35000, months: { 'June 2025': 35000 } },
+    { name: 'Property Tax Payable', total: 20000, months: { 'June 2025': 20000 } },
+  ],
+  'Long-term Debt': [
+    { name: 'Property Mortgage - Downtown', total: 350000, months: { 'June 2025': 350000 } },
+    { name: 'Property Mortgage - Seaside', total: 200000, months: { 'June 2025': 200000 } },
+    { name: 'Equipment Financing', total: 75000, months: { 'June 2025': 75000 } },
+    { name: 'Line of Credit', total: 25000, months: { 'June 2025': 25000 } },
+  ],
+};
+
 const propertyCashFlowData: PropertyCashFlowData = {
   'Downtown Loft': {
     inFlow: [
@@ -438,6 +472,8 @@ const propertyCashFlowData: PropertyCashFlowData = {
     endingCash: 84755
   },
 };
+
+
 
 // Cash Flow Details - Sub-accounts for each category
 const cashFlowDetails: Record<string, FinancialDataItem[]> = {
@@ -834,6 +870,10 @@ const getSelectedBankAccountsText = () => {
   const isCashFlowExpandableAccount = (accountName: string): boolean => {
     return cashFlowDetails.hasOwnProperty(accountName);
   };
+
+  const isBalanceSheetExpandableAccount = (accountName: string): boolean => {
+  return balanceSheetDetails.hasOwnProperty(accountName);
+};
 
   const handleAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
     const details = subAccountDetails[subAccountName];
@@ -1683,36 +1723,120 @@ const getSelectedBankAccountsText = () => {
           </td>
         </tr>
         
-        <tr className="hover:bg-gray-50 transition-colors">
-          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-              Cash & Cash Equivalents
-            </div>
-          </td>
-          <td className="px-4 py-3 text-right text-sm font-medium">
-            {formatCurrency(285000)}
-          </td>
-          <td className="px-4 py-3 text-right text-sm text-gray-500">
-            12.4%
-          </td>
-        </tr>
+        {/* Cash & Cash Equivalents - Expandable */}
+        <React.Fragment key="cash-equivalents">
+          <tr className="hover:bg-gray-50 transition-colors">
+            <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+              <div className="flex items-center">
+                {isBalanceSheetExpandableAccount('Cash & Cash Equivalents') && (
+                  <button
+                    onClick={() => toggleAccountExpansion('Cash & Cash Equivalents')}
+                    className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                  >
+                    {expandedAccounts.has('Cash & Cash Equivalents') ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                  </button>
+                )}
+                <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                Cash & Cash Equivalents
+              </div>
+            </td>
+            <td className="px-4 py-3 text-right text-sm font-medium">
+              {formatCurrency(285000)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-gray-500">
+              12.4%
+            </td>
+          </tr>
+          
+          {/* Expanded Cash Detail Rows */}
+          {isBalanceSheetExpandableAccount('Cash & Cash Equivalents') && 
+           expandedAccounts.has('Cash & Cash Equivalents') && 
+           balanceSheetDetails['Cash & Cash Equivalents'].map((subItem) => {
+             const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
+             return (
+               <tr key={`cash-${subItem.name}`} className="bg-blue-25 hover:bg-blue-50 transition-colors">
+                 <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
+                   <div className="flex items-center">
+                     <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                     {subItem.name}
+                   </div>
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-600">
+                   <span 
+                     className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
+                     onMouseEnter={hasSubDetails ? (e) => handleAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
+                     onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
+                   >
+                     {formatCurrency(subItem.total)}
+                   </span>
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-500">
+                   {((subItem.total / 2300000) * 100).toFixed(1)}%
+                 </td>
+               </tr>
+             );
+           })
+          }
+        </React.Fragment>
         
-        <tr className="hover:bg-gray-50 transition-colors">
-          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-              Accounts Receivable
-            </div>
-          </td>
-          <td className="px-4 py-3 text-right text-sm font-medium">
-            {formatCurrency(165000)}
-          </td>
-          <td className="px-4 py-3 text-right text-sm text-gray-500">
-            7.2%
-          </td>
-        </tr>
+        {/* Accounts Receivable - Expandable */}
+        <React.Fragment key="accounts-receivable">
+          <tr className="hover:bg-gray-50 transition-colors">
+            <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+              <div className="flex items-center">
+                {isBalanceSheetExpandableAccount('Accounts Receivable') && (
+                  <button
+                    onClick={() => toggleAccountExpansion('Accounts Receivable')}
+                    className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                  >
+                    {expandedAccounts.has('Accounts Receivable') ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                  </button>
+                )}
+                <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                Accounts Receivable
+              </div>
+            </td>
+            <td className="px-4 py-3 text-right text-sm font-medium">
+              {formatCurrency(165000)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-gray-500">
+              7.2%
+            </td>
+          </tr>
+          
+          {/* Expanded A/R Detail Rows */}
+          {isBalanceSheetExpandableAccount('Accounts Receivable') && 
+           expandedAccounts.has('Accounts Receivable') && 
+           balanceSheetDetails['Accounts Receivable'].map((subItem) => {
+             return (
+               <tr key={`ar-${subItem.name}`} className="bg-blue-25 hover:bg-blue-50 transition-colors">
+                 <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
+                   <div className="flex items-center">
+                     <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                     {subItem.name}
+                   </div>
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-600">
+                   {formatCurrency(subItem.total)}
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-500">
+                   {((subItem.total / 2300000) * 100).toFixed(1)}%
+                 </td>
+               </tr>
+             );
+           })
+          }
+        </React.Fragment>
         
+        {/* Inventory - Non-expandable */}
         <tr className="hover:bg-gray-50 transition-colors">
           <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
             <div className="flex items-center">
@@ -1728,6 +1852,7 @@ const getSelectedBankAccountsText = () => {
           </td>
         </tr>
         
+        {/* Prepaid Expenses - Non-expandable */}
         <tr className="hover:bg-gray-50 transition-colors">
           <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
             <div className="flex items-center">
@@ -1762,21 +1887,60 @@ const getSelectedBankAccountsText = () => {
           </td>
         </tr>
         
-        <tr className="hover:bg-gray-50 transition-colors">
-          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-              Property, Plant & Equipment
-            </div>
-          </td>
-          <td className="px-4 py-3 text-right text-sm font-medium">
-            {formatCurrency(1450000)}
-          </td>
-          <td className="px-4 py-3 text-right text-sm text-gray-500">
-            63.0%
-          </td>
-        </tr>
+        {/* Property, Plant & Equipment - Expandable */}
+        <React.Fragment key="ppe">
+          <tr className="hover:bg-gray-50 transition-colors">
+            <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+              <div className="flex items-center">
+                {isBalanceSheetExpandableAccount('Property, Plant & Equipment') && (
+                  <button
+                    onClick={() => toggleAccountExpansion('Property, Plant & Equipment')}
+                    className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                  >
+                    {expandedAccounts.has('Property, Plant & Equipment') ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                  </button>
+                )}
+                <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                Property, Plant & Equipment
+              </div>
+            </td>
+            <td className="px-4 py-3 text-right text-sm font-medium">
+              {formatCurrency(1450000)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-gray-500">
+              63.0%
+            </td>
+          </tr>
+          
+          {/* Expanded PPE Detail Rows */}
+          {isBalanceSheetExpandableAccount('Property, Plant & Equipment') && 
+           expandedAccounts.has('Property, Plant & Equipment') && 
+           balanceSheetDetails['Property, Plant & Equipment'].map((subItem) => {
+             return (
+               <tr key={`ppe-${subItem.name}`} className="bg-blue-25 hover:bg-blue-50 transition-colors">
+                 <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
+                   <div className="flex items-center">
+                     <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                     {subItem.name}
+                   </div>
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-600">
+                   {formatCurrency(subItem.total)}
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-500">
+                   {((subItem.total / 2300000) * 100).toFixed(1)}%
+                 </td>
+               </tr>
+             );
+           })
+          }
+        </React.Fragment>
         
+        {/* Continue with other sections... */}
         <tr className="hover:bg-gray-50 transition-colors">
           <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
             <div className="flex items-center">
@@ -1819,7 +1983,7 @@ const getSelectedBankAccountsText = () => {
           </td>
         </tr>
         
-        {/* Other Assets */}
+        {/* Other Assets - Keep existing structure */}
         <tr className="bg-blue-25">
           <td colSpan={100} className="px-4 py-2 text-left text-sm font-semibold text-blue-700">
             Other Assets
@@ -1895,21 +2059,60 @@ const getSelectedBankAccountsText = () => {
           </td>
         </tr>
         
-        <tr className="hover:bg-gray-50 transition-colors">
-          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
-              Accounts Payable
-            </div>
-          </td>
-          <td className="px-4 py-3 text-right text-sm font-medium">
-            {formatCurrency(185000)}
-          </td>
-          <td className="px-4 py-3 text-right text-sm text-gray-500">
-            8.0%
-          </td>
-        </tr>
+        {/* Accounts Payable - Expandable */}
+        <React.Fragment key="accounts-payable">
+          <tr className="hover:bg-gray-50 transition-colors">
+            <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+              <div className="flex items-center">
+                {isBalanceSheetExpandableAccount('Accounts Payable') && (
+                  <button
+                    onClick={() => toggleAccountExpansion('Accounts Payable')}
+                    className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                  >
+                    {expandedAccounts.has('Accounts Payable') ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                  </button>
+                )}
+                <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                Accounts Payable
+              </div>
+            </td>
+            <td className="px-4 py-3 text-right text-sm font-medium">
+              {formatCurrency(185000)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-gray-500">
+              8.0%
+            </td>
+          </tr>
+          
+          {/* Expanded A/P Detail Rows */}
+          {isBalanceSheetExpandableAccount('Accounts Payable') && 
+           expandedAccounts.has('Accounts Payable') && 
+           balanceSheetDetails['Accounts Payable'].map((subItem) => {
+             return (
+               <tr key={`ap-${subItem.name}`} className="bg-red-25 hover:bg-red-50 transition-colors">
+                 <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
+                   <div className="flex items-center">
+                     <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                     {subItem.name}
+                   </div>
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-600">
+                   {formatCurrency(subItem.total)}
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-500">
+                   {((subItem.total / 2300000) * 100).toFixed(1)}%
+                 </td>
+               </tr>
+             );
+           })
+          }
+        </React.Fragment>
         
+        {/* Continue with remaining liability items... */}
         <tr className="hover:bg-gray-50 transition-colors">
           <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
             <div className="flex items-center">
@@ -1959,21 +2162,60 @@ const getSelectedBankAccountsText = () => {
           </td>
         </tr>
         
-        <tr className="hover:bg-gray-50 transition-colors">
-          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
-              Long-term Debt
-            </div>
-          </td>
-          <td className="px-4 py-3 text-right text-sm font-medium">
-            {formatCurrency(650000)}
-          </td>
-          <td className="px-4 py-3 text-right text-sm text-gray-500">
-            28.3%
-          </td>
-        </tr>
+        {/* Long-term Debt - Expandable */}
+        <React.Fragment key="long-term-debt">
+          <tr className="hover:bg-gray-50 transition-colors">
+            <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+              <div className="flex items-center">
+                {isBalanceSheetExpandableAccount('Long-term Debt') && (
+                  <button
+                    onClick={() => toggleAccountExpansion('Long-term Debt')}
+                    className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                  >
+                    {expandedAccounts.has('Long-term Debt') ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                  </button>
+                )}
+                <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                Long-term Debt
+              </div>
+            </td>
+            <td className="px-4 py-3 text-right text-sm font-medium">
+              {formatCurrency(650000)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm text-gray-500">
+              28.3%
+            </td>
+          </tr>
+          
+          {/* Expanded Long-term Debt Detail Rows */}
+          {isBalanceSheetExpandableAccount('Long-term Debt') && 
+           expandedAccounts.has('Long-term Debt') && 
+           balanceSheetDetails['Long-term Debt'].map((subItem) => {
+             return (
+               <tr key={`ltd-${subItem.name}`} className="bg-red-25 hover:bg-red-50 transition-colors">
+                 <td className="px-4 py-2 text-left text-sm text-gray-600 pl-16">
+                   <div className="flex items-center">
+                     <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                     {subItem.name}
+                   </div>
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-600">
+                   {formatCurrency(subItem.total)}
+                 </td>
+                 <td className="px-4 py-2 text-right text-sm text-gray-500">
+                   {((subItem.total / 2300000) * 100).toFixed(1)}%
+                 </td>
+               </tr>
+             );
+           })
+          }
+        </React.Fragment>
         
+        {/* Continue with remaining sections as in original... */}
         <tr className="hover:bg-gray-50 transition-colors">
           <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
             <div className="flex items-center">
