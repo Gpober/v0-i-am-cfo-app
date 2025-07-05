@@ -1575,14 +1575,431 @@ export default function FinancialsPage() {
                 )}
 
                 {/* Balance Sheet Content */}
-                {activeTab === 'balance-sheet' && (
-                  <div className="p-6">
-                    <div className="text-center py-8">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Balance Sheet</h3>
-                      <p className="text-gray-600">Balance sheet functionality coming soon...</p>
-                    </div>
-                  </div>
-                )}
+{activeTab === 'balance-sheet' && (
+  <div className="overflow-x-auto">
+    <table className="w-full">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Account
+          </th>
+          {renderColumnHeaders()}
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            % of Total Assets
+          </th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {/* ASSETS SECTION */}
+        <tr className="bg-blue-50">
+          <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-blue-800">
+            📊 ASSETS
+          </td>
+        </tr>
+        
+        {/* Current Assets */}
+        <tr className="bg-blue-25">
+          <td colSpan={100} className="px-4 py-2 text-left text-sm font-semibold text-blue-700">
+            Current Assets
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Cash & Cash Equivalents
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(285000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            12.4%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Accounts Receivable
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(165000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            7.2%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Inventory
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(125000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            5.4%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Prepaid Expenses
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(35000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            1.5%
+          </td>
+        </tr>
+        
+        <tr className="bg-blue-100 font-semibold">
+          <td className="px-4 py-3 text-left text-sm text-blue-800 font-bold pl-6">
+            Total Current Assets
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-blue-800 font-bold">
+            {formatCurrency(610000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-blue-800 font-bold">
+            26.5%
+          </td>
+        </tr>
+        
+        {/* Fixed Assets */}
+        <tr className="bg-blue-25">
+          <td colSpan={100} className="px-4 py-2 text-left text-sm font-semibold text-blue-700">
+            Fixed Assets
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Property, Plant & Equipment
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(1450000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            63.0%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Less: Accumulated Depreciation
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium text-red-600">
+            ({formatCurrency(285000)})
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            -12.4%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Intangible Assets
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(125000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            5.4%
+          </td>
+        </tr>
+        
+        <tr className="bg-blue-100 font-semibold">
+          <td className="px-4 py-3 text-left text-sm text-blue-800 font-bold pl-6">
+            Total Fixed Assets
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-blue-800 font-bold">
+            {formatCurrency(1290000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-blue-800 font-bold">
+            56.0%
+          </td>
+        </tr>
+        
+        {/* Other Assets */}
+        <tr className="bg-blue-25">
+          <td colSpan={100} className="px-4 py-2 text-left text-sm font-semibold text-blue-700">
+            Other Assets
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Investments
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(235000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            10.2%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              Goodwill
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(165000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            7.2%
+          </td>
+        </tr>
+        
+        <tr className="bg-blue-100 font-semibold">
+          <td className="px-4 py-3 text-left text-sm text-blue-800 font-bold pl-6">
+            Total Other Assets
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-blue-800 font-bold">
+            {formatCurrency(400000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-blue-800 font-bold">
+            17.4%
+          </td>
+        </tr>
+        
+        {/* TOTAL ASSETS */}
+        <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
+          <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+            📈 TOTAL ASSETS
+          </td>
+          <td className="px-4 py-4 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+            {formatCurrency(2300000)}
+          </td>
+          <td className="px-4 py-4 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+            100.0%
+          </td>
+        </tr>
+        
+        {/* LIABILITIES SECTION */}
+        <tr className="bg-red-50">
+          <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
+            💳 LIABILITIES
+          </td>
+        </tr>
+        
+        {/* Current Liabilities */}
+        <tr className="bg-red-25">
+          <td colSpan={100} className="px-4 py-2 text-left text-sm font-semibold text-red-700">
+            Current Liabilities
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+              Accounts Payable
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(185000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            8.0%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+              Accrued Expenses
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(95000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            4.1%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+              Short-term Debt
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(150000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            6.5%
+          </td>
+        </tr>
+        
+        <tr className="bg-red-100 font-semibold">
+          <td className="px-4 py-3 text-left text-sm text-red-800 font-bold pl-6">
+            Total Current Liabilities
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+            {formatCurrency(430000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+            18.7%
+          </td>
+        </tr>
+        
+        {/* Long-term Liabilities */}
+        <tr className="bg-red-25">
+          <td colSpan={100} className="px-4 py-2 text-left text-sm font-semibold text-red-700">
+            Long-term Liabilities
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+              Long-term Debt
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(650000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            28.3%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-8">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+              Deferred Tax Liabilities
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(85000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            3.7%
+          </td>
+        </tr>
+        
+        <tr className="bg-red-100 font-semibold">
+          <td className="px-4 py-3 text-left text-sm text-red-800 font-bold pl-6">
+            Total Long-term Liabilities
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+            {formatCurrency(735000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+            32.0%
+          </td>
+        </tr>
+        
+        {/* TOTAL LIABILITIES */}
+        <tr className="bg-red-200 font-semibold">
+          <td className="px-4 py-3 text-left text-sm text-red-900 font-bold">
+            Total Liabilities
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-red-900 font-bold">
+            {formatCurrency(1165000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-red-900 font-bold">
+            50.7%
+          </td>
+        </tr>
+        
+        {/* EQUITY SECTION */}
+        <tr className="bg-green-50">
+          <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
+            🏛️ OWNERS' EQUITY
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-6">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+              Owner's Capital
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(750000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            32.6%
+          </td>
+        </tr>
+        
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 text-left text-sm text-gray-700 pl-6">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+              Retained Earnings
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right text-sm font-medium">
+            {formatCurrency(385000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-gray-500">
+            16.7%
+          </td>
+        </tr>
+        
+        <tr className="bg-green-100 font-semibold">
+          <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
+            Total Owners' Equity
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+            {formatCurrency(1135000)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+            49.3%
+          </td>
+        </tr>
+        
+        {/* TOTAL LIABILITIES & EQUITY */}
+        <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
+          <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+            ⚖️ TOTAL LIABILITIES & EQUITY
+          </td>
+          <td className="px-4 py-4 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+            {formatCurrency(2300000)}
+          </td>
+          <td className="px-4 py-4 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+            100.0%
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+)}
               </div>
             </div>
 
