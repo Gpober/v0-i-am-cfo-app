@@ -2036,22 +2036,20 @@ export default function FinancialsPage() {
     <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
   </div>
   <div className="p-6">
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={280}>
       <RechartsPieChart>
-        <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']} />
+        <Tooltip 
+          formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']}
+          labelFormatter={(label) => label}
+        />
         <Pie
           data={expenseData}
           cx="50%"
-          cy="50%"
-          outerRadius={90}
+          cy="45%"
+          outerRadius={85}
           fill="#8884d8"
           dataKey="value"
-          label={({ name, percent }: any) => {
-            // Shorten long names for labels
-            const shortName = name.length > 15 ? name.substring(0, 12) + '...' : name;
-            return `${shortName}: ${(percent * 100).toFixed(0)}%`;
-          }}
-          labelLine={false}
+          // Remove labels from pie slices completely
         >
           {expenseData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -2059,8 +2057,14 @@ export default function FinancialsPage() {
         </Pie>
         <Legend 
           verticalAlign="bottom" 
-          height={36}
-          formatter={(value) => value.length > 20 ? value.substring(0, 17) + '...' : value}
+          height={60}
+          wrapperStyle={{ paddingTop: '20px' }}
+          formatter={(value, entry) => {
+            const percentage = expenseData.find(item => item.name === value);
+            const total = expenseData.reduce((sum, item) => sum + item.value, 0);
+            const percent = percentage ? ((percentage.value / total) * 100).toFixed(1) : '0';
+            return `${value} (${percent}%)`;
+          }}
         />
       </RechartsPieChart>
     </ResponsiveContainer>
