@@ -410,10 +410,19 @@ const ReservationsTab: React.FC = () => {
     totalGuests: '',
     notes: ''
   });
-  const [syncing, setSyncing] = useState(false);
+const [syncing, setSyncing] = useState(false);
+  
+  // Add these new state variables for backend integration
+  const [loading, setLoading] = useState(false);
+  const [isConnectedToBackend, setIsConnectedToBackend] = useState(false);
+  const [backendData, setBackendData] = useState(null);
+// Load data when component mounts
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-  // Sample data
-  const appData = {
+// Use backend data if available, otherwise use demo data
+  const currentData = backendData || {
     properties: [
       {
         id: 'miami-beach',
@@ -510,22 +519,30 @@ const ReservationsTab: React.FC = () => {
     ]
   };
 
-  // API connection function
-  const connectToAPI = async () => {
-    setSyncing(true);
-    try {
-      const response = await fetch('https://iamcfo-guesty-backend.onrender.com/api/guesty/sync', { method: 'POST' });
-      if (response.ok) {
-        showNotification('Guesty sync started successfully!', 'success');
-      } else {
-        showNotification('Backend not connected - using demo data', 'info');
-      }
-    } catch (error) {
-      showNotification('Backend not connected - using demo data', 'info');
-    } finally {
-      setSyncing(false);
+ // API connection function
+const connectToAPI = async () => {
+  setSyncing(true);
+  try {
+    const response = await fetch('https://iamcfo-guesty-backend.onrender.com/api/guesty/sync', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (response.ok) {
+      showNotification('Guesty sync started successfully!', 'success');
+      // Wait a few seconds then reload data
+      setTimeout(() => {
+        loadDashboardData();
+      }, 3000);
+    } else {
+      showNotification('Backend sync failed - using demo data', 'error');
     }
-  };
+  } catch (error) {
+    showNotification('Backend not reachable - using demo data', 'error');
+  } finally {
+    setSyncing(false);
+  }
+};
 
   // Utility functions
   const formatCurrency = (amount: number): string => {
@@ -553,7 +570,7 @@ const ReservationsTab: React.FC = () => {
   };
 
   const getPropertyColor = (propertyName: string): string => {
-    const property = appData.properties.find(p => p.name === propertyName);
+    const property = currentData.properties.find(p => p.name === propertyName);
     return property ? property.color : BRAND_COLORS.primary;
   };
 
@@ -568,7 +585,7 @@ const ReservationsTab: React.FC = () => {
 
   const handlePropertyCheckboxChange = (propertyId: string): void => {
     if (propertyId === 'all') {
-      const allProperties = appData.properties.map(p => p.id);
+      const allProperties = currentData.properties.map(p => p.id);
       const allSelected = selectedProperties.length === allProperties.length;
       setSelectedProperties(allSelected ? [] : allProperties);
     } else {
@@ -584,14 +601,51 @@ const ReservationsTab: React.FC = () => {
 
   const getFilteredReservations = (): Reservation[] => {
     const selectedPropertyNames = selectedProperties.map(id => 
-      appData.properties.find(p => p.id === id)?.name
+      currentData.properties.find(p => p.id === id)?.name
     ).filter(Boolean) as string[];
     
-    return appData.reservations.filter(r => 
+    return currentData.reservations.filter(r => 
       selectedPropertyNames.includes(r.property)
     );
   };
+// Backend data loading function
+const loadDashboardData = async () => {
+  try {
+    setLoading(true);
+    const [propertiesRes, reservationsRes, kpisRes] = await Promise.all([
+      fetch('https://iamcfo-guesty-backend.onrender.com/api/dashboard/properties').catch(() => null),
+      fetch('https://iamcfo-guesty-backend.onrender.com/api/dashboard/reservations').catch(() => null),
+      fetch('https://iamcfo-guesty-backend.onrender.com/api/dashboard/kpis').catch(() => null)
+    ]);
 
+    if (propertiesRes?.ok && reservationsRes?.ok) {
+      const [propertiesData, reservationsData, kpisData] = await Promise.all([
+        propertiesRes.json(),
+        reservationsRes.json(),
+        kpisRes?.json() || {}
+      ]);
+      
+      // Update with real backend data
+      setBackendData({
+        properties: propertiesData.properties || currentData.properties,
+        reservations: reservationsData.reservations || currentData.reservations,
+        kpis: kpisData
+      });
+      
+      setIsConnectedToBackend(true);
+      showNotification('Connected to live Guesty data!', 'success');
+    } else {
+      setIsConnectedToBackend(false);
+      showNotification('Using demo data - backend connecting...', 'info');
+    }
+  } catch (error) {
+    setIsConnectedToBackend(false);
+    showNotification('Using demo data - check backend connection', 'info');
+  } finally {
+    setLoading(false);
+  }
+};
+  
   const calculateKPIs = (): KPIs => {
     const filteredReservations = getFilteredReservations();
     const totalRevenue = filteredReservations.reduce((sum, r) => sum + r.revenue, 0);
@@ -663,10 +717,10 @@ const ReservationsTab: React.FC = () => {
   const getBookingsForDate = (dateStr: string): Reservation[] => {
     const targetDate = new Date(dateStr);
     const selectedPropertyNames = selectedProperties.map(id => 
-      appData.properties.find(p => p.id === id)?.name
+      currentData.properties.find(p => p.id === id)?.name
     ).filter(Boolean) as string[];
 
-    return appData.reservations.filter(reservation => {
+    return currentData.reservations.filter(reservation => {
       const checkinDate = new Date(reservation.checkin);
       const checkoutDate = new Date(reservation.checkout);
       
@@ -798,12 +852,12 @@ const ReservationsTab: React.FC = () => {
         showNotification('Reservation created in backend!', 'success');
       } else {
         // Fallback to local update
-        appData.reservations.push(newReservation);
+        currentData.reservations.push(newReservation);
         showNotification('Reservation created locally (backend not connected)', 'info');
       }
     }).catch(() => {
       // Fallback to local update
-      appData.reservations.push(newReservation);
+      currentData.reservations.push(newReservation);
       showNotification('Reservation created locally (backend not connected)', 'info');
     });
 
@@ -826,7 +880,7 @@ const ReservationsTab: React.FC = () => {
       return seasons.map((season) => {
         const data: Record<string, any> = { month: season };
         selectedProperties.forEach(propertyId => {
-          const property = appData.properties.find(p => p.id === propertyId);
+          const property = currentData.properties.find(p => p.id === propertyId);
           if (property) {
             const seasonalMultipliers = { Winter: 0.8, Spring: 1.0, Summer: 1.3, Fall: 1.1 };
             const baseOccupancy = property.occupancy;
@@ -847,7 +901,7 @@ const ReservationsTab: React.FC = () => {
       return months.map((month, index) => {
         const data: Record<string, any> = { month };
         selectedProperties.forEach(propertyId => {
-          const property = appData.properties.find(p => p.id === propertyId);
+          const property = currentData.properties.find(p => p.id === propertyId);
           if (property) {
             const baseOccupancy = property.occupancy;
             const variation = Math.sin(index * 0.5) * 10;
@@ -871,7 +925,7 @@ const ReservationsTab: React.FC = () => {
       return seasons.map((season) => {
         const data: Record<string, any> = { month: season };
         selectedProperties.forEach(propertyId => {
-          const property = appData.properties.find(p => p.id === propertyId);
+          const property = currentData.properties.find(p => p.id === propertyId);
           if (property) {
             const seasonalMultipliers = { Winter: 0.7, Spring: 1.0, Summer: 1.6, Fall: 1.2 };
             const baseRevenue = property.revenue * 90;
@@ -886,7 +940,7 @@ const ReservationsTab: React.FC = () => {
       return months.map((month, index) => {
         const data: Record<string, any> = { month };
         selectedProperties.forEach(propertyId => {
-          const property = appData.properties.find(p => p.id === propertyId);
+          const property = currentData.properties.find(p => p.id === propertyId);
           if (property) {
             const baseRevenue = property.revenue * 14;
             const seasonalMultiplier = 1 + Math.sin((index + 5) * 0.5) * 0.4;
@@ -914,6 +968,11 @@ const ReservationsTab: React.FC = () => {
                 <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
                   Reservation Management
                 </span>
+                {isConnectedToBackend && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                    Guesty Connected
+                  </span>
+                )}
               </div>
               <p className="text-sm text-gray-600 mt-1">Real-time booking analytics • Airbnb/Guesty Integration • Revenue Optimization</p>
             </div>
@@ -928,7 +987,7 @@ const ReservationsTab: React.FC = () => {
             <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Reservation Management</h2>
             <div className="flex flex-wrap gap-4 items-center">
               <PropertyDropdown
-                properties={appData.properties}
+                properties={currentData.properties}
                 selectedProperties={selectedProperties}
                 onPropertyChange={handlePropertyCheckboxChange}
                 isOpen={propertyDropdownOpen}
@@ -1050,7 +1109,7 @@ const ReservationsTab: React.FC = () => {
                       <Tooltip formatter={(value) => [`${value.toLocaleString()}`, 'Revenue']} />
                       <Legend />
                       {selectedProperties.map(propertyId => {
-                        const property = appData.properties.find(p => p.id === propertyId);
+                        const property = currentData.properties.find(p => p.id === propertyId);
                         return property ? (
                           <Bar 
                             key={property.id} 
@@ -1177,7 +1236,7 @@ const ReservationsTab: React.FC = () => {
                       <Legend />
                       {occupancyChartMode === '2025-only' ? (
                         selectedProperties.map(propertyId => {
-                          const property = appData.properties.find(p => p.id === propertyId);
+                          const property = currentData.properties.find(p => p.id === propertyId);
                           return property ? (
                             <Line 
                               key={property.id}
@@ -1192,7 +1251,7 @@ const ReservationsTab: React.FC = () => {
                         })
                       ) : (
                         selectedProperties.flatMap(propertyId => {
-                          const property = appData.properties.find(p => p.id === propertyId);
+                          const property = currentData.properties.find(p => p.id === propertyId);
                           return property ? [
                             <Line 
                               key={`${property.id}-2024`}
@@ -1376,7 +1435,7 @@ const ReservationsTab: React.FC = () => {
         onSubmit={handleNewReservation}
         formData={newReservationForm}
         onFormChange={(field, value) => setNewReservationForm(prev => ({...prev, [field]: value}))}
-        properties={appData.properties}
+        properties={currentData.properties}
       />
 
       <Notification notification={notification} />
