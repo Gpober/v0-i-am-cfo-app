@@ -627,10 +627,10 @@ const loadDashboardData = async () => {
       
       // Update with real backend data
       setBackendData({
-        properties: propertiesData.properties || currentData.properties,
-        reservations: reservationsData.reservations || currentData.reservations,
-        kpis: kpisData
-      });
+  properties: propertiesData.properties || [],
+  reservations: reservationsData.reservations || [],
+  kpis: kpisData
+});
       
       setIsConnectedToBackend(true);
       showNotification('Connected to live Guesty data!', 'success');
@@ -639,11 +639,11 @@ const loadDashboardData = async () => {
       showNotification('Using demo data - backend connecting...', 'info');
     }
   } catch (error) {
-    setIsConnectedToBackend(false);
-    showNotification('Using demo data - check backend connection', 'info');
-  } finally {
-    setLoading(false);
-  }
+  setIsConnectedToBackend(false);
+  showNotification('Using demo data - backend will connect when Guesty credentials are added', 'info');
+} finally {
+  setLoading(false);
+}
 };
   
   const calculateKPIs = (): KPIs => {
