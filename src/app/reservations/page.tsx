@@ -410,6 +410,7 @@ const ReservationsTab: React.FC = () => {
     totalGuests: '',
     notes: ''
   });
+  const [syncing, setSyncing] = useState(false);
 
   // Sample data
   const appData = {
@@ -507,6 +508,23 @@ const ReservationsTab: React.FC = () => {
         status: 'pending' as ReservationStatus
       }
     ]
+  };
+
+  // API connection function
+  const connectToAPI = async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch('https://iamcfo-guesty-backend.onrender.com/api/guesty/sync', { method: 'POST' });
+      if (response.ok) {
+        showNotification('Guesty sync started successfully!', 'success');
+      } else {
+        showNotification('Backend not connected - using demo data', 'info');
+      }
+    } catch (error) {
+      showNotification('Backend not connected - using demo data', 'info');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // Utility functions
@@ -770,8 +788,25 @@ const ReservationsTab: React.FC = () => {
       status: 'pending'
     };
 
-    // In a real app, this would update the backend
-    appData.reservations.push(newReservation);
+    // Try to create via API, fallback to local update
+    fetch('https://iamcfo-guesty-backend.onrender.com/api/reservations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newReservationForm)
+    }).then(response => {
+      if (response.ok) {
+        showNotification('Reservation created in backend!', 'success');
+      } else {
+        // Fallback to local update
+        appData.reservations.push(newReservation);
+        showNotification('Reservation created locally (backend not connected)', 'info');
+      }
+    }).catch(() => {
+      // Fallback to local update
+      appData.reservations.push(newReservation);
+      showNotification('Reservation created locally (backend not connected)', 'info');
+    });
+
     setNewReservationModalOpen(false);
     setNewReservationForm({
       guestName: '',
@@ -783,7 +818,6 @@ const ReservationsTab: React.FC = () => {
       totalGuests: '',
       notes: ''
     });
-    showNotification('Reservation created successfully!', 'success');
   };
 
   const generateOccupancyChartData = () => {
@@ -921,11 +955,12 @@ const ReservationsTab: React.FC = () => {
               </button>
 
               <button
-                onClick={() => showNotification('Reservations refreshed', 'info')}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm"
+                onClick={connectToAPI}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
+                disabled={syncing}
               >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
+                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Refresh'}
               </button>
 
               <button
