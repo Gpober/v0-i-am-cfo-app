@@ -43,6 +43,10 @@ interface FinancialDataItem {
   total: number;
   months: Partial<Record<MonthString, number>>;
   type?: string;
+  original_type?: string;
+  detail_type?: string;
+  entries?: any[];
+  mapping_method?: string;
 }
 
 interface FinancialEntry {
@@ -63,6 +67,8 @@ interface FinancialEntry {
   last_modified: string;
   created_at: string;
   updated_at: string;
+  classification?: string;
+  mapping_method?: string;
 }
 
 interface NotificationState {
@@ -78,17 +84,141 @@ interface TooltipState {
   y: number;
 }
 
-// Enhanced data transformation functions with proper account type mapping
-const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
-  // Function to get a clean, descriptive account name
-  const getCleanAccountName = (entry: any) => {
-    // Use account_name (column D) which contains the actual account names
-    let accountName = entry.account_name?.trim() || '';
+// Real Supabase client
+const createSupabaseClient = () => {
+  return {
+    from: (table: string) => ({
+      select: (columns: string = '*') => ({
+        eq: (column: string, value: string) => ({
+          order: (orderBy: string) => 
+            fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&${column}=eq.${encodeURIComponent(value)}&order=${orderBy}`, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+              }
+            }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
+        }),
+        order: (orderBy: string) => 
+          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&order=${orderBy}`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
+        then: (callback: Function) => 
+          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(res => res.json()).then(data => callback({ data, error: null })).catch(error => callback({ data: null, error }))
+      })
+    })
+  };
+};
+
+const supabase = createSupabaseClient();
+
+// Fetch properties from Supabase
+const fetchProperties = async (): Promise<string[]> => {
+  try {
+    console.log('🏠 Fetching unique property_class values from journal_entries...');
     
-    // Clean up property-specific prefixes if present (like "615 Pine Terrace:")
+    // First try to get properties from 2025 data to get the most current property list
+    const current2025Response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&transaction_date=gte.2025-01-01&transaction_date=lte.2025-12-31`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    let uniquePropertiesFromData = [];
+    
+    if (current2025Response.ok) {
+      const data2025 = await current2025Response.json();
+      console.log('📅 Found 2025 data entries:', data2025.length);
+      const properties2025 = data2025.map((item: any) => item.property_class);
+      const filtered2025 = properties2025.filter((pc: any) => pc && pc.trim() !== '');
+      uniquePropertiesFromData = [...new Set(filtered2025)];
+      console.log('🏠 Properties found in 2025 data:', uniquePropertiesFromData);
+    } else {
+      console.log('📅 No 2025 data found, fetching all property data...');
+      // Fallback to all data if 2025 data not available
+      const allDataResponse = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (allDataResponse.ok) {
+        const allData = await allDataResponse.json();
+        const allProperties = allData.map((item: any) => item.property_class);
+        const filteredAll = allProperties.filter((pc: any) => pc && pc.trim() !== '');
+        uniquePropertiesFromData = [...new Set(filteredAll)];
+      }
+    }
+    
+    // Known properties based on your data (with correct names)
+    const knownProperties = [
+      'Cleveland',
+      'Columbus, IN',  // Corrected name with capital IN
+      'Detroit',
+      'General', 
+      'Hastings MN',
+      'Lisbon',
+      'McHenry IL',    // Added missing property
+      'Mokena IL',
+      'Pine Terrace',
+      'Rockford',
+      'Terraview',
+      'Wesley'
+    ];
+    
+    // Combine data-driven properties with known properties
+    const allProperties = [...new Set([...uniquePropertiesFromData, ...knownProperties])];
+    
+    if (allProperties.length === 0) {
+      return ['All Properties', 'General'];
+    }
+    
+    const result = ['All Properties', ...allProperties.sort()];
+    console.log('✅ Final property list (2025 data + known):', result);
+    console.log('🔍 Properties from 2025 data:', uniquePropertiesFromData);
+    console.log('🔍 Known properties added:', knownProperties);
+    return result;
+    
+  } catch (error) {
+    console.error('❌ Property fetch error:', error);
+    return [
+      'All Properties',
+      'Cleveland',
+      'Columbus, IN',  // Corrected name in fallback too
+      'Detroit',
+      'General', 
+      'Hastings MN',
+      'Lisbon',
+      'McHenry IL',    // Added missing property
+      'Mokena IL',
+      'Pine Terrace',
+      'Rockford',
+      'Terraview',
+      'Wesley'
+    ];
+  }
+};
+
+// Enhanced data transformation functions
+const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
+  const getCleanAccountName = (entry: any) => {
+    let accountName = entry.account_name?.trim() || '';
     accountName = accountName.replace(/^[^:]*:/, '').trim();
     
-    // If still empty, use a fallback
     if (!accountName || accountName === 'Journal Entry' || accountName === 'RJE') {
       accountName = entry.description?.trim() || `${entry.account_type || 'Other'} Account`;
     }
@@ -96,13 +226,11 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     return accountName;
   };
 
-  // Group by cleaned account name and calculate net amounts
   const groupedData = entries.reduce((acc, entry) => {
     const accountName = getCleanAccountName(entry);
     const key = accountName;
     
     if (!acc[key]) {
-      // Use the classification we determined in fetchFinancialData
       const plClassification = entry.classification || entry.account_type;
       
       acc[key] = {
@@ -117,50 +245,29 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       };
     }
     
-    // Simplified accounting logic using line_amount primarily
     let amount = 0;
     
     switch (acc[key].type) {
       case 'Revenue':
-        // For revenue: use line_amount as-is (don't force absolute value)
-        // QuickBooks often stores revenue as negative line_amount
         amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
-        // If amount is negative, make it positive for P&L display
         if (amount < 0) {
           amount = Math.abs(amount);
-        }
-        
-        // Debug Guesty specifically
-        if (entry.account_name && entry.account_name.toLowerCase().includes('guesty')) {
-          console.log(`💰 GUESTY ENTRY: ${entry.account_name}`, {
-            je_number: entry.je_number,
-            date: entry.transaction_date,
-            line_amount: entry.line_amount,
-            debit: entry.debit_amount,
-            credit: entry.credit_amount,
-            calculated_amount: amount,
-            description: entry.description
-          });
         }
         break;
         
       case 'Expenses':
-        // For expenses: use absolute value
         amount = Math.abs(entry.line_amount || (entry.debit_amount - entry.credit_amount));
         break;
         
       case 'Assets':
-        // Assets: use line_amount as-is (positive = asset increase)
         amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
         break;
         
       case 'Liabilities':
-        // Liabilities: use line_amount as-is (negative = liability increase typically)
         amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
         break;
         
       default:
-        // Default: use line_amount as-is
         amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
     }
     
@@ -182,7 +289,6 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     return acc;
   }, {} as Record<string, any>);
 
-  // Convert to array and sort by account type hierarchy for P&L presentation
   const typeOrder: Record<string, number> = {
     'Revenue': 1,
     'Expenses': 2,
@@ -204,24 +310,6 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       return a.name.localeCompare(b.name);
     });
 
-  // Debug: Log the final totals for revenue accounts
-  const revenueAccounts = sortedData.filter(item => item.type === 'Revenue');
-  console.log('📊 FINAL REVENUE TOTALS:');
-  revenueAccounts.forEach(account => {
-    console.log(`💰 ${account.name}: ${account.total.toLocaleString()} (${account.entries.length} entries)`);
-    
-    // Special debug for Guesty
-    if (account.name.toLowerCase().includes('guesty')) {
-      console.log('🔍 GUESTY DETAILED BREAKDOWN:');
-      console.log(`Total entries: ${account.entries.length}`);
-      console.log(`Sum of amounts used: ${account.entries.reduce((sum: number, e: any) => sum + e.amount_used, 0)}`);
-      account.entries.forEach((entry: any, idx: number) => {
-        console.log(`  ${idx + 1}. JE: ${entry.je_number}, Date: ${entry.transaction_date}, Amount: ${entry.amount_used}, Line: ${entry.line}, Credit: ${entry.credit}, Debit: ${entry.debit}`);
-      });
-    }
-  });
-
-  // SEPARATE P&L DATA FROM BALANCE SHEET DATA
   const plData = sortedData.filter(item => 
     item.type === 'Revenue' || item.type === 'Expenses'
   );
@@ -234,14 +322,14 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     propertyFinancialData: {
       'All Properties': {
         Monthly: {
-          [monthYear]: plData  // Only P&L accounts for P&L statement
+          [monthYear]: plData
         }
       }
     },
     propertyBalanceSheetData: {
       'All Properties': {
         Monthly: {
-          [monthYear]: balanceSheetData  // Only Balance Sheet accounts
+          [monthYear]: balanceSheetData
         }
       }
     }
@@ -249,15 +337,6 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
 };
 
 const transformCashFlowData = (entries: FinancialEntry[]) => {
-  // Cash flow transformation using actual cash account movements
-  const cashAccounts = entries.filter(entry => 
-    entry.account_type === 'Bank' || 
-    entry.account_name.toLowerCase().includes('cash') ||
-    entry.account_name.toLowerCase().includes('checking') ||
-    entry.account_name.toLowerCase().includes('savings')
-  );
-
-  // Group by account for cash movements
   const inFlowItems: FinancialDataItem[] = [];
   const outFlowItems: FinancialDataItem[] = [];
 
@@ -313,159 +392,14 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
   };
 };
 
-// Real Supabase client
-const createSupabaseClient = () => {
-  return {
-    from: (table: string) => ({
-      select: (columns: string = '*') => ({
-        eq: (column: string, value: string) => ({
-          order: (orderBy: string) => 
-            fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&${column}=eq.${encodeURIComponent(value)}&order=${orderBy}`, {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-              }
-            }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
-        }),
-        order: (orderBy: string) => 
-          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&order=${orderBy}`, {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
-        then: (callback: Function) => 
-          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}`, {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }).then(res => res.json()).then(data => callback({ data, error: null })).catch(error => callback({ data: null, error }))
-      })
-    })
-  };
-};
-
-// Supabase API Functions
-const supabase = createSupabaseClient();
-
-const fetchProperties = async (): Promise<string[]> => {
-  try {
-    console.log('🏠 Fetching unique property_class values from journal_entries...');
-    
-    // Simpler query - just get all property_class values
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`, {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    console.log('📡 Response status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Supabase error:', response.status, errorText);
-      throw new Error(`Supabase error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log('📋 Total rows received:', data.length);
-    console.log('📋 Sample data:', data.slice(0, 10));
-    
-    // Let's see ALL the property class values, not just unique ones
-    const allPropertyClasses = data.map((item: any) => item.property_class);
-    console.log('🔍 ALL property_class values (first 20):', allPropertyClasses.slice(0, 20));
-    console.log('🔍 Property class value types:', allPropertyClasses.slice(0, 5).map(pc => typeof pc));
-    
-    // Count occurrences
-    const propertyCounts = {};
-    allPropertyClasses.forEach(pc => {
-      if (pc !== null && pc !== undefined && pc !== '') {
-        propertyCounts[pc] = (propertyCounts[pc] || 0) + 1;
-      }
-    });
-    console.log('📊 Property class counts:', propertyCounts);
-    
-    // Extract unique property classes, filtering out null/empty values
-    const filteredClasses = allPropertyClasses.filter((pc: any) => pc && pc.trim() !== '');
-    const uniqueProperties = [...new Set(filteredClasses)];
-    
-    console.log('🏠 Filtered property classes:', filteredClasses.length);
-    console.log('🏠 Unique property classes found:', uniqueProperties);
-    
-    if (uniqueProperties.length === 0) {
-      console.warn('⚠️ No property classes found, using fallback');
-      return ['All Properties', 'General']; // Minimal fallback
-    }
-    
-    if (uniqueProperties.length === 1) {
-      console.warn('⚠️ Only 1 property class found:', uniqueProperties[0]);
-      console.log('🔄 Adding hardcoded properties to supplement');
-      // If only one found, add the others we know exist
-      const knownProperties = ['Detroit', 'General', 'Hastings MN', 'Lisbon', 'Mokena IL', 'Pine Terrace', 'Rockford', 'Terraview', 'Wesley'];
-      const combined = [...new Set([...uniqueProperties, ...knownProperties])];
-      return ['All Properties', ...combined.sort()];
-    }
-    
-    const result = ['All Properties', ...uniqueProperties.sort()];
-    console.log('✅ Final property list:', result);
-    return result;
-    
-  } catch (error) {
-    console.error('❌ Property fetch error:', error);
-    console.log('🔄 Using hardcoded property list from your data');
-    
-    // Use the exact properties I saw in your screenshot
-    return [
-      'All Properties', 
-      'Detroit',
-      'General', 
-      'Hastings MN',
-      'Lisbon',
-      'Mokena IL',
-      'Pine Terrace',
-      'Rockford',
-      'Terraview',
-      'Wesley'
-    ];
-  }
-};
-
-const fetchBankAccounts = async (): Promise<string[]> => {
-  try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/accounts?select=account_name&account_type=eq.Bank&order=account_name`, {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) throw new Error('Failed to fetch bank accounts');
-    
-    const data = await response.json();
-    const bankAccounts = data.map((item: any) => item.account_name).filter(Boolean);
-    return ['All Accounts', ...bankAccounts];
-  } catch (error) {
-    console.error('Error fetching bank accounts:', error);
-    return ['All Accounts'];
-  }
-};
-
+// Fetch financial data from Supabase
 const fetchFinancialData = async (
   property: string = 'All Properties',
-  bankAccount: string = 'All Accounts',
   monthYear: string
 ) => {
   try {
-    console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, bankAccount, monthYear });
+    console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, monthYear });
     
-    // Convert "June 2025" to date range for filtering
     const [month, year] = monthYear.split(' ');
     const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
     const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
@@ -473,20 +407,9 @@ const fetchFinancialData = async (
     
     let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=account_name`;
     
-    // Handle multiple property filtering
     if (property !== 'All Properties') {
-      // For now, handle single property (first selected)
-      // TODO: Enhance to handle multiple property filtering with OR conditions
       url += `&property_class=eq.${encodeURIComponent(property)}`;
       console.log('🏠 Filtering by property_class:', property);
-    } else {
-      console.log('🏠 No property filter applied (All Properties selected)');
-    }
-    
-    // Add bank account filter if applicable
-    if (bankAccount !== 'All Accounts') {
-      url += `&account_name=ilike.%${encodeURIComponent(bankAccount)}%`;
-      console.log('🏦 Filtering by bank account:', bankAccount);
     }
 
     console.log('📡 Final URL:', url);
@@ -516,17 +439,10 @@ const fetchFinancialData = async (
     const accountsData = await accountsResponse.json();
     
     console.log('📊 Journal entries loaded:', journalData.length);
-    console.log('📋 Properties in loaded data:', [...new Set(journalData.map((e: any) => e.property_class))]);
-    console.log('🔍 Sample journal entries for classification:', journalData.slice(0, 3));
     
-    // Log account names to see what we're working with
-    const accountNames = [...new Set(journalData.map((e: any) => e.account_name))].slice(0, 10);
-    console.log('📝 Sample account names:', accountNames);
-    
-    // Create account code to name mapping from your chart of accounts
+    // Create account lookup map
     const accountLookupMap = new Map();
     
-    // Build lookup from your accounts table - THIS IS THE KEY!
     accountsData.forEach((account: any) => {
       accountLookupMap.set(account.account_name, {
         type: account.account_type,
@@ -537,27 +453,21 @@ const fetchFinancialData = async (
                       account.account_type === 'Other Income' ? 'Revenue' :
                       account.account_type === 'Other Expenses' ? 'Expenses' :
                       account.account_type === 'Interest Expense' ? 'Other Expenses' :
-                      account.account_type // Default to the account type
+                      account.account_type
       });
     });
 
-    console.log('📋 Accounts lookup built:', accountLookupMap.size, 'accounts mapped');
-    console.log('📋 Sample account mappings:', Array.from(accountLookupMap.entries()).slice(0, 5));
-
-    // Enhanced classification for journal entries using account_name (column D)
+    // Enhanced classification for journal entries
     const classifyJournalAccount = (entry: any) => {
       const accountName = entry.account_name || '';
       const name = accountName.toLowerCase();
       
-      console.log('🔍 Classifying account:', accountName, 'Line amount:', entry.line_amount, 'Debit:', entry.debit_amount, 'Credit:', entry.credit_amount);
-      
-      // Revenue/Income classification - BROADER CRITERIA
+      // Revenue/Income classification
       if (name.includes('rental') || name.includes('airbnb') || 
           name.includes('income') || name.includes('revenue') ||
           name.includes('rent') || name.includes('fee') ||
           name.includes('sales') || name.includes('service') ||
-          entry.credit_amount > 0 && entry.debit_amount === 0) { // Pure credit entries often revenue
-        console.log('✅ Classified as REVENUE:', accountName);
+          entry.credit_amount > 0 && entry.debit_amount === 0) {
         return { 
           type: 'Income', 
           classification: 'Revenue', 
@@ -565,7 +475,7 @@ const fetchFinancialData = async (
         };
       }
       
-      // Expense classification - matching your actual P&L categories
+      // Expense classification
       if (name.includes('advertising') || name.includes('marketing') ||
           name.includes('facebook') || name.includes('google') ||
           name.includes('arcade') || name.includes('bank fee') || 
@@ -583,8 +493,7 @@ const fetchFinancialData = async (
           name.includes('utilities') || name.includes('water') || 
           name.includes('sewer') || name.includes('expense') || 
           name.includes('cost') ||
-          entry.debit_amount > 0 && entry.credit_amount === 0) { // Pure debit entries often expenses
-        console.log('✅ Classified as EXPENSE:', accountName);
+          entry.debit_amount > 0 && entry.credit_amount === 0) {
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
@@ -592,84 +501,27 @@ const fetchFinancialData = async (
         };
       }
       
-      // Interest expense (separate category like your P&L)
-      if (name.includes('mortgage') || name.includes('interest')) {
-        return { 
-          type: 'Interest Expense', 
-          classification: 'Other Expenses', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Asset classification
-      if (name.includes('improvements') || name.includes('property') || 
-          name.includes('equipment') || name.includes('cash') ||
-          name.includes('bank') || name.includes('checking') ||
-          name.includes('savings') || name.includes('receivable') ||
-          entry.account_type === 'Fixed Assets') {
-        return { 
-          type: 'Fixed Assets', 
-          classification: 'Assets', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Liability classification
-      if (name.includes('loan') || name.includes('payable') || 
-          name.includes('credit card') || name.includes('debt') || 
-          name.includes('liability') || entry.account_type === 'Credit Card') {
-        return { 
-          type: 'Credit Card', 
-          classification: 'Liabilities', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // DEFAULT CLASSIFICATION: Use credit/debit logic
+      // Default classification
       if (entry.credit_amount > entry.debit_amount) {
-        console.log('🔄 Default classified as REVENUE (credit > debit):', accountName);
         return { 
           type: 'Income', 
           classification: 'Revenue', 
           standardName: entry.account_name || 'Revenue Account'
         };
-      } else if (entry.debit_amount > entry.credit_amount) {
-        console.log('🔄 Default classified as EXPENSE (debit > credit):', accountName);
+      } else {
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
           standardName: entry.account_name || 'Expense Account'
         };
-      } else {
-        // Equal or both zero - classify based on line_amount
-        if (entry.line_amount < 0) {
-          console.log('🔄 Default classified as REVENUE (negative line_amount):', accountName);
-          return { 
-            type: 'Income', 
-            classification: 'Revenue', 
-            standardName: entry.account_name || 'Revenue Account'
-          };
-        } else {
-          console.log('🔄 Default classified as EXPENSE (positive line_amount):', accountName);
-          return { 
-            type: 'Expenses', 
-            classification: 'Expenses', 
-            standardName: entry.account_name || 'Expense Account'
-          };
-        }
       }
     };
 
-    // Process journal entries using your accounts table classification
+    // Process journal entries
     const enhancedData = journalData.map((entry: any) => {
-      // First try to find exact match in your accounts table
       let accountInfo = accountLookupMap.get(entry.account_name);
       
-      if (accountInfo) {
-        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
-      } else {
-        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using fallback classification`);
-        // Fallback to intelligent classification for unmapped accounts
+      if (!accountInfo) {
         const classification = classifyJournalAccount(entry);
         accountInfo = classification;
       }
@@ -684,26 +536,6 @@ const fetchFinancialData = async (
       };
     });
 
-    // Debug: Log classification results using your accounts table
-    const revenueEntries = enhancedData.filter(e => e.classification === 'Revenue');
-    const expenseEntries = enhancedData.filter(e => e.classification === 'Expenses');
-    
-    console.log('💰 Revenue entries found using accounts table:', revenueEntries.length);
-    console.log('💰 Revenue accounts from your table:', revenueEntries.slice(0, 5).map(e => ({
-      account: e.account_name,
-      classification: e.classification,
-      mapping: e.mapping_method,
-      line_amount: e.line_amount
-    })));
-    
-    console.log('💸 Expense entries found using accounts table:', expenseEntries.length);
-    console.log('💸 Expense accounts from your table:', expenseEntries.slice(0, 5).map(e => ({
-      account: e.account_name,
-      classification: e.classification,
-      mapping: e.mapping_method,
-      line_amount: e.line_amount
-    })));
-
     return {
       success: true,
       data: enhancedData || [],
@@ -711,7 +543,7 @@ const fetchFinancialData = async (
       summary: {
         filteredEntries: enhancedData?.length || 0,
         dataSource: 'Supabase + Property Class Filtering',
-        filters: { property, bankAccount, monthYear },
+        filters: { property, monthYear },
         accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
         propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
         mappingStats: {
@@ -760,6 +592,35 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
 
 const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning, BRAND_COLORS.danger, BRAND_COLORS.secondary, BRAND_COLORS.tertiary];
 
+// Expandable account data for detailed views
+const accountDetails: Record<string, FinancialDataItem[]> = {
+  'Revenue': [
+    { name: 'Product Sales', total: 850000, months: { 'June 2025': 850000 } },
+    { name: 'Service Revenue', total: 300000, months: { 'June 2025': 300000 } },
+    { name: 'Licensing Fees', total: 75000, months: { 'June 2025': 75000 } },
+    { name: 'Other Revenue', total: 25000, months: { 'June 2025': 25000 } },
+  ],
+  'Cost of Goods Sold': [
+    { name: 'Direct Materials', total: 450000, months: { 'June 2025': 450000 } },
+    { name: 'Direct Labor', total: 200000, months: { 'June 2025': 200000 } },
+    { name: 'Manufacturing Overhead', total: 100000, months: { 'June 2025': 100000 } },
+  ],
+};
+
+// Sub-detail breakdowns
+const subAccountDetails: Record<string, Array<{name: string, amount: number}>> = {
+  'Direct Materials': [
+    { name: 'Raw Steel', amount: 180000 },
+    { name: 'Electronic Components', amount: 120000 },
+    { name: 'Packaging Materials', amount: 85000 },
+  ],
+  'Direct Labor': [
+    { name: 'Production Workers', amount: 120000 },
+    { name: 'Assembly Technicians', amount: 45000 },
+    { name: 'Quality Inspectors', amount: 25000 },
+  ],
+};
+
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
   const [selectedMonth, setSelectedMonth] = useState<MonthString>('May 2023');
@@ -768,24 +629,21 @@ export default function FinancialsPage() {
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
   const [timeViewDropdownOpen, setTimeViewDropdownOpen] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
-  const [bankAccountDropdownOpen, setBankAccountDropdownOpen] = useState(false);
-  const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(new Set(['All Accounts']));
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
+  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
 
   // Real data state
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [realData, setRealData] = useState<any>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
-  const [availableBankAccounts, setAvailableBankAccounts] = useState<string[]>(['All Accounts']);
 
-  // Dynamic months list - will work with any year/month combination
+  // Generate months list
   const generateMonthsList = () => {
     const months = [];
     const currentYear = new Date().getFullYear();
     
-    // Generate months for multiple years to handle any data range
     for (let year = 2020; year <= currentYear + 2; year++) {
       for (let month = 1; month <= 12; month++) {
         const monthNames = [
@@ -808,23 +666,16 @@ export default function FinancialsPage() {
   // Load data when filters change
   useEffect(() => {
     loadRealFinancialData();
-  }, [selectedProperties, selectedBankAccounts, selectedMonth]);
+  }, [selectedProperties, selectedMonth]);
 
   const loadInitialData = async () => {
     try {
       setIsLoadingData(true);
       
-      // Load properties and bank accounts
-      const [properties, bankAccounts] = await Promise.all([
-        fetchProperties(),
-        fetchBankAccounts()
-      ]);
-      
+      const properties = await fetchProperties();
       console.log('🏠 Available properties loaded:', properties);
       setAvailableProperties(properties);
-      setAvailableBankAccounts(bankAccounts);
       
-      // Load initial financial data
       await loadRealFinancialData();
       
     } catch (error) {
@@ -840,33 +691,24 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
-      // Handle property selection - use first selected property for filtering
       let propertyFilter = 'All Properties';
       if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-        propertyFilter = Array.from(selectedProperties)[0]; // Use first selected for now
-        // TODO: Enhance to support multiple property OR filtering
+        propertyFilter = Array.from(selectedProperties)[0];
       }
-      
-      const bankAccount = selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0
-        ? 'All Accounts'
-        : Array.from(selectedBankAccounts)[0];
       
       console.log('🔍 LOADING DATA WITH FILTERS:', {
         selectedProperties: Array.from(selectedProperties),
         propertyFilter,
-        bankAccount,
         month: selectedMonth
       });
       
-      const rawData = await fetchFinancialData(propertyFilter, bankAccount, selectedMonth);
+      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
       
       if (rawData.success) {
         const entries = rawData.data as FinancialEntry[];
         
-        // DEBUG: Log raw entries to console
         console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
         console.log('🔍 DEBUG - Total entries loaded:', entries.length);
-        console.log('🔍 DEBUG - Properties in data:', [...new Set(entries.map(e => e.property_class))]);
         
         const transformedPL = transformFinancialData(entries, selectedMonth);
         const transformedCF = transformCashFlowData(entries);
@@ -880,14 +722,13 @@ export default function FinancialsPage() {
             propertiesInData: [...new Set(entries.map(e => e.property_class))],
             selectedFilters: {
               properties: Array.from(selectedProperties),
-              bankAccounts: Array.from(selectedBankAccounts),
               month: selectedMonth
             }
           },
           performance: {
             executionTimeMs: Date.now() % 1000
           },
-          rawEntries: entries.slice(0, 5) // Keep sample for debugging
+          rawEntries: entries.slice(0, 5)
         };
 
         setRealData(combinedData);
@@ -916,21 +757,17 @@ export default function FinancialsPage() {
     const newSelected = new Set(selectedProperties);
     
     if (property === 'All Properties') {
-      // If clicking "All Properties", clear everything and add only "All Properties"
       newSelected.clear();
       newSelected.add('All Properties');
     } else {
-      // If clicking individual property, remove "All Properties" first
       newSelected.delete('All Properties');
       
-      // Then toggle the individual property
       if (newSelected.has(property)) {
         newSelected.delete(property);
       } else {
         newSelected.add(property);
       }
       
-      // If no individual properties selected, default back to "All Properties"
       if (newSelected.size === 0) {
         newSelected.add('All Properties');
       }
@@ -938,37 +775,6 @@ export default function FinancialsPage() {
     
     setSelectedProperties(newSelected);
     console.log('🏠 Property selection changed:', Array.from(newSelected));
-  };
-
-  const handleBankAccountToggle = (account: string) => {
-    const newSelected = new Set(selectedBankAccounts);
-    
-    if (account === 'All Accounts') {
-      if (newSelected.has('All Accounts')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Accounts');
-      }
-    } else {
-      newSelected.delete('All Accounts');
-      if (newSelected.has(account)) {
-        newSelected.delete(account);
-      } else {
-        newSelected.add(account);
-      }
-    }
-    setSelectedBankAccounts(newSelected);
-  };
-
-  const getSelectedBankAccountsText = () => {
-    if (selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0) {
-      return 'All Accounts';
-    }
-    if (selectedBankAccounts.size === 1) {
-      return Array.from(selectedBankAccounts)[0];
-    }
-    return `${selectedBankAccounts.size} Accounts Selected`;
   };
 
   const getSelectedPropertiesText = () => {
@@ -1001,21 +807,63 @@ export default function FinancialsPage() {
     }, 3000);
   };
 
-  // Get current financial data (P&L only)
+  const toggleAccountExpansion = (accountName: string): void => {
+    const newExpanded = new Set(expandedAccounts);
+    if (newExpanded.has(accountName)) {
+      newExpanded.delete(accountName);
+    } else {
+      newExpanded.add(accountName);
+    }
+    setExpandedAccounts(newExpanded);
+  };
+
+  const isExpandableAccount = (accountName: string): boolean => {
+    return accountDetails.hasOwnProperty(accountName);
+  };
+
+  const handleAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
+    const details = subAccountDetails[subAccountName];
+    if (!details || details.length === 0) return;
+
+    let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+      ${subAccountName} • ${formatCurrency(subAccountTotal)}
+    </div>`;
+
+    details.forEach((item, index) => {
+      const percentage = subAccountTotal ? ((item.amount / subAccountTotal) * 100).toFixed(1) : '0';
+      
+      tooltipContent += `
+        <div style="margin-bottom: ${index < details.length - 1 ? '8px' : '0'};">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 6px; height: 6px; background: ${BRAND_COLORS.success}; border-radius: 50%;"></div>
+            <strong style="font-size: 12px; color: white;">${item.name}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-left: 10px;">
+            <span style="font-size: 11px;">${formatCurrency(item.amount)}</span>
+            <span style="font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 10px;">${percentage}%</span>
+          </div>
+        </div>
+      `;
+    });
+
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    setAccountTooltip({
+      show: true,
+      content: tooltipContent,
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    });
+  };
+
+  const handleAccountMouseLeave = (): void => {
+    setAccountTooltip({ show: false, content: '', x: 0, y: 0 });
+  };
+
+  // Get current financial data
   const getCurrentFinancialData = () => {
     if (realData && realData.propertyFinancialData) {
       const propertyKey = Object.keys(realData.propertyFinancialData)[0] || 'All Properties';
       const monthlyData = realData.propertyFinancialData[propertyKey]?.Monthly;
-      return monthlyData?.[selectedMonth] || [];
-    }
-    return [];
-  };
-
-  // Get current balance sheet data
-  const getCurrentBalanceSheetData = () => {
-    if (realData && realData.propertyBalanceSheetData) {
-      const propertyKey = Object.keys(realData.propertyBalanceSheetData)[0] || 'All Properties';
-      const monthlyData = realData.propertyBalanceSheetData[propertyKey]?.Monthly;
       return monthlyData?.[selectedMonth] || [];
     }
     return [];
@@ -1045,11 +893,10 @@ export default function FinancialsPage() {
     };
   };
 
-  const currentData = getCurrentFinancialData(); // P&L accounts only
-  const currentBalanceSheetData = getCurrentBalanceSheetData(); // Balance sheet accounts only
+  const currentData = getCurrentFinancialData();
   const currentCashFlowData = getCurrentCashFlowData();
 
-  // Calculate KPIs using proper P&L structure matching your actual P&L
+  // Calculate KPIs
   const calculateKPIs = () => {
     if (!currentData || currentData.length === 0) {
       return {
@@ -1068,41 +915,35 @@ export default function FinancialsPage() {
       };
     }
 
-    // Total Income (like your P&L shows)
     const revenue = currentData
       .filter(item => item.type === 'Revenue' || 
                      (item.original_type && item.original_type.toLowerCase().includes('income')))
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Cost of Goods Sold (your P&L doesn't show COGS, so this will be 0)
     const cogs = currentData
       .filter(item => item.original_type === 'Cost of Goods Sold')
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Operating Expenses (all expenses except interest)
     const operatingExpenses = currentData
       .filter(item => item.type === 'Expenses' && 
                      item.original_type !== 'Interest Expense')
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Interest Expense (separate line like your P&L)
     const interestExpense = currentData
       .filter(item => item.original_type === 'Interest Expense' ||
                      item.name.toLowerCase().includes('mortgage interest'))
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Other Income (if any)
     const otherIncome = currentData
       .filter(item => item.original_type === 'Other Income')
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Other Expenses (non-operating, excluding interest)
     const otherExpenses = currentData
       .filter(item => item.name.toLowerCase().includes('other expense') &&
                      !item.name.toLowerCase().includes('interest'))
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    const grossProfit = revenue - cogs; // Since COGS = 0, this equals revenue
+    const grossProfit = revenue - cogs;
     const operatingIncome = grossProfit - operatingExpenses;
     const netOperatingIncome = operatingIncome - interestExpense;
     const netIncome = netOperatingIncome + otherIncome - otherExpenses;
@@ -1161,7 +1002,6 @@ export default function FinancialsPage() {
 
   const renderDataCells = (item: FinancialDataItem) => {
     const value = item.total || 0;
-    // Show revenue as positive, expenses as negative for P&L presentation
     const displayValue = item.type === 'Expenses' ? -Math.abs(value) : value;
     
     return (
@@ -1314,6 +1154,35 @@ export default function FinancialsPage() {
                 )}
               </div>
 
+              {/* Time View Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setTimeViewDropdownOpen(!timeViewDropdownOpen)}
+                  className="flex items-center justify-between w-32 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+                >
+                  <span>{timeView}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${timeViewDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {timeViewDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                    {(['Monthly', 'YTD', 'TTM', 'MoM', 'YoY'] as TimeView[]).map((view) => (
+                      <div
+                        key={view}
+                        className="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                        onClick={() => {
+                          setTimeView(view);
+                          setTimeViewDropdownOpen(false);
+                        }}
+                      >
+                        {view}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Action Buttons */}
               <button
                 onClick={() => showNotification('Financial data exported', 'success')}
@@ -1335,30 +1204,14 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* DEBUG SECTION - Property Class Multi-Select Status */}
+          {/* Data Status */}
           {realData && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div className="text-yellow-800 text-sm">
-                <strong>🔍 Property Class Multi-Select Debug:</strong>
-                <div className="mt-2 space-y-1 text-xs bg-white p-3 rounded border font-mono">
-                  <div><strong>Available Property Classes:</strong> {availableProperties.filter(p => p !== 'All Properties').join(', ') || 'None found'}</div>
-                  <div><strong>Selected Properties:</strong> {Array.from(selectedProperties).join(', ')}</div>
-                  <div><strong>Active Filter:</strong> {!selectedProperties.has('All Properties') ? `property_class = "${Array.from(selectedProperties)[0]}"` : 'No filter (All Properties)'}</div>
-                  <div><strong>Properties in Current Data:</strong> {realData.summary.propertiesInData?.join(', ') || 'None'}</div>
-                  <div><strong>Total Entries Loaded:</strong> {realData.summary.filteredEntries}</div>
-                  <div><strong>Multi-Select Status:</strong> {selectedProperties.size > 1 ? `${selectedProperties.size} properties selected (showing first: ${Array.from(selectedProperties)[0]})` : 'Single or All selected'}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {realData?.performance && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
                 from Supabase • Property Class Filtering Active
                 <div className="mt-1 text-xs">
-                  <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {getSelectedBankAccountsText()} • {selectedMonth}
+                  <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {selectedMonth}
                 </div>
                 <div className="mt-1 text-xs">
                   <strong>Data Source:</strong> {realData.summary.dataSource}
@@ -1371,7 +1224,7 @@ export default function FinancialsPage() {
             </div>
           )}
 
-          {/* Financial KPIs - Updated for P&L Structure */}
+          {/* Financial KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.primary }}>
               <div className="flex items-center justify-between">
@@ -1439,249 +1292,586 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* Main Content: Financial Table */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Profit & Loss Statement (By Property Class)
-                </h3>
-                <div className="text-sm text-gray-600">
-                  Filtered by property_class column
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column: Financial Tables */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      {activeTab === 'p&l' ? 'Profit & Loss Statement (By Property Class)' : 
+                       activeTab === 'cash-flow' ? 'Cash Flow Statement' : 
+                       'Balance Sheet'}
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setActiveTab('p&l')}
+                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                          activeTab === 'p&l' 
+                            ? 'text-white' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                        style={{ backgroundColor: activeTab === 'p&l' ? BRAND_COLORS.primary : undefined }}
+                      >
+                        P&L
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('cash-flow')}
+                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                          activeTab === 'cash-flow' 
+                            ? 'text-white' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                        style={{ backgroundColor: activeTab === 'cash-flow' ? BRAND_COLORS.primary : undefined }}
+                      >
+                        Cash Flow
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('balance-sheet')}
+                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                          activeTab === 'balance-sheet' 
+                            ? 'text-white' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                        style={{ backgroundColor: activeTab === 'balance-sheet' ? BRAND_COLORS.primary : undefined }}
+                      >
+                        Balance Sheet
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                {/* P&L Content */}
+                {activeTab === 'p&l' && (
+                  <div className="overflow-x-auto">
+                    {isLoadingData ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                        <span>Loading financial data from Supabase...</span>
+                      </div>
+                    ) : currentData.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No financial data available for the selected filters
+                      </div>
+                    ) : (
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Account
+                            </th>
+                            {renderColumnHeaders()}
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              % of Revenue
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {/* REVENUE */}
+                          <tr className="bg-blue-50 border-t-2 border-blue-200">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
+                              💰 REVENUE
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
+                              {formatCurrency(kpis.revenue)}
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm text-blue-700">
+                              100.0%
+                            </td>
+                          </tr>
+                          {currentData
+                            .filter(item => item.type === 'Revenue' || 
+                                           (item.original_type && item.original_type.toLowerCase().includes('income')))
+                            .map((item) => (
+                              <tr key={`revenue-${item.name}`} className="hover:bg-gray-50">
+                                <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                  {item.name}
+                                </td>
+                                <td className="px-4 py-2 text-right text-sm text-green-600">
+                                  {formatCurrency(Math.abs(item.total))}
+                                </td>
+                                <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                  {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                </td>
+                              </tr>
+                            ))}
+
+                          {/* COST OF GOODS SOLD */}
+                          <tr className="bg-orange-50 border-t border-gray-200">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-orange-900">
+                              📦 COST OF GOODS SOLD
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                              ({formatCurrency(kpis.cogs)})
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm text-red-600">
+                              {kpis.revenue ? calculatePercentage(kpis.cogs, kpis.revenue) : '0%'}
+                            </td>
+                          </tr>
+                          {currentData
+                            .filter(item => item.original_type === 'Cost of Goods Sold' || 
+                                           item.name.toLowerCase().includes('cost of goods') ||
+                                           item.name.toLowerCase().includes('cogs'))
+                            .map((item) => (
+                              <tr key={`cogs-${item.name}`} className="hover:bg-gray-50">
+                                <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                  {item.name}
+                                </td>
+                                <td className="px-4 py-2 text-right text-sm text-red-600">
+                                  ({formatCurrency(Math.abs(item.total))})
+                                </td>
+                                <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                  {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                </td>
+                              </tr>
+                            ))}
+
+                          {/* GROSS PROFIT */}
+                          <tr className="bg-green-100 border-t-2 border-green-300">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-green-800">
+                              💚 GROSS PROFIT
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-green-800">
+                              {formatCurrency(kpis.grossProfit)}
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm font-bold text-green-800">
+                              {kpis.grossMargin.toFixed(1)}%
+                            </td>
+                          </tr>
+
+                          {/* OPERATING EXPENSES */}
+                          <tr className="bg-red-50 border-t border-gray-200">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
+                              🏢 OPERATING EXPENSES
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                              ({formatCurrency(kpis.operatingExpenses)})
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm text-red-600">
+                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
+                            </td>
+                          </tr>
+                          {currentData
+                            .filter(item => item.type === 'Expenses' && 
+                                           item.original_type !== 'Cost of Goods Sold' &&
+                                           !item.name.toLowerCase().includes('interest') &&
+                                           !item.name.toLowerCase().includes('other'))
+                            .map((item) => {
+                              const isExpandable = isExpandableAccount(item.name);
+                              const isExpanded = expandedAccounts.has(item.name);
+                              
+                              return (
+                                <React.Fragment key={`opex-${item.name}`}>
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                      <div className="flex items-center">
+                                        {isExpandable && (
+                                          <button
+                                            onClick={() => toggleAccountExpansion(item.name)}
+                                            className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                                          >
+                                            {isExpanded ? (
+                                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                                            ) : (
+                                              <ChevronRight className="w-4 h-4 text-gray-500" />
+                                            )}
+                                          </button>
+                                        )}
+                                        {item.name}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-red-600">
+                                      ({formatCurrency(Math.abs(item.total))})
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                    </td>
+                                  </tr>
+                                  
+                                  {/* Expanded Detail Rows */}
+                                  {isExpandable && isExpanded && accountDetails[item.name] && 
+                                    accountDetails[item.name].map((subItem) => {
+                                      const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
+                                      return (
+                                        <tr key={`${item.name}-${subItem.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
+                                          <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
+                                            <div className="flex items-center">
+                                              <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: BRAND_COLORS.primary }}></div>
+                                              {subItem.name}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-2 text-right text-sm text-gray-600">
+                                            <span 
+                                              className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
+                                              onMouseEnter={hasSubDetails ? (e) => handleAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
+                                              onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
+                                            >
+                                              ({formatCurrency(subItem.total)})
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                            {kpis.revenue ? calculatePercentage(subItem.total, kpis.revenue) : '0%'}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  }
+                                </React.Fragment>
+                              );
+                            })}
+
+                          {/* OPERATING INCOME */}
+                          <tr className="bg-blue-100 border-t-2 border-blue-300">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
+                              🎯 OPERATING INCOME
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
+                              {formatCurrency(kpis.operatingIncome)}
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
+                              {kpis.operatingMargin.toFixed(1)}%
+                            </td>
+                          </tr>
+
+                          {/* OTHER INCOME */}
+                          {kpis.otherIncome > 0 && (
+                            <>
+                              <tr className="bg-green-50 border-t border-gray-200">
+                                <td className="px-6 py-4 text-left text-lg font-bold text-green-900">
+                                  ➕ OTHER INCOME
+                                </td>
+                                <td className="px-4 py-4 text-right text-lg font-bold text-green-600">
+                                  {formatCurrency(kpis.otherIncome)}
+                                </td>
+                                <td className="px-4 py-4 text-right text-sm text-green-600">
+                                  {kpis.revenue ? calculatePercentage(kpis.otherIncome, kpis.revenue) : '0%'}
+                                </td>
+                              </tr>
+                              {currentData
+                                .filter(item => item.original_type === 'Other Income' ||
+                                               item.name.toLowerCase().includes('other income') ||
+                                               item.name.toLowerCase().includes('interest income'))
+                                .map((item) => (
+                                  <tr key={`other-income-${item.name}`} className="hover:bg-gray-50">
+                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                      {item.name}
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-green-600">
+                                      {formatCurrency(Math.abs(item.total))}
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                    </td>
+                                  </tr>
+                                ))}
+                            </>
+                          )}
+
+                          {/* OTHER EXPENSES */}
+                          {kpis.otherExpenses > 0 && (
+                            <>
+                              <tr className="bg-red-50 border-t border-gray-200">
+                                <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
+                                  ➖ OTHER EXPENSES
+                                </td>
+                                <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                                  ({formatCurrency(kpis.otherExpenses)})
+                                </td>
+                                <td className="px-4 py-4 text-right text-sm text-red-600">
+                                  {kpis.revenue ? calculatePercentage(kpis.otherExpenses, kpis.revenue) : '0%'}
+                                </td>
+                              </tr>
+                              {currentData
+                                .filter(item => item.name.toLowerCase().includes('interest expense') ||
+                                               item.name.toLowerCase().includes('other expense') ||
+                                               (item.type === 'Expenses' && item.name.toLowerCase().includes('other')))
+                                .map((item) => (
+                                  <tr key={`other-expense-${item.name}`} className="hover:bg-gray-50">
+                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                      {item.name}
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-red-600">
+                                      ({formatCurrency(Math.abs(item.total))})
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                    </td>
+                                  </tr>
+                                ))}
+                            </>
+                          )}
+
+                          {/* NET INCOME */}
+                          <tr className="border-t-4" style={{ 
+                            backgroundColor: BRAND_COLORS.primary + '20', 
+                            borderTopColor: BRAND_COLORS.primary 
+                          }}>
+                            <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              🏆 NET INCOME
+                            </td>
+                            <td className={`px-4 py-5 text-right text-xl font-bold ${
+                              kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {formatCurrency(kpis.netIncome)}
+                            </td>
+                            <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              {kpis.netMargin.toFixed(1)}%
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {/* Cash Flow Content */}
+                {activeTab === 'cash-flow' && (
+                  <div className="overflow-x-auto">
+                    {isLoadingData ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                        <span>Loading cash flow data...</span>
+                      </div>
+                    ) : (
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Account
+                            </th>
+                            {renderColumnHeaders()}
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              % of Total Cash
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {/* Cash In-Flow Section */}
+                          <tr className="bg-green-50">
+                            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
+                              💰 CASH IN-FLOW
+                            </td>
+                          </tr>
+                          {currentCashFlowData.inFlow.map((item) => (
+                            <tr key={`inflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-left text-sm text-gray-700">
+                                <span className="ml-4">{item.name}</span>
+                              </td>
+                              {renderCashFlowDataCells(item)}
+                              <td className="px-4 py-3 text-right text-sm text-green-600">
+                                {currentCashFlowData.totalCashFlow ? calculatePercentage(item.total, Math.abs(currentCashFlowData.totalCashFlow)) : '0%'}
+                              </td>
+                            </tr>
+                          ))}
+                          
+                          {/* Total Cash In-Flow */}
+                          <tr className="bg-green-100 font-semibold">
+                            <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
+                              Total Cash In-Flow
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+                              {formatCurrency(currentCashFlowData.totalInFlow)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+                              100%
+                            </td>
+                          </tr>
+
+                          {/* Cash Out-Flow Section */}
+                          <tr className="bg-red-50">
+                            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
+                              💸 CASH OUT-FLOW
+                            </td>
+                          </tr>
+                          {currentCashFlowData.outFlow.map((item) => (
+                            <tr key={`outflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-left text-sm text-gray-700">
+                                <span className="ml-4">{item.name}</span>
+                              </td>
+                              {renderCashFlowDataCells(item)}
+                              <td className="px-4 py-3 text-right text-sm text-red-600">
+                                {currentCashFlowData.totalOutFlow ? calculatePercentage(Math.abs(item.total), Math.abs(currentCashFlowData.totalOutFlow)) : '0%'}
+                              </td>
+                            </tr>
+                          ))}
+
+                          {/* Total Cash Out-Flow */}
+                          <tr className="bg-red-100 font-semibold">
+                            <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
+                              Total Cash Out-Flow
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+                              ({formatCurrency(Math.abs(currentCashFlowData.totalOutFlow))})
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+                              100%
+                            </td>
+                          </tr>
+
+                          {/* Net Cash Flow */}
+                          <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
+                            <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              🏦 NET CASH FLOW
+                            </td>
+                            <td className={`px-4 py-4 text-right text-lg font-bold ${
+                              currentCashFlowData.totalCashFlow >= 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {formatCurrency(currentCashFlowData.totalCashFlow)}
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
+                              Net Change
+                            </td>
+                          </tr>
+
+                          {/* Beginning & Ending Cash Balance */}
+                          <tr className="bg-gray-50">
+                            <td className="px-4 py-3 text-left text-sm text-gray-700">
+                              Beginning Cash Balance
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-700">
+                              {formatCurrency(currentCashFlowData.beginningCash)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-500">
+                              Starting
+                            </td>
+                          </tr>
+                          <tr className="border-t" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
+                            <td className="px-4 py-3 text-left text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              Ending Cash Balance
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              {formatCurrency(currentCashFlowData.endingCash)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
+                              Final
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {/* Balance Sheet Content */}
+                {activeTab === 'balance-sheet' && (
+                  <div className="p-6">
+                    <div className="text-center py-8">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Balance Sheet</h3>
+                      <p className="text-gray-600">Balance sheet functionality coming soon...</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              {isLoadingData ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                  <span>Loading financial data from Supabase...</span>
+            {/* Right Column: Charts */}
+            <div className="space-y-8">
+              {/* Revenue Trend Chart */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Revenue Trend</h3>
                 </div>
-              ) : currentData.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No financial data available for the selected filters
+                <div className="p-6">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke={BRAND_COLORS.primary} 
+                        strokeWidth={3}
+                        dot={{ r: 6, fill: BRAND_COLORS.primary }}
+                        activeDot={{ r: 8, fill: BRAND_COLORS.primary }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account
-                      </th>
-                      {renderColumnHeaders()}
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        % of Revenue
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {/* REVENUE */}
-                    <tr className="bg-blue-50 border-t-2 border-blue-200">
-                      <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
-                        💰 REVENUE
-                      </td>
-                      <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
-                        {formatCurrency(kpis.revenue)}
-                      </td>
-                      <td className="px-4 py-4 text-right text-sm text-blue-700">
-                        100.0%
-                      </td>
-                    </tr>
-                    {currentData
-                      .filter(item => item.type === 'Revenue' || 
-                                     (item.original_type && item.original_type.toLowerCase().includes('income')))
-                      .map((item) => (
-                        <tr key={`revenue-${item.name}`} className="hover:bg-gray-50">
-                          <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                            {item.name}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-green-600">
-                            {formatCurrency(Math.abs(item.total))}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-500">
-                            {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                          </td>
-                        </tr>
-                      ))}
+              </div>
 
-                    {/* COST OF GOODS SOLD */}
-                    <tr className="bg-orange-50 border-t border-gray-200">
-                      <td className="px-6 py-4 text-left text-lg font-bold text-orange-900">
-                        📦 COST OF GOODS SOLD
-                      </td>
-                      <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                        ({formatCurrency(kpis.cogs)})
-                      </td>
-                      <td className="px-4 py-4 text-right text-sm text-red-600">
-                        {kpis.revenue ? calculatePercentage(kpis.cogs, kpis.revenue) : '0%'}
-                      </td>
-                    </tr>
-                    {currentData
-                      .filter(item => item.original_type === 'Cost of Goods Sold' || 
-                                     item.name.toLowerCase().includes('cost of goods') ||
-                                     item.name.toLowerCase().includes('cogs'))
-                      .map((item) => (
-                        <tr key={`cogs-${item.name}`} className="hover:bg-gray-50">
-                          <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                            {item.name}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-red-600">
-                            ({formatCurrency(Math.abs(item.total))})
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-500">
-                            {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                          </td>
-                        </tr>
-                      ))}
-
-                    {/* GROSS PROFIT */}
-                    <tr className="bg-green-100 border-t-2 border-green-300">
-                      <td className="px-6 py-4 text-left text-lg font-bold text-green-800">
-                        💚 GROSS PROFIT
-                      </td>
-                      <td className="px-4 py-4 text-right text-lg font-bold text-green-800">
-                        {formatCurrency(kpis.grossProfit)}
-                      </td>
-                      <td className="px-4 py-4 text-right text-sm font-bold text-green-800">
-                        {kpis.grossMargin.toFixed(1)}%
-                      </td>
-                    </tr>
-
-                    {/* OPERATING EXPENSES */}
-                    <tr className="bg-red-50 border-t border-gray-200">
-                      <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
-                        🏢 OPERATING EXPENSES
-                      </td>
-                      <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                        ({formatCurrency(kpis.operatingExpenses)})
-                      </td>
-                      <td className="px-4 py-4 text-right text-sm text-red-600">
-                        {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
-                      </td>
-                    </tr>
-                    {currentData
-                      .filter(item => item.type === 'Expenses' && 
-                                     item.original_type !== 'Cost of Goods Sold' &&
-                                     !item.name.toLowerCase().includes('interest') &&
-                                     !item.name.toLowerCase().includes('other'))
-                      .map((item) => (
-                        <tr key={`opex-${item.name}`} className="hover:bg-gray-50">
-                          <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                            {item.name}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-red-600">
-                            ({formatCurrency(Math.abs(item.total))})
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm text-gray-500">
-                            {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                          </td>
-                        </tr>
-                      ))}
-
-                    {/* OPERATING INCOME */}
-                    <tr className="bg-blue-100 border-t-2 border-blue-300">
-                      <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
-                        🎯 OPERATING INCOME
-                      </td>
-                      <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
-                        {formatCurrency(kpis.operatingIncome)}
-                      </td>
-                      <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
-                        {kpis.operatingMargin.toFixed(1)}%
-                      </td>
-                    </tr>
-
-                    {/* OTHER INCOME */}
-                    {kpis.otherIncome > 0 && (
-                      <>
-                        <tr className="bg-green-50 border-t border-gray-200">
-                          <td className="px-6 py-4 text-left text-lg font-bold text-green-900">
-                            ➕ OTHER INCOME
-                          </td>
-                          <td className="px-4 py-4 text-right text-lg font-bold text-green-600">
-                            {formatCurrency(kpis.otherIncome)}
-                          </td>
-                          <td className="px-4 py-4 text-right text-sm text-green-600">
-                            {kpis.revenue ? calculatePercentage(kpis.otherIncome, kpis.revenue) : '0%'}
-                          </td>
-                        </tr>
-                        {currentData
-                          .filter(item => item.original_type === 'Other Income' ||
-                                         item.name.toLowerCase().includes('other income') ||
-                                         item.name.toLowerCase().includes('interest income'))
-                          .map((item) => (
-                            <tr key={`other-income-${item.name}`} className="hover:bg-gray-50">
-                              <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                                {item.name}
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-green-600">
-                                {formatCurrency(Math.abs(item.total))}
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                              </td>
-                            </tr>
+              {/* Expense Breakdown */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
+                </div>
+                <div className="p-6">
+                  {expenseData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <RechartsPieChart>
+                        <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']} />
+                        <Pie
+                          data={expenseData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {expenseData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
+                        </Pie>
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-48 text-gray-500">
+                      No expense data available
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Property Performance Summary */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Property Summary</h3>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Selected Properties:</span>
+                      <span className="text-sm font-medium">{getSelectedPropertiesText()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Data Period:</span>
+                      <span className="text-sm font-medium">{selectedMonth}</span>
+                    </div>
+                    {realData?.summary && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Journal Entries:</span>
+                          <span className="text-sm font-medium">{realData.summary.filteredEntries}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Properties in Data:</span>
+                          <span className="text-sm font-medium">{realData.summary.propertiesInData?.length || 0}</span>
+                        </div>
                       </>
                     )}
-
-                    {/* OTHER EXPENSES */}
-                    {kpis.otherExpenses > 0 && (
-                      <>
-                        <tr className="bg-red-50 border-t border-gray-200">
-                          <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
-                            ➖ OTHER EXPENSES
-                          </td>
-                          <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                            ({formatCurrency(kpis.otherExpenses)})
-                          </td>
-                          <td className="px-4 py-4 text-right text-sm text-red-600">
-                            {kpis.revenue ? calculatePercentage(kpis.otherExpenses, kpis.revenue) : '0%'}
-                          </td>
-                        </tr>
-                        {currentData
-                          .filter(item => item.name.toLowerCase().includes('interest expense') ||
-                                         item.name.toLowerCase().includes('other expense') ||
-                                         (item.type === 'Expenses' && item.name.toLowerCase().includes('other')))
-                          .map((item) => (
-                            <tr key={`other-expense-${item.name}`} className="hover:bg-gray-50">
-                              <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                                {item.name}
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-red-600">
-                                ({formatCurrency(Math.abs(item.total))})
-                              </td>
-                              <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                              </td>
-                            </tr>
-                          ))}
-                      </>
-                    )}
-
-                    {/* NET INCOME */}
-                    <tr className="border-t-4" style={{ 
-                      backgroundColor: BRAND_COLORS.primary + '20', 
-                      borderTopColor: BRAND_COLORS.primary 
-                    }}>
-                      <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
-                        🏆 NET INCOME
-                      </td>
-                      <td className={`px-4 py-5 text-right text-xl font-bold ${
-                        kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
-                      }`}>
-                        {formatCurrency(kpis.netIncome)}
-                      </td>
-                      <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
-                        {kpis.netMargin.toFixed(1)}%
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Account Tooltip */}
+          {accountTooltip.show && (
+            <div
+              className="fixed z-50 bg-gray-900 text-white p-4 rounded-lg text-xs shadow-xl pointer-events-none transition-opacity border border-gray-700"
+              style={{
+                left: Math.max(10, Math.min(accountTooltip.x - 140, window.innerWidth - 290)),
+                top: accountTooltip.y - 10,
+                transform: 'translateY(-100%)',
+                maxWidth: '280px',
+                minWidth: '260px'
+              }}
+              dangerouslySetInnerHTML={{ __html: accountTooltip.content }}
+            />
+          )}
 
           {/* Notification */}
           {notification.show && (
@@ -1695,13 +1885,12 @@ export default function FinancialsPage() {
           )}
 
           {/* Click outside to close dropdowns */}
-          {(timeViewDropdownOpen || propertyDropdownOpen || bankAccountDropdownOpen) && (
+          {(timeViewDropdownOpen || propertyDropdownOpen) && (
             <div
               className="fixed inset-0 z-10"
               onClick={() => {
                 setTimeViewDropdownOpen(false);
                 setPropertyDropdownOpen(false);
-                setBankAccountDropdownOpen(false);
               }}
             />
           )}
