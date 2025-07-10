@@ -492,17 +492,32 @@ const fetchFinancialData = async (
       });
     });
 
-    // Enhanced classification for journal entries
+    // Enhanced classification for journal entries to match your Google Sheets structure
     const classifyJournalAccount = (entry: any) => {
       const accountName = entry.account_name || '';
       const name = accountName.toLowerCase();
       
-      // Revenue/Income classification
-      if (name.includes('rental') || name.includes('airbnb') || 
-          name.includes('income') || name.includes('revenue') ||
-          name.includes('rent') || name.includes('fee') ||
-          name.includes('sales') || name.includes('service') ||
+      console.log('🔍 Classifying account:', accountName, 'Line amount:', entry.line_amount);
+      
+      // Revenue/Income classification - matching your Google Sheets exactly
+      if (name.includes('rental revenue - airbnb') || 
+          name.includes('rental revenue - direct') ||
+          name.includes('rental revenue - guesty') ||
+          name.includes('rental revenue - reserve payout') ||
+          name.includes('rental revenue - vrbo') ||
+          name.includes('bookings') ||
+          name.includes('income') || 
+          name.includes('revenue') ||
+          name.includes('rent') || 
+          name.includes('airbnb') ||
+          name.includes('guesty') ||
+          name.includes('vrbo') ||
+          name.includes('direct booking') ||
+          name.includes('adjustment for occupancy taxes') ||
+          name.includes('miscellaneous income') ||
+          name.includes('resolution adjustments') ||
           entry.credit_amount > 0 && entry.debit_amount === 0) {
+        console.log('✅ Classified as REVENUE:', accountName);
         return { 
           type: 'Income', 
           classification: 'Revenue', 
@@ -510,7 +525,7 @@ const fetchFinancialData = async (
         };
       }
       
-      // Expense classification
+      // Expense classification - matching your actual expense categories
       if (name.includes('advertising') || name.includes('marketing') ||
           name.includes('facebook') || name.includes('google') ||
           name.includes('arcade') || name.includes('bank fee') || 
@@ -529,6 +544,7 @@ const fetchFinancialData = async (
           name.includes('sewer') || name.includes('expense') || 
           name.includes('cost') ||
           entry.debit_amount > 0 && entry.credit_amount === 0) {
+        console.log('✅ Classified as EXPENSE:', accountName);
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
@@ -536,18 +552,61 @@ const fetchFinancialData = async (
         };
       }
       
-      // Default classification
-      if (entry.credit_amount > entry.debit_amount) {
+      // Interest expense (separate category)
+      if (name.includes('mortgage') || name.includes('interest')) {
+        return { 
+          type: 'Interest Expense', 
+          classification: 'Other Expenses', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // Asset classification
+      if (name.includes('improvements') || name.includes('property') || 
+          name.includes('equipment') || name.includes('cash') ||
+          name.includes('bank') || name.includes('checking') ||
+          name.includes('savings') || name.includes('receivable') ||
+          entry.account_type === 'Fixed Assets') {
+        return { 
+          type: 'Fixed Assets', 
+          classification: 'Assets', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // Liability classification
+      if (name.includes('loan') || name.includes('payable') || 
+          name.includes('credit card') || name.includes('debt') || 
+          name.includes('liability') || entry.account_type === 'Credit Card') {
+        return { 
+          type: 'Credit Card', 
+          classification: 'Liabilities', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // DEFAULT CLASSIFICATION: Use credit/debit logic
+      if (entry.credit_amount > entry.debit_amount || entry.line_amount < 0) {
+        console.log('🔄 Default classified as REVENUE (credit > debit or negative line_amount):', accountName);
         return { 
           type: 'Income', 
           classification: 'Revenue', 
           standardName: entry.account_name || 'Revenue Account'
         };
-      } else {
+      } else if (entry.debit_amount > entry.credit_amount || entry.line_amount > 0) {
+        console.log('🔄 Default classified as EXPENSE (debit > credit or positive line_amount):', accountName);
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
           standardName: entry.account_name || 'Expense Account'
+        };
+      } else {
+        // Equal amounts - classify based on account name patterns
+        console.log('🔄 Equal amounts - using name patterns for:', accountName);
+        return { 
+          type: 'Other', 
+          classification: 'Other', 
+          standardName: entry.account_name || 'Other Account'
         };
       }
     };
@@ -661,7 +720,7 @@ const subAccountDetails: Record<string, Array<{name: string, amount: number}>> =
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [selectedMonth, setSelectedMonth] = useState<MonthString>('May 2023');
+  const [selectedMonth, setSelectedMonth] = useState<MonthString>('May 2025');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [timeView, setTimeView] = useState<TimeView>('Monthly');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
@@ -1481,10 +1540,10 @@ export default function FinancialsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {/* REVENUE */}
+                          {/* INCOME SECTION - Matching Your Google Sheets */}
                           <tr className="bg-blue-50 border-t-2 border-blue-200">
                             <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
-                              💰 REVENUE
+                              💰 INCOME
                             </td>
                             <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
                               {formatCurrency(kpis.revenue)}
@@ -1493,11 +1552,13 @@ export default function FinancialsPage() {
                               100.0%
                             </td>
                           </tr>
+                          
+                          {/* Individual Income Line Items */}
                           {currentData
                             .filter(item => item.type === 'Revenue' || 
                                            (item.original_type && item.original_type.toLowerCase().includes('income')))
                             .map((item) => (
-                              <tr key={`revenue-${item.name}`} className="hover:bg-gray-50">
+                              <tr key={`income-${item.name}`} className="hover:bg-gray-50">
                                 <td 
                                   className="px-6 py-2 text-left text-sm text-gray-700 pl-12 cursor-help"
                                   onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
@@ -1514,53 +1575,23 @@ export default function FinancialsPage() {
                               </tr>
                             ))}
 
-                          {/* COST OF GOODS SOLD */}
-                          <tr className="bg-orange-50 border-t border-gray-200">
-                            <td className="px-6 py-4 text-left text-lg font-bold text-orange-900">
-                              📦 COST OF GOODS SOLD
+                          {/* TOTAL INCOME - Bold Line Like Your Sheet */}
+                          <tr className="bg-blue-100 border-t-2 border-blue-300">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
+                              📊 TOTAL INCOME
                             </td>
-                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                              ({formatCurrency(kpis.cogs)})
+                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
+                              {formatCurrency(kpis.revenue)}
                             </td>
-                            <td className="px-4 py-4 text-right text-sm text-red-600">
-                              {kpis.revenue ? calculatePercentage(kpis.cogs, kpis.revenue) : '0%'}
-                            </td>
-                          </tr>
-                          {currentData
-                            .filter(item => item.original_type === 'Cost of Goods Sold' || 
-                                           item.name.toLowerCase().includes('cost of goods') ||
-                                           item.name.toLowerCase().includes('cogs'))
-                            .map((item) => (
-                              <tr key={`cogs-${item.name}`} className="hover:bg-gray-50">
-                                <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                                  {item.name}
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-red-600">
-                                  ({formatCurrency(Math.abs(item.total))})
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                  {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                                </td>
-                              </tr>
-                            ))}
-
-                          {/* GROSS PROFIT */}
-                          <tr className="bg-green-100 border-t-2 border-green-300">
-                            <td className="px-6 py-4 text-left text-lg font-bold text-green-800">
-                              💚 GROSS PROFIT
-                            </td>
-                            <td className="px-4 py-4 text-right text-lg font-bold text-green-800">
-                              {formatCurrency(kpis.grossProfit)}
-                            </td>
-                            <td className="px-4 py-4 text-right text-sm font-bold text-green-800">
-                              {kpis.grossMargin.toFixed(1)}%
+                            <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
+                              100.0%
                             </td>
                           </tr>
 
-                          {/* OPERATING EXPENSES */}
-                          <tr className="bg-red-50 border-t border-gray-200">
+                          {/* EXPENSES SECTION */}
+                          <tr className="bg-red-50 border-t-4 border-red-200 mt-4">
                             <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
-                              🏢 OPERATING EXPENSES
+                              💸 EXPENSES
                             </td>
                             <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
                               ({formatCurrency(kpis.operatingExpenses)})
@@ -1569,17 +1600,18 @@ export default function FinancialsPage() {
                               {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
                             </td>
                           </tr>
+                          
+                          {/* Individual Expense Line Items */}
                           {currentData
                             .filter(item => item.type === 'Expenses' && 
                                            item.original_type !== 'Cost of Goods Sold' &&
-                                           !item.name.toLowerCase().includes('interest') &&
-                                           !item.name.toLowerCase().includes('other'))
+                                           !item.name.toLowerCase().includes('interest'))
                             .map((item) => {
                               const isExpandable = isExpandableAccount(item.name);
                               const isExpanded = expandedAccounts.has(item.name);
                               
                               return (
-                                <React.Fragment key={`opex-${item.name}`}>
+                                <React.Fragment key={`expense-${item.name}`}>
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
                                       <div className="flex items-center">
@@ -1644,88 +1676,20 @@ export default function FinancialsPage() {
                               );
                             })}
 
-                          {/* OPERATING INCOME */}
-                          <tr className="bg-blue-100 border-t-2 border-blue-300">
-                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
-                              🎯 OPERATING INCOME
+                          {/* TOTAL EXPENSES */}
+                          <tr className="bg-red-100 border-t-2 border-red-300">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-red-800">
+                              📊 TOTAL EXPENSES
                             </td>
-                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
-                              {formatCurrency(kpis.operatingIncome)}
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-800">
+                              ({formatCurrency(kpis.operatingExpenses)})
                             </td>
-                            <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
-                              {kpis.operatingMargin.toFixed(1)}%
+                            <td className="px-4 py-4 text-right text-sm font-bold text-red-800">
+                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
                             </td>
                           </tr>
 
-                          {/* OTHER INCOME */}
-                          {kpis.otherIncome > 0 && (
-                            <>
-                              <tr className="bg-green-50 border-t border-gray-200">
-                                <td className="px-6 py-4 text-left text-lg font-bold text-green-900">
-                                  ➕ OTHER INCOME
-                                </td>
-                                <td className="px-4 py-4 text-right text-lg font-bold text-green-600">
-                                  {formatCurrency(kpis.otherIncome)}
-                                </td>
-                                <td className="px-4 py-4 text-right text-sm text-green-600">
-                                  {kpis.revenue ? calculatePercentage(kpis.otherIncome, kpis.revenue) : '0%'}
-                                </td>
-                              </tr>
-                              {currentData
-                                .filter(item => item.original_type === 'Other Income' ||
-                                               item.name.toLowerCase().includes('other income') ||
-                                               item.name.toLowerCase().includes('interest income'))
-                                .map((item) => (
-                                  <tr key={`other-income-${item.name}`} className="hover:bg-gray-50">
-                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                                      {item.name}
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-sm text-green-600">
-                                      {formatCurrency(Math.abs(item.total))}
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                                    </td>
-                                  </tr>
-                                ))}
-                            </>
-                          )}
-
-                          {/* OTHER EXPENSES */}
-                          {kpis.otherExpenses > 0 && (
-                            <>
-                              <tr className="bg-red-50 border-t border-gray-200">
-                                <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
-                                  ➖ OTHER EXPENSES
-                                </td>
-                                <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                                  ({formatCurrency(kpis.otherExpenses)})
-                                </td>
-                                <td className="px-4 py-4 text-right text-sm text-red-600">
-                                  {kpis.revenue ? calculatePercentage(kpis.otherExpenses, kpis.revenue) : '0%'}
-                                </td>
-                              </tr>
-                              {currentData
-                                .filter(item => item.name.toLowerCase().includes('interest expense') ||
-                                               item.name.toLowerCase().includes('other expense') ||
-                                               (item.type === 'Expenses' && item.name.toLowerCase().includes('other')))
-                                .map((item) => (
-                                  <tr key={`other-expense-${item.name}`} className="hover:bg-gray-50">
-                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                                      {item.name}
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-sm text-red-600">
-                                      ({formatCurrency(Math.abs(item.total))})
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                                    </td>
-                                  </tr>
-                                ))}
-                            </>
-                          )}
-
-                          {/* NET INCOME */}
+                          {/* NET INCOME - Final Bottom Line Like Your Sheet */}
                           <tr className="border-t-4" style={{ 
                             backgroundColor: BRAND_COLORS.primary + '20', 
                             borderTopColor: BRAND_COLORS.primary 
