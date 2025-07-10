@@ -27,8 +27,9 @@ const BRAND_COLORS = {
   }
 };
 
-// API Configuration - YOUR REAL DEPLOYMENT URL
-const API_BASE = 'https://script.google.com/macros/s/AKfycbwa-onxvlAVJTwdg_vasOLyGs0iSN32MO4ASBabdO6YTXTdwJBueyATp1ZNDHaHbkC2/exec';
+// Supabase Configuration - Your actual credentials
+const SUPABASE_URL = 'https://ijeuusvwqcnljctkvjdi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZXV1c3Z3cWNubGpjdGt2amRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMjE4MDUsImV4cCI6MjA2NzY5NzgwNX0.O9Mb_X47wbXEMXbPQ8Cr3dzDn_E5DYG9b222FPy4LEU';
 
 // Type definitions
 type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
@@ -41,12 +42,27 @@ interface FinancialDataItem {
   name: string;
   total: number;
   months: Partial<Record<MonthString, number>>;
+  type?: string;
 }
 
-interface FinancialData {
-  [timeView: string]: {
-    [month: string]: FinancialDataItem[];
-  };
+interface FinancialEntry {
+  id: number;
+  je_number: string;
+  transaction_date: string;
+  account_name: string;
+  account_type: string;
+  detail_type: string;
+  property_class: string;
+  debit_amount: number;
+  credit_amount: number;
+  line_amount: number;
+  posting_type: string;
+  description: string;
+  balance: number;
+  created_by: string;
+  last_modified: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface NotificationState {
@@ -62,21 +78,385 @@ interface TooltipState {
   y: number;
 }
 
-interface PropertyFinancialData {
-  [property: string]: FinancialData;
-}
-
-interface PropertyCashFlowData {
-  [property: string]: {
-    inFlow: FinancialDataItem[];
-    outFlow: FinancialDataItem[];
-    totalInFlow: number;
-    totalOutFlow: number;
-    totalCashFlow: number;
-    beginningCash: number;
-    endingCash: number;
+// Real Supabase client
+const createSupabaseClient = () => {
+  return {
+    from: (table: string) => ({
+      select: (columns: string = '*') => ({
+        eq: (column: string, value: string) => ({
+          order: (orderBy: string) => 
+            fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&${column}=eq.${encodeURIComponent(value)}&order=${orderBy}`, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+              }
+            }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
+        }),
+        order: (orderBy: string) => 
+          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&order=${orderBy}`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
+        then: (callback: Function) => 
+          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(res => res.json()).then(data => callback({ data, error: null })).catch(error => callback({ data: null, error }))
+      })
+    })
   };
-}
+};
+
+// Mock data for demonstration
+const mockData = {
+  properties: [
+    { id: '1', name: 'Property A', created_at: '2025-01-01' },
+    { id: '2', name: 'Property B', created_at: '2025-01-01' },
+    { id: '3', name: 'Property C', created_at: '2025-01-01' }
+  ],
+  bank_accounts: [
+    { id: '1', name: 'Main Checking', bank_name: 'Chase Bank' },
+    { id: '2', name: 'Savings Account', bank_name: 'Bank of America' },
+    { id: '3', name: 'Business Account', bank_name: 'Wells Fargo' }
+  ],
+  financial_entries: [
+    {
+      id: '1',
+      property_name: 'Property A',
+      bank_account: 'Main Checking',
+      account_name: 'Rental Income',
+      account_type: 'Revenue' as const,
+      amount: 5000,
+      transaction_date: '2025-06-01',
+      month_year: 'June 2025',
+      description: 'Monthly rent',
+      created_at: '2025-06-01',
+      updated_at: '2025-06-01'
+    },
+    {
+      id: '2',
+      property_name: 'Property A',
+      bank_account: 'Main Checking',
+      account_name: 'Maintenance',
+      account_type: 'Expense' as const,
+      amount: -500,
+      transaction_date: '2025-06-15',
+      month_year: 'June 2025',
+      description: 'HVAC repair',
+      created_at: '2025-06-15',
+      updated_at: '2025-06-15'
+    },
+    {
+      id: '3',
+      property_name: 'Property B',
+      bank_account: 'Business Account',
+      account_name: 'Rental Income',
+      account_type: 'Revenue' as const,
+      amount: 3000,
+      transaction_date: '2025-06-01',
+      month_year: 'June 2025',
+      description: 'Monthly rent',
+      created_at: '2025-06-01',
+      updated_at: '2025-06-01'
+    },
+    {
+      id: '4',
+      property_name: 'Property A',
+      bank_account: 'Main Checking',
+      account_name: 'Property Management Fee',
+      account_type: 'Expense' as const,
+      amount: -400,
+      transaction_date: '2025-06-30',
+      month_year: 'June 2025',
+      description: 'Monthly management fee',
+      created_at: '2025-06-30',
+      updated_at: '2025-06-30'
+    }
+  ]
+};
+
+// Supabase API Functions
+const supabase = createSupabaseClient();
+
+// Enhanced Supabase API Functions with Chart of Accounts
+const fetchAccounts = async () => {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/accounts?select=*&order=account_name`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch accounts');
+    
+    const data = await response.json();
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching accounts:', error);
+    return [];
+  }
+};
+
+const fetchProperties = async (): Promise<string[]> => {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&property_class=not.is.null`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch properties');
+    
+    const data = await response.json();
+    const uniqueProperties = [...new Set(data.map((item: any) => item.property_class).filter(Boolean))];
+    return ['All Properties', ...uniqueProperties];
+  } catch (error) {
+    console.error('Error fetching properties:', error);
+    return ['All Properties'];
+  }
+};
+
+const fetchBankAccounts = async (): Promise<string[]> => {
+  try {
+    // Get bank accounts from the accounts table
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/accounts?select=account_name&account_type=eq.Bank&order=account_name`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch bank accounts');
+    
+    const data = await response.json();
+    const bankAccounts = data.map((item: any) => item.account_name).filter(Boolean);
+    return ['All Accounts', ...bankAccounts];
+  } catch (error) {
+    console.error('Error fetching bank accounts:', error);
+    return ['All Accounts'];
+  }
+};
+
+const fetchFinancialData = async (
+  property: string = 'All Properties',
+  bankAccount: string = 'All Accounts',
+  monthYear: string
+) => {
+  try {
+    // Convert "June 2025" to date range for filtering
+    const [month, year] = monthYear.split(' ');
+    const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
+    const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+    const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${new Date(parseInt(year), monthNum, 0).getDate()}`;
+    
+    let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=account_name`;
+    
+    // Add property filter
+    if (property !== 'All Properties') {
+      url += `&property_class=eq.${encodeURIComponent(property)}`;
+    }
+    
+    // Add bank account filter
+    if (bankAccount !== 'All Accounts') {
+      url += `&account_name=eq.${encodeURIComponent(bankAccount)}`;
+    }
+
+    const [journalResponse, accountsResponse] = await Promise.all([
+      fetch(url, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      fetch(`${SUPABASE_URL}/rest/v1/accounts?select=*`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      })
+    ]);
+
+    if (!journalResponse.ok || !accountsResponse.ok) {
+      throw new Error('Failed to fetch financial data');
+    }
+    
+    const journalData = await journalResponse.json();
+    const accountsData = await accountsResponse.json();
+    
+    // Create account lookup map
+    const accountMap = new Map();
+    accountsData.forEach((account: any) => {
+      accountMap.set(account.account_name, account.account_type);
+    });
+
+    // Enhance journal entries with account types
+    const enhancedData = journalData.map((entry: any) => ({
+      ...entry,
+      account_type: accountMap.get(entry.account_name) || 'Other'
+    }));
+
+    return {
+      success: true,
+      data: enhancedData || [],
+      accountsData: accountsData,
+      summary: {
+        filteredEntries: enhancedData?.length || 0,
+        dataSource: 'Supabase',
+        filters: { property, bankAccount, monthYear },
+        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))]
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching financial data:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+      data: []
+    };
+  }
+};
+
+const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
+  // Group by account name and calculate net amounts using proper account types from chart of accounts
+  const groupedData = entries.reduce((acc, entry) => {
+    const key = entry.account_name;
+    if (!acc[key]) {
+      acc[key] = {
+        name: entry.account_name,
+        type: entry.account_type || 'Other',
+        total: 0,
+        months: {}
+      };
+    }
+    
+    // Use line_amount which represents the net effect
+    acc[key].total += entry.line_amount;
+    acc[key].months[monthYear as MonthString] = (acc[key].months[monthYear as MonthString] || 0) + entry.line_amount;
+    
+    return acc;
+  }, {} as Record<string, any>);
+
+  // Convert to array and sort by account type hierarchy for P&L presentation
+  const typeOrder: Record<string, number> = {
+    'Revenue': 1,
+    'Other Income': 2,
+    'Cost of Goods Sold': 3,
+    'Expenses': 4,
+    'Other Expenses': 5,
+    'Interest Expense': 6,
+    'Taxes': 7,
+    'Assets': 8,
+    'Current Assets': 9,
+    'Fixed Assets': 10,
+    'Other Assets': 11,
+    'Liabilities': 12,
+    'Current Liabilities': 13,
+    'Long Term Liabilities': 14,
+    'Other Current Liabilities': 15,
+    'Equity': 16,
+    'Bank': 17,
+    'Other': 99
+  };
+
+  const sortedData = Object.values(groupedData)
+    .filter((item: any) => Math.abs(item.total) > 0.01) // Filter out zero amounts
+    .sort((a: any, b: any) => {
+      // Sort by account type hierarchy, then by name
+      const aOrder = typeOrder[a.type] || 99;
+      const bOrder = typeOrder[b.type] || 99;
+      
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+  return {
+    propertyFinancialData: {
+      'All Properties': {
+        Monthly: {
+          [monthYear]: sortedData
+        }
+      }
+    }
+  };
+};
+
+const transformCashFlowData = (entries: FinancialEntry[]) => {
+  // Group by account type for better cash flow categorization
+  const revenueTypes = ['Revenue', 'Other Income'];
+  const expenseTypes = ['Expenses', 'Other Expenses', 'Cost of Goods Sold', 'Interest Expense', 'Taxes'];
+  
+  const inFlowEntries = entries.filter(entry => 
+    revenueTypes.includes(entry.account_type) || entry.line_amount > 0
+  );
+  
+  const outFlowEntries = entries.filter(entry => 
+    expenseTypes.includes(entry.account_type) || entry.line_amount < 0
+  );
+
+  const inFlow = inFlowEntries.reduce((acc, entry) => {
+    const existing = acc.find(item => item.name === entry.account_name);
+    if (existing) {
+      existing.total += Math.abs(entry.line_amount);
+    } else {
+      acc.push({
+        name: entry.account_name,
+        total: Math.abs(entry.line_amount),
+        months: {},
+        type: entry.account_type
+      });
+    }
+    return acc;
+  }, [] as FinancialDataItem[]);
+
+  const outFlow = outFlowEntries.reduce((acc, entry) => {
+    const existing = acc.find(item => item.name === entry.account_name);
+    if (existing) {
+      existing.total += Math.abs(entry.line_amount);
+    } else {
+      acc.push({
+        name: entry.account_name,
+        total: -Math.abs(entry.line_amount), // Keep negative for display
+        months: {},
+        type: entry.account_type
+      });
+    }
+    return acc;
+  }, [] as FinancialDataItem[]);
+
+  const totalInFlow = inFlow.reduce((sum, item) => sum + item.total, 0);
+  const totalOutFlow = outFlow.reduce((sum, item) => sum + Math.abs(item.total), 0);
+  const totalCashFlow = totalInFlow - totalOutFlow;
+
+  return {
+    propertyCashFlowData: {
+      'All Properties': {
+        inFlow: inFlow.sort((a, b) => b.total - a.total), // Sort by amount descending
+        outFlow: outFlow.sort((a, b) => a.total - b.total), // Sort by amount ascending (most negative first)
+        totalInFlow,
+        totalOutFlow,
+        totalCashFlow,
+        beginningCash: 0,
+        endingCash: totalCashFlow
+      }
+    }
+  };
+};
 
 // IAM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -105,37 +485,6 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   </div>
 );
 
-// API Functions
-const fetchFromAPI = async (endpoint: string, params: Record<string, string> = {}) => {
-  try {
-    const urlParams = new URLSearchParams(params);
-    const response = await fetch(`${API_BASE}?endpoint=${endpoint}&${urlParams}`);
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`API Error (${endpoint}):`, error);
-    throw error;
-  }
-};
-
-const loadFinancialData = async (property: string, bankAccount: string, month: string) => {
-  return await fetchFromAPI('financial-data', {
-    property,
-    bankAccount,
-    month
-  });
-};
-
-const loadProperties = async () => {
-  const response = await fetchFromAPI('properties');
-  return response.properties || ['All Properties'];
-};
-
-const loadBankAccounts = async () => {
-  const response = await fetchFromAPI('bank-accounts');
-  return response.bankAccounts || ['All Accounts'];
-};
-
 const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning, BRAND_COLORS.danger, BRAND_COLORS.secondary, BRAND_COLORS.tertiary];
 
 export default function FinancialsPage() {
@@ -159,7 +508,7 @@ export default function FinancialsPage() {
   const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
   const [availableBankAccounts, setAvailableBankAccounts] = useState<string[]>(['All Accounts']);
 
-  // Available months (you might want to get these from API too)
+  // Available months
   const monthsList: MonthString[] = [
     'January 2023', 'February 2023', 'March 2023', 'April 2023', 'May 2023', 'June 2023',
     'July 2023', 'August 2023', 'September 2023', 'October 2023', 'November 2023', 'December 2023',
@@ -184,8 +533,8 @@ export default function FinancialsPage() {
       
       // Load properties and bank accounts
       const [properties, bankAccounts] = await Promise.all([
-        loadProperties(),
-        loadBankAccounts()
+        fetchProperties(),
+        fetchBankAccounts()
       ]);
       
       setAvailableProperties(properties);
@@ -215,14 +564,28 @@ export default function FinancialsPage() {
         ? 'All Accounts'
         : Array.from(selectedBankAccounts)[0];
       
-      const data = await loadFinancialData(property, bankAccount, selectedMonth);
+      const rawData = await fetchFinancialData(property, bankAccount, selectedMonth);
       
-      if (data.success) {
-        setRealData(data);
+      if (rawData.success) {
+        const entries = rawData.data as FinancialEntry[];
+        const transformedPL = transformFinancialData(entries, selectedMonth);
+        const transformedCF = transformCashFlowData(entries);
+
+        const combinedData = {
+          success: true,
+          ...transformedPL,
+          ...transformedCF,
+          summary: rawData.summary,
+          performance: {
+            executionTimeMs: Date.now() % 1000 // Mock timing
+          }
+        };
+
+        setRealData(combinedData);
         setDataError(null);
-        showNotification('Financial data loaded successfully', 'success');
+        showNotification(`Loaded ${entries.length} financial entries from Supabase`, 'success');
       } else {
-        setDataError(data.error || 'Failed to load financial data');
+        setDataError(rawData.error || 'Failed to load financial data');
         showNotification('Failed to load financial data', 'error');
       }
       
@@ -327,7 +690,7 @@ export default function FinancialsPage() {
     setExpandedAccounts(newExpanded);
   };
 
-  // Get current financial data (from real API or fallback)
+  // Get current financial data
   const getCurrentFinancialData = () => {
     if (realData && realData.propertyFinancialData) {
       const propertyKey = Object.keys(realData.propertyFinancialData)[0] || 'All Properties';
@@ -364,15 +727,44 @@ export default function FinancialsPage() {
   const currentData = getCurrentFinancialData();
   const currentCashFlowData = getCurrentCashFlowData();
 
-  // Calculate KPIs from real data
+  // Calculate KPIs using proper account classifications
   const calculateKPIs = () => {
-    const revenue = currentData.find(item => item.name === 'Revenue')?.total || 0;
-    const grossProfit = currentData.find(item => item.name === 'Gross Profit')?.total || 0;
-    const operatingIncome = currentData.find(item => item.name === 'Operating Income')?.total || 0;
-    const netIncome = currentData.find(item => item.name === 'Net Income')?.total || 0;
+    // Revenue accounts (using chart of accounts classification)
+    const revenueAccounts = currentData.filter(item => 
+      item.type === 'Revenue' || 
+      item.type === 'Other Income' ||
+      item.name.toLowerCase().includes('rental') ||
+      item.name.toLowerCase().includes('airbnb')
+    );
+    const revenue = revenueAccounts.reduce((sum, item) => sum + Math.abs(item.total), 0);
+    
+    // Expense accounts (using chart of accounts classification)
+    const expenseAccounts = currentData.filter(item => 
+      item.type === 'Expenses' || 
+      item.type === 'Other Expenses' ||
+      item.type === 'Cost of Goods Sold' ||
+      item.total < 0
+    );
+    const expenses = expenseAccounts.reduce((sum, item) => sum + Math.abs(item.total), 0);
+    
+    // Interest and tax expenses
+    const interestExpense = currentData
+      .filter(item => item.type === 'Interest Expense')
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+    
+    const taxExpense = currentData
+      .filter(item => item.type === 'Taxes')
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+    
+    const grossProfit = revenue - expenses;
+    const operatingIncome = grossProfit - interestExpense;
+    const netIncome = operatingIncome - taxExpense;
     
     return {
       revenue,
+      grossProfit,
+      operatingIncome,
+      netIncome,
       grossMargin: revenue ? (grossProfit / revenue) * 100 : 0,
       operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
       netMargin: revenue ? (netIncome / revenue) * 100 : 0
@@ -380,13 +772,12 @@ export default function FinancialsPage() {
   };
 
   const generateTrendData = () => {
-    // This could be enhanced to use real historical data from the API
     const months = ['Jan 2025', 'Feb 2025', 'Mar 2025', 'Apr 2025', 'May 2025', 'Jun 2025'];
-    const revenue = currentData.find(item => item.name === 'Revenue')?.total || 0;
+    const revenue = kpis.revenue;
     
     return months.map((month, index) => ({
       month,
-      revenue: revenue * (0.8 + (index * 0.04)), // Simulated trend
+      revenue: revenue * (0.8 + (index * 0.04)),
       grossProfit: (revenue * (0.8 + (index * 0.04))) * 0.4,
       operatingIncome: (revenue * (0.8 + (index * 0.04))) * 0.2,
       netIncome: (revenue * (0.8 + (index * 0.04))) * 0.15,
@@ -394,17 +785,13 @@ export default function FinancialsPage() {
   };
 
   const generateExpenseBreakdown = () => {
-    const cogs = currentData.find(item => item.name === 'Cost of Goods Sold')?.total || 0;
-    const opex = currentData.find(item => item.name === 'Operating Expenses')?.total || 0;
-    const interest = currentData.find(item => item.name === 'Interest Expense')?.total || 0;
-    const taxes = currentData.find(item => item.name === 'Taxes')?.total || 0;
-    
-    return [
-      { name: 'Cost of Goods Sold', value: cogs },
-      { name: 'Operating Expenses', value: opex },
-      { name: 'Interest Expense', value: interest },
-      { name: 'Taxes', value: taxes },
-    ].filter(item => item.value > 0);
+    return currentData
+      .filter(item => item.total < 0)
+      .map(item => ({
+        name: item.name,
+        value: Math.abs(item.total)
+      }))
+      .filter(item => item.value > 0);
   };
 
   const kpis = calculateKPIs();
@@ -454,12 +841,12 @@ export default function FinancialsPage() {
                 </span>
                 {realData && (
                   <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
-                    Live Data Connected
+                    Supabase Connected
                   </span>
                 )}
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Real-time P&L, Cash Flow & Balance Sheet • QuickBooks Integration
+                Real-time P&L, Cash Flow & Balance Sheet • Supabase Integration
                 {realData?.summary && (
                   <span className="ml-2 text-green-600">
                     • {realData.summary.filteredEntries} entries loaded
@@ -615,9 +1002,16 @@ export default function FinancialsPage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
-                in {realData.performance.executionTimeMs}ms • Source: {realData.summary.dataSource}
-                {realData.summary.journalEntriesFound && (
-                  <span> • {realData.summary.journalEntriesFound} journal entries processed</span>
+                from Supabase • Source: {realData.summary.dataSource}
+                {realData.summary.accountTypes && (
+                  <span> • Account Types: {realData.summary.accountTypes.join(', ')}</span>
+                )}
+                {realData.summary.filters && (
+                  <div className="mt-1">
+                    <strong>Filters:</strong> Property: {realData.summary.filters.property}, 
+                    Bank: {realData.summary.filters.bankAccount}, 
+                    Month: {realData.summary.filters.monthYear}
+                  </div>
                 )}
               </div>
             </div>
@@ -631,7 +1025,7 @@ export default function FinancialsPage() {
                   <div className="text-gray-600 text-sm font-medium mb-2">Total Revenue</div>
                   <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
                   <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
-                    Real QuickBooks Data
+                    Real Supabase Data
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
                     {getSelectedPropertiesText()}
@@ -644,13 +1038,13 @@ export default function FinancialsPage() {
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.success }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Gross Margin</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{kpis.grossMargin.toFixed(1)}%</div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Gross Profit</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.grossProfit || 0)}</div>
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
-                    Live Calculation
+                    {kpis.grossMargin.toFixed(1)}% Margin
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {getSelectedPropertiesText()}
+                    Chart of Accounts
                   </div>
                 </div>
                 <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
@@ -660,13 +1054,13 @@ export default function FinancialsPage() {
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Margin</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{kpis.operatingMargin.toFixed(1)}%</div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Income</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingIncome || 0)}</div>
                   <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full inline-block">
-                    Live Calculation
+                    {kpis.operatingMargin.toFixed(1)}% Margin
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {getSelectedPropertiesText()}
+                    Before Interest & Taxes
                   </div>
                 </div>
                 <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
@@ -676,13 +1070,13 @@ export default function FinancialsPage() {
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.secondary }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Net Margin</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{kpis.netMargin.toFixed(1)}%</div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome || 0)}</div>
                   <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
-                    Live Calculation
+                    {kpis.netMargin.toFixed(1)}% Margin
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {getSelectedPropertiesText()}
+                    After All Expenses
                   </div>
                 </div>
                 <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
@@ -746,7 +1140,7 @@ export default function FinancialsPage() {
                     {isLoadingData ? (
                       <div className="flex items-center justify-center py-8">
                         <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                        <span>Loading financial data...</span>
+                        <span>Loading financial data from Supabase...</span>
                       </div>
                     ) : currentData.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
@@ -768,9 +1162,14 @@ export default function FinancialsPage() {
                         <tbody className="bg-white divide-y divide-gray-200">
                           {currentData.map((item, index) => {
                             const isTotalRow = item.name === 'Net Income' || item.name === 'Gross Profit';
-                            const revenueItem = currentData.find(i => i.name === 'Revenue');
-                            const percentOfRevenue = revenueItem 
-                              ? calculatePercentage(item.total, revenueItem.total)
+                            const revenueAccounts = currentData.filter(i => 
+                              i.name.toLowerCase().includes('rental') || 
+                              i.name.toLowerCase().includes('revenue') ||
+                              (i.total > 0 && i.name.toLowerCase().includes('airbnb'))
+                            );
+                            const totalRevenue = revenueAccounts.reduce((sum, i) => sum + Math.abs(i.total), 0);
+                            const percentOfRevenue = totalRevenue 
+                              ? calculatePercentage(Math.abs(item.total), totalRevenue)
                               : '0%';
 
                             return (
@@ -846,7 +1245,7 @@ export default function FinancialsPage() {
                       {isLoadingData ? (
                         <div className="flex items-center justify-center py-8">
                           <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                          <span>Loading cash flow data...</span>
+                          <span>Loading cash flow data from Supabase...</span>
                         </div>
                       ) : (
                         <table className="w-full">
@@ -1056,7 +1455,7 @@ export default function FinancialsPage() {
                       </ResponsiveContainer>
                       
                       {/* Manual Legend */}
-                      <div className="mt-6 grid grid-cols-2 gap-4">
+                      <div className="mt-6 grid grid-cols-1 gap-4">
                         {expenseData.map((item, index) => {
                           const total = expenseData.reduce((sum, expense) => sum + expense.value, 0);
                           const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0';
