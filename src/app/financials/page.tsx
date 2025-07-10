@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   ArrowUp, 
@@ -147,6 +149,12 @@ const IAMCFOLogo: React.FC<{ className?: string }> = ({ className = "w-8 h-8" })
 // API Service Functions
 class SupabaseService {
   private static async request(endpoint: string, params: Record<string, string> = {}) {
+    // In artifact environment, simulate API delay and return mock data
+    if (typeof window !== 'undefined' && window.location.hostname.includes('claude.ai')) {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
+      return this.getMockData(endpoint, params);
+    }
+
     const url = new URL(`${SUPABASE_CONFIG.URL}/rest/v1/${endpoint}`);
     Object.entries(params).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
@@ -172,6 +180,45 @@ class SupabaseService {
       console.error('Supabase request failed:', error);
       throw error;
     }
+  }
+
+  private static getMockData(endpoint: string, params: Record<string, string>) {
+    if (endpoint === 'journal_entries' && params.select === 'property_class') {
+      return [
+        { property_class: 'Pine Terrace' },
+        { property_class: 'Wesley' },
+        { property_class: 'Terra2' },
+        { property_class: 'Terra3' },
+        { property_class: 'Sunset Gardens' },
+        { property_class: 'Ocean View' }
+      ];
+    }
+
+    if (endpoint === 'journal_entries' && params.account_name?.includes('checking')) {
+      return [
+        { account_name: 'Wesley Checking' },
+        { account_name: 'Terra3 Checking' },
+        { account_name: 'Pine Terrace Checking' },
+        { account_name: 'Main Operating Checking' }
+      ];
+    }
+
+    if (endpoint === 'journal_entries' && params.select === '*') {
+      // Mock journal entries for financial data
+      return Array.from({ length: 150 }, (_, i) => ({
+        id: i + 1,
+        transaction_date: '2025-06-15',
+        account_name: i % 4 === 0 ? 'Rental Revenue' : 
+                      i % 4 === 1 ? 'Maintenance Expense' :
+                      i % 4 === 2 ? 'Utilities Expense' : 'Property Management Fee',
+        debit_amount: i % 4 === 0 ? 0 : Math.floor(Math.random() * 1000) + 200,
+        credit_amount: i % 4 === 0 ? Math.floor(Math.random() * 2000) + 800 : 0,
+        property_class: ['Pine Terrace', 'Wesley', 'Terra2', 'Terra3'][i % 4],
+        description: `Transaction ${i + 1}`
+      }));
+    }
+
+    return [];
   }
 
   static async getProperties(): Promise<string[]> {
