@@ -84,21 +84,16 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
   const getCleanAccountName = (entry: any) => {
     let accountName = entry.account_name?.trim() || '';
     
-    // If account_name is just a number (like 103.41), try to get a better name
-    if (/^\d+(\.\d+)?$/.test(accountName)) {
-      // It's just a number - try to use description or classify it
-      if (entry.description && entry.description.trim() && entry.description !== 'RJE') {
-        accountName = entry.description.trim();
-      } else {
-        // Create a descriptive name based on account type and context
-        accountName = `Account ${accountName}`;
-      }
-    }
-    
-    // Clean up property-specific prefixes (like "615 Pine Terrace:")
+    // ALWAYS use account_name first, not description
+    // Only clean up property-specific prefixes (like "615 Pine Terrace:")
     accountName = accountName.replace(/^[^:]*:/, '').trim();
     
-    // If still empty or generic, use a fallback
+    // If account_name is just a number (like 103.41), keep it but make it more readable
+    if (/^\d+(\.\d+)?$/.test(accountName)) {
+      accountName = `Account ${accountName}`;
+    }
+    
+    // If still empty, use a fallback based on account type
     if (!accountName || accountName === 'Journal Entry' || accountName === 'RJE') {
       accountName = `${entry.account_type || 'Other'} Account`;
     }
