@@ -318,7 +318,9 @@ const supabase = createSupabaseClient();
 
 const fetchProperties = async (): Promise<string[]> => {
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&property_class=not.is.null`, {
+    console.log('🏠 Fetching properties from property_class column...');
+    
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&property_class=not.is.null&order=property_class`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
@@ -326,14 +328,21 @@ const fetchProperties = async (): Promise<string[]> => {
       }
     });
 
-    if (!response.ok) throw new Error('Failed to fetch properties');
+    if (!response.ok) {
+      console.error('❌ Failed to fetch properties:', response.status, response.statusText);
+      throw new Error('Failed to fetch properties');
+    }
     
     const data = await response.json();
+    console.log('📋 Raw property data sample:', data.slice(0, 10));
+    
     const uniqueProperties = [...new Set(data.map((item: any) => item.property_class).filter(Boolean))];
-    return ['All Properties', ...uniqueProperties];
+    console.log('🏠 Unique properties found:', uniqueProperties);
+    
+    return ['All Properties', ...uniqueProperties.sort()];
   } catch (error) {
-    console.error('Error fetching properties:', error);
-    return ['All Properties'];
+    console.error('❌ Error fetching properties:', error);
+    return ['All Properties', 'Demo Property'];
   }
 };
 
@@ -364,6 +373,8 @@ const fetchFinancialData = async (
   monthYear: string
 ) => {
   try {
+    console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, bankAccount, monthYear });
+    
     // Convert "June 2025" to date range for filtering
     const [month, year] = monthYear.split(' ');
     const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
@@ -372,15 +383,19 @@ const fetchFinancialData = async (
     
     let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=account_name`;
     
-    // Add property filter
+    // Add property filter - FILTER BY PROPERTY_CLASS COLUMN
     if (property !== 'All Properties') {
       url += `&property_class=eq.${encodeURIComponent(property)}`;
+      console.log('🏠 Filtering by property_class:', property);
     }
     
     // Add bank account filter if applicable
     if (bankAccount !== 'All Accounts') {
       url += `&account_name=ilike.%${encodeURIComponent(bankAccount)}%`;
+      console.log('🏦 Filtering by bank account:', bankAccount);
     }
+
+    console.log('📡 Final URL:', url);
 
     const [journalResponse, accountsResponse] = await Promise.all([
       fetch(url, {
@@ -406,6 +421,9 @@ const fetchFinancialData = async (
     const journalData = await journalResponse.json();
     const accountsData = await accountsResponse.json();
     
+    console.log('📊 Journal entries loaded:', journalData.length);
+    console.log('📋 Properties in loaded data:', [...new Set(journalData.map((e: any) => e.property_class))]);
+    
     // Create account code to name mapping from your chart of accounts
     const accountCodeMap = new Map();
     
@@ -416,75 +434,6 @@ const fetchFinancialData = async (
         standardName: account.account_name
       });
     });
-
-    // Create comprehensive account code mappings based on your actual P&L structure
-    const commonAccountMappings = {
-      // INCOME ACCOUNTS
-      '103.41': { type: 'Income', standardName: 'Rental Revenue - Airbnb', classification: 'Revenue' },
-      '103.42': { type: 'Income', standardName: 'Rental Revenue - Property 2', classification: 'Revenue' },
-      '1050': { type: 'Income', standardName: 'Rental Revenue', classification: 'Revenue' },
-      '1115.58': { type: 'Income', standardName: 'Other Rental Income', classification: 'Revenue' },
-      '142.6': { type: 'Income', standardName: 'Rental Revenue - Additional', classification: 'Revenue' },
-      '150': { type: 'Income', standardName: 'Rental Revenue - Fees', classification: 'Revenue' },
-      '160': { type: 'Income', standardName: 'Rental Revenue - Services', classification: 'Revenue' },
-      '180': { type: 'Income', standardName: 'Rental Revenue - Utilities', classification: 'Revenue' },
-      '200': { type: 'Income', standardName: 'Rental Revenue - Applications', classification: 'Revenue' },
-      '2195.86': { type: 'Income', standardName: 'Rental Revenue - Late Fees', classification: 'Revenue' },
-      '250': { type: 'Income', standardName: 'Rental Revenue - Parking', classification: 'Revenue' },
-      '270': { type: 'Income', standardName: 'Rental Revenue - Storage', classification: 'Revenue' },
-      '490': { type: 'Income', standardName: 'Rental Revenue - Miscellaneous', classification: 'Revenue' },
-      '60': { type: 'Income', standardName: 'Rental Revenue - Pool', classification: 'Revenue' },
-      
-      // ADVERTISING & MARKETING
-      '500': { type: 'Expenses', standardName: 'Advertising & marketing', classification: 'Expenses' },
-      '501': { type: 'Expenses', standardName: 'Facebook', classification: 'Expenses' },
-      '502': { type: 'Expenses', standardName: 'Google Ads', classification: 'Expenses' },
-      
-      // OPERATING EXPENSES
-      '510': { type: 'Expenses', standardName: 'Arcade Expenses', classification: 'Expenses' },
-      '520': { type: 'Expenses', standardName: 'Bank fees & service charges', classification: 'Expenses' },
-      '530': { type: 'Expenses', standardName: 'Disposal & waste fees', classification: 'Expenses' },
-      '540': { type: 'Expenses', standardName: 'Insurance', classification: 'Expenses' },
-      '550': { type: 'Expenses', standardName: 'Internet & TV services', classification: 'Expenses' },
-      '560': { type: 'Expenses', standardName: 'Labor - Cleaning', classification: 'Expenses' },
-      '570': { type: 'Expenses', standardName: 'Meals', classification: 'Expenses' },
-      '580': { type: 'Expenses', standardName: 'Memberships & subscriptions', classification: 'Expenses' },
-      
-      // INTEREST EXPENSES
-      '600': { type: 'Interest Expense', standardName: 'Mortgage interest', classification: 'Other Expenses' },
-      
-      // OFFICE EXPENSES
-      '610': { type: 'Expenses', standardName: 'Office expenses', classification: 'Expenses' },
-      '611': { type: 'Expenses', standardName: 'Shipping & postage', classification: 'Expenses' },
-      
-      // POOL & HOT TUB
-      '620': { type: 'Expenses', standardName: 'Pool and Hot Tub Maintenance', classification: 'Expenses' },
-      '621': { type: 'Expenses', standardName: 'Pool and Hot Tub Repairs & Upgrades', classification: 'Expenses' },
-      '622': { type: 'Expenses', standardName: 'Pool and Hot Tub Supplies', classification: 'Expenses' },
-      
-      // MAINTENANCE & REPAIRS
-      '630': { type: 'Expenses', standardName: 'Repairs & maintenance', classification: 'Expenses' },
-      '640': { type: 'Expenses', standardName: 'Snow & Lawn', classification: 'Expenses' },
-      '650': { type: 'Expenses', standardName: 'Supplies', classification: 'Expenses' },
-      '660': { type: 'Expenses', standardName: 'Travel', classification: 'Expenses' },
-      
-      // UTILITIES
-      '670': { type: 'Expenses', standardName: 'Utilities', classification: 'Expenses' },
-      '671': { type: 'Expenses', standardName: 'Water & sewer', classification: 'Expenses' },
-      
-      // Additional mappings based on common patterns
-      '4720.99': { type: 'Income', standardName: 'Rental Revenue - Airbnb', classification: 'Revenue' },
-      
-      // Asset accounts (if any appear)
-      '1000': { type: 'Fixed Assets', standardName: 'Property - Cost', classification: 'Assets' },
-      '1100': { type: 'Fixed Assets', standardName: 'Property Improvements', classification: 'Assets' },
-      '1200': { type: 'Current Assets', standardName: 'Cash', classification: 'Assets' },
-      '1210': { type: 'Bank', standardName: 'Checking Account', classification: 'Assets' },
-      
-      // Liability accounts (if any appear)
-      '2000': { type: 'Long Term Liabilities', standardName: 'Mortgage Payable', classification: 'Liabilities' },
-      '2100': { type: 'Current Liabilities', standardName: 'Accounts Payable', classification: 'Liabilities' }
-    };
 
     // Enhanced classification for journal entries using account_name (column D)
     const classifyJournalAccount = (entry: any) => {
@@ -602,14 +551,14 @@ const fetchFinancialData = async (
       accountsData: accountsData,
       summary: {
         filteredEntries: enhancedData?.length || 0,
-        dataSource: 'Supabase + Account Code Mapping',
+        dataSource: 'Supabase + Property Class Filtering',
         filters: { property, bankAccount, monthYear },
         accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
+        propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
         mappingStats: {
           totalEntries: enhancedData?.length || 0,
           chartMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Chart of Accounts').length || 0,
-          commonMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Common Mapping').length || 0,
-          intelligentMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Intelligent Classification').length || 0
+          intelligentMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Account Name Classification').length || 0
         }
       }
     };
@@ -654,7 +603,7 @@ const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2025');
+  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2023');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [timeView, setTimeView] = useState<TimeView>('Monthly');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
@@ -712,6 +661,7 @@ export default function FinancialsPage() {
         fetchBankAccounts()
       ]);
       
+      console.log('🏠 Available properties loaded:', properties);
       setAvailableProperties(properties);
       setAvailableBankAccounts(bankAccounts);
       
@@ -1010,7 +960,7 @@ export default function FinancialsPage() {
   };
 
   const generateTrendData = () => {
-    const months = ['Jan 2025', 'Feb 2025', 'Mar 2025', 'Apr 2025', 'May 2025', 'Jun 2025'];
+    const months = ['Jan 2023', 'Feb 2023', 'Mar 2023', 'Apr 2023', 'May 2023', 'Jun 2023'];
     const revenue = kpis.revenue;
     
     return months.map((month, index) => ({
@@ -1089,7 +1039,7 @@ export default function FinancialsPage() {
                 )}
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Real-time P&L, Cash Flow & Balance Sheet • Fixed Data Mapping
+                Real-time P&L by Property Class • Fixed Data Mapping
                 {realData?.summary && (
                   <span className="ml-2 text-green-600">
                     • {realData.summary.filteredEntries} entries loaded
@@ -1121,7 +1071,7 @@ export default function FinancialsPage() {
                 ))}
               </select>
 
-              {/* Property Filter Dropdown */}
+              {/* Property Filter Dropdown - FILTERS BY PROPERTY_CLASS */}
               <div className="relative">
                 <button
                   onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
@@ -1177,23 +1127,17 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* DEBUG SECTION - Let's see what we're actually getting */}
+          {/* DEBUG SECTION - Property Class Filtering Status */}
           {realData && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
               <div className="text-yellow-800 text-sm">
-                <strong>🔍 DEBUG - First Journal Entry Fields:</strong>
+                <strong>🔍 Property Class Filtering Debug:</strong>
                 <div className="mt-2 space-y-1 text-xs bg-white p-3 rounded border font-mono">
-                  {realData.rawEntries && realData.rawEntries.length > 0 && (
-                    <div>
-                      <div><strong>Column D (account_name):</strong> "{realData.rawEntries[0].account_name}"</div>
-                      <div><strong>Column G (property_class):</strong> "{realData.rawEntries[0].property_class}"</div>
-                      <div><strong>Column J (line_amount):</strong> {realData.rawEntries[0].line_amount}</div>
-                      <div><strong>Column L (description):</strong> "{realData.rawEntries[0].description}"</div>
-                      <div><strong>Account Type:</strong> "{realData.rawEntries[0].account_type}"</div>
-                      <div><strong>Detail Type:</strong> "{realData.rawEntries[0].detail_type}"</div>
-                      <div><strong>What getCleanAccountName() returns:</strong> "<span className="text-red-600">{getCurrentFinancialData()[0]?.name}</span>"</div>
-                    </div>
-                  )}
+                  <div><strong>Available Properties in Dropdown:</strong> {availableProperties.join(', ')}</div>
+                  <div><strong>Currently Selected:</strong> {getSelectedPropertiesText()}</div>
+                  <div><strong>Properties in Current Data:</strong> {realData.summary.propertiesInData?.join(', ') || 'None'}</div>
+                  <div><strong>Total Entries Loaded:</strong> {realData.summary.filteredEntries}</div>
+                  <div><strong>Filter Applied:</strong> {Array.from(selectedProperties)[0] !== 'All Properties' ? `property_class = "${Array.from(selectedProperties)[0]}"` : 'No filter (All Properties)'}</div>
                 </div>
               </div>
             </div>
@@ -1203,16 +1147,16 @@ export default function FinancialsPage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
-                from Supabase • Dynamic Filtering Active
+                from Supabase • Property Class Filtering Active
                 <div className="mt-1 text-xs">
                   <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {getSelectedBankAccountsText()} • {selectedMonth}
                 </div>
                 <div className="mt-1 text-xs">
-                  <strong>Available Data Range:</strong> Dynamically queries whatever data exists for selected period
+                  <strong>Data Source:</strong> {realData.summary.dataSource}
                 </div>
                 <div className="mt-1 text-xs">
                   <strong>Mapping Results:</strong> {realData.summary.mappingStats?.chartMapped || 0} chart matches, 
-                  {realData.summary.mappingStats?.accountNameMapped || 0} account name classifications
+                  {realData.summary.mappingStats?.intelligentMapped || 0} intelligent classifications
                 </div>
               </div>
             </div>
@@ -1291,10 +1235,10 @@ export default function FinancialsPage() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-semibold text-gray-900">
-                  Profit & Loss Statement (Fixed Mapping)
+                  Profit & Loss Statement (By Property Class)
                 </h3>
                 <div className="text-sm text-gray-600">
-                  Account-based classification applied
+                  Filtered by property_class column
                 </div>
               </div>
             </div>
