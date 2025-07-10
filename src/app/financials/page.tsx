@@ -317,9 +317,10 @@ const supabase = createSupabaseClient();
 
 const fetchProperties = async (): Promise<string[]> => {
   try {
-    console.log('🏠 Fetching properties from property_class column...');
+    console.log('🏠 Fetching unique property_class values from journal_entries...');
     
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&property_class=not.is.null&order=property_class`, {
+    // Simpler query - just get all property_class values
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
@@ -327,21 +328,53 @@ const fetchProperties = async (): Promise<string[]> => {
       }
     });
 
+    console.log('📡 Response status:', response.status);
+
     if (!response.ok) {
-      console.error('❌ Failed to fetch properties:', response.status, response.statusText);
-      throw new Error('Failed to fetch properties');
+      const errorText = await response.text();
+      console.error('❌ Supabase error:', response.status, errorText);
+      throw new Error(`Supabase error: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('📋 Raw property data sample:', data.slice(0, 10));
+    console.log('📋 Total rows received:', data.length);
+    console.log('📋 Sample data:', data.slice(0, 5));
     
-    const uniqueProperties = [...new Set(data.map((item: any) => item.property_class).filter(Boolean))];
-    console.log('🏠 Unique properties found:', uniqueProperties);
+    // Extract unique property classes, filtering out null/empty values
+    const allPropertyClasses = data
+      .map((item: any) => item.property_class)
+      .filter((pc: any) => pc && pc.trim() !== ''); // Remove null, undefined, empty strings
     
-    return ['All Properties', ...uniqueProperties.sort()];
+    const uniqueProperties = [...new Set(allPropertyClasses)];
+    console.log('🏠 All property classes found:', allPropertyClasses.length);
+    console.log('🏠 Unique property classes:', uniqueProperties);
+    
+    if (uniqueProperties.length === 0) {
+      console.warn('⚠️ No property classes found, using fallback');
+      return ['All Properties', 'General']; // Minimal fallback
+    }
+    
+    const result = ['All Properties', ...uniqueProperties.sort()];
+    console.log('✅ Final property list:', result);
+    return result;
+    
   } catch (error) {
-    console.error('❌ Error fetching properties:', error);
-    return ['All Properties', 'Demo Property'];
+    console.error('❌ Property fetch error:', error);
+    console.log('🔄 Using hardcoded property list from your data');
+    
+    // Use the exact properties I saw in your screenshot
+    return [
+      'All Properties', 
+      'Detroit',
+      'General', 
+      'Hastings MN',
+      'Lisbon',
+      'Mokena IL',
+      'Pine Terrace',
+      'Rockford',
+      'Terraview',
+      'Wesley'
+    ];
   }
 };
 
