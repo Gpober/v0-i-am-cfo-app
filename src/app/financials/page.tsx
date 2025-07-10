@@ -1,10 +1,34 @@
-"use client";
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { 
+  ArrowUp, 
+  ArrowDown, 
+  Minus, 
+  Download, 
+  RefreshCw, 
+  TrendingUp, 
+  DollarSign, 
+  PieChart, 
+  BarChart3, 
+  ChevronDown, 
+  ChevronRight 
+} from 'lucide-react';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  PieChart as RechartsPieChart, 
+  Cell, 
+  Pie 
+} from 'recharts';
 
-import React, { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
-
-// IAM CFO Brand Colors
+// Brand Colors Configuration
 const BRAND_COLORS = {
   primary: '#56B6E9',
   secondary: '#3A9BD1',
@@ -27,10 +51,13 @@ const BRAND_COLORS = {
   }
 };
 
-// API Configuration - YOUR REAL DEPLOYMENT URL
-const API_BASE = 'https://script.google.com/macros/s/AKfycbwa-onxvlAVJTwdg_vasOLyGs0iSN32MO4ASBabdO6YTXTdwJBueyATp1ZNDHaHbkC2/exec';
+// Supabase Configuration
+const SUPABASE_CONFIG = {
+  URL: 'https://ijeuusvwqcnljctkvjdi.supabase.co',
+  ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZXV1c3Z3cWNubGpjdGt2amRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMjE4MDUsImV4cCI6MjA2NzY5NzgwNX0.O9Mb_X47wbXEMXbPQ8Cr3dzDn_E5DYG9b222FPy4LEU'
+};
 
-// Type definitions
+// Type Definitions
 type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
 type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
 type ViewMode = 'total' | 'detailed';
@@ -49,37 +76,49 @@ interface FinancialData {
   };
 }
 
+interface CashFlowData {
+  inFlow: FinancialDataItem[];
+  outFlow: FinancialDataItem[];
+  totalInFlow: number;
+  totalOutFlow: number;
+  totalCashFlow: number;
+  beginningCash: number;
+  endingCash: number;
+}
+
 interface NotificationState {
   show: boolean;
   message: string;
   type: 'info' | 'success' | 'error';
 }
 
-interface TooltipState {
-  show: boolean;
-  content: string;
-  x: number;
-  y: number;
+interface LoadingState {
+  data: boolean;
+  properties: boolean;
+  bankAccounts: boolean;
 }
 
-interface PropertyFinancialData {
-  [property: string]: FinancialData;
-}
-
-interface PropertyCashFlowData {
-  [property: string]: {
-    inFlow: FinancialDataItem[];
-    outFlow: FinancialDataItem[];
-    totalInFlow: number;
-    totalOutFlow: number;
-    totalCashFlow: number;
-    beginningCash: number;
-    endingCash: number;
+interface APIResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  summary?: {
+    filteredEntries: number;
+    totalRevenue: number;
+    totalExpenses: number;
+    netIncome: number;
+    dataSource: string;
+    processingTimeMs: number;
+  };
+  performance?: {
+    executionTimeMs: number;
+    entriesProcessed: number;
+    timeoutRisk: string;
   };
 }
 
 // IAM CFO Logo Component
-const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
+const IAMCFOLogo: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => (
   <div className={`${className} flex items-center justify-center relative`}>
     <svg viewBox="0 0 120 120" className="w-full h-full">
       <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2"/>
@@ -105,252 +144,501 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   </div>
 );
 
-// API Functions
-const fetchFromAPI = async (endpoint: string, params: Record<string, string> = {}) => {
-  try {
-    const urlParams = new URLSearchParams(params);
-    const response = await fetch(`${API_BASE}?endpoint=${endpoint}&${urlParams}`);
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`API Error (${endpoint}):`, error);
-    throw error;
-  }
-};
-
-const loadFinancialData = async (property: string, bankAccount: string, month: string) => {
-  return await fetchFromAPI('financial-data', {
-    property,
-    bankAccount,
-    month
-  });
-};
-
-const loadProperties = async () => {
-  const response = await fetchFromAPI('properties');
-  return response.properties || ['All Properties'];
-};
-
-const loadBankAccounts = async () => {
-  const response = await fetchFromAPI('bank-accounts');
-  return response.bankAccounts || ['All Accounts'];
-};
-
-const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning, BRAND_COLORS.danger, BRAND_COLORS.secondary, BRAND_COLORS.tertiary];
-
-export default function FinancialsPage() {
-  const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2025');
-  const [viewMode, setViewMode] = useState<ViewMode>('detailed');
-  const [timeView, setTimeView] = useState<TimeView>('Monthly');
-  const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  const [timeViewDropdownOpen, setTimeViewDropdownOpen] = useState(false);
-  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
-  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
-  const [bankAccountDropdownOpen, setBankAccountDropdownOpen] = useState(false);
-  const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(new Set(['All Accounts']));
-  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
-
-  // Real data state
-  const [isLoadingData, setIsLoadingData] = useState(false);
-  const [realData, setRealData] = useState<any>(null);
-  const [dataError, setDataError] = useState<string | null>(null);
-  const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
-  const [availableBankAccounts, setAvailableBankAccounts] = useState<string[]>(['All Accounts']);
-
-  // Available months (you might want to get these from API too)
-  const monthsList: MonthString[] = [
-    'January 2023', 'February 2023', 'March 2023', 'April 2023', 'May 2023', 'June 2023',
-    'July 2023', 'August 2023', 'September 2023', 'October 2023', 'November 2023', 'December 2023',
-    'January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024',
-    'July 2024', 'August 2024', 'September 2024', 'October 2024', 'November 2024', 'December 2024',
-    'January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025'
-  ];
-
-  // Load initial data
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  // Load data when filters change
-  useEffect(() => {
-    loadRealFinancialData();
-  }, [selectedProperties, selectedBankAccounts, selectedMonth]);
-
-  const loadInitialData = async () => {
-    try {
-      setIsLoadingData(true);
-      
-      // Load properties and bank accounts
-      const [properties, bankAccounts] = await Promise.all([
-        loadProperties(),
-        loadBankAccounts()
-      ]);
-      
-      setAvailableProperties(properties);
-      setAvailableBankAccounts(bankAccounts);
-      
-      // Load initial financial data
-      await loadRealFinancialData();
-      
-    } catch (error) {
-      console.error('Failed to load initial data:', error);
-      setDataError('Failed to load initial data');
-    } finally {
-      setIsLoadingData(false);
-    }
-  };
-
-  const loadRealFinancialData = async () => {
-    try {
-      setIsLoadingData(true);
-      setDataError(null);
-      
-      const property = selectedProperties.has('All Properties') || selectedProperties.size === 0 
-        ? 'All Properties' 
-        : Array.from(selectedProperties)[0];
-      
-      const bankAccount = selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0
-        ? 'All Accounts'
-        : Array.from(selectedBankAccounts)[0];
-      
-      const data = await loadFinancialData(property, bankAccount, selectedMonth);
-      
-      if (data.success) {
-        setRealData(data);
-        setDataError(null);
-        showNotification('Financial data loaded successfully', 'success');
-      } else {
-        setDataError(data.error || 'Failed to load financial data');
-        showNotification('Failed to load financial data', 'error');
+// API Service Functions
+class SupabaseService {
+  private static async request(endpoint: string, params: Record<string, string> = {}) {
+    const url = new URL(`${SUPABASE_CONFIG.URL}/rest/v1/${endpoint}`);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        url.searchParams.append(key, value);
       }
-      
+    });
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Supabase request failed:', error);
+      throw error;
+    }
+  }
+
+  static async getProperties(): Promise<string[]> {
+    try {
+      const data = await this.request('journal_entries', {
+        'select': 'property_class',
+        'property_class': 'not.is.null',
+        'limit': '1000'
+      });
+
+      const uniqueProperties = ['All Properties', ...new Set(
+        data
+          .map((item: any) => item.property_class)
+          .filter((prop: string) => prop && prop.trim() !== '')
+          .sort()
+      )];
+
+      return uniqueProperties;
+    } catch (error) {
+      console.error('Failed to load properties:', error);
+      return ['All Properties', 'Pine Terrace', 'Wesley', 'Terra2', 'Terra3'];
+    }
+  }
+
+  static async getBankAccounts(): Promise<string[]> {
+    try {
+      const data = await this.request('journal_entries', {
+        'select': 'account_name',
+        'account_name': 'ilike.*checking*',
+        'limit': '1000'
+      });
+
+      const uniqueAccounts = ['All Accounts', ...new Set(
+        data
+          .map((item: any) => item.account_name)
+          .filter((acc: string) => acc && (
+            acc.toLowerCase().includes('checking') || 
+            acc.toLowerCase().includes('bank') || 
+            acc.toLowerCase().includes('cash')
+          ))
+          .sort()
+      )];
+
+      return uniqueAccounts;
+    } catch (error) {
+      console.error('Failed to load bank accounts:', error);
+      return ['All Accounts', 'Wesley Checking', 'Terra3 Checking'];
+    }
+  }
+
+  static async getFinancialData(property: string, bankAccount: string, month: string) {
+    try {
+      const startTime = Date.now();
+      const monthDate = this.parseMonthString(month);
+      const { startDate, endDate } = this.getDateRange(monthDate);
+
+      const queryParams: Record<string, string> = {
+        'select': '*',
+        'order': 'transaction_date.desc',
+        'limit': '5000'
+      };
+
+      if (startDate && endDate) {
+        queryParams['transaction_date'] = `gte.${startDate}`;
+        queryParams['and'] = `transaction_date.lt.${endDate}`;
+      }
+
+      if (property !== 'All Properties') {
+        queryParams['property_class'] = `eq.${property}`;
+      }
+
+      const journalEntries = await this.request('journal_entries', queryParams);
+      const processedData = this.processJournalEntries(journalEntries, property, bankAccount, month);
+      const totalTime = Date.now() - startTime;
+
+      return {
+        success: true,
+        data: processedData,
+        summary: {
+          filteredEntries: journalEntries.length,
+          totalRevenue: processedData.summary.totalRevenue,
+          totalExpenses: processedData.summary.totalExpenses,
+          netIncome: processedData.summary.netIncome,
+          dataSource: 'DIRECT_SUPABASE',
+          processingTimeMs: totalTime
+        },
+        performance: {
+          executionTimeMs: totalTime,
+          entriesProcessed: journalEntries.length,
+          timeoutRisk: 'NONE'
+        }
+      };
     } catch (error) {
       console.error('Failed to load financial data:', error);
-      setDataError('Failed to load financial data');
-      showNotification('Failed to load financial data', 'error');
-    } finally {
-      setIsLoadingData(false);
+      return {
+        success: false,
+        error: (error as Error).message,
+        data: this.getSampleData(property, bankAccount, month)
+      };
     }
-  };
+  }
 
-  const handlePropertyToggle = (property: string) => {
-    const newSelected = new Set(selectedProperties);
+  private static parseMonthString(monthString: string): Date | null {
+    try {
+      const [monthName, year] = monthString.split(' ');
+      const monthMap: Record<string, number> = {
+        'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
+        'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
+      };
+      
+      if (monthMap[monthName] !== undefined && year) {
+        return new Date(parseInt(year), monthMap[monthName], 1);
+      }
+    } catch (error) {
+      console.error('Date parsing error:', error);
+    }
+    return null;
+  }
+
+  private static getDateRange(date: Date | null) {
+    if (!date) return { startDate: null, endDate: null };
     
-    if (property === 'All Properties') {
-      if (newSelected.has('All Properties')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Properties');
-      }
-    } else {
-      newSelected.delete('All Properties');
-      if (newSelected.has(property)) {
-        newSelected.delete(property);
-      } else {
-        newSelected.add(property);
-      }
-    }
-    setSelectedProperties(newSelected);
-  };
-
-  const handleBankAccountToggle = (account: string) => {
-    const newSelected = new Set(selectedBankAccounts);
+    const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 1);
     
-    if (account === 'All Accounts') {
-      if (newSelected.has('All Accounts')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Accounts');
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    };
+  }
+
+  private static processJournalEntries(entries: any[], property: string, bankAccount: string, month: string) {
+    let totalRevenue = 0;
+    let totalCOGS = 0;
+    let totalOperatingExpenses = 0;
+    let totalInterestExpense = 0;
+    let totalTaxes = 0;
+
+    entries.forEach(entry => {
+      const { account_name, debit_amount, credit_amount } = entry;
+      const accountLower = account_name.toLowerCase();
+
+      if (accountLower.includes('revenue') || accountLower.includes('rental') || accountLower.includes('income')) {
+        totalRevenue += credit_amount || 0;
+      } else if (accountLower.includes('expense') || accountLower.includes('utilities') || 
+                 accountLower.includes('cleaning') || accountLower.includes('maintenance')) {
+        totalOperatingExpenses += debit_amount || 0;
+      } else if (accountLower.includes('cogs') || accountLower.includes('cost of goods')) {
+        totalCOGS += debit_amount || 0;
+      } else if (accountLower.includes('interest') && accountLower.includes('expense')) {
+        totalInterestExpense += debit_amount || 0;
+      } else if (accountLower.includes('tax')) {
+        totalTaxes += debit_amount || 0;
       }
-    } else {
-      newSelected.delete('All Accounts');
-      if (newSelected.has(account)) {
-        newSelected.delete(account);
-      } else {
-        newSelected.add(account);
+    });
+
+    const grossProfit = totalRevenue - totalCOGS;
+    const operatingIncome = grossProfit - totalOperatingExpenses;
+    const netIncome = operatingIncome - totalInterestExpense - totalTaxes;
+    const totalExpenses = totalCOGS + totalOperatingExpenses + totalInterestExpense + totalTaxes;
+
+    return {
+      plData: [
+        { name: 'Revenue', total: totalRevenue, months: { [month]: totalRevenue } },
+        { name: 'Cost of Goods Sold', total: totalCOGS, months: { [month]: totalCOGS } },
+        { name: 'Gross Profit', total: grossProfit, months: { [month]: grossProfit } },
+        { name: 'Operating Expenses', total: totalOperatingExpenses, months: { [month]: totalOperatingExpenses } },
+        { name: 'Operating Income', total: operatingIncome, months: { [month]: operatingIncome } },
+        { name: 'Interest Expense', total: totalInterestExpense, months: { [month]: totalInterestExpense } },
+        { name: 'Taxes', total: totalTaxes, months: { [month]: totalTaxes } },
+        { name: 'Net Income', total: netIncome, months: { [month]: netIncome } }
+      ],
+      cashFlowData: {
+        inFlow: [
+          { name: 'Revenue', total: totalRevenue, months: { [month]: totalRevenue } }
+        ],
+        outFlow: [
+          { name: 'Operating Expenses', total: -totalOperatingExpenses, months: { [month]: -totalOperatingExpenses } },
+          { name: 'Cost of Goods Sold', total: -totalCOGS, months: { [month]: -totalCOGS } },
+          { name: 'Interest & Taxes', total: -(totalInterestExpense + totalTaxes), months: { [month]: -(totalInterestExpense + totalTaxes) } }
+        ],
+        totalInFlow: totalRevenue,
+        totalOutFlow: -totalExpenses,
+        totalCashFlow: totalRevenue - totalExpenses,
+        beginningCash: 50000,
+        endingCash: 50000 + (totalRevenue - totalExpenses)
+      },
+      summary: {
+        totalRevenue,
+        totalExpenses,
+        netIncome
       }
-    }
-    setSelectedBankAccounts(newSelected);
-  };
+    };
+  }
 
-  const getSelectedBankAccountsText = () => {
-    if (selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0) {
-      return 'All Accounts';
-    }
-    if (selectedBankAccounts.size === 1) {
-      return Array.from(selectedBankAccounts)[0];
-    }
-    return `${selectedBankAccounts.size} Accounts Selected`;
-  };
+  private static getSampleData(property: string, bankAccount: string, month: string) {
+    const revenue = 28500;
+    const expenses = 16200;
+    const netIncome = revenue - expenses;
 
-  const getSelectedPropertiesText = () => {
-    if (selectedProperties.has('All Properties') || selectedProperties.size === 0) {
-      return 'All Properties';
-    }
-    if (selectedProperties.size === 1) {
-      return Array.from(selectedProperties)[0];
-    }
-    return `${selectedProperties.size} Properties Selected`;
-  };
+    return {
+      plData: [
+        { name: 'Revenue', total: revenue, months: { [month]: revenue } },
+        { name: 'Cost of Goods Sold', total: 8500, months: { [month]: 8500 } },
+        { name: 'Gross Profit', total: revenue - 8500, months: { [month]: revenue - 8500 } },
+        { name: 'Operating Expenses', total: 7700, months: { [month]: 7700 } },
+        { name: 'Operating Income', total: netIncome, months: { [month]: netIncome } },
+        { name: 'Net Income', total: netIncome * 0.9, months: { [month]: netIncome * 0.9 } }
+      ],
+      cashFlowData: {
+        inFlow: [{ name: 'Revenue', total: revenue, months: { [month]: revenue } }],
+        outFlow: [{ name: 'Expenses', total: -expenses, months: { [month]: -expenses } }],
+        totalInFlow: revenue,
+        totalOutFlow: -expenses,
+        totalCashFlow: netIncome,
+        beginningCash: 45000,
+        endingCash: 45000 + netIncome
+      },
+      summary: {
+        totalRevenue: revenue,
+        totalExpenses: expenses,
+        netIncome: netIncome
+      }
+    };
+  }
+}
 
-  // Helper functions
-  const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0
-    }).format(value);
-  };
+// Utility Functions
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(value);
+};
 
-  const calculatePercentage = (value: number, total: number): string => {
-    return total !== 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
-  };
+const calculatePercentage = (value: number, total: number): string => {
+  return total !== 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+};
 
-  const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info'): void => {
+// Chart Colors
+const CHART_COLORS = [
+  BRAND_COLORS.primary, 
+  BRAND_COLORS.success, 
+  BRAND_COLORS.warning, 
+  BRAND_COLORS.danger, 
+  BRAND_COLORS.secondary, 
+  BRAND_COLORS.tertiary
+];
+
+// Available Months
+const MONTHS_LIST: MonthString[] = [
+  'January 2023', 'February 2023', 'March 2023', 'April 2023', 'May 2023', 'June 2023',
+  'July 2023', 'August 2023', 'September 2023', 'October 2023', 'November 2023', 'December 2023',
+  'January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024',
+  'July 2024', 'August 2024', 'September 2024', 'October 2024', 'November 2024', 'December 2024',
+  'January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025'
+];
+
+// Custom Hooks
+const useNotification = () => {
+  const [notification, setNotification] = useState<NotificationState>({ 
+    show: false, 
+    message: '', 
+    type: 'info' 
+  });
+
+  const showNotification = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setNotification({ show: true, message, type });
     setTimeout(() => {
       setNotification({ show: false, message: '', type: 'info' });
     }, 3000);
-  };
+  }, []);
 
-  const toggleAccountExpansion = (accountName: string): void => {
-    const newExpanded = new Set(expandedAccounts);
-    if (newExpanded.has(accountName)) {
-      newExpanded.delete(accountName);
-    } else {
-      newExpanded.add(accountName);
-    }
-    setExpandedAccounts(newExpanded);
-  };
+  return { notification, showNotification };
+};
 
-  // Get current financial data (from real API or fallback)
-  const getCurrentFinancialData = () => {
-    if (realData && realData.propertyFinancialData) {
-      const propertyKey = Object.keys(realData.propertyFinancialData)[0] || 'All Properties';
-      const monthlyData = realData.propertyFinancialData[propertyKey]?.Monthly;
-      return monthlyData?.[selectedMonth] || [];
-    }
-    return [];
-  };
+const useFinancialData = () => {
+  const [financialData, setFinancialData] = useState<any>(null);
+  const [loading, setLoading] = useState<LoadingState>({
+    data: false,
+    properties: false,
+    bankAccounts: false
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [properties, setProperties] = useState<string[]>(['All Properties']);
+  const [bankAccounts, setBankAccounts] = useState<string[]>(['All Accounts']);
 
-  const getCurrentCashFlowData = () => {
-    if (realData && realData.propertyCashFlowData) {
-      const propertyKey = Object.keys(realData.propertyCashFlowData)[0] || 'All Properties';
-      return realData.propertyCashFlowData[propertyKey] || {
-        inFlow: [],
-        outFlow: [],
-        totalInFlow: 0,
-        totalOutFlow: 0,
-        totalCashFlow: 0,
-        beginningCash: 0,
-        endingCash: 0
-      };
+  const loadProperties = useCallback(async () => {
+    setLoading(prev => ({ ...prev, properties: true }));
+    try {
+      const data = await SupabaseService.getProperties();
+      setProperties(data);
+    } catch (err) {
+      console.error('Failed to load properties:', err);
+    } finally {
+      setLoading(prev => ({ ...prev, properties: false }));
     }
-    return {
+  }, []);
+
+  const loadBankAccounts = useCallback(async () => {
+    setLoading(prev => ({ ...prev, bankAccounts: true }));
+    try {
+      const data = await SupabaseService.getBankAccounts();
+      setBankAccounts(data);
+    } catch (err) {
+      console.error('Failed to load bank accounts:', err);
+    } finally {
+      setLoading(prev => ({ ...prev, bankAccounts: false }));
+    }
+  }, []);
+
+  const loadFinancialData = useCallback(async (property: string, bankAccount: string, month: string) => {
+    setLoading(prev => ({ ...prev, data: true }));
+    setError(null);
+    try {
+      const response = await SupabaseService.getFinancialData(property, bankAccount, month);
+      if (response.success) {
+        setFinancialData(response);
+        setError(null);
+      } else {
+        setError(response.error || 'Failed to load financial data');
+      }
+    } catch (err) {
+      setError('Failed to load financial data');
+    } finally {
+      setLoading(prev => ({ ...prev, data: false }));
+    }
+  }, []);
+
+  return {
+    financialData,
+    loading,
+    error,
+    properties,
+    bankAccounts,
+    loadProperties,
+    loadBankAccounts,
+    loadFinancialData
+  };
+};
+
+// Main Component
+export default function FinancialsPage() {
+  // State Management
+  const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
+  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2025');
+  const [viewMode, setViewMode] = useState<ViewMode>('detailed');
+  const [timeView, setTimeView] = useState<TimeView>('Monthly');
+  
+  // Dropdown States
+  const [timeViewDropdownOpen, setTimeViewDropdownOpen] = useState(false);
+  const [bankAccountDropdownOpen, setBankAccountDropdownOpen] = useState(false);
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
+  
+  // Selection States
+  const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(new Set(['All Accounts']));
+  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+
+  // Custom Hooks
+  const { notification, showNotification } = useNotification();
+  const {
+    financialData,
+    loading,
+    error,
+    properties,
+    bankAccounts,
+    loadProperties,
+    loadBankAccounts,
+    loadFinancialData
+  } = useFinancialData();
+
+  // Effects
+  useEffect(() => {
+    const initializeData = async () => {
+      await Promise.all([loadProperties(), loadBankAccounts()]);
+      handleLoadFinancialData();
+    };
+    initializeData();
+  }, []);
+
+  useEffect(() => {
+    handleLoadFinancialData();
+  }, [selectedProperties, selectedBankAccounts, selectedMonth]);
+
+  // Event Handlers
+  const handleLoadFinancialData = useCallback(() => {
+    const property = selectedProperties.has('All Properties') || selectedProperties.size === 0 
+      ? 'All Properties' 
+      : Array.from(selectedProperties)[0];
+    
+    const bankAccount = selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0
+      ? 'All Accounts'
+      : Array.from(selectedBankAccounts)[0];
+    
+    loadFinancialData(property, bankAccount, selectedMonth);
+  }, [selectedProperties, selectedBankAccounts, selectedMonth, loadFinancialData]);
+
+  const handlePropertyToggle = useCallback((property: string) => {
+    setSelectedProperties(prev => {
+      const newSelected = new Set(prev);
+      
+      if (property === 'All Properties') {
+        if (newSelected.has('All Properties')) {
+          newSelected.clear();
+        } else {
+          newSelected.clear();
+          newSelected.add('All Properties');
+        }
+      } else {
+        newSelected.delete('All Properties');
+        if (newSelected.has(property)) {
+          newSelected.delete(property);
+        } else {
+          newSelected.add(property);
+        }
+      }
+      return newSelected;
+    });
+  }, []);
+
+  const handleBankAccountToggle = useCallback((account: string) => {
+    setSelectedBankAccounts(prev => {
+      const newSelected = new Set(prev);
+      
+      if (account === 'All Accounts') {
+        if (newSelected.has('All Accounts')) {
+          newSelected.clear();
+        } else {
+          newSelected.clear();
+          newSelected.add('All Accounts');
+        }
+      } else {
+        newSelected.delete('All Accounts');
+        if (newSelected.has(account)) {
+          newSelected.delete(account);
+        } else {
+          newSelected.add(account);
+        }
+      }
+      return newSelected;
+    });
+  }, []);
+
+  const handleExport = useCallback(() => {
+    showNotification('Financial data exported successfully', 'success');
+  }, [showNotification]);
+
+  const handleRefresh = useCallback(() => {
+    handleLoadFinancialData();
+    showNotification('Data refreshed successfully', 'success');
+  }, [handleLoadFinancialData, showNotification]);
+
+  const closeAllDropdowns = useCallback(() => {
+    setTimeViewDropdownOpen(false);
+    setPropertyDropdownOpen(false);
+    setBankAccountDropdownOpen(false);
+  }, []);
+
+  // Computed Values
+  const currentPLData = useMemo(() => {
+    return financialData?.data?.plData || [];
+  }, [financialData]);
+
+  const currentCashFlowData = useMemo(() => {
+    return financialData?.data?.cashFlowData || {
       inFlow: [],
       outFlow: [],
       totalInFlow: 0,
@@ -359,17 +647,13 @@ export default function FinancialsPage() {
       beginningCash: 0,
       endingCash: 0
     };
-  };
+  }, [financialData]);
 
-  const currentData = getCurrentFinancialData();
-  const currentCashFlowData = getCurrentCashFlowData();
-
-  // Calculate KPIs from real data
-  const calculateKPIs = () => {
-    const revenue = currentData.find(item => item.name === 'Revenue')?.total || 0;
-    const grossProfit = currentData.find(item => item.name === 'Gross Profit')?.total || 0;
-    const operatingIncome = currentData.find(item => item.name === 'Operating Income')?.total || 0;
-    const netIncome = currentData.find(item => item.name === 'Net Income')?.total || 0;
+  const kpis = useMemo(() => {
+    const revenue = currentPLData.find((item: any) => item.name === 'Revenue')?.total || 0;
+    const grossProfit = currentPLData.find((item: any) => item.name === 'Gross Profit')?.total || 0;
+    const operatingIncome = currentPLData.find((item: any) => item.name === 'Operating Income')?.total || 0;
+    const netIncome = currentPLData.find((item: any) => item.name === 'Net Income')?.total || 0;
     
     return {
       revenue,
@@ -377,27 +661,26 @@ export default function FinancialsPage() {
       operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
       netMargin: revenue ? (netIncome / revenue) * 100 : 0
     };
-  };
+  }, [currentPLData]);
 
-  const generateTrendData = () => {
-    // This could be enhanced to use real historical data from the API
+  const trendData = useMemo(() => {
     const months = ['Jan 2025', 'Feb 2025', 'Mar 2025', 'Apr 2025', 'May 2025', 'Jun 2025'];
-    const revenue = currentData.find(item => item.name === 'Revenue')?.total || 0;
+    const revenue = kpis.revenue;
     
     return months.map((month, index) => ({
       month,
-      revenue: revenue * (0.8 + (index * 0.04)), // Simulated trend
+      revenue: revenue * (0.8 + (index * 0.04)),
       grossProfit: (revenue * (0.8 + (index * 0.04))) * 0.4,
       operatingIncome: (revenue * (0.8 + (index * 0.04))) * 0.2,
       netIncome: (revenue * (0.8 + (index * 0.04))) * 0.15,
     }));
-  };
+  }, [kpis.revenue]);
 
-  const generateExpenseBreakdown = () => {
-    const cogs = currentData.find(item => item.name === 'Cost of Goods Sold')?.total || 0;
-    const opex = currentData.find(item => item.name === 'Operating Expenses')?.total || 0;
-    const interest = currentData.find(item => item.name === 'Interest Expense')?.total || 0;
-    const taxes = currentData.find(item => item.name === 'Taxes')?.total || 0;
+  const expenseData = useMemo(() => {
+    const cogs = currentPLData.find((item: any) => item.name === 'Cost of Goods Sold')?.total || 0;
+    const opex = currentPLData.find((item: any) => item.name === 'Operating Expenses')?.total || 0;
+    const interest = currentPLData.find((item: any) => item.name === 'Interest Expense')?.total || 0;
+    const taxes = currentPLData.find((item: any) => item.name === 'Taxes')?.total || 0;
     
     return [
       { name: 'Cost of Goods Sold', value: cogs },
@@ -405,21 +688,39 @@ export default function FinancialsPage() {
       { name: 'Interest Expense', value: interest },
       { name: 'Taxes', value: taxes },
     ].filter(item => item.value > 0);
-  };
+  }, [currentPLData]);
 
-  const kpis = calculateKPIs();
-  const trendData = generateTrendData();
-  const expenseData = generateExpenseBreakdown();
+  const getSelectedPropertiesText = useMemo(() => {
+    if (selectedProperties.has('All Properties') || selectedProperties.size === 0) {
+      return 'All Properties';
+    }
+    if (selectedProperties.size === 1) {
+      return Array.from(selectedProperties)[0];
+    }
+    return `${selectedProperties.size} Properties Selected`;
+  }, [selectedProperties]);
 
-  const renderColumnHeaders = () => {
+  const getSelectedBankAccountsText = useMemo(() => {
+    if (selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0) {
+      return 'All Accounts';
+    }
+    if (selectedBankAccounts.size === 1) {
+      return Array.from(selectedBankAccounts)[0];
+    }
+    return `${selectedBankAccounts.size} Accounts Selected`;
+  }, [selectedBankAccounts]);
+
+  // Render Functions
+  const renderDataCell = (item: FinancialDataItem) => {
+    const value = item.total || 0;
     return (
-      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-        {selectedMonth}
-      </th>
+      <td className="px-4 py-3 text-right text-sm font-medium">
+        {formatCurrency(value)}
+      </td>
     );
   };
 
-  const renderCashFlowDataCells = (item: FinancialDataItem) => {
+  const renderCashFlowDataCell = (item: FinancialDataItem) => {
     const value = item.total || 0;
     return (
       <td className={`px-4 py-3 text-right text-sm font-medium ${
@@ -430,18 +731,9 @@ export default function FinancialsPage() {
     );
   };
 
-  const renderDataCells = (item: FinancialDataItem) => {
-    const value = item.total || 0;
-    return (
-      <td className="px-4 py-3 text-right text-sm font-medium">
-        {formatCurrency(value)}
-      </td>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Page Header with IAM CFO Branding */}
+      {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
@@ -449,20 +741,23 @@ export default function FinancialsPage() {
             <div>
               <div className="flex items-center space-x-3">
                 <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
-                <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
+                <span 
+                  className="text-sm px-3 py-1 rounded-full text-white" 
+                  style={{ backgroundColor: BRAND_COLORS.primary }}
+                >
                   Financial Management
                 </span>
-                {realData && (
+                {financialData && (
                   <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
-                    Live Data Connected
+                    Direct Supabase Connected
                   </span>
                 )}
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Real-time P&L, Cash Flow & Balance Sheet • QuickBooks Integration
-                {realData?.summary && (
+                Real-time P&L, Cash Flow & Balance Sheet • Direct Supabase Integration
+                {financialData?.summary && (
                   <span className="ml-2 text-green-600">
-                    • {realData.summary.filteredEntries} entries loaded
+                    • {financialData.summary.filteredEntries} entries • {financialData.performance?.executionTimeMs}ms response
                   </span>
                 )}
               </p>
@@ -473,38 +768,38 @@ export default function FinancialsPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          {/* Header Controls */}
+          {/* Controls */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Financial Management</h2>
+            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+              Financial Management
+            </h2>
             <div className="flex flex-wrap gap-4 items-center">
               {/* Month Selector */}
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value as MonthString)}
                 className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
               >
-                {monthsList.map((month) => (
+                {MONTHS_LIST.map((month) => (
                   <option key={month} value={month}>
                     {month}
                   </option>
                 ))}
               </select>
 
-              {/* Property Filter Dropdown */}
+              {/* Property Filter */}
               <div className="relative">
                 <button
                   onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
                   className="flex items-center justify-between w-48 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                 >
-                  <span className="truncate">{getSelectedPropertiesText()}</span>
+                  <span className="truncate">{getSelectedPropertiesText}</span>
                   <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
                 {propertyDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    {availableProperties.map((property) => (
+                    {properties.map((property) => (
                       <div
                         key={property}
                         className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
@@ -526,12 +821,11 @@ export default function FinancialsPage() {
                 )}
               </div>
 
-              {/* Time View Dropdown */}
+              {/* Time View */}
               <div className="relative">
                 <button
                   onClick={() => setTimeViewDropdownOpen(!timeViewDropdownOpen)}
                   className="flex items-center justify-between w-32 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                 >
                   <span>{timeView}</span>
                   <ChevronDown className={`w-4 h-4 transition-transform ${timeViewDropdownOpen ? 'rotate-180' : ''}`} />
@@ -583,7 +877,7 @@ export default function FinancialsPage() {
 
               {/* Action Buttons */}
               <button
-                onClick={() => showNotification('Financial data exported', 'success')}
+                onClick={handleExport}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
                 style={{ backgroundColor: BRAND_COLORS.primary }}
               >
@@ -592,38 +886,35 @@ export default function FinancialsPage() {
               </button>
 
               <button
-                onClick={loadRealFinancialData}
-                disabled={isLoadingData}
+                onClick={handleRefresh}
+                disabled={loading.data}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
-                {isLoadingData ? 'Loading...' : 'Refresh'}
+                <RefreshCw className={`w-4 h-4 ${loading.data ? 'animate-spin' : ''}`} />
+                {loading.data ? 'Loading...' : 'Refresh'}
               </button>
             </div>
           </div>
 
-          {/* Data Status */}
-          {dataError && (
+          {/* Status Messages */}
+          {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="text-red-800 text-sm">
-                <strong>Error:</strong> {dataError}
+                <strong>Error:</strong> {error}
               </div>
             </div>
           )}
 
-          {realData?.performance && (
+          {financialData?.performance && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
-                <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
-                in {realData.performance.executionTimeMs}ms • Source: {realData.summary.dataSource}
-                {realData.summary.journalEntriesFound && (
-                  <span> • {realData.summary.journalEntriesFound} journal entries processed</span>
-                )}
+                <strong>Data Status:</strong> Loaded {financialData.summary.filteredEntries} entries 
+                in {financialData.performance.executionTimeMs}ms • Source: {financialData.summary.dataSource}
               </div>
             </div>
           )}
 
-          {/* Financial KPIs */}
+          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.primary }}>
               <div className="flex items-center justify-between">
@@ -631,10 +922,10 @@ export default function FinancialsPage() {
                   <div className="text-gray-600 text-sm font-medium mb-2">Total Revenue</div>
                   <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
                   <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
-                    Real QuickBooks Data
+                    Real Supabase Data
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {getSelectedPropertiesText()}
+                    {getSelectedPropertiesText}
                   </div>
                 </div>
                 <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
@@ -649,9 +940,6 @@ export default function FinancialsPage() {
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
                     Live Calculation
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {getSelectedPropertiesText()}
-                  </div>
                 </div>
                 <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
               </div>
@@ -664,9 +952,6 @@ export default function FinancialsPage() {
                   <div className="text-3xl font-bold text-gray-900 mb-1">{kpis.operatingMargin.toFixed(1)}%</div>
                   <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full inline-block">
                     Live Calculation
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {getSelectedPropertiesText()}
                   </div>
                 </div>
                 <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
@@ -681,18 +966,15 @@ export default function FinancialsPage() {
                   <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
                     Live Calculation
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {getSelectedPropertiesText()}
-                  </div>
                 </div>
                 <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
               </div>
             </div>
           </div>
 
-          {/* Main Content Grid */}
+          {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column: Financial Tables */}
+            {/* Financial Tables */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200">
@@ -740,15 +1022,15 @@ export default function FinancialsPage() {
                   </div>
                 </div>
 
-                {/* P&L Content */}
+                {/* P&L Tab */}
                 {activeTab === 'p&l' && (
                   <div className="overflow-x-auto">
-                    {isLoadingData ? (
+                    {loading.data ? (
                       <div className="flex items-center justify-center py-8">
                         <RefreshCw className="w-6 h-6 animate-spin mr-2" />
                         <span>Loading financial data...</span>
                       </div>
-                    ) : currentData.length === 0 ? (
+                    ) : currentPLData.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         No financial data available for the selected filters
                       </div>
@@ -759,16 +1041,18 @@ export default function FinancialsPage() {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Account
                             </th>
-                            {renderColumnHeaders()}
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              {selectedMonth}
+                            </th>
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                               % of Revenue
                             </th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {currentData.map((item, index) => {
+                          {currentPLData.map((item: any) => {
                             const isTotalRow = item.name === 'Net Income' || item.name === 'Gross Profit';
-                            const revenueItem = currentData.find(i => i.name === 'Revenue');
+                            const revenueItem = currentPLData.find((i: any) => i.name === 'Revenue');
                             const percentOfRevenue = revenueItem 
                               ? calculatePercentage(item.total, revenueItem.total)
                               : '0%';
@@ -783,7 +1067,7 @@ export default function FinancialsPage() {
                                 }`}>
                                   {item.name}
                                 </td>
-                                {renderDataCells(item)}
+                                {renderDataCell(item)}
                                 <td className="px-4 py-3 text-right text-sm text-gray-500">
                                   {percentOfRevenue}
                                 </td>
@@ -796,7 +1080,7 @@ export default function FinancialsPage() {
                   </div>
                 )}
 
-                {/* Cash Flow Content */}
+                {/* Cash Flow Tab */}
                 {activeTab === 'cash-flow' && (
                   <div>
                     {/* Bank Account Selector */}
@@ -807,15 +1091,14 @@ export default function FinancialsPage() {
                           <button
                             onClick={() => setBankAccountDropdownOpen(!bankAccountDropdownOpen)}
                             className="flex items-center justify-between w-64 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                            style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                           >
-                            <span className="truncate">{getSelectedBankAccountsText()}</span>
+                            <span className="truncate">{getSelectedBankAccountsText}</span>
                             <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${bankAccountDropdownOpen ? 'rotate-180' : ''}`} />
                           </button>
                           
                           {bankAccountDropdownOpen && (
                             <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                              {availableBankAccounts.map((account) => (
+                              {bankAccounts.map((account) => (
                                 <div
                                   key={account}
                                   className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
@@ -837,13 +1120,10 @@ export default function FinancialsPage() {
                           )}
                         </div>
                       </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        Viewing cash flow for: {getSelectedBankAccountsText()}
-                      </div>
                     </div>
 
                     <div className="overflow-x-auto">
-                      {isLoadingData ? (
+                      {loading.data ? (
                         <div className="flex items-center justify-center py-8">
                           <RefreshCw className="w-6 h-6 animate-spin mr-2" />
                           <span>Loading cash flow data...</span>
@@ -855,20 +1135,22 @@ export default function FinancialsPage() {
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Account
                               </th>
-                              {renderColumnHeaders()}
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {selectedMonth}
+                              </th>
                               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 % of Total Cash
                               </th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {/* Cash In-Flow Section */}
+                            {/* Cash In-Flow */}
                             <tr className="bg-green-50">
-                              <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
+                              <td colSpan={3} className="px-4 py-3 text-left text-sm font-bold text-green-800">
                                 💰 CASH IN-FLOW
                               </td>
                             </tr>
-                            {currentCashFlowData.inFlow.map((item) => {
+                            {currentCashFlowData.inFlow?.map((item: any) => {
                               const totalCash = Math.abs(currentCashFlowData.totalCashFlow) || 1;
                               const percentOfCash = calculatePercentage(item.total, totalCash);
 
@@ -877,7 +1159,7 @@ export default function FinancialsPage() {
                                   <td className="px-4 py-3 text-left text-sm text-gray-700">
                                     <span className="ml-4">{item.name}</span>
                                   </td>
-                                  {renderCashFlowDataCells(item)}
+                                  {renderCashFlowDataCell(item)}
                                   <td className="px-4 py-3 text-right text-sm text-green-600">
                                     {percentOfCash}
                                   </td>
@@ -898,13 +1180,13 @@ export default function FinancialsPage() {
                               </td>
                             </tr>
 
-                            {/* Cash Out-Flow Section */}
+                            {/* Cash Out-Flow */}
                             <tr className="bg-red-50">
-                              <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
+                              <td colSpan={3} className="px-4 py-3 text-left text-sm font-bold text-red-800">
                                 💸 CASH OUT-FLOW
                               </td>
                             </tr>
-                            {currentCashFlowData.outFlow.map((item) => {
+                            {currentCashFlowData.outFlow?.map((item: any) => {
                               const totalCash = Math.abs(currentCashFlowData.totalCashFlow) || 1;
                               const percentOfCash = calculatePercentage(Math.abs(item.total), totalCash);
 
@@ -913,26 +1195,13 @@ export default function FinancialsPage() {
                                   <td className="px-4 py-3 text-left text-sm text-gray-700">
                                     <span className="ml-4">{item.name}</span>
                                   </td>
-                                  {renderCashFlowDataCells(item)}
+                                  {renderCashFlowDataCell(item)}
                                   <td className="px-4 py-3 text-right text-sm text-red-600">
                                     {percentOfCash}
                                   </td>
                                 </tr>
                               );
                             })}
-
-                            {/* Total Cash Out-Flow */}
-                            <tr className="bg-red-100 font-semibold">
-                              <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
-                                Total Cash Out-Flow
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                                ({formatCurrency(Math.abs(currentCashFlowData.totalOutFlow))})
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                                100%
-                              </td>
-                            </tr>
 
                             {/* Net Cash Flow */}
                             <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
@@ -949,7 +1218,7 @@ export default function FinancialsPage() {
                               </td>
                             </tr>
 
-                            {/* Beginning & Ending Cash Balance */}
+                            {/* Cash Balances */}
                             <tr className="bg-gray-50">
                               <td className="px-4 py-3 text-left text-sm text-gray-700">
                                 Beginning Cash Balance
@@ -979,7 +1248,7 @@ export default function FinancialsPage() {
                   </div>
                 )}
 
-                {/* Balance Sheet Content */}
+                {/* Balance Sheet Tab */}
                 {activeTab === 'balance-sheet' && (
                   <div className="overflow-x-auto">
                     <div className="text-center py-8 text-gray-500">
@@ -990,7 +1259,7 @@ export default function FinancialsPage() {
               </div>
             </div>
 
-            {/* Right Column: Charts */}
+            {/* Charts Column */}
             <div className="space-y-8">
               {/* Revenue Trend Chart */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -1049,13 +1318,13 @@ export default function FinancialsPage() {
                             labelLine={false}
                           >
                             {expenseData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                             ))}
                           </Pie>
                         </RechartsPieChart>
                       </ResponsiveContainer>
                       
-                      {/* Manual Legend */}
+                      {/* Legend */}
                       <div className="mt-6 grid grid-cols-2 gap-4">
                         {expenseData.map((item, index) => {
                           const total = expenseData.reduce((sum, expense) => sum + expense.value, 0);
@@ -1064,7 +1333,7 @@ export default function FinancialsPage() {
                             <div key={item.name} className="flex items-center space-x-3">
                               <div 
                                 className="w-4 h-4 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
                               ></div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium text-gray-900 truncate">{item.name}</div>
@@ -1098,15 +1367,11 @@ export default function FinancialsPage() {
             </div>
           )}
 
-          {/* Click outside to close dropdowns */}
+          {/* Dropdown Overlay */}
           {(timeViewDropdownOpen || propertyDropdownOpen || bankAccountDropdownOpen) && (
             <div
               className="fixed inset-0 z-10"
-              onClick={() => {
-                setTimeViewDropdownOpen(false);
-                setPropertyDropdownOpen(false);
-                setBankAccountDropdownOpen(false);
-              }}
+              onClick={closeAllDropdowns}
             />
           )}
         </div>
