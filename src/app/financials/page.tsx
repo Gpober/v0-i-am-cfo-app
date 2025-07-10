@@ -433,15 +433,25 @@ const fetchFinancialData = async (
     console.log('📝 Sample account names:', accountNames);
     
     // Create account code to name mapping from your chart of accounts
-    const accountCodeMap = new Map();
+    const accountLookupMap = new Map();
     
-    // First, map your chart of accounts (property addresses as Fixed Assets)
+    // Build lookup from your accounts table - THIS IS THE KEY!
     accountsData.forEach((account: any) => {
-      accountCodeMap.set(account.account_name, {
+      accountLookupMap.set(account.account_name, {
         type: account.account_type,
-        standardName: account.account_name
+        standardName: account.account_name,
+        classification: account.account_type === 'Income' ? 'Revenue' : 
+                      account.account_type === 'Expenses' ? 'Expenses' :
+                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                      account.account_type === 'Other Income' ? 'Revenue' :
+                      account.account_type === 'Other Expenses' ? 'Expenses' :
+                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
+                      account.account_type // Default to the account type
       });
     });
+
+    console.log('📋 Accounts lookup built:', accountLookupMap.size, 'accounts mapped');
+    console.log('📋 Sample account mappings:', Array.from(accountLookupMap.entries()).slice(0, 5));
 
     // Enhanced classification for journal entries using account_name (column D)
     const classifyJournalAccount = (entry: any) => {
@@ -559,13 +569,16 @@ const fetchFinancialData = async (
       }
     };
 
-    // Process journal entries using the correct fields
+    // Process journal entries using your accounts table classification
     const enhancedData = journalData.map((entry: any) => {
-      // First try to find exact match in chart of accounts
-      let accountInfo = accountCodeMap.get(entry.account_name);
+      // First try to find exact match in your accounts table
+      let accountInfo = accountLookupMap.get(entry.account_name);
       
-      if (!accountInfo) {
-        // Use intelligent classification based on account_name (column D)
+      if (accountInfo) {
+        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
+      } else {
+        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using fallback classification`);
+        // Fallback to intelligent classification for unmapped accounts
         const classification = classifyJournalAccount(entry);
         accountInfo = classification;
       }
@@ -575,29 +588,29 @@ const fetchFinancialData = async (
         account_type: accountInfo?.type || entry.account_type || 'Other',
         classification: accountInfo?.classification || accountInfo?.type || 'Other',
         standard_account_name: accountInfo?.standardName || entry.account_name,
-        mapping_method: accountCodeMap.has(entry.account_name) ? 'Chart of Accounts' : 
-                        'Account Name Classification'
+        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 
+                        'Fallback Classification'
       };
     });
 
-    // Debug: Log classification results
+    // Debug: Log classification results using your accounts table
     const revenueEntries = enhancedData.filter(e => e.classification === 'Revenue');
     const expenseEntries = enhancedData.filter(e => e.classification === 'Expenses');
     
-    console.log('💰 Revenue entries found:', revenueEntries.length);
-    console.log('💰 Sample revenue accounts:', revenueEntries.slice(0, 5).map(e => ({
+    console.log('💰 Revenue entries found using accounts table:', revenueEntries.length);
+    console.log('💰 Revenue accounts from your table:', revenueEntries.slice(0, 5).map(e => ({
       account: e.account_name,
-      line_amount: e.line_amount,
-      debit: e.debit_amount,
-      credit: e.credit_amount
+      classification: e.classification,
+      mapping: e.mapping_method,
+      line_amount: e.line_amount
     })));
     
-    console.log('💸 Expense entries found:', expenseEntries.length);
-    console.log('💸 Sample expense accounts:', expenseEntries.slice(0, 5).map(e => ({
+    console.log('💸 Expense entries found using accounts table:', expenseEntries.length);
+    console.log('💸 Expense accounts from your table:', expenseEntries.slice(0, 5).map(e => ({
       account: e.account_name,
-      line_amount: e.line_amount,
-      debit: e.debit_amount,
-      credit: e.credit_amount
+      classification: e.classification,
+      mapping: e.mapping_method,
+      line_amount: e.line_amount
     })));
 
     return {
@@ -612,8 +625,8 @@ const fetchFinancialData = async (
         propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
         mappingStats: {
           totalEntries: enhancedData?.length || 0,
-          chartMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Chart of Accounts').length || 0,
-          intelligentMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Account Name Classification').length || 0
+          accountsTableMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Accounts Table').length || 0,
+          fallbackMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Fallback Classification').length || 0
         }
       }
     };
@@ -1260,8 +1273,8 @@ export default function FinancialsPage() {
                   <strong>Data Source:</strong> {realData.summary.dataSource}
                 </div>
                 <div className="mt-1 text-xs">
-                  <strong>Mapping Results:</strong> {realData.summary.mappingStats?.chartMapped || 0} chart matches, 
-                  {realData.summary.mappingStats?.intelligentMapped || 0} intelligent classifications
+                  <strong>Mapping Results:</strong> {realData.summary.mappingStats?.accountsTableMapped || 0} accounts table matches, 
+                  {realData.summary.mappingStats?.fallbackMapped || 0} fallback classifications
                 </div>
               </div>
             </div>
