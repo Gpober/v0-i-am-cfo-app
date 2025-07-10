@@ -129,7 +129,19 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
         if (amount < 0) {
           amount = Math.abs(amount);
         }
-        console.log(`💰 Revenue calc for ${entry.account_name}: line_amount=${entry.line_amount}, credit=${entry.credit_amount}, debit=${entry.debit_amount}, final=${amount}`);
+        
+        // Debug Guesty specifically
+        if (entry.account_name && entry.account_name.toLowerCase().includes('guesty')) {
+          console.log(`💰 GUESTY ENTRY: ${entry.account_name}`, {
+            je_number: entry.je_number,
+            date: entry.transaction_date,
+            line_amount: entry.line_amount,
+            debit: entry.debit_amount,
+            credit: entry.credit_amount,
+            calculated_amount: amount,
+            description: entry.description
+          });
+        }
         break;
         
       case 'Expenses':
@@ -159,10 +171,12 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       debit: entry.debit_amount,
       credit: entry.credit_amount,
       line: entry.line_amount,
+      amount_used: amount,
       property: entry.property_class,
       original_account: entry.account_name,
       original_description: entry.description,
-      classification: entry.classification
+      classification: entry.classification,
+      transaction_date: entry.transaction_date
     });
     
     return acc;
@@ -189,6 +203,23 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       }
       return a.name.localeCompare(b.name);
     });
+
+  // Debug: Log the final totals for revenue accounts
+  const revenueAccounts = sortedData.filter(item => item.type === 'Revenue');
+  console.log('📊 FINAL REVENUE TOTALS:');
+  revenueAccounts.forEach(account => {
+    console.log(`💰 ${account.name}: ${account.total.toLocaleString()} (${account.entries.length} entries)`);
+    
+    // Special debug for Guesty
+    if (account.name.toLowerCase().includes('guesty')) {
+      console.log('🔍 GUESTY DETAILED BREAKDOWN:');
+      console.log(`Total entries: ${account.entries.length}`);
+      console.log(`Sum of amounts used: ${account.entries.reduce((sum: number, e: any) => sum + e.amount_used, 0)}`);
+      account.entries.forEach((entry: any, idx: number) => {
+        console.log(`  ${idx + 1}. JE: ${entry.je_number}, Date: ${entry.transaction_date}, Amount: ${entry.amount_used}, Line: ${entry.line}, Credit: ${entry.credit}, Debit: ${entry.debit}`);
+      });
+    }
+  });
 
   // SEPARATE P&L DATA FROM BALANCE SHEET DATA
   const plData = sortedData.filter(item => 
