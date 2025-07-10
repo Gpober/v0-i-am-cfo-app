@@ -27,7 +27,7 @@ const BRAND_COLORS = {
   }
 };
 
-// Supabase Configuration - Your actual credentials
+// Supabase Configuration
 const SUPABASE_URL = 'https://ijeuusvwqcnljctkvjdi.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZXV1c3Z3cWNubGpjdGt2amRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMjE4MDUsImV4cCI6MjA2NzY5NzgwNX0.O9Mb_X47wbXEMXbPQ8Cr3dzDn_E5DYG9b222FPy4LEU';
 
@@ -78,6 +78,173 @@ interface TooltipState {
   y: number;
 }
 
+// Enhanced data transformation functions with proper account type mapping
+const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
+  // Group by account name and calculate net amounts
+  const groupedData = entries.reduce((acc, entry) => {
+    // Use the account name as-is since we've already classified it
+    const accountName = entry.account_name.replace(/^[^:]*:/, '').trim(); // Remove property prefix
+    const key = accountName;
+    
+    if (!acc[key]) {
+      // Use the classification we determined in fetchFinancialData
+      const plClassification = entry.classification || entry.account_type;
+      
+      acc[key] = {
+        name: accountName,
+        type: plClassification,
+        original_type: entry.account_type,
+        detail_type: entry.detail_type || entry.account_type,
+        total: 0,
+        months: {},
+        entries: [],
+        mapping_method: entry.mapping_method || 'Unknown'
+      };
+    }
+    
+    // Simplified accounting logic using line_amount primarily
+    let amount = 0;
+    
+    switch (acc[key].type) {
+      case 'Revenue':
+        // Revenue: negative line_amount typically means revenue increase
+        // But we want to show revenue as positive on P&L
+        amount = Math.abs(entry.line_amount || (entry.credit_amount - entry.debit_amount));
+        break;
+        
+      case 'Expenses':
+        // Expenses: positive line_amount typically means expense increase
+        amount = Math.abs(entry.line_amount || (entry.debit_amount - entry.credit_amount));
+        break;
+        
+      case 'Assets':
+        // Assets: use line_amount as-is (positive = asset increase)
+        amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
+        break;
+        
+      case 'Liabilities':
+        // Liabilities: use line_amount as-is (negative = liability increase typically)
+        amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
+        break;
+        
+      default:
+        // Default: use line_amount as-is
+        amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
+    }
+    
+    acc[key].total += amount;
+    acc[key].months[monthYear as MonthString] = (acc[key].months[monthYear as MonthString] || 0) + amount;
+    acc[key].entries.push({
+      je_number: entry.je_number,
+      debit: entry.debit_amount,
+      credit: entry.credit_amount,
+      line: entry.line_amount,
+      property: entry.property_class,
+      original_account: entry.account_name,
+      classification: entry.classification
+    });
+    
+    return acc;
+  }, {} as Record<string, any>);
+
+  // Convert to array and sort by account type hierarchy for P&L presentation
+  const typeOrder: Record<string, number> = {
+    'Revenue': 1,
+    'Expenses': 2,
+    'Assets': 3,
+    'Liabilities': 4,
+    'Equity': 5,
+    'Other': 99
+  };
+
+  const sortedData = Object.values(groupedData)
+    .filter((item: any) => Math.abs(item.total) > 0.01)
+    .sort((a: any, b: any) => {
+      const aOrder = typeOrder[a.type] || 99;
+      const bOrder = typeOrder[b.type] || 99;
+      
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+  return {
+    propertyFinancialData: {
+      'All Properties': {
+        Monthly: {
+          [monthYear]: sortedData
+        }
+      }
+    }
+  };
+};
+
+const transformCashFlowData = (entries: FinancialEntry[]) => {
+  // Cash flow transformation using actual cash account movements
+  const cashAccounts = entries.filter(entry => 
+    entry.account_type === 'Bank' || 
+    entry.account_name.toLowerCase().includes('cash') ||
+    entry.account_name.toLowerCase().includes('checking') ||
+    entry.account_name.toLowerCase().includes('savings')
+  );
+
+  // Group by account for cash movements
+  const inFlowItems: FinancialDataItem[] = [];
+  const outFlowItems: FinancialDataItem[] = [];
+
+  entries.forEach(entry => {
+    if (entry.account_type === 'Income' || entry.account_type === 'Revenue' || entry.account_type === 'Other Income') {
+      const existing = inFlowItems.find(item => item.name === entry.account_name);
+      const amount = Math.abs(entry.credit_amount - entry.debit_amount);
+      
+      if (existing) {
+        existing.total += amount;
+      } else if (amount > 0) {
+        inFlowItems.push({
+          name: entry.account_name,
+          total: amount,
+          months: {},
+          type: entry.account_type
+        });
+      }
+    } else if (entry.account_type === 'Expenses' || entry.account_type === 'Other Expenses' || 
+               entry.account_type === 'Cost of Goods Sold') {
+      const existing = outFlowItems.find(item => item.name === entry.account_name);
+      const amount = Math.abs(entry.debit_amount - entry.credit_amount);
+      
+      if (existing) {
+        existing.total += amount;
+      } else if (amount > 0) {
+        outFlowItems.push({
+          name: entry.account_name,
+          total: amount,
+          months: {},
+          type: entry.account_type
+        });
+      }
+    }
+  });
+
+  const totalInFlow = inFlowItems.reduce((sum, item) => sum + item.total, 0);
+  const totalOutFlow = outFlowItems.reduce((sum, item) => sum + item.total, 0);
+  const totalCashFlow = totalInFlow - totalOutFlow;
+
+  return {
+    propertyCashFlowData: {
+      'All Properties': {
+        inFlow: inFlowItems.sort((a, b) => b.total - a.total),
+        outFlow: outFlowItems.sort((a, b) => b.total - a.total),
+        totalInFlow,
+        totalOutFlow,
+        totalCashFlow,
+        beginningCash: 0,
+        endingCash: totalCashFlow
+      }
+    }
+  };
+};
+
 // Real Supabase client
 const createSupabaseClient = () => {
   return {
@@ -114,97 +281,8 @@ const createSupabaseClient = () => {
   };
 };
 
-// Mock data for demonstration
-const mockData = {
-  properties: [
-    { id: '1', name: 'Property A', created_at: '2025-01-01' },
-    { id: '2', name: 'Property B', created_at: '2025-01-01' },
-    { id: '3', name: 'Property C', created_at: '2025-01-01' }
-  ],
-  bank_accounts: [
-    { id: '1', name: 'Main Checking', bank_name: 'Chase Bank' },
-    { id: '2', name: 'Savings Account', bank_name: 'Bank of America' },
-    { id: '3', name: 'Business Account', bank_name: 'Wells Fargo' }
-  ],
-  financial_entries: [
-    {
-      id: '1',
-      property_name: 'Property A',
-      bank_account: 'Main Checking',
-      account_name: 'Rental Income',
-      account_type: 'Revenue' as const,
-      amount: 5000,
-      transaction_date: '2025-06-01',
-      month_year: 'June 2025',
-      description: 'Monthly rent',
-      created_at: '2025-06-01',
-      updated_at: '2025-06-01'
-    },
-    {
-      id: '2',
-      property_name: 'Property A',
-      bank_account: 'Main Checking',
-      account_name: 'Maintenance',
-      account_type: 'Expense' as const,
-      amount: -500,
-      transaction_date: '2025-06-15',
-      month_year: 'June 2025',
-      description: 'HVAC repair',
-      created_at: '2025-06-15',
-      updated_at: '2025-06-15'
-    },
-    {
-      id: '3',
-      property_name: 'Property B',
-      bank_account: 'Business Account',
-      account_name: 'Rental Income',
-      account_type: 'Revenue' as const,
-      amount: 3000,
-      transaction_date: '2025-06-01',
-      month_year: 'June 2025',
-      description: 'Monthly rent',
-      created_at: '2025-06-01',
-      updated_at: '2025-06-01'
-    },
-    {
-      id: '4',
-      property_name: 'Property A',
-      bank_account: 'Main Checking',
-      account_name: 'Property Management Fee',
-      account_type: 'Expense' as const,
-      amount: -400,
-      transaction_date: '2025-06-30',
-      month_year: 'June 2025',
-      description: 'Monthly management fee',
-      created_at: '2025-06-30',
-      updated_at: '2025-06-30'
-    }
-  ]
-};
-
 // Supabase API Functions
 const supabase = createSupabaseClient();
-
-// Enhanced Supabase API Functions with Chart of Accounts
-const fetchAccounts = async () => {
-  try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/accounts?select=*&order=account_name`, {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) throw new Error('Failed to fetch accounts');
-    
-    const data = await response.json();
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching accounts:', error);
-    return [];
-  }
-};
 
 const fetchProperties = async (): Promise<string[]> => {
   try {
@@ -229,7 +307,6 @@ const fetchProperties = async (): Promise<string[]> => {
 
 const fetchBankAccounts = async (): Promise<string[]> => {
   try {
-    // Get bank accounts from the accounts table
     const response = await fetch(`${SUPABASE_URL}/rest/v1/accounts?select=account_name&account_type=eq.Bank&order=account_name`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -268,9 +345,9 @@ const fetchFinancialData = async (
       url += `&property_class=eq.${encodeURIComponent(property)}`;
     }
     
-    // Add bank account filter
+    // Add bank account filter if applicable
     if (bankAccount !== 'All Accounts') {
-      url += `&account_name=eq.${encodeURIComponent(bankAccount)}`;
+      url += `&account_name=ilike.%${encodeURIComponent(bankAccount)}%`;
     }
 
     const [journalResponse, accountsResponse] = await Promise.all([
@@ -281,7 +358,7 @@ const fetchFinancialData = async (
           'Content-Type': 'application/json'
         }
       }),
-      fetch(`${SUPABASE_URL}/rest/v1/accounts?select=*`, {
+      fetch(`${SUPABASE_URL}/rest/v1/accounts?select=*&order=account_name`, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
@@ -297,17 +374,79 @@ const fetchFinancialData = async (
     const journalData = await journalResponse.json();
     const accountsData = await accountsResponse.json();
     
-    // Create account lookup map
+    // Create account lookup map - the accounts table appears to be property addresses as Fixed Assets
     const accountMap = new Map();
     accountsData.forEach((account: any) => {
-      accountMap.set(account.account_name, account.account_type);
+      accountMap.set(account.account_name, {
+        type: account.account_type,
+        standardName: account.account_name
+      });
     });
 
-    // Enhance journal entries with account types
-    const enhancedData = journalData.map((entry: any) => ({
-      ...entry,
-      account_type: accountMap.get(entry.account_name) || 'Other'
-    }));
+    // Enhanced classification for journal entries since they don't match chart of accounts directly
+    const classifyJournalAccount = (accountName: string, debitAmount: number, creditAmount: number) => {
+      const name = accountName.toLowerCase();
+      
+      // Revenue/Income classification
+      if (name.includes('income') || name.includes('revenue') || 
+          name.includes('rental') || name.includes('rent') ||
+          name.includes('airbnb') || name.includes('credit card rewards')) {
+        return { type: 'Other Income', classification: 'Revenue' };
+      }
+      
+      // Expense classification
+      if (name.includes('expense') || name.includes('cost') || 
+          name.includes('fee') || name.includes('tax') ||
+          name.includes('insurance') || name.includes('maintenance') ||
+          name.includes('repair') || name.includes('management') ||
+          name.includes('labor') || name.includes('business licenses')) {
+        return { type: 'Expenses', classification: 'Expenses' };
+      }
+      
+      // Asset classification
+      if (name.includes('improvements') || name.includes('property') || 
+          name.includes('equipment') || name.includes('cash') ||
+          name.includes('bank') || name.includes('checking') ||
+          name.includes('savings') || name.includes('receivable') ||
+          name.includes('deferred') || name.includes('prepayment')) {
+        return { type: 'Fixed Assets', classification: 'Assets' };
+      }
+      
+      // Liability classification
+      if (name.includes('loan') || name.includes('mortgage') || 
+          name.includes('payable') || name.includes('credit card') ||
+          name.includes('debt') || name.includes('liability') ||
+          name.includes('capital one')) {
+        return { type: 'Credit Card', classification: 'Liabilities' };
+      }
+      
+      // Default based on debit/credit behavior
+      if (creditAmount > debitAmount) {
+        return { type: 'Other Income', classification: 'Revenue' };
+      } else {
+        return { type: 'Expenses', classification: 'Expenses' };
+      }
+    };
+
+    // Process journal entries with intelligent classification
+    const enhancedData = journalData.map((entry: any) => {
+      // First try to find exact match in chart of accounts
+      let accountInfo = accountMap.get(entry.account_name);
+      
+      if (!accountInfo) {
+        // Use intelligent classification for journal entries
+        const classification = classifyJournalAccount(entry.account_name, entry.debit_amount, entry.credit_amount);
+        accountInfo = classification;
+      }
+      
+      return {
+        ...entry,
+        account_type: accountInfo?.type || 'Other',
+        classification: accountInfo?.classification || accountInfo?.type || 'Other',
+        standard_account_name: accountInfo?.standardName || entry.account_name,
+        mapping_method: accountMap.has(entry.account_name) ? 'Chart of Accounts' : 'Intelligent Classification'
+      };
+    });
 
     return {
       success: true,
@@ -315,9 +454,14 @@ const fetchFinancialData = async (
       accountsData: accountsData,
       summary: {
         filteredEntries: enhancedData?.length || 0,
-        dataSource: 'Supabase',
+        dataSource: 'Supabase + Hybrid Classification',
         filters: { property, bankAccount, monthYear },
-        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))]
+        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
+        mappingStats: {
+          totalEntries: enhancedData?.length || 0,
+          chartMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Chart of Accounts').length || 0,
+          intelligentMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Intelligent Classification').length || 0
+        }
       }
     };
   } catch (error) {
@@ -328,134 +472,6 @@ const fetchFinancialData = async (
       data: []
     };
   }
-};
-
-const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
-  // Group by account name and calculate net amounts using proper account types from chart of accounts
-  const groupedData = entries.reduce((acc, entry) => {
-    const key = entry.account_name;
-    if (!acc[key]) {
-      acc[key] = {
-        name: entry.account_name,
-        type: entry.account_type || 'Other',
-        total: 0,
-        months: {}
-      };
-    }
-    
-    // Use line_amount which represents the net effect
-    acc[key].total += entry.line_amount;
-    acc[key].months[monthYear as MonthString] = (acc[key].months[monthYear as MonthString] || 0) + entry.line_amount;
-    
-    return acc;
-  }, {} as Record<string, any>);
-
-  // Convert to array and sort by account type hierarchy for P&L presentation
-  const typeOrder: Record<string, number> = {
-    'Revenue': 1,
-    'Other Income': 2,
-    'Cost of Goods Sold': 3,
-    'Expenses': 4,
-    'Other Expenses': 5,
-    'Interest Expense': 6,
-    'Taxes': 7,
-    'Assets': 8,
-    'Current Assets': 9,
-    'Fixed Assets': 10,
-    'Other Assets': 11,
-    'Liabilities': 12,
-    'Current Liabilities': 13,
-    'Long Term Liabilities': 14,
-    'Other Current Liabilities': 15,
-    'Equity': 16,
-    'Bank': 17,
-    'Other': 99
-  };
-
-  const sortedData = Object.values(groupedData)
-    .filter((item: any) => Math.abs(item.total) > 0.01) // Filter out zero amounts
-    .sort((a: any, b: any) => {
-      // Sort by account type hierarchy, then by name
-      const aOrder = typeOrder[a.type] || 99;
-      const bOrder = typeOrder[b.type] || 99;
-      
-      if (aOrder !== bOrder) {
-        return aOrder - bOrder;
-      }
-      return a.name.localeCompare(b.name);
-    });
-
-  return {
-    propertyFinancialData: {
-      'All Properties': {
-        Monthly: {
-          [monthYear]: sortedData
-        }
-      }
-    }
-  };
-};
-
-const transformCashFlowData = (entries: FinancialEntry[]) => {
-  // Group by account type for better cash flow categorization
-  const revenueTypes = ['Revenue', 'Other Income'];
-  const expenseTypes = ['Expenses', 'Other Expenses', 'Cost of Goods Sold', 'Interest Expense', 'Taxes'];
-  
-  const inFlowEntries = entries.filter(entry => 
-    revenueTypes.includes(entry.account_type) || entry.line_amount > 0
-  );
-  
-  const outFlowEntries = entries.filter(entry => 
-    expenseTypes.includes(entry.account_type) || entry.line_amount < 0
-  );
-
-  const inFlow = inFlowEntries.reduce((acc, entry) => {
-    const existing = acc.find(item => item.name === entry.account_name);
-    if (existing) {
-      existing.total += Math.abs(entry.line_amount);
-    } else {
-      acc.push({
-        name: entry.account_name,
-        total: Math.abs(entry.line_amount),
-        months: {},
-        type: entry.account_type
-      });
-    }
-    return acc;
-  }, [] as FinancialDataItem[]);
-
-  const outFlow = outFlowEntries.reduce((acc, entry) => {
-    const existing = acc.find(item => item.name === entry.account_name);
-    if (existing) {
-      existing.total += Math.abs(entry.line_amount);
-    } else {
-      acc.push({
-        name: entry.account_name,
-        total: -Math.abs(entry.line_amount), // Keep negative for display
-        months: {},
-        type: entry.account_type
-      });
-    }
-    return acc;
-  }, [] as FinancialDataItem[]);
-
-  const totalInFlow = inFlow.reduce((sum, item) => sum + item.total, 0);
-  const totalOutFlow = outFlow.reduce((sum, item) => sum + Math.abs(item.total), 0);
-  const totalCashFlow = totalInFlow - totalOutFlow;
-
-  return {
-    propertyCashFlowData: {
-      'All Properties': {
-        inFlow: inFlow.sort((a, b) => b.total - a.total), // Sort by amount descending
-        outFlow: outFlow.sort((a, b) => a.total - b.total), // Sort by amount ascending (most negative first)
-        totalInFlow,
-        totalOutFlow,
-        totalCashFlow,
-        beginningCash: 0,
-        endingCash: totalCashFlow
-      }
-    }
-  };
 };
 
 // IAM CFO Logo Component
@@ -495,7 +511,6 @@ export default function FinancialsPage() {
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
   const [timeViewDropdownOpen, setTimeViewDropdownOpen] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
-  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
   const [bankAccountDropdownOpen, setBankAccountDropdownOpen] = useState(false);
   const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(new Set(['All Accounts']));
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
@@ -577,7 +592,7 @@ export default function FinancialsPage() {
           ...transformedCF,
           summary: rawData.summary,
           performance: {
-            executionTimeMs: Date.now() % 1000 // Mock timing
+            executionTimeMs: Date.now() % 1000
           }
         };
 
@@ -680,16 +695,6 @@ export default function FinancialsPage() {
     }, 3000);
   };
 
-  const toggleAccountExpansion = (accountName: string): void => {
-    const newExpanded = new Set(expandedAccounts);
-    if (newExpanded.has(accountName)) {
-      newExpanded.delete(accountName);
-    } else {
-      newExpanded.add(accountName);
-    }
-    setExpandedAccounts(newExpanded);
-  };
-
   // Get current financial data
   const getCurrentFinancialData = () => {
     if (realData && realData.propertyFinancialData) {
@@ -727,41 +732,22 @@ export default function FinancialsPage() {
   const currentData = getCurrentFinancialData();
   const currentCashFlowData = getCurrentCashFlowData();
 
-  // Calculate KPIs using proper account classifications
+  // Calculate KPIs using corrected logic
   const calculateKPIs = () => {
-    // Revenue accounts (using chart of accounts classification)
-    const revenueAccounts = currentData.filter(item => 
-      item.type === 'Revenue' || 
-      item.type === 'Other Income' ||
-      item.name.toLowerCase().includes('rental') ||
-      item.name.toLowerCase().includes('airbnb')
-    );
-    const revenue = revenueAccounts.reduce((sum, item) => sum + Math.abs(item.total), 0);
+    // Separate revenue and expense accounts
+    const revenueAccounts = currentData.filter(item => item.type === 'Revenue');
+    const expenseAccounts = currentData.filter(item => item.type === 'Expenses');
     
-    // Expense accounts (using chart of accounts classification)
-    const expenseAccounts = currentData.filter(item => 
-      item.type === 'Expenses' || 
-      item.type === 'Other Expenses' ||
-      item.type === 'Cost of Goods Sold' ||
-      item.total < 0
-    );
+    const revenue = revenueAccounts.reduce((sum, item) => sum + Math.abs(item.total), 0);
     const expenses = expenseAccounts.reduce((sum, item) => sum + Math.abs(item.total), 0);
     
-    // Interest and tax expenses
-    const interestExpense = currentData
-      .filter(item => item.type === 'Interest Expense')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
-    
-    const taxExpense = currentData
-      .filter(item => item.type === 'Taxes')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
-    
     const grossProfit = revenue - expenses;
-    const operatingIncome = grossProfit - interestExpense;
-    const netIncome = operatingIncome - taxExpense;
+    const operatingIncome = grossProfit; // Simplified for now
+    const netIncome = operatingIncome; // Simplified for now
     
     return {
       revenue,
+      expenses,
       grossProfit,
       operatingIncome,
       netIncome,
@@ -786,10 +772,10 @@ export default function FinancialsPage() {
 
   const generateExpenseBreakdown = () => {
     return currentData
-      .filter(item => item.total < 0)
+      .filter(item => item.type === 'Expenses' && item.total > 0)
       .map(item => ({
         name: item.name,
-        value: Math.abs(item.total)
+        value: item.total
       }))
       .filter(item => item.value > 0);
   };
@@ -806,6 +792,20 @@ export default function FinancialsPage() {
     );
   };
 
+  const renderDataCells = (item: FinancialDataItem) => {
+    const value = item.total || 0;
+    // Show revenue as positive, expenses as negative for P&L presentation
+    const displayValue = item.type === 'Expenses' ? -Math.abs(value) : value;
+    
+    return (
+      <td className={`px-4 py-3 text-right text-sm font-medium ${
+        displayValue >= 0 ? 'text-green-600' : 'text-red-600'
+      }`}>
+        {displayValue >= 0 ? formatCurrency(displayValue) : `(${formatCurrency(Math.abs(displayValue))})`}
+      </td>
+    );
+  };
+
   const renderCashFlowDataCells = (item: FinancialDataItem) => {
     const value = item.total || 0;
     return (
@@ -813,15 +813,6 @@ export default function FinancialsPage() {
         value >= 0 ? 'text-green-600' : 'text-red-600'
       }`}>
         {value >= 0 ? formatCurrency(value) : `(${formatCurrency(Math.abs(value))})`}
-      </td>
-    );
-  };
-
-  const renderDataCells = (item: FinancialDataItem) => {
-    const value = item.total || 0;
-    return (
-      <td className="px-4 py-3 text-right text-sm font-medium">
-        {formatCurrency(value)}
       </td>
     );
   };
@@ -846,7 +837,7 @@ export default function FinancialsPage() {
                 )}
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Real-time P&L, Cash Flow & Balance Sheet • Supabase Integration
+                Real-time P&L, Cash Flow & Balance Sheet • Fixed Data Mapping
                 {realData?.summary && (
                   <span className="ml-2 text-green-600">
                     • {realData.summary.filteredEntries} entries loaded
@@ -913,61 +904,6 @@ export default function FinancialsPage() {
                 )}
               </div>
 
-              {/* Time View Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setTimeViewDropdownOpen(!timeViewDropdownOpen)}
-                  className="flex items-center justify-between w-32 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
-                >
-                  <span>{timeView}</span>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${timeViewDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {timeViewDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
-                    {(['Monthly', 'YTD', 'TTM', 'MoM', 'YoY'] as TimeView[]).map((view) => (
-                      <div
-                        key={view}
-                        className="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                        onClick={() => {
-                          setTimeView(view);
-                          setTimeViewDropdownOpen(false);
-                        }}
-                      >
-                        {view}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* View Mode Toggle */}
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setViewMode('total')}
-                  className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                    viewMode === 'total'
-                      ? 'text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
-                >
-                  Total
-                </button>
-                <button
-                  onClick={() => setViewMode('detailed')}
-                  className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                    viewMode === 'detailed'
-                      ? 'text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
-                >
-                  Detailed
-                </button>
-              </div>
-
               {/* Action Buttons */}
               <button
                 onClick={() => showNotification('Financial data exported', 'success')}
@@ -1002,15 +938,14 @@ export default function FinancialsPage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
-                from Supabase • Source: {realData.summary.dataSource}
+                from Supabase • Chart of Accounts Integration
+                <div className="mt-1 text-xs">
+                  <strong>Mapping Success:</strong> {realData.summary.mappingStats?.chartMapped || 0} entries mapped to chart of accounts, 
+                  {realData.summary.mappingStats?.defaultMapped || 0} using fallback logic
+                </div>
                 {realData.summary.accountTypes && (
-                  <span> • Account Types: {realData.summary.accountTypes.join(', ')}</span>
-                )}
-                {realData.summary.filters && (
                   <div className="mt-1">
-                    <strong>Filters:</strong> Property: {realData.summary.filters.property}, 
-                    Bank: {realData.summary.filters.bankAccount}, 
-                    Month: {realData.summary.filters.monthYear}
+                    <strong>Account Types Found:</strong> {realData.summary.accountTypes.join(', ')}
                   </div>
                 )}
               </div>
@@ -1025,13 +960,29 @@ export default function FinancialsPage() {
                   <div className="text-gray-600 text-sm font-medium mb-2">Total Revenue</div>
                   <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
                   <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
-                    Real Supabase Data
+                    Fixed Mapping
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {getSelectedPropertiesText()}
+                    Revenue Accounts Only
                   </div>
                 </div>
                 <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
+              </div>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Total Expenses</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.expenses)}</div>
+                  <div className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full inline-block">
+                    Expense Accounts
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Proper Classification
+                  </div>
+                </div>
+                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
               </div>
             </div>
             
@@ -1039,31 +990,15 @@ export default function FinancialsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-gray-600 text-sm font-medium mb-2">Gross Profit</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.grossProfit || 0)}</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.grossProfit)}</div>
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
                     {kpis.grossMargin.toFixed(1)}% Margin
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    Chart of Accounts
+                    Revenue - Expenses
                   </div>
                 </div>
                 <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
-              </div>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Income</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingIncome || 0)}</div>
-                  <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full inline-block">
-                    {kpis.operatingMargin.toFixed(1)}% Margin
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Before Interest & Taxes
-                  </div>
-                </div>
-                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
               </div>
             </div>
             
@@ -1071,12 +1006,12 @@ export default function FinancialsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome || 0)}</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
                   <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
                     {kpis.netMargin.toFixed(1)}% Margin
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    After All Expenses
+                    Bottom Line
                   </div>
                 </div>
                 <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
@@ -1084,405 +1019,156 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column: Financial Tables */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      {activeTab === 'p&l' ? 'Profit & Loss Statement' : 
-                       activeTab === 'cash-flow' ? 'Cash Flow Statement' : 
-                       'Balance Sheet'}
-                    </h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setActiveTab('p&l')}
-                        className={`px-3 py-1 text-xs rounded transition-colors ${
-                          activeTab === 'p&l' 
-                            ? 'text-white' 
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                        style={{ backgroundColor: activeTab === 'p&l' ? BRAND_COLORS.primary : undefined }}
-                      >
-                        P&L
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('cash-flow')}
-                        className={`px-3 py-1 text-xs rounded transition-colors ${
-                          activeTab === 'cash-flow' 
-                            ? 'text-white' 
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                        style={{ backgroundColor: activeTab === 'cash-flow' ? BRAND_COLORS.primary : undefined }}
-                      >
-                        Cash Flow
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('balance-sheet')}
-                        className={`px-3 py-1 text-xs rounded transition-colors ${
-                          activeTab === 'balance-sheet' 
-                            ? 'text-white' 
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                        style={{ backgroundColor: activeTab === 'balance-sheet' ? BRAND_COLORS.primary : undefined }}
-                      >
-                        Balance Sheet
-                      </button>
-                    </div>
-                  </div>
+          {/* Main Content: Financial Table */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Profit & Loss Statement (Fixed Mapping)
+                </h3>
+                <div className="text-sm text-gray-600">
+                  Account-based classification applied
                 </div>
-
-                {/* P&L Content */}
-                {activeTab === 'p&l' && (
-                  <div className="overflow-x-auto">
-                    {isLoadingData ? (
-                      <div className="flex items-center justify-center py-8">
-                        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                        <span>Loading financial data from Supabase...</span>
-                      </div>
-                    ) : currentData.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        No financial data available for the selected filters
-                      </div>
-                    ) : (
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Account
-                            </th>
-                            {renderColumnHeaders()}
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              % of Revenue
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {currentData.map((item, index) => {
-                            const isTotalRow = item.name === 'Net Income' || item.name === 'Gross Profit';
-                            const revenueAccounts = currentData.filter(i => 
-                              i.name.toLowerCase().includes('rental') || 
-                              i.name.toLowerCase().includes('revenue') ||
-                              (i.total > 0 && i.name.toLowerCase().includes('airbnb'))
-                            );
-                            const totalRevenue = revenueAccounts.reduce((sum, i) => sum + Math.abs(i.total), 0);
-                            const percentOfRevenue = totalRevenue 
-                              ? calculatePercentage(Math.abs(item.total), totalRevenue)
-                              : '0%';
-
-                            return (
-                              <tr 
-                                key={item.name}
-                                className={`hover:bg-gray-50 transition-colors ${isTotalRow ? 'bg-gray-50 font-semibold' : ''}`}
-                              >
-                                <td className={`px-4 py-3 text-left text-sm ${
-                                  isTotalRow ? 'font-semibold text-gray-900' : 'text-gray-700'
-                                }`}>
-                                  {item.name}
-                                </td>
-                                {renderDataCells(item)}
-                                <td className="px-4 py-3 text-right text-sm text-gray-500">
-                                  {percentOfRevenue}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-                {/* Cash Flow Content */}
-                {activeTab === 'cash-flow' && (
-                  <div>
-                    {/* Bank Account Selector */}
-                    <div className="p-4 bg-gray-50 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium text-gray-700">Select Bank Accounts:</h4>
-                        <div className="relative">
-                          <button
-                            onClick={() => setBankAccountDropdownOpen(!bankAccountDropdownOpen)}
-                            className="flex items-center justify-between w-64 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                            style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
-                          >
-                            <span className="truncate">{getSelectedBankAccountsText()}</span>
-                            <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${bankAccountDropdownOpen ? 'rotate-180' : ''}`} />
-                          </button>
-                          
-                          {bankAccountDropdownOpen && (
-                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                              {availableBankAccounts.map((account) => (
-                                <div
-                                  key={account}
-                                  className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                                  onClick={() => handleBankAccountToggle(account)}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedBankAccounts.has(account)}
-                                    onChange={() => {}}
-                                    className="mr-3 h-4 w-4 border-gray-300 rounded"
-                                    style={{ accentColor: BRAND_COLORS.primary }}
-                                  />
-                                  <span className={account === 'All Accounts' ? 'font-medium text-gray-900' : 'text-gray-700'}>
-                                    {account}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        Viewing cash flow for: {getSelectedBankAccountsText()}
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      {isLoadingData ? (
-                        <div className="flex items-center justify-center py-8">
-                          <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                          <span>Loading cash flow data from Supabase...</span>
-                        </div>
-                      ) : (
-                        <table className="w-full">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Account
-                              </th>
-                              {renderColumnHeaders()}
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                % of Total Cash
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {/* Cash In-Flow Section */}
-                            <tr className="bg-green-50">
-                              <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
-                                💰 CASH IN-FLOW
-                              </td>
-                            </tr>
-                            {currentCashFlowData.inFlow.map((item) => {
-                              const totalCash = Math.abs(currentCashFlowData.totalCashFlow) || 1;
-                              const percentOfCash = calculatePercentage(item.total, totalCash);
-
-                              return (
-                                <tr key={`inflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
-                                  <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                    <span className="ml-4">{item.name}</span>
-                                  </td>
-                                  {renderCashFlowDataCells(item)}
-                                  <td className="px-4 py-3 text-right text-sm text-green-600">
-                                    {percentOfCash}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                            
-                            {/* Total Cash In-Flow */}
-                            <tr className="bg-green-100 font-semibold">
-                              <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
-                                Total Cash In-Flow
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
-                                {formatCurrency(currentCashFlowData.totalInFlow)}
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
-                                100%
-                              </td>
-                            </tr>
-
-                            {/* Cash Out-Flow Section */}
-                            <tr className="bg-red-50">
-                              <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
-                                💸 CASH OUT-FLOW
-                              </td>
-                            </tr>
-                            {currentCashFlowData.outFlow.map((item) => {
-                              const totalCash = Math.abs(currentCashFlowData.totalCashFlow) || 1;
-                              const percentOfCash = calculatePercentage(Math.abs(item.total), totalCash);
-
-                              return (
-                                <tr key={`outflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
-                                  <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                    <span className="ml-4">{item.name}</span>
-                                  </td>
-                                  {renderCashFlowDataCells(item)}
-                                  <td className="px-4 py-3 text-right text-sm text-red-600">
-                                    {percentOfCash}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-
-                            {/* Total Cash Out-Flow */}
-                            <tr className="bg-red-100 font-semibold">
-                              <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
-                                Total Cash Out-Flow
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                                ({formatCurrency(Math.abs(currentCashFlowData.totalOutFlow))})
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                                100%
-                              </td>
-                            </tr>
-
-                            {/* Net Cash Flow */}
-                            <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                              <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
-                                🏦 NET CASH FLOW
-                              </td>
-                              <td className={`px-4 py-4 text-right text-lg font-bold ${
-                                currentCashFlowData.totalCashFlow >= 0 ? 'text-green-700' : 'text-red-700'
-                              }`}>
-                                {formatCurrency(currentCashFlowData.totalCashFlow)}
-                              </td>
-                              <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
-                                Net Change
-                              </td>
-                            </tr>
-
-                            {/* Beginning & Ending Cash Balance */}
-                            <tr className="bg-gray-50">
-                              <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                Beginning Cash Balance
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm text-gray-700">
-                                {formatCurrency(currentCashFlowData.beginningCash)}
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm text-gray-500">
-                                Starting
-                              </td>
-                            </tr>
-                            <tr className="border-t" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                              <td className="px-4 py-3 text-left text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
-                                Ending Cash Balance
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
-                                {formatCurrency(currentCashFlowData.endingCash)}
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
-                                Final
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Balance Sheet Content */}
-                {activeTab === 'balance-sheet' && (
-                  <div className="overflow-x-auto">
-                    <div className="text-center py-8 text-gray-500">
-                      Balance Sheet functionality will be available in the next update
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Right Column: Charts */}
-            <div className="space-y-8">
-              {/* Revenue Trend Chart */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Revenue Trend</h3>
+            <div className="overflow-x-auto">
+              {isLoadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                  <span>Loading financial data from Supabase...</span>
                 </div>
-                <div className="p-6">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke={BRAND_COLORS.primary} 
-                        strokeWidth={3}
-                        dot={{ r: 6, fill: BRAND_COLORS.primary }}
-                        activeDot={{ r: 8, fill: BRAND_COLORS.primary }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+              ) : currentData.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No financial data available for the selected filters
                 </div>
-              </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Account Name
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Account Type
+                      </th>
+                      {renderColumnHeaders()}
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        % of Revenue
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {/* Revenue Section */}
+                    <tr className="bg-green-50">
+                      <td colSpan={4} className="px-4 py-3 text-left text-sm font-bold text-green-800">
+                        💰 REVENUE
+                      </td>
+                    </tr>
+                    {currentData
+                      .filter(item => item.type === 'Revenue')
+                      .map((item) => {
+                        const percentOfRevenue = kpis.revenue 
+                          ? calculatePercentage(Math.abs(item.total), kpis.revenue)
+                          : '0%';
 
-              {/* Expense Breakdown */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
-                </div>
-                <div className="p-6">
-                  {expenseData.length > 0 ? (
-                    <>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <RechartsPieChart>
-                          <Tooltip 
-                            formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']}
-                            labelFormatter={(label) => label}
-                            contentStyle={{
-                              backgroundColor: 'white',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '8px',
-                              color: '#374151',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
-                            }}
-                          />
-                          <Pie
-                            data={expenseData}
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={90}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({name, percent}) => `${(percent * 100).toFixed(1)}%`}
-                            labelLine={false}
-                          >
-                            {expenseData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                        </RechartsPieChart>
-                      </ResponsiveContainer>
-                      
-                      {/* Manual Legend */}
-                      <div className="mt-6 grid grid-cols-1 gap-4">
-                        {expenseData.map((item, index) => {
-                          const total = expenseData.reduce((sum, expense) => sum + expense.value, 0);
-                          const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0';
-                          return (
-                            <div key={item.name} className="flex items-center space-x-3">
-                              <div 
-                                className="w-4 h-4 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                              ></div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium text-gray-900 truncate">{item.name}</div>
-                                <div className="text-xs text-gray-500">
-                                  {formatCurrency(item.value)} ({percent}%)
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      No expense data available
-                    </div>
-                  )}
-                </div>
-              </div>
+                        return (
+                          <tr key={`revenue-${item.name}`} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3 text-left text-sm text-gray-700">
+                              <span className="ml-4">{item.name}</span>
+                            </td>
+                            <td className="px-4 py-3 text-left text-sm text-gray-500">
+                              {item.type}
+                            </td>
+                            {renderDataCells(item)}
+                            <td className="px-4 py-3 text-right text-sm text-green-600">
+                              {percentOfRevenue}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                    {/* Total Revenue */}
+                    <tr className="bg-green-100 font-semibold">
+                      <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
+                        Total Revenue
+                      </td>
+                      <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
+                        Revenue
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+                        {formatCurrency(kpis.revenue)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+                        100%
+                      </td>
+                    </tr>
+
+                    {/* Expense Section */}
+                    <tr className="bg-red-50">
+                      <td colSpan={4} className="px-4 py-3 text-left text-sm font-bold text-red-800">
+                        💸 EXPENSES
+                      </td>
+                    </tr>
+                    {currentData
+                      .filter(item => item.type === 'Expenses')
+                      .map((item) => {
+                        const percentOfRevenue = kpis.revenue 
+                          ? calculatePercentage(Math.abs(item.total), kpis.revenue)
+                          : '0%';
+
+                        return (
+                          <tr key={`expense-${item.name}`} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3 text-left text-sm text-gray-700">
+                              <span className="ml-4">{item.name}</span>
+                            </td>
+                            <td className="px-4 py-3 text-left text-sm text-gray-500">
+                              {item.type}
+                            </td>
+                            {renderDataCells(item)}
+                            <td className="px-4 py-3 text-right text-sm text-red-600">
+                              {percentOfRevenue}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                    {/* Total Expenses */}
+                    <tr className="bg-red-100 font-semibold">
+                      <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
+                        Total Expenses
+                      </td>
+                      <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
+                        Expenses
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+                        ({formatCurrency(kpis.expenses)})
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+                        {kpis.revenue ? calculatePercentage(kpis.expenses, kpis.revenue) : '0%'}
+                      </td>
+                    </tr>
+
+                    {/* Net Income */}
+                    <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
+                      <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+                        🏦 NET INCOME
+                      </td>
+                      <td className="px-4 py-4 text-left text-sm" style={{ color: BRAND_COLORS.primary }}>
+                        Net Result
+                      </td>
+                      <td className={`px-4 py-4 text-right text-lg font-bold ${
+                        kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                      }`}>
+                        {formatCurrency(kpis.netIncome)}
+                      </td>
+                      <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
+                        {kpis.netMargin.toFixed(1)}%
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
 
