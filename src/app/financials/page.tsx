@@ -383,10 +383,14 @@ const fetchFinancialData = async (
     
     let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=account_name`;
     
-    // Add property filter - FILTER BY PROPERTY_CLASS COLUMN
+    // Handle multiple property filtering
     if (property !== 'All Properties') {
+      // For now, handle single property (first selected)
+      // TODO: Enhance to handle multiple property filtering with OR conditions
       url += `&property_class=eq.${encodeURIComponent(property)}`;
       console.log('🏠 Filtering by property_class:', property);
+    } else {
+      console.log('🏠 No property filter applied (All Properties selected)');
     }
     
     // Add bank account filter if applicable
@@ -681,12 +685,11 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
-      // Handle multiple property selection
+      // Handle property selection - use first selected property for filtering
       let propertyFilter = 'All Properties';
       if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-        // If multiple properties selected, we'll need to modify the fetch function
-        // For now, use the first selected property
-        propertyFilter = Array.from(selectedProperties)[0];
+        propertyFilter = Array.from(selectedProperties)[0]; // Use first selected for now
+        // TODO: Enhance to support multiple property OR filtering
       }
       
       const bankAccount = selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0
@@ -694,7 +697,7 @@ export default function FinancialsPage() {
         : Array.from(selectedBankAccounts)[0];
       
       console.log('🔍 LOADING DATA WITH FILTERS:', {
-        properties: Array.from(selectedProperties),
+        selectedProperties: Array.from(selectedProperties),
         propertyFilter,
         bankAccount,
         month: selectedMonth
@@ -758,21 +761,28 @@ export default function FinancialsPage() {
     const newSelected = new Set(selectedProperties);
     
     if (property === 'All Properties') {
-      if (newSelected.has('All Properties')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Properties');
-      }
+      // If clicking "All Properties", clear everything and add only "All Properties"
+      newSelected.clear();
+      newSelected.add('All Properties');
     } else {
+      // If clicking individual property, remove "All Properties" first
       newSelected.delete('All Properties');
+      
+      // Then toggle the individual property
       if (newSelected.has(property)) {
         newSelected.delete(property);
       } else {
         newSelected.add(property);
       }
+      
+      // If no individual properties selected, default back to "All Properties"
+      if (newSelected.size === 0) {
+        newSelected.add('All Properties');
+      }
     }
+    
     setSelectedProperties(newSelected);
+    console.log('🏠 Property selection changed:', Array.from(newSelected));
   };
 
   const handleBankAccountToggle = (account: string) => {
@@ -1071,37 +1081,80 @@ export default function FinancialsPage() {
                 ))}
               </select>
 
-              {/* Property Filter Dropdown - FILTERS BY PROPERTY_CLASS */}
+              {/* Property Class Multi-Select Dropdown */}
               <div className="relative">
                 <button
                   onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
-                  className="flex items-center justify-between w-48 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  className="flex items-center justify-between w-56 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
                   style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                 >
-                  <span className="truncate">{getSelectedPropertiesText()}</span>
+                  <span className="truncate">
+                    {selectedProperties.has('All Properties') 
+                      ? 'All Property Classes' 
+                      : selectedProperties.size === 0 
+                        ? 'Select Property Classes'
+                        : selectedProperties.size === 1
+                          ? Array.from(selectedProperties)[0]
+                          : `${selectedProperties.size} Properties Selected`
+                    }
+                  </span>
                   <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
                 {propertyDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    {availableProperties.map((property) => (
-                      <div
-                        key={property}
-                        className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                        onClick={() => handlePropertyToggle(property)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedProperties.has(property)}
-                          onChange={() => {}}
-                          className="mr-3 h-4 w-4 border-gray-300 rounded"
-                          style={{ accentColor: BRAND_COLORS.primary }}
-                        />
-                        <span className={property === 'All Properties' ? 'font-medium text-gray-900' : 'text-gray-700'}>
-                          {property}
-                        </span>
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                    {/* All Properties Option */}
+                    <div
+                      className="flex items-center px-4 py-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePropertyToggle('All Properties');
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedProperties.has('All Properties')}
+                        onChange={() => {}}
+                        className="mr-3 h-4 w-4 border-gray-300 rounded"
+                        style={{ accentColor: BRAND_COLORS.primary }}
+                      />
+                      <span className="font-medium text-blue-900">
+                        All Property Classes
+                      </span>
+                    </div>
+                    
+                    {/* Individual Property Classes */}
+                    <div className="max-h-60 overflow-y-auto">
+                      {availableProperties
+                        .filter(property => property !== 'All Properties')
+                        .map((property) => (
+                          <div
+                            key={property}
+                            className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePropertyToggle(property);
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedProperties.has(property)}
+                              onChange={() => {}}
+                              className="mr-3 h-4 w-4 border-gray-300 rounded"
+                              style={{ accentColor: BRAND_COLORS.primary }}
+                            />
+                            <span className="text-gray-700">
+                              {property}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                    
+                    {availableProperties.length <= 1 && (
+                      <div className="px-4 py-3 text-sm text-gray-500 italic">
+                        No individual property classes found
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </div>
@@ -1127,17 +1180,18 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* DEBUG SECTION - Property Class Filtering Status */}
+          {/* DEBUG SECTION - Property Class Multi-Select Status */}
           {realData && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
               <div className="text-yellow-800 text-sm">
-                <strong>🔍 Property Class Filtering Debug:</strong>
+                <strong>🔍 Property Class Multi-Select Debug:</strong>
                 <div className="mt-2 space-y-1 text-xs bg-white p-3 rounded border font-mono">
-                  <div><strong>Available Properties in Dropdown:</strong> {availableProperties.join(', ')}</div>
-                  <div><strong>Currently Selected:</strong> {getSelectedPropertiesText()}</div>
+                  <div><strong>Available Property Classes:</strong> {availableProperties.filter(p => p !== 'All Properties').join(', ') || 'None found'}</div>
+                  <div><strong>Selected Properties:</strong> {Array.from(selectedProperties).join(', ')}</div>
+                  <div><strong>Active Filter:</strong> {!selectedProperties.has('All Properties') ? `property_class = "${Array.from(selectedProperties)[0]}"` : 'No filter (All Properties)'}</div>
                   <div><strong>Properties in Current Data:</strong> {realData.summary.propertiesInData?.join(', ') || 'None'}</div>
                   <div><strong>Total Entries Loaded:</strong> {realData.summary.filteredEntries}</div>
-                  <div><strong>Filter Applied:</strong> {Array.from(selectedProperties)[0] !== 'All Properties' ? `property_class = "${Array.from(selectedProperties)[0]}"` : 'No filter (All Properties)'}</div>
+                  <div><strong>Multi-Select Status:</strong> {selectedProperties.size > 1 ? `${selectedProperties.size} properties selected (showing first: ${Array.from(selectedProperties)[0]})` : 'Single or All selected'}</div>
                 </div>
               </div>
             </div>
