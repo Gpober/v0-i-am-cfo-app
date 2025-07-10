@@ -82,19 +82,24 @@ interface TooltipState {
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
   // Function to get a clean, descriptive account name
   const getCleanAccountName = (entry: any) => {
-    let accountName = entry.account_name?.trim() || '';
+    // Use detail_type (column 4) which contains the actual account names
+    let accountName = entry.detail_type?.trim() || '';
     
-    // ALWAYS use account_name first, not description
-    // Only clean up property-specific prefixes (like "615 Pine Terrace:")
-    accountName = accountName.replace(/^[^:]*:/, '').trim();
-    
-    // If account_name is just a number (like 103.41), keep it but make it more readable
-    if (/^\d+(\.\d+)?$/.test(accountName)) {
-      accountName = `Account ${accountName}`;
+    // If detail_type is empty, fall back to account_name
+    if (!accountName || accountName === 'Journal Entry' || accountName === 'RJE') {
+      accountName = entry.account_name?.trim() || '';
+      
+      // Clean up property-specific prefixes if using account_name
+      accountName = accountName.replace(/^[^:]*:/, '').trim();
+      
+      // If account_name is just a number, make it readable
+      if (/^\d+(\.\d+)?$/.test(accountName)) {
+        accountName = `Account ${accountName}`;
+      }
     }
     
-    // If still empty, use a fallback based on account type
-    if (!accountName || accountName === 'Journal Entry' || accountName === 'RJE') {
+    // Final fallback
+    if (!accountName) {
       accountName = `${entry.account_type || 'Other'} Account`;
     }
     
@@ -411,68 +416,173 @@ const fetchFinancialData = async (
     const journalData = await journalResponse.json();
     const accountsData = await accountsResponse.json();
     
-    // Create account lookup map - the accounts table appears to be property addresses as Fixed Assets
-    const accountMap = new Map();
+    // Create account code to name mapping from your chart of accounts
+    const accountCodeMap = new Map();
+    
+    // First, map your chart of accounts (property addresses as Fixed Assets)
     accountsData.forEach((account: any) => {
-      accountMap.set(account.account_name, {
+      accountCodeMap.set(account.account_name, {
         type: account.account_type,
         standardName: account.account_name
       });
     });
 
-    // Enhanced classification for journal entries since they don't match chart of accounts directly
-    const classifyJournalAccount = (accountName: string, debitAmount: number, creditAmount: number) => {
+    // Create comprehensive account code mappings based on your actual P&L structure
+    const commonAccountMappings = {
+      // INCOME ACCOUNTS
+      '103.41': { type: 'Income', standardName: 'Rental Revenue - Airbnb', classification: 'Revenue' },
+      '103.42': { type: 'Income', standardName: 'Rental Revenue - Property 2', classification: 'Revenue' },
+      '1050': { type: 'Income', standardName: 'Rental Revenue', classification: 'Revenue' },
+      '1115.58': { type: 'Income', standardName: 'Other Rental Income', classification: 'Revenue' },
+      '142.6': { type: 'Income', standardName: 'Rental Revenue - Additional', classification: 'Revenue' },
+      '150': { type: 'Income', standardName: 'Rental Revenue - Fees', classification: 'Revenue' },
+      '160': { type: 'Income', standardName: 'Rental Revenue - Services', classification: 'Revenue' },
+      '180': { type: 'Income', standardName: 'Rental Revenue - Utilities', classification: 'Revenue' },
+      '200': { type: 'Income', standardName: 'Rental Revenue - Applications', classification: 'Revenue' },
+      '2195.86': { type: 'Income', standardName: 'Rental Revenue - Late Fees', classification: 'Revenue' },
+      '250': { type: 'Income', standardName: 'Rental Revenue - Parking', classification: 'Revenue' },
+      '270': { type: 'Income', standardName: 'Rental Revenue - Storage', classification: 'Revenue' },
+      '490': { type: 'Income', standardName: 'Rental Revenue - Miscellaneous', classification: 'Revenue' },
+      '60': { type: 'Income', standardName: 'Rental Revenue - Pool', classification: 'Revenue' },
+      
+      // ADVERTISING & MARKETING
+      '500': { type: 'Expenses', standardName: 'Advertising & marketing', classification: 'Expenses' },
+      '501': { type: 'Expenses', standardName: 'Facebook', classification: 'Expenses' },
+      '502': { type: 'Expenses', standardName: 'Google Ads', classification: 'Expenses' },
+      
+      // OPERATING EXPENSES
+      '510': { type: 'Expenses', standardName: 'Arcade Expenses', classification: 'Expenses' },
+      '520': { type: 'Expenses', standardName: 'Bank fees & service charges', classification: 'Expenses' },
+      '530': { type: 'Expenses', standardName: 'Disposal & waste fees', classification: 'Expenses' },
+      '540': { type: 'Expenses', standardName: 'Insurance', classification: 'Expenses' },
+      '550': { type: 'Expenses', standardName: 'Internet & TV services', classification: 'Expenses' },
+      '560': { type: 'Expenses', standardName: 'Labor - Cleaning', classification: 'Expenses' },
+      '570': { type: 'Expenses', standardName: 'Meals', classification: 'Expenses' },
+      '580': { type: 'Expenses', standardName: 'Memberships & subscriptions', classification: 'Expenses' },
+      
+      // INTEREST EXPENSES
+      '600': { type: 'Interest Expense', standardName: 'Mortgage interest', classification: 'Other Expenses' },
+      
+      // OFFICE EXPENSES
+      '610': { type: 'Expenses', standardName: 'Office expenses', classification: 'Expenses' },
+      '611': { type: 'Expenses', standardName: 'Shipping & postage', classification: 'Expenses' },
+      
+      // POOL & HOT TUB
+      '620': { type: 'Expenses', standardName: 'Pool and Hot Tub Maintenance', classification: 'Expenses' },
+      '621': { type: 'Expenses', standardName: 'Pool and Hot Tub Repairs & Upgrades', classification: 'Expenses' },
+      '622': { type: 'Expenses', standardName: 'Pool and Hot Tub Supplies', classification: 'Expenses' },
+      
+      // MAINTENANCE & REPAIRS
+      '630': { type: 'Expenses', standardName: 'Repairs & maintenance', classification: 'Expenses' },
+      '640': { type: 'Expenses', standardName: 'Snow & Lawn', classification: 'Expenses' },
+      '650': { type: 'Expenses', standardName: 'Supplies', classification: 'Expenses' },
+      '660': { type: 'Expenses', standardName: 'Travel', classification: 'Expenses' },
+      
+      // UTILITIES
+      '670': { type: 'Expenses', standardName: 'Utilities', classification: 'Expenses' },
+      '671': { type: 'Expenses', standardName: 'Water & sewer', classification: 'Expenses' },
+      
+      // Additional mappings based on common patterns
+      '4720.99': { type: 'Income', standardName: 'Rental Revenue - Airbnb', classification: 'Revenue' },
+      
+      // Asset accounts (if any appear)
+      '1000': { type: 'Fixed Assets', standardName: 'Property - Cost', classification: 'Assets' },
+      '1100': { type: 'Fixed Assets', standardName: 'Property Improvements', classification: 'Assets' },
+      '1200': { type: 'Current Assets', standardName: 'Cash', classification: 'Assets' },
+      '1210': { type: 'Bank', standardName: 'Checking Account', classification: 'Assets' },
+      
+      // Liability accounts (if any appear)
+      '2000': { type: 'Long Term Liabilities', standardName: 'Mortgage Payable', classification: 'Liabilities' },
+      '2100': { type: 'Current Liabilities', standardName: 'Accounts Payable', classification: 'Liabilities' }
+    };
+
+    // Enhanced classification for journal entries using detail_type (column 4) as primary account name
+    const classifyJournalAccount = (entry: any) => {
+      const accountName = entry.detail_type || entry.account_name || '';
       const name = accountName.toLowerCase();
       
       // Revenue/Income classification
-      if (name.includes('income') || name.includes('revenue') || 
-          name.includes('rental') || name.includes('rent') ||
-          name.includes('airbnb') || name.includes('credit card rewards')) {
-        return { type: 'Other Income', classification: 'Revenue' };
+      if (name.includes('rental') || name.includes('airbnb') || 
+          name.includes('income') || name.includes('revenue')) {
+        return { 
+          type: 'Income', 
+          classification: 'Revenue', 
+          standardName: entry.detail_type || accountName 
+        };
       }
       
-      // Expense classification
-      if (name.includes('expense') || name.includes('cost') || 
-          name.includes('fee') || name.includes('tax') ||
-          name.includes('insurance') || name.includes('maintenance') ||
-          name.includes('repair') || name.includes('management') ||
-          name.includes('labor') || name.includes('business licenses')) {
-        return { type: 'Expenses', classification: 'Expenses' };
+      // Expense classification - be more specific based on your P&L
+      if (name.includes('advertising') || name.includes('facebook') || name.includes('google ads') ||
+          name.includes('arcade') || name.includes('bank fee') || name.includes('disposal') ||
+          name.includes('insurance') || name.includes('internet') || name.includes('cleaning') ||
+          name.includes('meal') || name.includes('membership') || name.includes('office') ||
+          name.includes('pool') || name.includes('repair') || name.includes('snow') || 
+          name.includes('lawn') || name.includes('supplies') || name.includes('travel') ||
+          name.includes('utilities') || name.includes('water') || name.includes('sewer') ||
+          name.includes('expense') || name.includes('cost') || name.includes('fee')) {
+        return { 
+          type: 'Expenses', 
+          classification: 'Expenses', 
+          standardName: entry.detail_type || accountName 
+        };
+      }
+      
+      // Interest expense (separate category like your P&L)
+      if (name.includes('mortgage') || name.includes('interest')) {
+        return { 
+          type: 'Interest Expense', 
+          classification: 'Other Expenses', 
+          standardName: entry.detail_type || accountName 
+        };
       }
       
       // Asset classification
       if (name.includes('improvements') || name.includes('property') || 
           name.includes('equipment') || name.includes('cash') ||
           name.includes('bank') || name.includes('checking') ||
-          name.includes('savings') || name.includes('receivable') ||
-          name.includes('deferred') || name.includes('prepayment')) {
-        return { type: 'Fixed Assets', classification: 'Assets' };
+          name.includes('savings') || name.includes('receivable')) {
+        return { 
+          type: 'Fixed Assets', 
+          classification: 'Assets', 
+          standardName: entry.detail_type || accountName 
+        };
       }
       
       // Liability classification
-      if (name.includes('loan') || name.includes('mortgage') || 
-          name.includes('payable') || name.includes('credit card') ||
-          name.includes('debt') || name.includes('liability') ||
-          name.includes('capital one')) {
-        return { type: 'Credit Card', classification: 'Liabilities' };
+      if (name.includes('loan') || name.includes('payable') || 
+          name.includes('credit card') || name.includes('debt') || 
+          name.includes('liability')) {
+        return { 
+          type: 'Credit Card', 
+          classification: 'Liabilities', 
+          standardName: entry.detail_type || accountName 
+        };
       }
       
       // Default based on debit/credit behavior
-      if (creditAmount > debitAmount) {
-        return { type: 'Other Income', classification: 'Revenue' };
+      if (entry.credit_amount > entry.debit_amount) {
+        return { 
+          type: 'Income', 
+          classification: 'Revenue', 
+          standardName: entry.detail_type || accountName || 'Revenue Account'
+        };
       } else {
-        return { type: 'Expenses', classification: 'Expenses' };
+        return { 
+          type: 'Expenses', 
+          classification: 'Expenses', 
+          standardName: entry.detail_type || accountName || 'Expense Account'
+        };
       }
     };
 
-    // Process journal entries with intelligent classification
+    // Process journal entries with intelligent classification using detail_type
     const enhancedData = journalData.map((entry: any) => {
       // First try to find exact match in chart of accounts
-      let accountInfo = accountMap.get(entry.account_name);
+      let accountInfo = accountCodeMap.get(entry.account_name);
       
       if (!accountInfo) {
-        // Use intelligent classification for journal entries
-        const classification = classifyJournalAccount(entry.account_name, entry.debit_amount, entry.credit_amount);
+        // Use intelligent classification based on detail_type (column 4)
+        const classification = classifyJournalAccount(entry);
         accountInfo = classification;
       }
       
@@ -480,8 +590,9 @@ const fetchFinancialData = async (
         ...entry,
         account_type: accountInfo?.type || 'Other',
         classification: accountInfo?.classification || accountInfo?.type || 'Other',
-        standard_account_name: accountInfo?.standardName || entry.account_name,
-        mapping_method: accountMap.has(entry.account_name) ? 'Chart of Accounts' : 'Intelligent Classification'
+        standard_account_name: accountInfo?.standardName || entry.detail_type || entry.account_name,
+        mapping_method: accountCodeMap.has(entry.account_name) ? 'Chart of Accounts' : 
+                        'Detail Type Classification'
       };
     });
 
@@ -491,12 +602,13 @@ const fetchFinancialData = async (
       accountsData: accountsData,
       summary: {
         filteredEntries: enhancedData?.length || 0,
-        dataSource: 'Supabase + Hybrid Classification',
+        dataSource: 'Supabase + Account Code Mapping',
         filters: { property, bankAccount, monthYear },
         accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
         mappingStats: {
           totalEntries: enhancedData?.length || 0,
           chartMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Chart of Accounts').length || 0,
+          commonMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Common Mapping').length || 0,
           intelligentMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Intelligent Classification').length || 0
         }
       }
@@ -786,7 +898,7 @@ export default function FinancialsPage() {
   const currentBalanceSheetData = getCurrentBalanceSheetData(); // Balance sheet accounts only
   const currentCashFlowData = getCurrentCashFlowData();
 
-  // Calculate KPIs using proper P&L structure
+  // Calculate KPIs using proper P&L structure matching your actual P&L
   const calculateKPIs = () => {
     if (!currentData || currentData.length === 0) {
       return {
@@ -797,6 +909,7 @@ export default function FinancialsPage() {
         operatingIncome: 0,
         otherIncome: 0,
         otherExpenses: 0,
+        interestExpense: 0,
         netIncome: 0,
         grossMargin: 0,
         operatingMargin: 0,
@@ -804,44 +917,44 @@ export default function FinancialsPage() {
       };
     }
 
-    // Revenue
+    // Total Income (like your P&L shows)
     const revenue = currentData
       .filter(item => item.type === 'Revenue' || 
                      (item.original_type && item.original_type.toLowerCase().includes('income')))
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Cost of Goods Sold
+    // Cost of Goods Sold (your P&L doesn't show COGS, so this will be 0)
     const cogs = currentData
-      .filter(item => item.original_type === 'Cost of Goods Sold' || 
-                     item.name.toLowerCase().includes('cost of goods') ||
-                     item.name.toLowerCase().includes('cogs'))
+      .filter(item => item.original_type === 'Cost of Goods Sold')
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Operating Expenses
+    // Operating Expenses (all expenses except interest)
     const operatingExpenses = currentData
       .filter(item => item.type === 'Expenses' && 
-                     item.original_type !== 'Cost of Goods Sold' &&
-                     !item.name.toLowerCase().includes('interest') &&
-                     !item.name.toLowerCase().includes('other'))
+                     item.original_type !== 'Interest Expense')
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Other Income
+    // Interest Expense (separate line like your P&L)
+    const interestExpense = currentData
+      .filter(item => item.original_type === 'Interest Expense' ||
+                     item.name.toLowerCase().includes('mortgage interest'))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    // Other Income (if any)
     const otherIncome = currentData
-      .filter(item => item.original_type === 'Other Income' ||
-                     item.name.toLowerCase().includes('other income') ||
-                     item.name.toLowerCase().includes('interest income'))
+      .filter(item => item.original_type === 'Other Income')
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    // Other Expenses
+    // Other Expenses (non-operating, excluding interest)
     const otherExpenses = currentData
-      .filter(item => item.name.toLowerCase().includes('interest expense') ||
-                     item.name.toLowerCase().includes('other expense') ||
-                     (item.type === 'Expenses' && item.name.toLowerCase().includes('other')))
+      .filter(item => item.name.toLowerCase().includes('other expense') &&
+                     !item.name.toLowerCase().includes('interest'))
       .reduce((sum, item) => sum + Math.abs(item.total), 0);
 
-    const grossProfit = revenue - cogs;
+    const grossProfit = revenue - cogs; // Since COGS = 0, this equals revenue
     const operatingIncome = grossProfit - operatingExpenses;
-    const netIncome = operatingIncome + otherIncome - otherExpenses;
+    const netOperatingIncome = operatingIncome - interestExpense;
+    const netIncome = netOperatingIncome + otherIncome - otherExpenses;
 
     return {
       revenue,
@@ -849,6 +962,8 @@ export default function FinancialsPage() {
       grossProfit,
       operatingExpenses,
       operatingIncome,
+      interestExpense,
+      netOperatingIncome,
       otherIncome,
       otherExpenses,
       netIncome,
@@ -1132,10 +1247,10 @@ export default function FinancialsPage() {
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.tertiary }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">COGS</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.cogs)}</div>
-                  <div className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full inline-block">
-                    Cost of Sales
+                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Expenses</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingExpenses)}</div>
+                  <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full inline-block">
+                    Operating Costs
                   </div>
                 </div>
                 <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.tertiary }} />
