@@ -732,24 +732,71 @@ export default function FinancialsPage() {
   const currentData = getCurrentFinancialData();
   const currentCashFlowData = getCurrentCashFlowData();
 
-  // Calculate KPIs using corrected logic
+  // Calculate KPIs using proper P&L structure
   const calculateKPIs = () => {
-    // Separate revenue and expense accounts
-    const revenueAccounts = currentData.filter(item => item.type === 'Revenue');
-    const expenseAccounts = currentData.filter(item => item.type === 'Expenses');
-    
-    const revenue = revenueAccounts.reduce((sum, item) => sum + Math.abs(item.total), 0);
-    const expenses = expenseAccounts.reduce((sum, item) => sum + Math.abs(item.total), 0);
-    
-    const grossProfit = revenue - expenses;
-    const operatingIncome = grossProfit; // Simplified for now
-    const netIncome = operatingIncome; // Simplified for now
-    
+    if (!currentData || currentData.length === 0) {
+      return {
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        operatingExpenses: 0,
+        operatingIncome: 0,
+        otherIncome: 0,
+        otherExpenses: 0,
+        netIncome: 0,
+        grossMargin: 0,
+        operatingMargin: 0,
+        netMargin: 0
+      };
+    }
+
+    // Revenue
+    const revenue = currentData
+      .filter(item => item.type === 'Revenue' || 
+                     (item.original_type && item.original_type.toLowerCase().includes('income')))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    // Cost of Goods Sold
+    const cogs = currentData
+      .filter(item => item.original_type === 'Cost of Goods Sold' || 
+                     item.name.toLowerCase().includes('cost of goods') ||
+                     item.name.toLowerCase().includes('cogs'))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    // Operating Expenses
+    const operatingExpenses = currentData
+      .filter(item => item.type === 'Expenses' && 
+                     item.original_type !== 'Cost of Goods Sold' &&
+                     !item.name.toLowerCase().includes('interest') &&
+                     !item.name.toLowerCase().includes('other'))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    // Other Income
+    const otherIncome = currentData
+      .filter(item => item.original_type === 'Other Income' ||
+                     item.name.toLowerCase().includes('other income') ||
+                     item.name.toLowerCase().includes('interest income'))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    // Other Expenses
+    const otherExpenses = currentData
+      .filter(item => item.name.toLowerCase().includes('interest expense') ||
+                     item.name.toLowerCase().includes('other expense') ||
+                     (item.type === 'Expenses' && item.name.toLowerCase().includes('other')))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    const grossProfit = revenue - cogs;
+    const operatingIncome = grossProfit - operatingExpenses;
+    const netIncome = operatingIncome + otherIncome - otherExpenses;
+
     return {
       revenue,
-      expenses,
+      cogs,
       grossProfit,
+      operatingExpenses,
       operatingIncome,
+      otherIncome,
+      otherExpenses,
       netIncome,
       grossMargin: revenue ? (grossProfit / revenue) * 100 : 0,
       operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
@@ -938,32 +985,33 @@ export default function FinancialsPage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
-                from Supabase • Chart of Accounts Integration
+                from Supabase • Hybrid Classification System
                 <div className="mt-1 text-xs">
-                  <strong>Mapping Success:</strong> {realData.summary.mappingStats?.chartMapped || 0} entries mapped to chart of accounts, 
-                  {realData.summary.mappingStats?.defaultMapped || 0} using fallback logic
+                  <strong>Schema Discovery:</strong> Chart of accounts contains property addresses as Fixed Assets, 
+                  journal entries use descriptive account names - using intelligent classification
+                </div>
+                <div className="mt-1 text-xs">
+                  <strong>Mapping Results:</strong> {realData.summary.mappingStats?.chartMapped || 0} exact matches, 
+                  {realData.summary.mappingStats?.intelligentMapped || 0} intelligent classifications
                 </div>
                 {realData.summary.accountTypes && (
                   <div className="mt-1">
-                    <strong>Account Types Found:</strong> {realData.summary.accountTypes.join(', ')}
+                    <strong>Chart Account Types:</strong> {realData.summary.accountTypes.join(', ')}
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Financial KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Financial KPIs - Updated for P&L Structure */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.primary }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Total Revenue</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
-                  <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
-                    Fixed Mapping
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Revenue Accounts Only
+                  <div className="text-gray-600 text-sm font-medium mb-2">Revenue</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
+                  <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
+                    Top Line
                   </div>
                 </div>
                 <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
@@ -973,13 +1021,10 @@ export default function FinancialsPage() {
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Total Expenses</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.expenses)}</div>
-                  <div className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full inline-block">
-                    Expense Accounts
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Proper Classification
+                  <div className="text-gray-600 text-sm font-medium mb-2">Gross Profit</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.grossProfit)}</div>
+                  <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
+                    {kpis.grossMargin.toFixed(1)}% Margin
                   </div>
                 </div>
                 <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
@@ -989,13 +1034,10 @@ export default function FinancialsPage() {
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.success }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Gross Profit</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.grossProfit)}</div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Income</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingIncome)}</div>
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
-                    {kpis.grossMargin.toFixed(1)}% Margin
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Revenue - Expenses
+                    {kpis.operatingMargin.toFixed(1)}% Margin
                   </div>
                 </div>
                 <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
@@ -1006,15 +1048,25 @@ export default function FinancialsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
                   <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
                     {kpis.netMargin.toFixed(1)}% Margin
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Bottom Line
-                  </div>
                 </div>
                 <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.tertiary }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">COGS</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.cogs)}</div>
+                  <div className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full inline-block">
+                    Cost of Sales
+                  </div>
+                </div>
+                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.tertiary }} />
               </div>
             </div>
           </div>
@@ -1046,11 +1098,8 @@ export default function FinancialsPage() {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account Name
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account Type
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Account
                       </th>
                       {renderColumnHeaders()}
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1059,110 +1108,204 @@ export default function FinancialsPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {/* Revenue Section */}
-                    <tr className="bg-green-50">
-                      <td colSpan={4} className="px-4 py-3 text-left text-sm font-bold text-green-800">
+                    {/* REVENUE */}
+                    <tr className="bg-blue-50 border-t-2 border-blue-200">
+                      <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
                         💰 REVENUE
                       </td>
-                    </tr>
-                    {currentData
-                      .filter(item => item.type === 'Revenue')
-                      .map((item) => {
-                        const percentOfRevenue = kpis.revenue 
-                          ? calculatePercentage(Math.abs(item.total), kpis.revenue)
-                          : '0%';
-
-                        return (
-                          <tr key={`revenue-${item.name}`} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3 text-left text-sm text-gray-700">
-                              <span className="ml-4">{item.name}</span>
-                            </td>
-                            <td className="px-4 py-3 text-left text-sm text-gray-500">
-                              {item.type}
-                            </td>
-                            {renderDataCells(item)}
-                            <td className="px-4 py-3 text-right text-sm text-green-600">
-                              {percentOfRevenue}
-                            </td>
-                          </tr>
-                        );
-                      })}
-
-                    {/* Total Revenue */}
-                    <tr className="bg-green-100 font-semibold">
-                      <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
-                        Total Revenue
-                      </td>
-                      <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
-                        Revenue
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+                      <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
                         {formatCurrency(kpis.revenue)}
                       </td>
-                      <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
-                        100%
-                      </td>
-                    </tr>
-
-                    {/* Expense Section */}
-                    <tr className="bg-red-50">
-                      <td colSpan={4} className="px-4 py-3 text-left text-sm font-bold text-red-800">
-                        💸 EXPENSES
+                      <td className="px-4 py-4 text-right text-sm text-blue-700">
+                        100.0%
                       </td>
                     </tr>
                     {currentData
-                      .filter(item => item.type === 'Expenses')
-                      .map((item) => {
-                        const percentOfRevenue = kpis.revenue 
-                          ? calculatePercentage(Math.abs(item.total), kpis.revenue)
-                          : '0%';
+                      .filter(item => item.type === 'Revenue' || 
+                                     (item.original_type && item.original_type.toLowerCase().includes('income')))
+                      .map((item) => (
+                        <tr key={`revenue-${item.name}`} className="hover:bg-gray-50">
+                          <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                            {item.name}
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-green-600">
+                            {formatCurrency(Math.abs(item.total))}
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-gray-500">
+                            {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                          </td>
+                        </tr>
+                      ))}
 
-                        return (
-                          <tr key={`expense-${item.name}`} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3 text-left text-sm text-gray-700">
-                              <span className="ml-4">{item.name}</span>
-                            </td>
-                            <td className="px-4 py-3 text-left text-sm text-gray-500">
-                              {item.type}
-                            </td>
-                            {renderDataCells(item)}
-                            <td className="px-4 py-3 text-right text-sm text-red-600">
-                              {percentOfRevenue}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                    {/* COST OF GOODS SOLD */}
+                    <tr className="bg-orange-50 border-t border-gray-200">
+                      <td className="px-6 py-4 text-left text-lg font-bold text-orange-900">
+                        📦 COST OF GOODS SOLD
+                      </td>
+                      <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                        ({formatCurrency(kpis.cogs)})
+                      </td>
+                      <td className="px-4 py-4 text-right text-sm text-red-600">
+                        {kpis.revenue ? calculatePercentage(kpis.cogs, kpis.revenue) : '0%'}
+                      </td>
+                    </tr>
+                    {currentData
+                      .filter(item => item.original_type === 'Cost of Goods Sold' || 
+                                     item.name.toLowerCase().includes('cost of goods') ||
+                                     item.name.toLowerCase().includes('cogs'))
+                      .map((item) => (
+                        <tr key={`cogs-${item.name}`} className="hover:bg-gray-50">
+                          <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                            {item.name}
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-red-600">
+                            ({formatCurrency(Math.abs(item.total))})
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-gray-500">
+                            {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                          </td>
+                        </tr>
+                      ))}
 
-                    {/* Total Expenses */}
-                    <tr className="bg-red-100 font-semibold">
-                      <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
-                        Total Expenses
+                    {/* GROSS PROFIT */}
+                    <tr className="bg-green-100 border-t-2 border-green-300">
+                      <td className="px-6 py-4 text-left text-lg font-bold text-green-800">
+                        💚 GROSS PROFIT
                       </td>
-                      <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
-                        Expenses
+                      <td className="px-4 py-4 text-right text-lg font-bold text-green-800">
+                        {formatCurrency(kpis.grossProfit)}
                       </td>
-                      <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                        ({formatCurrency(kpis.expenses)})
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                        {kpis.revenue ? calculatePercentage(kpis.expenses, kpis.revenue) : '0%'}
+                      <td className="px-4 py-4 text-right text-sm font-bold text-green-800">
+                        {kpis.grossMargin.toFixed(1)}%
                       </td>
                     </tr>
 
-                    {/* Net Income */}
-                    <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                      <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
-                        🏦 NET INCOME
+                    {/* OPERATING EXPENSES */}
+                    <tr className="bg-red-50 border-t border-gray-200">
+                      <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
+                        🏢 OPERATING EXPENSES
                       </td>
-                      <td className="px-4 py-4 text-left text-sm" style={{ color: BRAND_COLORS.primary }}>
-                        Net Result
+                      <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                        ({formatCurrency(kpis.operatingExpenses)})
                       </td>
-                      <td className={`px-4 py-4 text-right text-lg font-bold ${
+                      <td className="px-4 py-4 text-right text-sm text-red-600">
+                        {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
+                      </td>
+                    </tr>
+                    {currentData
+                      .filter(item => item.type === 'Expenses' && 
+                                     item.original_type !== 'Cost of Goods Sold' &&
+                                     !item.name.toLowerCase().includes('interest') &&
+                                     !item.name.toLowerCase().includes('other'))
+                      .map((item) => (
+                        <tr key={`opex-${item.name}`} className="hover:bg-gray-50">
+                          <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                            {item.name}
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-red-600">
+                            ({formatCurrency(Math.abs(item.total))})
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-gray-500">
+                            {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                          </td>
+                        </tr>
+                      ))}
+
+                    {/* OPERATING INCOME */}
+                    <tr className="bg-blue-100 border-t-2 border-blue-300">
+                      <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
+                        🎯 OPERATING INCOME
+                      </td>
+                      <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
+                        {formatCurrency(kpis.operatingIncome)}
+                      </td>
+                      <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
+                        {kpis.operatingMargin.toFixed(1)}%
+                      </td>
+                    </tr>
+
+                    {/* OTHER INCOME */}
+                    {kpis.otherIncome > 0 && (
+                      <>
+                        <tr className="bg-green-50 border-t border-gray-200">
+                          <td className="px-6 py-4 text-left text-lg font-bold text-green-900">
+                            ➕ OTHER INCOME
+                          </td>
+                          <td className="px-4 py-4 text-right text-lg font-bold text-green-600">
+                            {formatCurrency(kpis.otherIncome)}
+                          </td>
+                          <td className="px-4 py-4 text-right text-sm text-green-600">
+                            {kpis.revenue ? calculatePercentage(kpis.otherIncome, kpis.revenue) : '0%'}
+                          </td>
+                        </tr>
+                        {currentData
+                          .filter(item => item.original_type === 'Other Income' ||
+                                         item.name.toLowerCase().includes('other income') ||
+                                         item.name.toLowerCase().includes('interest income'))
+                          .map((item) => (
+                            <tr key={`other-income-${item.name}`} className="hover:bg-gray-50">
+                              <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                {item.name}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-green-600">
+                                {formatCurrency(Math.abs(item.total))}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                              </td>
+                            </tr>
+                          ))}
+                      </>
+                    )}
+
+                    {/* OTHER EXPENSES */}
+                    {kpis.otherExpenses > 0 && (
+                      <>
+                        <tr className="bg-red-50 border-t border-gray-200">
+                          <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
+                            ➖ OTHER EXPENSES
+                          </td>
+                          <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                            ({formatCurrency(kpis.otherExpenses)})
+                          </td>
+                          <td className="px-4 py-4 text-right text-sm text-red-600">
+                            {kpis.revenue ? calculatePercentage(kpis.otherExpenses, kpis.revenue) : '0%'}
+                          </td>
+                        </tr>
+                        {currentData
+                          .filter(item => item.name.toLowerCase().includes('interest expense') ||
+                                         item.name.toLowerCase().includes('other expense') ||
+                                         (item.type === 'Expenses' && item.name.toLowerCase().includes('other')))
+                          .map((item) => (
+                            <tr key={`other-expense-${item.name}`} className="hover:bg-gray-50">
+                              <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                {item.name}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-red-600">
+                                ({formatCurrency(Math.abs(item.total))})
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                              </td>
+                            </tr>
+                          ))}
+                      </>
+                    )}
+
+                    {/* NET INCOME */}
+                    <tr className="border-t-4" style={{ 
+                      backgroundColor: BRAND_COLORS.primary + '20', 
+                      borderTopColor: BRAND_COLORS.primary 
+                    }}>
+                      <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                        🏆 NET INCOME
+                      </td>
+                      <td className={`px-4 py-5 text-right text-xl font-bold ${
                         kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
                       }`}>
                         {formatCurrency(kpis.netIncome)}
                       </td>
-                      <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
+                      <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
                         {kpis.netMargin.toFixed(1)}%
                       </td>
                     </tr>
