@@ -653,11 +653,25 @@ const fetchFinancialData = async (
 
     // Process journal entries using the STRICTLY FILTERED data
     const enhancedData = filteredJournalData.map((entry: any) => {
+      // First: Try to find exact match in your accounts table
       let accountInfo = accountLookupMap.get(entry.account_name);
       
-      if (!accountInfo) {
-        const classification = classifyJournalAccount(entry);
-        accountInfo = classification;
+      if (accountInfo) {
+        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
+      } else {
+        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using account_type from journal entry`);
+        // Use the account_type directly from the journal entry - no guessing!
+        accountInfo = {
+          type: entry.account_type,
+          classification: entry.account_type === 'Income' ? 'Revenue' : 
+                         entry.account_type === 'Expenses' ? 'Expenses' :
+                         entry.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                         entry.account_type === 'Other Income' ? 'Revenue' :
+                         entry.account_type === 'Other Expenses' ? 'Expenses' :
+                         entry.account_type === 'Interest Expense' ? 'Other Expenses' :
+                         entry.account_type, // Default to whatever the journal entry says
+          standardName: entry.account_name
+        };
       }
       
       return {
@@ -665,8 +679,7 @@ const fetchFinancialData = async (
         account_type: accountInfo?.type || entry.account_type || 'Other',
         classification: accountInfo?.classification || accountInfo?.type || 'Other',
         standard_account_name: accountInfo?.standardName || entry.account_name,
-        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 
-                        'Fallback Classification'
+        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Journal Entry Type'
       };
     });
 
