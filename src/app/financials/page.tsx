@@ -968,7 +968,10 @@ export default function FinancialsPage() {
   };
 
   const isExpandableAccount = (accountName: string): boolean => {
-    return accountDetails.hasOwnProperty(accountName);
+    // Check if it's in the static expandable accounts OR if it has sub-accounts
+    const currentDataItem = currentData.find(item => item.name === accountName);
+    return accountDetails.hasOwnProperty(accountName) || 
+           (currentDataItem && currentDataItem.hasSubAccounts);
   };
 
   const handleAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, accountItem: FinancialDataItem): void => {
@@ -1038,7 +1041,76 @@ export default function FinancialsPage() {
     });
   };
 
-  const handleSubAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
+  const handleSubAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, subAccountItem: any): void => {
+    // Handle both new sub-account structure and old static structure
+    if (typeof subAccountItem === 'object' && subAccountItem.entries) {
+      // New sub-account with real transaction data
+      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      
+      let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+        ${subAccountItem.name} • ${formatCurrency(subAccountItem.total)}
+      </div>`;
+
+      tooltipContent += `<div style="font-size: 11px; color: #E5E7EB; margin-bottom: 8px;">
+        ${subAccountItem.entries.length} Journal Entries • Property: ${subAccountItem.name}
+      </div>`;
+
+      // Show up to 3 most recent transactions for sub-accounts
+      const recentEntries = subAccountItem.entries.slice(0, 3);
+      
+      recentEntries.forEach((entry: any, index: number) => {
+        const entryDate = new Date(entry.transaction_date).toLocaleDateString();
+        const isLast = index === recentEntries.length - 1;
+        
+        tooltipContent += `
+          <div style="margin-bottom: ${isLast ? '0' : '6px'}; padding: 4px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <div style="width: 4px; height: 4px; background: #10B981; border-radius: 50%;"></div>
+                <strong style="font-size: 11px; color: white;">JE: ${entry.je_number}</strong>
+              </div>
+              <span style="font-size: 10px; color: #D1D5DB;">${entryDate}</span>
+            </div>
+            <div style="margin-left: 8px; margin-top: 2px;">
+              <div style="font-size: 10px; color: #F3F4F6;">
+                ${entry.original_description || 'No description'}
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                <span style="font-size: 10px; color: #9CA3AF;">
+                  ${entry.property || 'No Property'}
+                </span>
+                <span style="font-size: 11px; font-weight: bold; color: #10B981;">
+                  ${formatCurrency(Math.abs(entry.amount_used))}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      if (subAccountItem.entries.length > 3) {
+        tooltipContent += `
+          <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
+            <span style="font-size: 10px; color: #D1D5DB; font-style: italic;">
+              + ${subAccountItem.entries.length - 3} more entries
+            </span>
+          </div>
+        `;
+      }
+
+      setAccountTooltip({
+        show: true,
+        content: tooltipContent,
+        x: rect.left + rect.width / 2,
+        y: rect.top - 10
+      });
+    } else {
+      // Fallback to old static sub-account handling
+      handleSubAccountMouseEnterStatic(event, subAccountItem, typeof subAccountItem === 'string' ? 0 : subAccountItem);
+    }
+  };
+
+  const handleSubAccountMouseEnterStatic = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
     const details = subAccountDetails[subAccountName];
     if (!details || details.length === 0) return;
 
@@ -1610,23 +1682,107 @@ export default function FinancialsPage() {
                           {currentData
                             .filter(item => item.type === 'Revenue' || 
                                            (item.original_type && item.original_type.toLowerCase().includes('income')))
-                            .map((item) => (
-                              <tr key={`income-${item.name}`} className="hover:bg-gray-50">
-                                <td 
-                                  className="px-6 py-2 text-left text-sm text-gray-700 pl-12 cursor-help"
-                                  onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
-                                  onMouseLeave={handleAccountMouseLeave}
-                                >
-                                  {item.name}
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-green-600">
-                                  {formatCurrency(Math.abs(item.total))}
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                  {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                                </td>
-                              </tr>
-                            ))}
+                            .map((item) => {
+                              const isExpandable = isExpandableAccount(item.name);
+                              const isExpanded = expandedAccounts.has(item.name);
+                              
+                              return (
+                                <React.Fragment key={`income-${item.name}`}>
+                                  {/* Parent Account Row */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                      <div className="flex items-center">
+                                        {isExpandable && (
+                                          <button
+                                            onClick={() => toggleAccountExpansion(item.name)}
+                                            className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                                          >
+                                            {isExpanded ? (
+                                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                                            ) : (
+                                              <ChevronRight className="w-4 h-4 text-gray-500" />
+                                            )}
+                                          </button>
+                                        )}
+                                        <span 
+                                          className="cursor-help"
+                                          onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                          onMouseLeave={handleAccountMouseLeave}
+                                        >
+                                          {item.name}
+                                          {item.entries && item.entries.length > 0 && (
+                                            <span className="ml-2 text-xs text-gray-500">
+                                              ({item.entries.reduce((props: Set<string>, entry: any) => props.add(entry.property || 'No Property'), new Set()).size} properties)
+                                            </span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-green-600">
+                                      {formatCurrency(Math.abs(item.total))}
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                    </td>
+                                  </tr>
+                                  
+                                  {/* Sub-Account Details (when expanded) */}
+                                  {isExpandable && isExpanded && item.hasSubAccounts && 
+                                    Object.values(item.subAccounts || {}).map((subAccount: any) => (
+                                      <tr key={`${item.name}-${subAccount.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
+                                        <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
+                                          <div className="flex items-center">
+                                            <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                                            <span 
+                                              className="cursor-help"
+                                              onMouseEnter={(e) => handleSubAccountMouseEnter(e, subAccount)}
+                                              onMouseLeave={handleAccountMouseLeave}
+                                            >
+                                              {subAccount.name}
+                                            </span>
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-sm text-green-600">
+                                          {formatCurrency(Math.abs(subAccount.total))}
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                          {item.total ? calculatePercentage(Math.abs(subAccount.total), Math.abs(item.total)) : '0%'}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  }
+                                  
+                                  {/* Static Sub-Account Details (for demo accounts) */}
+                                  {isExpandable && isExpanded && accountDetails[item.name] && 
+                                    accountDetails[item.name].map((subItem) => {
+                                      const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
+                                      return (
+                                        <tr key={`${item.name}-${subItem.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
+                                          <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
+                                            <div className="flex items-center">
+                                              <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: BRAND_COLORS.primary }}></div>
+                                              {subItem.name}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-2 text-right text-sm text-gray-600">
+                                            <span 
+                                              className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
+                                              onMouseEnter={hasSubDetails ? (e) => handleSubAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
+                                              onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
+                                            >
+                                              {formatCurrency(subItem.total)}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                            {kpis.revenue ? calculatePercentage(subItem.total, kpis.revenue) : '0%'}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  }
+                                </React.Fragment>
+                              );
+                            })}
 
                           {/* TOTAL INCOME - Bold Line Like Your Sheet */}
                           <tr className="bg-blue-100 border-t-2 border-blue-300">
