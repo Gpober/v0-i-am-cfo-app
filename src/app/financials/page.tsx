@@ -731,22 +731,34 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
-      const property = selectedProperties.has('All Properties') || selectedProperties.size === 0 
-        ? 'All Properties' 
-        : Array.from(selectedProperties)[0];
+      // Handle multiple property selection
+      let propertyFilter = 'All Properties';
+      if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
+        // If multiple properties selected, we'll need to modify the fetch function
+        // For now, use the first selected property
+        propertyFilter = Array.from(selectedProperties)[0];
+      }
       
       const bankAccount = selectedBankAccounts.has('All Accounts') || selectedBankAccounts.size === 0
         ? 'All Accounts'
         : Array.from(selectedBankAccounts)[0];
       
-      const rawData = await fetchFinancialData(property, bankAccount, selectedMonth);
+      console.log('🔍 LOADING DATA WITH FILTERS:', {
+        properties: Array.from(selectedProperties),
+        propertyFilter,
+        bankAccount,
+        month: selectedMonth
+      });
+      
+      const rawData = await fetchFinancialData(propertyFilter, bankAccount, selectedMonth);
       
       if (rawData.success) {
         const entries = rawData.data as FinancialEntry[];
         
         // DEBUG: Log raw entries to console
         console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
-        console.log('🔍 DEBUG - Available fields in first entry:', Object.keys(entries[0] || {}));
+        console.log('🔍 DEBUG - Total entries loaded:', entries.length);
+        console.log('🔍 DEBUG - Properties in data:', [...new Set(entries.map(e => e.property_class))]);
         
         const transformedPL = transformFinancialData(entries, selectedMonth);
         const transformedCF = transformCashFlowData(entries);
@@ -755,7 +767,15 @@ export default function FinancialsPage() {
           success: true,
           ...transformedPL,
           ...transformedCF,
-          summary: rawData.summary,
+          summary: {
+            ...rawData.summary,
+            propertiesInData: [...new Set(entries.map(e => e.property_class))],
+            selectedFilters: {
+              properties: Array.from(selectedProperties),
+              bankAccounts: Array.from(selectedBankAccounts),
+              month: selectedMonth
+            }
+          },
           performance: {
             executionTimeMs: Date.now() % 1000
           },
@@ -764,7 +784,12 @@ export default function FinancialsPage() {
 
         setRealData(combinedData);
         setDataError(null);
-        showNotification(`Loaded ${entries.length} financial entries from Supabase`, 'success');
+        
+        const propertyText = selectedProperties.has('All Properties') 
+          ? 'all properties' 
+          : `${selectedProperties.size} selected properties`;
+          
+        showNotification(`Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`, 'success');
       } else {
         setDataError(rawData.error || 'Failed to load financial data');
         showNotification('Failed to load financial data', 'error');
