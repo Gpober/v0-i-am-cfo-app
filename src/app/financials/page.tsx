@@ -122,13 +122,12 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     
     switch (acc[key].type) {
       case 'Revenue':
-        // Revenue: negative line_amount typically means revenue increase
-        // But we want to show revenue as positive on P&L
+        // Revenue: Use absolute value of line_amount, but check if it should be negative
         amount = Math.abs(entry.line_amount || (entry.credit_amount - entry.debit_amount));
         break;
         
       case 'Expenses':
-        // Expenses: positive line_amount typically means expense increase
+        // Expenses: Use absolute value of line_amount
         amount = Math.abs(entry.line_amount || (entry.debit_amount - entry.credit_amount));
         break;
         
@@ -427,6 +426,11 @@ const fetchFinancialData = async (
     
     console.log('📊 Journal entries loaded:', journalData.length);
     console.log('📋 Properties in loaded data:', [...new Set(journalData.map((e: any) => e.property_class))]);
+    console.log('🔍 Sample journal entries for classification:', journalData.slice(0, 3));
+    
+    // Log account names to see what we're working with
+    const accountNames = [...new Set(journalData.map((e: any) => e.account_name))].slice(0, 10);
+    console.log('📝 Sample account names:', accountNames);
     
     // Create account code to name mapping from your chart of accounts
     const accountCodeMap = new Map();
@@ -444,9 +448,15 @@ const fetchFinancialData = async (
       const accountName = entry.account_name || '';
       const name = accountName.toLowerCase();
       
-      // Revenue/Income classification based on your actual account names
+      console.log('🔍 Classifying account:', accountName, 'Line amount:', entry.line_amount, 'Debit:', entry.debit_amount, 'Credit:', entry.credit_amount);
+      
+      // Revenue/Income classification - BROADER CRITERIA
       if (name.includes('rental') || name.includes('airbnb') || 
-          name.includes('income') || name.includes('revenue')) {
+          name.includes('income') || name.includes('revenue') ||
+          name.includes('rent') || name.includes('fee') ||
+          name.includes('sales') || name.includes('service') ||
+          entry.credit_amount > 0 && entry.debit_amount === 0) { // Pure credit entries often revenue
+        console.log('✅ Classified as REVENUE:', accountName);
         return { 
           type: 'Income', 
           classification: 'Revenue', 
@@ -471,7 +481,9 @@ const fetchFinancialData = async (
           name.includes('supplies') || name.includes('travel') ||
           name.includes('utilities') || name.includes('water') || 
           name.includes('sewer') || name.includes('expense') || 
-          name.includes('cost') || name.includes('fee')) {
+          name.includes('cost') ||
+          entry.debit_amount > 0 && entry.credit_amount === 0) { // Pure debit entries often expenses
+        console.log('✅ Classified as EXPENSE:', accountName);
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
@@ -512,19 +524,38 @@ const fetchFinancialData = async (
         };
       }
       
-      // Default based on debit/credit behavior and line_amount
-      if (entry.line_amount > 0 && (entry.credit_amount > entry.debit_amount)) {
+      // DEFAULT CLASSIFICATION: Use credit/debit logic
+      if (entry.credit_amount > entry.debit_amount) {
+        console.log('🔄 Default classified as REVENUE (credit > debit):', accountName);
         return { 
           type: 'Income', 
           classification: 'Revenue', 
           standardName: entry.account_name || 'Revenue Account'
         };
-      } else {
+      } else if (entry.debit_amount > entry.credit_amount) {
+        console.log('🔄 Default classified as EXPENSE (debit > credit):', accountName);
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
           standardName: entry.account_name || 'Expense Account'
         };
+      } else {
+        // Equal or both zero - classify based on line_amount
+        if (entry.line_amount < 0) {
+          console.log('🔄 Default classified as REVENUE (negative line_amount):', accountName);
+          return { 
+            type: 'Income', 
+            classification: 'Revenue', 
+            standardName: entry.account_name || 'Revenue Account'
+          };
+        } else {
+          console.log('🔄 Default classified as EXPENSE (positive line_amount):', accountName);
+          return { 
+            type: 'Expenses', 
+            classification: 'Expenses', 
+            standardName: entry.account_name || 'Expense Account'
+          };
+        }
       }
     };
 
@@ -548,6 +579,26 @@ const fetchFinancialData = async (
                         'Account Name Classification'
       };
     });
+
+    // Debug: Log classification results
+    const revenueEntries = enhancedData.filter(e => e.classification === 'Revenue');
+    const expenseEntries = enhancedData.filter(e => e.classification === 'Expenses');
+    
+    console.log('💰 Revenue entries found:', revenueEntries.length);
+    console.log('💰 Sample revenue accounts:', revenueEntries.slice(0, 5).map(e => ({
+      account: e.account_name,
+      line_amount: e.line_amount,
+      debit: e.debit_amount,
+      credit: e.credit_amount
+    })));
+    
+    console.log('💸 Expense entries found:', expenseEntries.length);
+    console.log('💸 Sample expense accounts:', expenseEntries.slice(0, 5).map(e => ({
+      account: e.account_name,
+      line_amount: e.line_amount,
+      debit: e.debit_amount,
+      credit: e.credit_amount
+    })));
 
     return {
       success: true,
@@ -1125,36 +1176,36 @@ export default function FinancialsPage() {
                     
                     {/* Individual Property Classes */}
                     <div className="max-h-60 overflow-y-auto">
-                      {availableProperties
-                        .filter(property => property !== 'All Properties')
-                        .map((property) => (
-                          <div
-                            key={property}
-                            className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePropertyToggle(property);
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedProperties.has(property)}
-                              onChange={() => {}}
-                              className="mr-3 h-4 w-4 border-gray-300 rounded"
-                              style={{ accentColor: BRAND_COLORS.primary }}
-                            />
-                            <span className="text-gray-700">
-                              {property}
-                            </span>
-                          </div>
-                        ))}
+                      {availableProperties.length > 1 ? (
+                        availableProperties
+                          .filter(property => property !== 'All Properties')
+                          .map((property) => (
+                            <div
+                              key={property}
+                              className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePropertyToggle(property);
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedProperties.has(property)}
+                                onChange={() => {}}
+                                className="mr-3 h-4 w-4 border-gray-300 rounded"
+                                style={{ accentColor: BRAND_COLORS.primary }}
+                              />
+                              <span className="text-gray-700">
+                                {property}
+                              </span>
+                            </div>
+                          ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500 italic">
+                          Loading property classes...
+                        </div>
+                      )}
                     </div>
-                    
-                    {availableProperties.length <= 1 && (
-                      <div className="px-4 py-3 text-sm text-gray-500 italic">
-                        No individual property classes found
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
