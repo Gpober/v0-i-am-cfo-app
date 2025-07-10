@@ -82,25 +82,15 @@ interface TooltipState {
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
   // Function to get a clean, descriptive account name
   const getCleanAccountName = (entry: any) => {
-    // Use detail_type (column 4) which contains the actual account names
-    let accountName = entry.detail_type?.trim() || '';
+    // Use account_name (column D) which contains the actual account names
+    let accountName = entry.account_name?.trim() || '';
     
-    // If detail_type is empty, fall back to account_name
+    // Clean up property-specific prefixes if present (like "615 Pine Terrace:")
+    accountName = accountName.replace(/^[^:]*:/, '').trim();
+    
+    // If still empty, use a fallback
     if (!accountName || accountName === 'Journal Entry' || accountName === 'RJE') {
-      accountName = entry.account_name?.trim() || '';
-      
-      // Clean up property-specific prefixes if using account_name
-      accountName = accountName.replace(/^[^:]*:/, '').trim();
-      
-      // If account_name is just a number, make it readable
-      if (/^\d+(\.\d+)?$/.test(accountName)) {
-        accountName = `Account ${accountName}`;
-      }
-    }
-    
-    // Final fallback
-    if (!accountName) {
-      accountName = `${entry.account_type || 'Other'} Account`;
+      accountName = entry.description?.trim() || `${entry.account_type || 'Other'} Account`;
     }
     
     return accountName;
@@ -496,34 +486,43 @@ const fetchFinancialData = async (
       '2100': { type: 'Current Liabilities', standardName: 'Accounts Payable', classification: 'Liabilities' }
     };
 
-    // Enhanced classification for journal entries using detail_type (column 4) as primary account name
+    // Enhanced classification for journal entries using account_name (column D)
     const classifyJournalAccount = (entry: any) => {
-      const accountName = entry.detail_type || entry.account_name || '';
+      const accountName = entry.account_name || '';
       const name = accountName.toLowerCase();
       
-      // Revenue/Income classification
+      // Revenue/Income classification based on your actual account names
       if (name.includes('rental') || name.includes('airbnb') || 
           name.includes('income') || name.includes('revenue')) {
         return { 
           type: 'Income', 
           classification: 'Revenue', 
-          standardName: entry.detail_type || accountName 
+          standardName: entry.account_name 
         };
       }
       
-      // Expense classification - be more specific based on your P&L
-      if (name.includes('advertising') || name.includes('facebook') || name.includes('google ads') ||
-          name.includes('arcade') || name.includes('bank fee') || name.includes('disposal') ||
-          name.includes('insurance') || name.includes('internet') || name.includes('cleaning') ||
-          name.includes('meal') || name.includes('membership') || name.includes('office') ||
-          name.includes('pool') || name.includes('repair') || name.includes('snow') || 
-          name.includes('lawn') || name.includes('supplies') || name.includes('travel') ||
-          name.includes('utilities') || name.includes('water') || name.includes('sewer') ||
-          name.includes('expense') || name.includes('cost') || name.includes('fee')) {
+      // Expense classification - matching your actual P&L categories
+      if (name.includes('advertising') || name.includes('marketing') ||
+          name.includes('facebook') || name.includes('google') ||
+          name.includes('arcade') || name.includes('bank fee') || 
+          name.includes('disposal') || name.includes('waste') ||
+          name.includes('insurance') || name.includes('internet') || 
+          name.includes('tv service') || name.includes('cleaning') ||
+          name.includes('labor') || name.includes('meal') || 
+          name.includes('membership') || name.includes('subscription') ||
+          name.includes('office') || name.includes('shipping') || 
+          name.includes('postage') || name.includes('pool') || 
+          name.includes('hot tub') || name.includes('maintenance') ||
+          name.includes('repair') || name.includes('upgrade') ||
+          name.includes('snow') || name.includes('lawn') || 
+          name.includes('supplies') || name.includes('travel') ||
+          name.includes('utilities') || name.includes('water') || 
+          name.includes('sewer') || name.includes('expense') || 
+          name.includes('cost') || name.includes('fee')) {
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
-          standardName: entry.detail_type || accountName 
+          standardName: entry.account_name 
         };
       }
       
@@ -532,7 +531,7 @@ const fetchFinancialData = async (
         return { 
           type: 'Interest Expense', 
           classification: 'Other Expenses', 
-          standardName: entry.detail_type || accountName 
+          standardName: entry.account_name 
         };
       }
       
@@ -540,59 +539,60 @@ const fetchFinancialData = async (
       if (name.includes('improvements') || name.includes('property') || 
           name.includes('equipment') || name.includes('cash') ||
           name.includes('bank') || name.includes('checking') ||
-          name.includes('savings') || name.includes('receivable')) {
+          name.includes('savings') || name.includes('receivable') ||
+          entry.account_type === 'Fixed Assets') {
         return { 
           type: 'Fixed Assets', 
           classification: 'Assets', 
-          standardName: entry.detail_type || accountName 
+          standardName: entry.account_name 
         };
       }
       
       // Liability classification
       if (name.includes('loan') || name.includes('payable') || 
           name.includes('credit card') || name.includes('debt') || 
-          name.includes('liability')) {
+          name.includes('liability') || entry.account_type === 'Credit Card') {
         return { 
           type: 'Credit Card', 
           classification: 'Liabilities', 
-          standardName: entry.detail_type || accountName 
+          standardName: entry.account_name 
         };
       }
       
-      // Default based on debit/credit behavior
-      if (entry.credit_amount > entry.debit_amount) {
+      // Default based on debit/credit behavior and line_amount
+      if (entry.line_amount > 0 && (entry.credit_amount > entry.debit_amount)) {
         return { 
           type: 'Income', 
           classification: 'Revenue', 
-          standardName: entry.detail_type || accountName || 'Revenue Account'
+          standardName: entry.account_name || 'Revenue Account'
         };
       } else {
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
-          standardName: entry.detail_type || accountName || 'Expense Account'
+          standardName: entry.account_name || 'Expense Account'
         };
       }
     };
 
-    // Process journal entries with intelligent classification using detail_type
+    // Process journal entries using the correct fields
     const enhancedData = journalData.map((entry: any) => {
       // First try to find exact match in chart of accounts
       let accountInfo = accountCodeMap.get(entry.account_name);
       
       if (!accountInfo) {
-        // Use intelligent classification based on detail_type (column 4)
+        // Use intelligent classification based on account_name (column D)
         const classification = classifyJournalAccount(entry);
         accountInfo = classification;
       }
       
       return {
         ...entry,
-        account_type: accountInfo?.type || 'Other',
+        account_type: accountInfo?.type || entry.account_type || 'Other',
         classification: accountInfo?.classification || accountInfo?.type || 'Other',
-        standard_account_name: accountInfo?.standardName || entry.detail_type || entry.account_name,
+        standard_account_name: accountInfo?.standardName || entry.account_name,
         mapping_method: accountCodeMap.has(entry.account_name) ? 'Chart of Accounts' : 
-                        'Detail Type Classification'
+                        'Account Name Classification'
       };
     });
 
