@@ -122,12 +122,18 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     
     switch (acc[key].type) {
       case 'Revenue':
-        // Revenue: Use absolute value of line_amount, but check if it should be negative
-        amount = Math.abs(entry.line_amount || (entry.credit_amount - entry.debit_amount));
+        // For revenue: use line_amount as-is (don't force absolute value)
+        // QuickBooks often stores revenue as negative line_amount
+        amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
+        // If amount is negative, make it positive for P&L display
+        if (amount < 0) {
+          amount = Math.abs(amount);
+        }
+        console.log(`💰 Revenue calc for ${entry.account_name}: line_amount=${entry.line_amount}, credit=${entry.credit_amount}, debit=${entry.debit_amount}, final=${amount}`);
         break;
         
       case 'Expenses':
-        // Expenses: Use absolute value of line_amount
+        // For expenses: use absolute value
         amount = Math.abs(entry.line_amount || (entry.debit_amount - entry.credit_amount));
         break;
         
@@ -725,7 +731,7 @@ const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2023');
+  const [selectedMonth, setSelectedMonth] = useState<MonthString>('May 2023');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [timeView, setTimeView] = useState<TimeView>('Monthly');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
