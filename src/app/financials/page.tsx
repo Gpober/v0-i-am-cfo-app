@@ -80,10 +80,35 @@ interface TooltipState {
 
 // Enhanced data transformation functions with proper account type mapping
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
-  // Group by account name and calculate net amounts
+  // Function to get a clean, descriptive account name
+  const getCleanAccountName = (entry: any) => {
+    let accountName = entry.account_name?.trim() || '';
+    
+    // If account_name is just a number (like 103.41), try to get a better name
+    if (/^\d+(\.\d+)?$/.test(accountName)) {
+      // It's just a number - try to use description or classify it
+      if (entry.description && entry.description.trim() && entry.description !== 'RJE') {
+        accountName = entry.description.trim();
+      } else {
+        // Create a descriptive name based on account type and context
+        accountName = `Account ${accountName}`;
+      }
+    }
+    
+    // Clean up property-specific prefixes (like "615 Pine Terrace:")
+    accountName = accountName.replace(/^[^:]*:/, '').trim();
+    
+    // If still empty or generic, use a fallback
+    if (!accountName || accountName === 'Journal Entry' || accountName === 'RJE') {
+      accountName = `${entry.account_type || 'Other'} Account`;
+    }
+    
+    return accountName;
+  };
+
+  // Group by cleaned account name and calculate net amounts
   const groupedData = entries.reduce((acc, entry) => {
-    // Use the account name as-is since we've already classified it
-    const accountName = entry.account_name.replace(/^[^:]*:/, '').trim(); // Remove property prefix
+    const accountName = getCleanAccountName(entry);
     const key = accountName;
     
     if (!acc[key]) {
@@ -141,6 +166,7 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       line: entry.line_amount,
       property: entry.property_class,
       original_account: entry.account_name,
+      original_description: entry.description,
       classification: entry.classification
     });
     
@@ -583,6 +609,11 @@ export default function FinancialsPage() {
       
       if (rawData.success) {
         const entries = rawData.data as FinancialEntry[];
+        
+        // DEBUG: Log raw entries to console
+        console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
+        console.log('🔍 DEBUG - Available fields in first entry:', Object.keys(entries[0] || {}));
+        
         const transformedPL = transformFinancialData(entries, selectedMonth);
         const transformedCF = transformCashFlowData(entries);
 
@@ -593,7 +624,8 @@ export default function FinancialsPage() {
           summary: rawData.summary,
           performance: {
             executionTimeMs: Date.now() % 1000
-          }
+          },
+          rawEntries: entries.slice(0, 5) // Keep sample for debugging
         };
 
         setRealData(combinedData);
@@ -972,11 +1004,29 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* Data Status */}
-          {dataError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="text-red-800 text-sm">
-                <strong>Error:</strong> {dataError}
+          {/* DEBUG SECTION - Remove after fixing */}
+          {realData && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <div className="text-yellow-800 text-sm">
+                <strong>🔍 DEBUG - Raw Data Sample (First 3 entries):</strong>
+                <div className="mt-2 space-y-2">
+                  {getCurrentFinancialData().slice(0, 3).map((item, index) => (
+                    <div key={index} className="text-xs bg-white p-2 rounded border">
+                      <div><strong>Display Name:</strong> {item.name}</div>
+                      <div><strong>Type:</strong> {item.type}</div>
+                      <div><strong>Original Type:</strong> {item.original_type}</div>
+                      <div><strong>Standard Account Name:</strong> {item.standard_account_name}</div>
+                      <div><strong>Mapping Method:</strong> {item.mapping_method}</div>
+                      {item.entries && item.entries.length > 0 && (
+                        <div><strong>Original Journal Account:</strong> {item.entries[0].original_account}</div>
+                      )}
+                      <div><strong>Total:</strong> {item.total}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-xs">
+                  <strong>Raw Journal Entry Sample:</strong> Check browser console for full data dump
+                </div>
               </div>
             </div>
           )}
