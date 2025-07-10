@@ -164,15 +164,15 @@ const fetchProperties = async (): Promise<string[]> => {
       }
     }
     
-    // Known properties based on your data (with correct names)
+    // Known properties based on your data (with correct names - only Columbus, IN)
     const knownProperties = [
       'Cleveland',
-      'Columbus, IN',  // Corrected name with capital IN
+      'Columbus, IN',  // Only the one with comma and state
       'Detroit',
       'General', 
       'Hastings MN',
       'Lisbon',
-      'McHenry IL',    // Added missing property
+      'McHenry IL',    
       'Mokena IL',
       'Pine Terrace',
       'Rockford',
@@ -198,12 +198,12 @@ const fetchProperties = async (): Promise<string[]> => {
     return [
       'All Properties',
       'Cleveland',
-      'Columbus, IN',  // Corrected name in fallback too
+      'Columbus, IN',  // Only the one with comma and state
       'Detroit',
       'General', 
       'Hastings MN',
       'Lisbon',
-      'McHenry IL',    // Added missing property
+      'McHenry IL',    
       'Mokena IL',
       'Pine Terrace',
       'Rockford',
