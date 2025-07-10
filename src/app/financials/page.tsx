@@ -496,8 +496,9 @@ const fetchFinancialData = async (
     const classifyJournalAccount = (entry: any) => {
       const accountName = entry.account_name || '';
       const name = accountName.toLowerCase();
+      const description = (entry.description || '').toLowerCase();
       
-      console.log('🔍 Classifying account:', accountName, 'Line amount:', entry.line_amount);
+      console.log('🔍 Classifying account:', accountName, 'Description:', entry.description, 'Line amount:', entry.line_amount, 'Credit:', entry.credit_amount, 'Debit:', entry.debit_amount);
       
       // Revenue/Income classification - matching your Google Sheets exactly
       if (name.includes('rental revenue - airbnb') || 
@@ -505,6 +506,8 @@ const fetchFinancialData = async (
           name.includes('rental revenue - guesty') ||
           name.includes('rental revenue - reserve payout') ||
           name.includes('rental revenue - vrbo') ||
+          name.includes('direct booking') ||
+          name.includes('direct revenue') ||
           name.includes('bookings') ||
           name.includes('income') || 
           name.includes('revenue') ||
@@ -512,12 +515,18 @@ const fetchFinancialData = async (
           name.includes('airbnb') ||
           name.includes('guesty') ||
           name.includes('vrbo') ||
-          name.includes('direct booking') ||
           name.includes('adjustment for occupancy taxes') ||
           name.includes('miscellaneous income') ||
           name.includes('resolution adjustments') ||
+          // Check description for reclassification entries
+          description.includes('reclassify') ||
+          description.includes('move income') ||
+          description.includes('transfer') ||
+          description.includes('direct booking') ||
+          description.includes('guesty to direct') ||
+          // Standard revenue patterns
           entry.credit_amount > 0 && entry.debit_amount === 0) {
-        console.log('✅ Classified as REVENUE:', accountName);
+        console.log('✅ Classified as REVENUE:', accountName, 'Method: Pattern matching or credit entry');
         return { 
           type: 'Income', 
           classification: 'Revenue', 
@@ -585,7 +594,30 @@ const fetchFinancialData = async (
         };
       }
       
-      // DEFAULT CLASSIFICATION: Use credit/debit logic
+      // ENHANCED DEFAULT CLASSIFICATION for reclassification entries
+      // For reclassification entries, look at the net effect and description
+      if (description.includes('reclassify') || description.includes('transfer') || description.includes('move')) {
+        console.log('🔄 RECLASSIFICATION ENTRY detected:', accountName, 'Description:', entry.description);
+        
+        // For reclassification entries, classify based on the account name pattern and net effect
+        if (name.includes('revenue') || name.includes('income') || name.includes('rental') || name.includes('booking')) {
+          console.log('✅ Reclassification classified as REVENUE:', accountName);
+          return { 
+            type: 'Income', 
+            classification: 'Revenue', 
+            standardName: entry.account_name 
+          };
+        } else {
+          console.log('✅ Reclassification classified as EXPENSE:', accountName);
+          return { 
+            type: 'Expenses', 
+            classification: 'Expenses', 
+            standardName: entry.account_name 
+          };
+        }
+      }
+      
+      // DEFAULT CLASSIFICATION: Use credit/debit logic with enhanced logging
       if (entry.credit_amount > entry.debit_amount || entry.line_amount < 0) {
         console.log('🔄 Default classified as REVENUE (credit > debit or negative line_amount):', accountName);
         return { 
@@ -603,11 +635,19 @@ const fetchFinancialData = async (
       } else {
         // Equal amounts - classify based on account name patterns
         console.log('🔄 Equal amounts - using name patterns for:', accountName);
-        return { 
-          type: 'Other', 
-          classification: 'Other', 
-          standardName: entry.account_name || 'Other Account'
-        };
+        if (name.includes('revenue') || name.includes('income') || name.includes('rental')) {
+          return { 
+            type: 'Income', 
+            classification: 'Revenue', 
+            standardName: entry.account_name 
+          };
+        } else {
+          return { 
+            type: 'Other', 
+            classification: 'Other', 
+            standardName: entry.account_name || 'Other Account'
+          };
+        }
       }
     };
 
