@@ -821,7 +821,74 @@ export default function FinancialsPage() {
     return accountDetails.hasOwnProperty(accountName);
   };
 
-  const handleAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
+  const handleAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, accountItem: FinancialDataItem): void => {
+    // Check if this account has real transaction entries
+    if (!accountItem.entries || accountItem.entries.length === 0) return;
+
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    
+    // Build tooltip content with actual transaction details
+    let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+      ${accountItem.name} • ${formatCurrency(accountItem.total)}
+    </div>`;
+
+    tooltipContent += `<div style="font-size: 11px; color: #E5E7EB; margin-bottom: 8px;">
+      ${accountItem.entries.length} Journal Entries • Mapping: ${accountItem.mapping_method}
+    </div>`;
+
+    // Show up to 5 most recent transactions
+    const recentEntries = accountItem.entries.slice(0, 5);
+    
+    recentEntries.forEach((entry: any, index: number) => {
+      const entryDate = new Date(entry.transaction_date).toLocaleDateString();
+      const isLast = index === recentEntries.length - 1;
+      
+      tooltipContent += `
+        <div style="margin-bottom: ${isLast ? '0' : '6px'}; padding: 4px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <div style="width: 4px; height: 4px; background: ${entry.amount_used >= 0 ? '#10B981' : '#EF4444'}; border-radius: 50%;"></div>
+              <strong style="font-size: 11px; color: white;">JE: ${entry.je_number}</strong>
+            </div>
+            <span style="font-size: 10px; color: #D1D5DB;">${entryDate}</span>
+          </div>
+          <div style="margin-left: 8px; margin-top: 2px;">
+            <div style="font-size: 10px; color: #F3F4F6;">
+              ${entry.original_description || 'No description'}
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+              <span style="font-size: 10px; color: #9CA3AF;">
+                ${entry.property || 'No Property'} • ${entry.classification}
+              </span>
+              <span style="font-size: 11px; font-weight: bold; color: ${entry.amount_used >= 0 ? '#10B981' : '#EF4444'};">
+                ${formatCurrency(Math.abs(entry.amount_used))}
+              </span>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    // Add summary if there are more entries
+    if (accountItem.entries.length > 5) {
+      tooltipContent += `
+        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
+          <span style="font-size: 10px; color: #D1D5DB; font-style: italic;">
+            + ${accountItem.entries.length - 5} more entries
+          </span>
+        </div>
+      `;
+    }
+
+    setAccountTooltip({
+      show: true,
+      content: tooltipContent,
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    });
+  };
+
+  const handleSubAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
     const details = subAccountDetails[subAccountName];
     if (!details || details.length === 0) return;
 
@@ -1385,7 +1452,11 @@ export default function FinancialsPage() {
                                            (item.original_type && item.original_type.toLowerCase().includes('income')))
                             .map((item) => (
                               <tr key={`revenue-${item.name}`} className="hover:bg-gray-50">
-                                <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                <td 
+                                  className="px-6 py-2 text-left text-sm text-gray-700 pl-12 cursor-help"
+                                  onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                  onMouseLeave={handleAccountMouseLeave}
+                                >
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-right text-sm text-green-600">
@@ -1478,7 +1549,13 @@ export default function FinancialsPage() {
                                             )}
                                           </button>
                                         )}
-                                        {item.name}
+                                        <span 
+                                          className="cursor-help"
+                                          onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                          onMouseLeave={handleAccountMouseLeave}
+                                        >
+                                          {item.name}
+                                        </span>
                                       </div>
                                     </td>
                                     <td className="px-4 py-2 text-right text-sm text-red-600">
@@ -1504,7 +1581,7 @@ export default function FinancialsPage() {
                                           <td className="px-4 py-2 text-right text-sm text-gray-600">
                                             <span 
                                               className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
-                                              onMouseEnter={hasSubDetails ? (e) => handleAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
+                                              onMouseEnter={hasSubDetails ? (e) => handleSubAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
                                               onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
                                             >
                                               ({formatCurrency(subItem.total)})
