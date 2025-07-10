@@ -654,7 +654,7 @@ const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2023');
+  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2025');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [timeView, setTimeView] = useState<TimeView>('Monthly');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
@@ -672,11 +672,25 @@ export default function FinancialsPage() {
   const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
   const [availableBankAccounts, setAvailableBankAccounts] = useState<string[]>(['All Accounts']);
 
-  // Available months - Updated to reflect your actual data (2023)
-  const monthsList: MonthString[] = [
-    'January 2023', 'February 2023', 'March 2023', 'April 2023', 'May 2023', 'June 2023',
-    'July 2023', 'August 2023', 'September 2023', 'October 2023', 'November 2023', 'December 2023'
-  ];
+  // Dynamic months list - will work with any year/month combination
+  const generateMonthsList = () => {
+    const months = [];
+    const currentYear = new Date().getFullYear();
+    
+    // Generate months for multiple years to handle any data range
+    for (let year = 2020; year <= currentYear + 2; year++) {
+      for (let month = 1; month <= 12; month++) {
+        const monthNames = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        months.push(`${monthNames[month - 1]} ${year}` as MonthString);
+      }
+    }
+    return months;
+  };
+
+  const monthsList = generateMonthsList();
 
   // Load initial data
   useEffect(() => {
@@ -1164,20 +1178,17 @@ export default function FinancialsPage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
-                from Supabase • Hybrid Classification System
+                from Supabase • Dynamic Filtering Active
                 <div className="mt-1 text-xs">
-                  <strong>Schema Discovery:</strong> Chart of accounts contains property addresses as Fixed Assets, 
-                  journal entries use descriptive account names - using intelligent classification
+                  <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {getSelectedBankAccountsText()} • {selectedMonth}
                 </div>
                 <div className="mt-1 text-xs">
-                  <strong>Mapping Results:</strong> {realData.summary.mappingStats?.chartMapped || 0} exact matches, 
-                  {realData.summary.mappingStats?.intelligentMapped || 0} intelligent classifications
+                  <strong>Available Data Range:</strong> Dynamically queries whatever data exists for selected period
                 </div>
-                {realData.summary.accountTypes && (
-                  <div className="mt-1">
-                    <strong>Chart Account Types:</strong> {realData.summary.accountTypes.join(', ')}
-                  </div>
-                )}
+                <div className="mt-1 text-xs">
+                  <strong>Mapping Results:</strong> {realData.summary.mappingStats?.chartMapped || 0} chart matches, 
+                  {realData.summary.mappingStats?.accountNameMapped || 0} account name classifications
+                </div>
               </div>
             </div>
           )}
