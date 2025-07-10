@@ -402,17 +402,22 @@ const fetchFinancialData = async (
     
     const [month, year] = monthYear.split(' ');
     const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
-    const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-    const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${new Date(parseInt(year), monthNum, 0).getDate()}`;
     
-    let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=account_name`;
+    // STRICT date filtering - exactly the month requested
+    const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(parseInt(year), monthNum, 0).getDate(); // Get last day of the month
+    const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+    
+    console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
+    
+    let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
     
     if (property !== 'All Properties') {
       url += `&property_class=eq.${encodeURIComponent(property)}`;
       console.log('🏠 Filtering by property_class:', property);
     }
 
-    console.log('📡 Final URL:', url);
+    console.log('📡 Final URL with STRICT date filtering:', url);
 
     const [journalResponse, accountsResponse] = await Promise.all([
       fetch(url, {
@@ -438,7 +443,37 @@ const fetchFinancialData = async (
     const journalData = await journalResponse.json();
     const accountsData = await accountsResponse.json();
     
-    console.log('📊 Journal entries loaded:', journalData.length);
+    console.log('📊 Journal entries loaded for STRICT date range:', journalData.length);
+    
+    // ADDITIONAL CLIENT-SIDE DATE VALIDATION to ensure no date leakage
+    const filteredJournalData = journalData.filter((entry: any) => {
+      const entryDate = new Date(entry.transaction_date);
+      const entryYear = entryDate.getFullYear();
+      const entryMonth = entryDate.getMonth() + 1; // getMonth() is 0-based
+      const entryDay = entryDate.getDate();
+      
+      const targetYear = parseInt(year);
+      const targetMonth = monthNum;
+      
+      const isCorrectYear = entryYear === targetYear;
+      const isCorrectMonth = entryMonth === targetMonth;
+      const isValidDay = entryDay >= 1 && entryDay <= lastDay;
+      
+      if (!isCorrectYear || !isCorrectMonth || !isValidDay) {
+        console.warn(`⚠️ FILTERED OUT: Entry ${entry.je_number} dated ${entry.transaction_date} (not in ${month} ${year})`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log(`✅ STRICT FILTERING RESULT: ${filteredJournalData.length} entries (filtered out ${journalData.length - filteredJournalData.length} entries)`);
+    
+    // Debug: Show date range of actual entries
+    if (filteredJournalData.length > 0) {
+      const dates = filteredJournalData.map((e: any) => e.transaction_date).sort();
+      console.log(`📅 ACTUAL DATE RANGE in filtered data: ${dates[0]} to ${dates[dates.length - 1]}`);
+    }
     
     // Create account lookup map
     const accountLookupMap = new Map();
@@ -517,8 +552,8 @@ const fetchFinancialData = async (
       }
     };
 
-    // Process journal entries
-    const enhancedData = journalData.map((entry: any) => {
+    // Process journal entries using the STRICTLY FILTERED data
+    const enhancedData = filteredJournalData.map((entry: any) => {
       let accountInfo = accountLookupMap.get(entry.account_name);
       
       if (!accountInfo) {
@@ -542,7 +577,10 @@ const fetchFinancialData = async (
       accountsData: accountsData,
       summary: {
         filteredEntries: enhancedData?.length || 0,
-        dataSource: 'Supabase + Property Class Filtering',
+        originalEntries: journalData.length,
+        dateFiltered: journalData.length - filteredJournalData.length,
+        dataSource: `Supabase + STRICT ${month} ${year} Filtering`,
+        dateRange: `${startDate} to ${endDate}`,
         filters: { property, monthYear },
         accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
         propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
@@ -1276,12 +1314,20 @@ export default function FinancialsPage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
-                from Supabase • Property Class Filtering Active
+                from Supabase • STRICT Date Filtering Active
+                <div className="mt-1 text-xs">
+                  <strong>Date Range:</strong> {realData.summary.dateRange} (STRICT {selectedMonth} ONLY)
+                </div>
                 <div className="mt-1 text-xs">
                   <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {selectedMonth}
                 </div>
                 <div className="mt-1 text-xs">
                   <strong>Data Source:</strong> {realData.summary.dataSource}
+                </div>
+                <div className="mt-1 text-xs">
+                  <strong>Date Filtering:</strong> {realData.summary.originalEntries || 0} original entries → 
+                  {realData.summary.filteredEntries} after STRICT filtering 
+                  {realData.summary.dateFiltered ? `(${realData.summary.dateFiltered} entries filtered out)` : ''}
                 </div>
                 <div className="mt-1 text-xs">
                   <strong>Mapping Results:</strong> {realData.summary.mappingStats?.accountsTableMapped || 0} accounts table matches, 
