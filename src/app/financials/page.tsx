@@ -654,7 +654,7 @@ const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2025');
+  const [selectedMonth, setSelectedMonth] = useState<MonthString>('June 2023');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [timeView, setTimeView] = useState<TimeView>('Monthly');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
@@ -672,13 +672,10 @@ export default function FinancialsPage() {
   const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
   const [availableBankAccounts, setAvailableBankAccounts] = useState<string[]>(['All Accounts']);
 
-  // Available months
+  // Available months - Updated to reflect your actual data (2023)
   const monthsList: MonthString[] = [
     'January 2023', 'February 2023', 'March 2023', 'April 2023', 'May 2023', 'June 2023',
-    'July 2023', 'August 2023', 'September 2023', 'October 2023', 'November 2023', 'December 2023',
-    'January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024',
-    'July 2024', 'August 2024', 'September 2024', 'October 2024', 'November 2024', 'December 2024',
-    'January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025'
+    'July 2023', 'August 2023', 'September 2023', 'October 2023', 'November 2023', 'December 2023'
   ];
 
   // Load initial data
@@ -1141,28 +1138,23 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* DEBUG SECTION - Remove after fixing */}
+          {/* DEBUG SECTION - Let's see what we're actually getting */}
           {realData && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
               <div className="text-yellow-800 text-sm">
-                <strong>🔍 DEBUG - Raw Data Sample (First 3 entries):</strong>
-                <div className="mt-2 space-y-2">
-                  {getCurrentFinancialData().slice(0, 3).map((item, index) => (
-                    <div key={index} className="text-xs bg-white p-2 rounded border">
-                      <div><strong>Display Name:</strong> {item.name}</div>
-                      <div><strong>Type:</strong> {item.type}</div>
-                      <div><strong>Original Type:</strong> {item.original_type}</div>
-                      <div><strong>Standard Account Name:</strong> {item.standard_account_name}</div>
-                      <div><strong>Mapping Method:</strong> {item.mapping_method}</div>
-                      {item.entries && item.entries.length > 0 && (
-                        <div><strong>Original Journal Account:</strong> {item.entries[0].original_account}</div>
-                      )}
-                      <div><strong>Total:</strong> {item.total}</div>
+                <strong>🔍 DEBUG - First Journal Entry Fields:</strong>
+                <div className="mt-2 space-y-1 text-xs bg-white p-3 rounded border font-mono">
+                  {realData.rawEntries && realData.rawEntries.length > 0 && (
+                    <div>
+                      <div><strong>Column D (account_name):</strong> "{realData.rawEntries[0].account_name}"</div>
+                      <div><strong>Column G (property_class):</strong> "{realData.rawEntries[0].property_class}"</div>
+                      <div><strong>Column J (line_amount):</strong> {realData.rawEntries[0].line_amount}</div>
+                      <div><strong>Column L (description):</strong> "{realData.rawEntries[0].description}"</div>
+                      <div><strong>Account Type:</strong> "{realData.rawEntries[0].account_type}"</div>
+                      <div><strong>Detail Type:</strong> "{realData.rawEntries[0].detail_type}"</div>
+                      <div><strong>What getCleanAccountName() returns:</strong> "<span className="text-red-600">{getCurrentFinancialData()[0]?.name}</span>"</div>
                     </div>
-                  ))}
-                </div>
-                <div className="mt-2 text-xs">
-                  <strong>Raw Journal Entry Sample:</strong> Check browser console for full data dump
+                  )}
                 </div>
               </div>
             </div>
