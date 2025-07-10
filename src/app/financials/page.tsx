@@ -195,11 +195,27 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       return a.name.localeCompare(b.name);
     });
 
+  // SEPARATE P&L DATA FROM BALANCE SHEET DATA
+  const plData = sortedData.filter(item => 
+    item.type === 'Revenue' || item.type === 'Expenses'
+  );
+
+  const balanceSheetData = sortedData.filter(item => 
+    item.type === 'Assets' || item.type === 'Liabilities' || item.type === 'Equity'
+  );
+
   return {
     propertyFinancialData: {
       'All Properties': {
         Monthly: {
-          [monthYear]: sortedData
+          [monthYear]: plData  // Only P&L accounts for P&L statement
+        }
+      }
+    },
+    propertyBalanceSheetData: {
+      'All Properties': {
+        Monthly: {
+          [monthYear]: balanceSheetData  // Only Balance Sheet accounts
         }
       }
     }
@@ -727,11 +743,21 @@ export default function FinancialsPage() {
     }, 3000);
   };
 
-  // Get current financial data
+  // Get current financial data (P&L only)
   const getCurrentFinancialData = () => {
     if (realData && realData.propertyFinancialData) {
       const propertyKey = Object.keys(realData.propertyFinancialData)[0] || 'All Properties';
       const monthlyData = realData.propertyFinancialData[propertyKey]?.Monthly;
+      return monthlyData?.[selectedMonth] || [];
+    }
+    return [];
+  };
+
+  // Get current balance sheet data
+  const getCurrentBalanceSheetData = () => {
+    if (realData && realData.propertyBalanceSheetData) {
+      const propertyKey = Object.keys(realData.propertyBalanceSheetData)[0] || 'All Properties';
+      const monthlyData = realData.propertyBalanceSheetData[propertyKey]?.Monthly;
       return monthlyData?.[selectedMonth] || [];
     }
     return [];
@@ -761,7 +787,8 @@ export default function FinancialsPage() {
     };
   };
 
-  const currentData = getCurrentFinancialData();
+  const currentData = getCurrentFinancialData(); // P&L accounts only
+  const currentBalanceSheetData = getCurrentBalanceSheetData(); // Balance sheet accounts only
   const currentCashFlowData = getCurrentCashFlowData();
 
   // Calculate KPIs using proper P&L structure
