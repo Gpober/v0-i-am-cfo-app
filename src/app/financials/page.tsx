@@ -1,52 +1,242 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
-import { supabaseQueries, testSupabaseConnection, type FinancialEntry } from '@/lib/supabase';
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  ArrowUp,
+  ArrowDown,
+  Download,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  BarChart3,
+  PieChart,
+  DollarSign,
+  TrendingUp,
+  Users,
+  FileText,
+  Banknote,
+} from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
+} from "recharts";
+import dayjs from "dayjs";
+import Papa from "papaparse";
+
+// ====== CONFIGURATION ======
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ijeuusvwqcnljctkvjdi.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
-  primary: '#56B6E9',
-  secondary: '#3A9BD1',
-  tertiary: '#7CC4ED',
-  accent: '#2E86C1',
-  success: '#27AE60',
-  warning: '#F39C12',
-  danger: '#E74C3C',
+  primary: "#56B6E9",
+  secondary: "#3A9BD1",
+  tertiary: "#7CC4ED",
+  accent: "#2E86C1",
+  success: "#27AE60",
+  warning: "#F39C12",
+  danger: "#E74C3C",
   gray: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475569',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A'
-  }
+    50: "#F8FAFC",
+    100: "#F1F5F9",
+    200: "#E2E8F0",
+    300: "#CBD5E1",
+    400: "#94A3B8",
+    500: "#64748B",
+    600: "#475569",
+    700: "#334155",
+    800: "#1E293B",
+    900: "#0F172A",
+  },
 };
+const COLORS = [
+  BRAND_COLORS.primary,
+  BRAND_COLORS.success,
+  BRAND_COLORS.warning,
+  BRAND_COLORS.danger,
+  BRAND_COLORS.secondary,
+  BRAND_COLORS.tertiary,
+];
 
-// Type definitions
-type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
-type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
-type ViewMode = 'total' | 'detailed';
-type MonthString = `${'January' | 'February' | 'March' | 'April' | 'May' | 'June' | 
-                   'July' | 'August' | 'September' | 'October' | 'November' | 'December'} ${number}`;
+// ====== LOGO PLACEHOLDER ======
+const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
+  <div className={`${className} flex items-center justify-center relative`}>
+    <svg viewBox="0 0 120 120" className="w-full h-full">
+      <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2"/>
+      <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary}/>
+      <g fill="white">
+        <rect x="35" y="70" width="6" height="15" rx="1"/>
+        <rect x="44" y="65" width="6" height="20" rx="1"/>
+        <rect x="53" y="55" width="6" height="30" rx="1"/>
+        <rect x="62" y="50" width="6" height="35" rx="1"/>
+        <rect x="71" y="60" width="6" height="25" rx="1"/>
+        <rect x="80" y="45" width="6" height="40" rx="1"/>
+        <path d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47" 
+              stroke="#FFFFFF" strokeWidth="2.5" fill="none"/>
+        <circle cx="35" cy="72" r="2.5" fill="#FFFFFF"/>
+        <circle cx="44" cy="67" r="2.5" fill="#FFFFFF"/>
+        <circle cx="53" cy="57" r="2.5" fill="#FFFFFF"/>
+        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF"/>
+        <circle cx="71" cy="62" r="2.5" fill="#FFFFFF"/>
+        <circle cx="80" cy="47" r="2.5" fill="#FFFFFF"/>
+      </g>
+      <text x="60" y="95" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">CFO</text>
+    </svg>
+  </div>
+);
 
-interface FinancialDataItem {
-  name: string;
-  total: number;
-  months: Partial<Record<MonthString, number>>;
-  type?: string;
-  original_type?: string;
-  detail_type?: string;
-  entries?: any[];
-  mapping_method?: string;
+// ====== TYPES ======
+type AccountType = "Revenue" | "Expenses" | "Assets" | "Liabilities" | "Equity" | "Other";
+type FinancialTab = "p&l" | "cash-flow" | "balance-sheet";
+type TimeView = "Monthly" | "YTD" | "TTM" | "MoM" | "YoY" | "Quarterly" | "Custom";
+type ViewMode = "total" | "detailed";
+type MonthString = string;
+
+interface AccountCOA {
+  account_name: string;
+  account_type: string;
 }
 
-interface FinancialEntry {
+interface JournalEntry {
+  id: number;
+  je_number: string;
+  transaction_date: string;
+  account_name: string;
+  account_type: string;
+  detail_type: string;
+  property_class: string;
+  debit_amount: number;
+  credit_amount: number;
+  line_amount: number;
+  posting_type: string;
+  description: string;
+  balance: number
+Absolutely! Here are Parts 1–5 of your Financials page code, ready for copy-paste.
+Copy each part in order into your page.tsx file.
+
+PART 1
+"use client";
+
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  ArrowUp,
+  ArrowDown,
+  Download,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  BarChart3,
+  PieChart,
+  DollarSign,
+  TrendingUp,
+  Users,
+  FileText,
+  Banknote,
+} from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
+} from "recharts";
+import dayjs from "dayjs";
+import Papa from "papaparse";
+
+// ====== CONFIGURATION ======
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ijeuusvwqcnljctkvjdi.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
+
+// IAM CFO Brand Colors
+const BRAND_COLORS = {
+  primary: "#56B6E9",
+  secondary: "#3A9BD1",
+  tertiary: "#7CC4ED",
+  accent: "#2E86C1",
+  success: "#27AE60",
+  warning: "#F39C12",
+  danger: "#E74C3C",
+  gray: {
+    50: "#F8FAFC",
+    100: "#F1F5F9",
+    200: "#E2E8F0",
+    300: "#CBD5E1",
+    400: "#94A3B8",
+    500: "#64748B",
+    600: "#475569",
+    700: "#334155",
+    800: "#1E293B",
+    900: "#0F172A",
+  },
+};
+const COLORS = [
+  BRAND_COLORS.primary,
+  BRAND_COLORS.success,
+  BRAND_COLORS.warning,
+  BRAND_COLORS.danger,
+  BRAND_COLORS.secondary,
+  BRAND_COLORS.tertiary,
+];
+
+// ====== LOGO PLACEHOLDER ======
+const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
+  <div className={`${className} flex items-center justify-center relative`}>
+    <svg viewBox="0 0 120 120" className="w-full h-full">
+      <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2"/>
+      <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary}/>
+      <g fill="white">
+        <rect x="35" y="70" width="6" height="15" rx="1"/>
+        <rect x="44" y="65" width="6" height="20" rx="1"/>
+        <rect x="53" y="55" width="6" height="30" rx="1"/>
+        <rect x="62" y="50" width="6" height="35" rx="1"/>
+        <rect x="71" y="60" width="6" height="25" rx="1"/>
+        <rect x="80" y="45" width="6" height="40" rx="1"/>
+        <path d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47" 
+              stroke="#FFFFFF" strokeWidth="2.5" fill="none"/>
+        <circle cx="35" cy="72" r="2.5" fill="#FFFFFF"/>
+        <circle cx="44" cy="67" r="2.5" fill="#FFFFFF"/>
+        <circle cx="53" cy="57" r="2.5" fill="#FFFFFF"/>
+        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF"/>
+        <circle cx="71" cy="62" r="2.5" fill="#FFFFFF"/>
+        <circle cx="80" cy="47" r="2.5" fill="#FFFFFF"/>
+      </g>
+      <text x="60" y="95" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">CFO</text>
+    </svg>
+  </div>
+);
+
+// ====== TYPES ======
+type AccountType = "Revenue" | "Expenses" | "Assets" | "Liabilities" | "Equity" | "Other";
+type FinancialTab = "p&l" | "cash-flow" | "balance-sheet";
+type TimeView = "Monthly" | "YTD" | "TTM" | "MoM" | "YoY" | "Quarterly" | "Custom";
+type ViewMode = "total" | "detailed";
+type MonthString = string;
+
+interface AccountCOA {
+  account_name: string;
+  account_type: string;
+}
+
+interface JournalEntry {
   id: number;
   je_number: string;
   transaction_date: string;
@@ -64,14 +254,23 @@ interface FinancialEntry {
   last_modified: string;
   created_at: string;
   updated_at: string;
-  classification?: string;
-  mapping_method?: string;
+}
+
+interface AccountNode {
+  name: string;
+  fullName: string;
+  type: AccountType;
+  children: AccountNode[];
+  entries: JournalEntry[];
+  total: number;
+  months: Record<string, number>;
+  parent?: AccountNode;
 }
 
 interface NotificationState {
   show: boolean;
   message: string;
-  type: 'info' | 'success' | 'error';
+  type: "info" | "success" | "error";
 }
 
 interface TooltipState {
@@ -81,3263 +280,1876 @@ interface TooltipState {
   y: number;
 }
 
-const FinancialsPage = () => {
-  // State variables
-  const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [timeView, setTimeView] = useState<TimeView>('Monthly');
-  const [viewMode, setViewMode] = useState<ViewMode>('total');
-  const [selectedMonth, setSelectedMonth] = useState<string>('May 2025');
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
-  const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
-  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
+// ====== DATA FETCHING HELPERS ======
+
+// Fetch Chart of Accounts (COA)
+async function fetchCOA(): Promise<AccountCOA[]> {
+  const res = await fetch(
+    `${SUPABASE
+Here is PART 2 of your Financials page code:
+
+// ====== DATA FETCHING HELPERS ======
+
+// Fetch Chart of Accounts (COA)
+async function fetchCOA(): Promise<AccountCOA[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) throw new Error("Failed to fetch COA");
+  return await res.json();
+}
+
+// Fetch Journal Entries for a date range and property/bank filter
+async function fetchJournalEntries({
+  startDate,
+  endDate,
+  properties,
+  bankAccounts,
+}: {
+  startDate: string;
+  endDate: string;
+  properties?: string[];
+  bankAccounts?: string[];
+}): Promise<JournalEntry[]> {
+  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
+  if (properties && properties.length && !properties.includes("All Properties")) {
+    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
+  }
+  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
+    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
+  }
+  url += "&order=transaction_date";
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer
+Here is PART 2 of your Financials page code:
+
+// ====== DATA FETCHING HELPERS ======
+
+// Fetch Chart of Accounts (COA)
+async function fetchCOA(): Promise<AccountCOA[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) throw new Error("Failed to fetch COA");
+  return await res.json();
+}
+
+// Fetch Journal Entries for a date range and property/bank filter
+async function fetchJournalEntries({
+  startDate,
+  endDate,
+  properties,
+  bankAccounts,
+}: {
+  startDate: string;
+  endDate: string;
+  properties?: string[];
+  bankAccounts?: string[];
+}): Promise<JournalEntry[]> {
+  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
+  if (properties && properties.length && !properties.includes("All Properties")) {
+    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
+  }
+  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
+    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
+  }
+  url += "&order=transaction_date";
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+  if (!res.ok) throw new Error("Failed to fetch Journal Entries");
+  return await res.json();
+}
+
+// Fetch unique property classes
+async function fetchProperties(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return ["All Properties"];
+  const data = await res.json();
+  const props = Array.from(
+    new Set(data.map((d: any) => d.property_class).filter(Boolean))
+  );
+  return ["All Properties", ...props];
+}
+
+// Fetch unique bank accounts from COA
+async function fetchBankAccounts(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return ["All Accounts"];
+  const data = await res.json();
+  const banks = data
+    .filter((a: any) => a.account_type && a.account_type.toLowerCase().includes("bank"))
+    .map((a: any) => a.account_name);
+  return ["All Accounts", ...banks
+Here is PART 2 of your Financials page code:
+
+// ====== DATA FETCHING HELPERS ======
+
+// Fetch Chart of Accounts (COA)
+async function fetchCOA(): Promise<AccountCOA[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) throw new Error("Failed to fetch COA");
+  return await res.json();
+}
+
+// Fetch Journal Entries for a date range and property/bank filter
+async function fetchJournalEntries({
+  startDate,
+  endDate,
+  properties,
+  bankAccounts,
+}: {
+  startDate: string;
+  endDate: string;
+  properties?: string[];
+  bankAccounts?: string[];
+}): Promise<JournalEntry[]> {
+  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
+  if (properties && properties.length && !properties.includes("All Properties")) {
+    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
+  }
+  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
+    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
+  }
+  url += "&order=transaction_date";
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+  if (!res.ok) throw new Error("Failed to fetch Journal Entries");
+  return await res.json();
+}
+
+// Fetch unique property classes
+async function fetchProperties(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return ["All Properties"];
+  const data = await res.json();
+  const props = Array.from(
+    new Set(data.map((d: any) => d.property_class).filter(Boolean))
+  );
+  return ["All Properties", ...props];
+}
+
+// Fetch unique bank accounts from COA
+async function fetchBankAccounts(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return ["All Accounts"];
+  const data = await res.json();
+  const banks = data
+    .filter((a: any) => a.account_type && a.account_type.toLowerCase().includes("bank"))
+    .map((a: any) => a.account_name);
+  return ["All Accounts", ...banks];
+}
+
+// ====== COA PARSING & ACCOUNT TREE ======
+
+// Parse COA into a nested tree structure
+function buildAccountTree(
+  coa: AccountCOA[],
+  entries: JournalEntry[]
+): AccountNode[] {
+  // Helper: Find or create node in tree
+  const root: Record<string, AccountNode> = {};
+  const getOrCreate = (path: string[], type: AccountType): AccountNode => {
+    let node: AccountNode | undefined;
+    let fullName = "";
+    let parent: AccountNode | undefined;
+    for (let i = 0; i < path.length; ++i) {
+      fullName = path.slice(0, i + 1).join(":");
+      if (!root[fullName]) {
+        root[fullName] = {
+          name: path[i],
+          fullName,
+          type: type,
+          children: [],
+          entries: [],
+          total: 0,
+          months: {},
+          parent,
+        };
+        if (parent) parent.children.push(root[fullName]);
+      }
+      parent = root[fullName];
+    }
+    return root[fullName];
+  };
+
+  // Build tree from COA
+  for (const acc of coa) {
+    const path = acc.account_name.split(":").map((s) => s.trim());
+    const type = mapAccountType(acc.account_type);
+    getOrCreate(path, type);
+  }
+
+  // Assign entries to the deepest matching node
+  for (const je of entries) {
+    // Try to match to the deepest COA node
+    let match: AccountNode | undefined;
+    let jePath = je.account_name.split(":").map((s) => s.trim());
+    while (jePath.length) {
+      const tryName = jePath.join(":");
+      if (root[tryName]) {
+        match = root[tryName];
+        break;
+      }
+      jePath.pop();
+    }
+    // If not found, try to match by
+Here is PART 2 of your Financials page code:
+
+// ====== DATA FETCHING HELPERS ======
+
+// Fetch Chart of Accounts (COA)
+async function fetchCOA(): Promise<AccountCOA[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) throw new Error("Failed to fetch COA");
+  return await res.json();
+}
+
+// Fetch Journal Entries for a date range and property/bank filter
+async function fetchJournalEntries({
+  startDate,
+  endDate,
+  properties,
+  bankAccounts,
+}: {
+  startDate: string;
+  endDate: string;
+  properties?: string[];
+  bankAccounts?: string[];
+}): Promise<JournalEntry[]> {
+  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
+  if (properties && properties.length && !properties.includes("All Properties")) {
+    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
+  }
+  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
+    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
+  }
+  url += "&order=transaction_date";
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+  if (!res.ok) throw new Error("Failed to fetch Journal Entries");
+  return await res.json();
+}
+
+// Fetch unique property classes
+async function fetchProperties(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return ["All Properties"];
+  const data = await res.json();
+  const props = Array.from(
+    new Set(data.map((d: any) => d.property_class).filter(Boolean))
+  );
+  return ["All Properties", ...props];
+}
+
+// Fetch unique bank accounts from COA
+async function fetchBankAccounts(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return ["All Accounts"];
+  const data = await res.json();
+  const banks = data
+    .filter((a: any) => a.account_type && a.account_type.toLowerCase().includes("bank"))
+    .map((a: any) => a.account_name);
+  return ["All Accounts", ...banks];
+}
+
+// ====== COA PARSING & ACCOUNT TREE ======
+
+// Parse COA into a nested tree structure
+function buildAccountTree(
+  coa: AccountCOA[],
+  entries: JournalEntry[]
+): AccountNode[] {
+  // Helper: Find or create node in tree
+  const root: Record<string, AccountNode> = {};
+  const getOrCreate = (path: string[], type: AccountType): AccountNode => {
+    let node: AccountNode | undefined;
+    let fullName = "";
+    let parent: AccountNode | undefined;
+    for (let i = 0; i < path.length; ++i) {
+      fullName = path.slice(0, i + 1).join(":");
+      if (!root[fullName]) {
+        root[fullName] = {
+          name: path[i],
+          fullName,
+          type: type,
+          children: [],
+          entries: [],
+          total: 0,
+          months: {},
+          parent,
+        };
+        if (parent) parent.children.push(root[fullName]);
+      }
+      parent = root[fullName];
+    }
+    return root[fullName];
+  };
+
+  // Build tree from COA
+  for (const acc of coa) {
+    const path = acc.account_name.split(":").map((s) => s.trim());
+    const type = mapAccountType(acc.account_type);
+    getOrCreate(path, type);
+  }
+
+  // Assign entries to the deepest matching node
+  for (const je of entries) {
+    // Try to match to the deepest COA node
+    let match: AccountNode | undefined;
+    let jePath = je.account_name.split(":").map((s) => s.trim());
+    while (jePath.length) {
+      const tryName = jePath.join(":");
+      if (root[tryName]) {
+        match = root[tryName];
+        break;
+      }
+      jePath.pop();
+    }
+    // If not found, try to match by suffix (e.g., "Hotel" matches "Travel:Hotel")
+    if (!match) {
+      for (const key in root) {
+        if (
+          key.endsWith(je.account_name) ||
+          key.split(":").pop() === je.account_name
+        ) {
+          match = root[key];
+          break;
+        }
+      }
+    }
+    // Fallback: assign to "Other"
+    if (!match) {
+      if (!root["Other"]) {
+        root["Other"] = {
+          name: "Other",
+          fullName: "Other",
+          type: "Other",
+          children: [],
+          entries: [],
+          total: 0,
+          months: {},
+        };
+      }
+      match = root["Other"];
+    }
+    match.entries.push(je);
+  }
+
+  // Calculate totals and months recursively
+  function calcTotals(node: AccountNode) {
+    node.total = node.entries.reduce(
+      (sum, je) => sum + (je.line_amount ?? je.debit_amount - je.credit_amount),
+      0
+    );
+    node.months = {};
+    node.entries.forEach((je) => {
+      const m = dayjs(je.transaction_date).format("MMMM YYYY");
+      node.months[m] = (node.months[m] || 0) + (je.line_amount ?? je.debit_amount - je.credit_amount);
+    });
+    node.children.forEach((child) => {
+      calcTotals(child);
+      node.total += child.total;
+      for (const m in child.months) {
+        node.months[m] = (node.months[m] || 0) + child.months[m];
+      }
+    });
+  }
+  // Only top-level nodes
+  const topNodes = Object.values(root).filter((n) => !n.parent);
+  topNodes.forEach(calcTotals);
+  return
+Here is PART 2 of your Financials page code:
+
+// ====== DATA FETCHING HELPERS ======
+
+// Fetch Chart of Accounts (COA)
+async function fetchCOA(): Promise<AccountCOA[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) throw new Error("Failed to fetch COA");
+  return await res.json();
+}
+
+// Fetch Journal Entries for a date range and property/bank filter
+async function fetchJournalEntries({
+  startDate,
+  endDate,
+  properties,
+  bankAccounts,
+}: {
+  startDate: string;
+  endDate: string;
+  properties?: string[];
+  bankAccounts?: string[];
+}): Promise<JournalEntry[]> {
+  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
+  if (properties && properties.length && !properties.includes("All Properties")) {
+    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
+  }
+  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
+    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
+  }
+  url += "&order=transaction_date";
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+  if (!res.ok) throw new Error("Failed to fetch Journal Entries");
+  return await res.json();
+}
+
+// Fetch unique property classes
+async function fetchProperties(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return ["All Properties"];
+  const data = await res.json();
+  const props = Array.from(
+    new Set(data.map((d: any) => d.property_class).filter(Boolean))
+  );
+  return ["All Properties", ...props];
+}
+
+// Fetch unique bank accounts from COA
+async function fetchBankAccounts(): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) return ["All Accounts"];
+  const data = await res.json();
+  const banks = data
+    .filter((a: any) => a.account_type && a.account_type.toLowerCase().includes("bank"))
+    .map((a: any) => a.account_name);
+  return ["All Accounts", ...banks];
+}
+
+// ====== COA PARSING & ACCOUNT TREE ======
+
+// Parse COA into a nested tree structure
+function buildAccountTree(
+  coa: AccountCOA[],
+  entries: JournalEntry[]
+): AccountNode[] {
+  // Helper: Find or create node in tree
+  const root: Record<string, AccountNode> = {};
+  const getOrCreate = (path: string[], type: AccountType): AccountNode => {
+    let node: AccountNode | undefined;
+    let fullName = "";
+    let parent: AccountNode | undefined;
+    for (let i = 0; i < path.length; ++i) {
+      fullName = path.slice(0, i + 1).join(":");
+      if (!root[fullName]) {
+        root[fullName] = {
+          name: path[i],
+          fullName,
+          type: type,
+          children: [],
+          entries: [],
+          total: 0,
+          months: {},
+          parent,
+        };
+        if (parent) parent.children.push(root[fullName]);
+      }
+      parent = root[fullName];
+    }
+    return root[fullName];
+  };
+
+  // Build tree from COA
+  for (const acc of coa) {
+    const path = acc.account_name.split(":").map((s) => s.trim());
+    const type = mapAccountType(acc.account_type);
+    getOrCreate(path, type);
+  }
+
+  // Assign entries to the deepest matching node
+  for (const je of entries) {
+    // Try to match to the deepest COA node
+    let match: AccountNode | undefined;
+    let jePath = je.account_name.split(":").map((s) => s.trim());
+    while (jePath.length) {
+      const tryName = jePath.join(":");
+      if (root[tryName]) {
+        match = root[tryName];
+        break;
+      }
+      jePath.pop();
+    }
+    // If not found, try to match by suffix (e.g., "Hotel" matches "Travel:Hotel")
+    if (!match) {
+      for (const key in root) {
+        if (
+          key.endsWith(je.account_name) ||
+          key.split(":").pop() === je.account_name
+        ) {
+          match = root[key];
+          break;
+        }
+      }
+    }
+    // Fallback: assign to "Other"
+    if (!match) {
+      if (!root["Other"]) {
+        root["Other"] = {
+          name: "Other",
+          fullName: "Other",
+          type: "Other",
+          children: [],
+          entries: [],
+          total: 0,
+          months: {},
+        };
+      }
+      match = root["Other"];
+    }
+    match.entries.push(je);
+  }
+
+  // Calculate totals and months recursively
+  function calcTotals(node: AccountNode) {
+    node.total = node.entries.reduce(
+      (sum, je) => sum + (je.line_amount ?? je.debit_amount - je.credit_amount),
+      0
+    );
+    node.months = {};
+    node.entries.forEach((je) => {
+      const m = dayjs(je.transaction_date).format("MMMM YYYY");
+      node.months[m] = (node.months[m] || 0) + (je.line_amount ?? je.debit_amount - je.credit_amount);
+    });
+    node.children.forEach((child) => {
+      calcTotals(child);
+      node.total += child.total;
+      for (const m in child.months) {
+        node.months[m] = (node.months[m] || 0) + child.months[m];
+      }
+    });
+  }
+  // Only top-level nodes
+  const topNodes = Object.values(root).filter((n) => !n.parent);
+  topNodes.forEach(calcTotals);
+  return topNodes;
+}
+
+// Map raw account_type to canonical AccountType
+function mapAccountType(type: string): AccountType {
+  if (!type) return "Other";
+  const t = type.toLowerCase();
+  if (t.includes("income") || t.includes("revenue")) return "Revenue";
+  if (t.includes("expense")) return "Expenses";
+  if (t.includes("asset")) return "Assets";
+  if (t.includes("liabilit")) return "Liabilities";
+  if (t.includes("equity")) return "Equity";
+  return "Other";
+}
+
+// ====== UTILITY FUNCTIONS ======
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function calculatePercentage(value: number, total: number): string {
+  return total !== 0 ? ((value / total) * 100).toFixed(1) + "%" : "0%";
+}
+
+function getMonthRange(start: string, end: string): string[] {
+  const result: string[] = [];
+  let current = dayjs(start).startOf("month");
+  const last = dayjs(end).startOf("month");
+  while (current.isBefore(last) || current.isSame(last)) {
+    result.push(current.format("MMMM YYYY"));
+    current = current.add(1, "month");
+  }
+  return result;
+}
+
+// ====== MAIN COMPONENT ======
+const defaultTimeView: TimeView = "Monthly";
+const defaultViewMode: ViewMode = "detailed";
+
+export default function FinancialsPage() {
+  // UI State
+  const [activeTab, setActiveTab] = useState<FinancialTab>("p&l");
+  const [selectedMonth, setSelectedMonth] = useState(() =>
+    dayjs().format("MMMM YYYY")
+  );
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  const [timeView, setTimeView] = useState<TimeView>(defaultTimeView);
+  const [notification, setNotification] = useState<NotificationState>({
+    show: false,
+    message: "",
+    type: "info",
+  });
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(
+    new Set()
+  );
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
+  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(
+    new Set(["All Properties"])
+  );
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
+  const [selectedBanks, setSelectedBanks] = useState<Set<string>>(
+    new Set(["All Accounts"])
+  );
+  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({
+    show: false,
+    content: "",
+    x: 0,
+    y: 0,
+  });
+  const [compareMode, setCompareMode] = useState<"none" | "quick" | "custom">(
+    "none"
+  );
+  const [comparePeriod, setComparePeriod] = useState<{
+    start: string;
+    end: string;
+    label: string;
+  } | null>(null);
+
+  // Data State
   const [isLoading, setIsLoading] = useState(false);
-  const [financialData, setFinancialData] = useState<FinancialDataItem[]>([]);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  const [tooltip, setTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
+  const [coa, setCOA] = useState<AccountCOA[]>([]);
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [properties, setProperties] = useState<string[]>(["All Properties"]);
+  const [bankAccounts, setBankAccounts] = useState<string[]>(["All Accounts"]);
+  const [dataError, setDataError] = useState<string | null>(null);
 
-  // Debug logging function
-  const debugLog = (...args: any[]) => {
-    console.log('🔍 FINANCIALS DEBUG:', ...args);
-  };
+  // Date Ranges
+  const currentMonth = dayjs(selectedMonth, "MMMM YYYY");
+  const [dateRange, setDateRange] = useState<{
+    start: string;
+    end: string;
+    months: string[];
+  }>({
+    start: currentMonth.startOf("month").format("YYYY-MM-DD"),
+    end: currentMonth.endOf("month").format("YYYY-MM-DD"),
+    months: [selectedMonth],
+  });
 
-  // Initialize and load data
+  // Update date range when timeView or selectedMonth changes
   useEffect(() => {
-    debugLog('🚀 Component initialized, loading initial data...');
-    loadFinancialData();
-  }, []);
-
-  // Load data when filters change
-  useEffect(() => {
-    debugLog('📊 Filters changed, reloading data...', {
-      selectedMonth,
-      selectedProperties: Array.from(selectedProperties),
-      activeTab
-    });
-    loadFinancialData();
-  }, [selectedMonth, selectedProperties, activeTab]);
-
-  // Load available properties
-  useEffect(() => {
-    loadAvailableProperties();
-  }, []);
-
-  const loadAvailableProperties = async () => {
-    try {
-      debugLog('🏠 Loading available properties...');
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error loading properties:', error);
-        return;
-      }
-
-      // Extract unique properties and deduplicate
-      const properties = Array.from(new Set(
-        entries?.map((entry: FinancialEntry) => entry.property_class).filter(Boolean) || []
-      ));
-      
-      debugLog('🏠 Raw properties from database:', properties);
-      
-      // Remove duplicates and sort
-      const uniqueProperties = Array.from(new Set(properties)).sort();
-      const propertiesWithAll = ['All Properties', ...uniqueProperties];
-      
-      debugLog('🏠 Processed unique properties:', propertiesWithAll);
-      setAvailableProperties(propertiesWithAll);
-      
-    } catch (error) {
-      debugLog('❌ Exception loading properties:', error);
+    let start = currentMonth.startOf("month");
+    let end = currentMonth.endOf("month");
+    let months = [selectedMonth];
+    if (timeView === "YTD") {
+      start = currentMonth.startOf("year");
+      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
+    } else if (timeView === "TTM") {
+      start = currentMonth.subtract(11, "month").startOf("month");
+      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
+    } else if (timeView === "Quarterly") {
+      start = currentMonth.startOf("quarter");
+      end = currentMonth.endOf("quarter");
+      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
     }
-  };
+    setDateRange({
+      start: start.format("YYYY-MM-DD"),
+      end: end.format("YYYY-MM-DD"),
+      months,
+    });
+  }, [selectedMonth, timeView]);
 
-  const loadFinancialData = async () => {
-    setIsLoading(true);
-    try {
-      debugLog('📊 Starting financial data load...', {
-        selectedMonth,
-        selectedProperties: Array.from(selectedProperties),
-        activeTab
-      });
-
-      // Test connection first
-      const connectionTest = await testSupabaseConnection();
-      debugLog('🔌 Supabase connection test:', connectionTest);
-
-      // Parse selected month
-      const [monthName, yearStr] = selectedMonth.split(' ');
-      const year = parseInt(yearStr);
-      const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-      
-      debugLog('📅 Date parsing:', { monthName, year, monthIndex });
-
-      // Create date range for the selected month
-      const startDate = new Date(year, monthIndex, 1);
-      const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
-      
-      debugLog('📅 Date range:', { 
-        startDate: startDate.toISOString(), 
-        endDate: endDate.toISOString() 
-      });
-
-      // Get journal entries
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error fetching journal entries:', error);
-        throw error;
+  // Load COA, Properties, Banks on mount
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      try {
+        const [coaData, propData, bankData] = await Promise.all([
+          fetchCOA(),
+          fetchProperties(),
+          fetchBankAccounts(),
+        ]);
+        setCOA(coaData);
+        setProperties(propData);
+        setBankAccounts(bankData);
+      } catch (e: any) {
+        setDataError("Failed to load initial data: " + e.message);
+      } finally {
+        setIsLoading(false);
       }
+    })();
+  }, []);
 
-      debugLog('📊 Raw journal entries count:', entries?.length || 0);
+  // Load Journal Entries when filters change
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      try {
+        const entries = await fetchJournalEntries({
+          startDate: dateRange.start,
+          endDate: dateRange.end,
+          properties: Array.from(selectedProperties
+Here is PART 3 of your Financials page code:
 
-      if (!entries || entries.length === 0) {
-        debugLog('⚠️ No journal entries found');
-        setFinancialData([]);
-        return;
+// ====== UTILITY FUNCTIONS ======
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function calculatePercentage(value: number, total: number): string {
+  return total !== 0 ? ((value / total) * 100).toFixed(1) + "%" : "0%";
+}
+
+function getMonthRange(start: string, end: string): string[] {
+  const result: string[] = [];
+  let current = dayjs(start).startOf("month");
+  const last = dayjs(end).startOf("month");
+  while (current.isBefore(last) || current.isSame(last)) {
+    result.push(current.format("MMMM YYYY"));
+    current = current.add(1, "month");
+  }
+  return result;
+}
+
+// ====== MAIN COMPONENT ======
+const defaultTimeView: TimeView = "Monthly";
+const defaultViewMode: ViewMode = "detailed";
+
+export default function FinancialsPage() {
+  // UI State
+  const [activeTab, setActiveTab] = useState<FinancialTab>("p&l");
+  const [selectedMonth, setSelectedMonth] = useState(() =>
+    dayjs().format("MMMM YYYY")
+  );
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  const [timeView, setTimeView] = useState<TimeView>(defaultTimeView);
+  const [notification, setNotification] = useState<NotificationState>({
+    show: false,
+    message: "",
+    type: "info",
+  });
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(
+    new Set()
+  );
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
+  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(
+    new Set(["All Properties"])
+  );
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
+  const [selectedBanks, setSelectedBanks] = useState<Set<string>>(
+    new Set(["All Accounts"])
+  );
+  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({
+    show: false,
+    content: "",
+    x: 0,
+    y: 0,
+  });
+  const [compareMode, setCompareMode] = useState<"none" | "quick" | "custom">(
+    "none"
+  );
+  const [comparePeriod, setComparePeriod] = useState<{
+    start: string;
+    end: string;
+    label: string;
+  } | null>(null);
+
+  // Data State
+  const [isLoading, setIsLoading] = useState(false);
+  const [coa, setCOA] = useState<AccountCOA[]>([]);
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [properties, setProperties] = useState<string[]>(["All Properties"]);
+  const [bankAccounts, setBankAccounts] = useState<string[]>(["All Accounts"]);
+  const [dataError, setDataError] = useState<string | null>(null);
+
+  // Date Ranges
+  const currentMonth = dayjs(selectedMonth, "MMMM YYYY");
+  const [dateRange, setDateRange] = useState<{
+    start: string;
+    end: string;
+    months: string[];
+  }>({
+    start: currentMonth.startOf("month").format("YYYY-MM-DD"),
+    end: currentMonth.endOf("month").format("YYYY-MM-DD"),
+    months: [selectedMonth],
+  });
+
+  // Update date range when timeView or selectedMonth changes
+  useEffect(() => {
+    let start = currentMonth.startOf("month");
+    let end = currentMonth.endOf("month");
+    let months = [selectedMonth];
+    if (timeView === "YTD") {
+      start = currentMonth.startOf("year");
+      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
+    } else if (timeView === "TTM") {
+      start = currentMonth.subtract(11, "month").startOf("month");
+      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
+    } else if (timeView === "Quarterly") {
+      start = currentMonth.startOf("quarter");
+      end = currentMonth.endOf("quarter");
+      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
+    }
+    setDateRange({
+      start: start.format("YYYY-MM-DD"),
+      end: end.format("YYYY-MM-DD"),
+      months,
+    });
+  }, [selectedMonth, timeView]);
+
+  // Load COA, Properties, Banks on mount
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      try {
+        const [coaData, propData, bankData] = await Promise.all([
+          fetchCOA(),
+          fetchProperties(),
+          fetchBankAccounts(),
+        ]);
+        setCOA(coaData);
+        setProperties(propData);
+        setBankAccounts(bankData);
+      } catch (e: any) {
+        setDataError("Failed to load initial data: " + e.message);
+      } finally {
+        setIsLoading(false);
       }
+    })();
+  }, []);
 
-      // Filter by date range
-      const dateFilteredEntries = entries.filter((entry: FinancialEntry) => {
-        const entryDate = new Date(entry.transaction_date);
-        const isInRange = entryDate >= startDate && entryDate <= endDate;
-        
-        if (!isInRange) {
-          debugLog('📅 Date filter debug:', {
-            entryDate: entryDate.toISOString(),
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            isInRange,
-            entry: entry.transaction_date
-          });
-        }
-        
-        return isInRange;
-      });
-
-      debugLog('📅 Date filtered entries:', dateFilteredEntries.length);
-
-      // Property filtering with detailed debugging
-      let propertyFilteredEntries = dateFilteredEntries;
-      const selectedPropsArray = Array.from(selectedProperties);
-      
-      debugLog('🏠 Property filtering:', {
-        selectedProperties: selectedPropsArray,
-        isAllProperties: selectedProperties.has('All Properties'),
-        selectedSize: selectedProperties.size
-      });
-
-      if (!selectedProperties.has('All Properties') && selectedProperties.size > 0) {
-        debugLog('🔍 Applying property filter...');
-        
-        propertyFilteredEntries = dateFilteredEntries.filter((entry: FinancialEntry) => {
-          const matches = selectedProperties.has(entry.property_class);
-          if (!matches) {
-            debugLog('🏠 Property filter:', {
-              entryProperty: entry.property_class,
-              selectedProperties: selectedPropsArray,
-              matches
-            });
-          }
-          return matches;
+  // Load Journal Entries when filters change
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      try {
+        const entries = await fetchJournalEntries({
+          startDate: dateRange.start,
+          endDate: dateRange.end,
+          properties: Array.from(selectedProperties),
+          bankAccounts: activeTab === "cash-flow" ? Array.from(selectedBanks) : undefined,
         });
-        
-        debugLog('🏠 Property filtered entries:', propertyFilteredEntries.length);
+        setJournalEntries(entries);
+        setDataError(null);
+      } catch (e: any) {
+        setDataError("Failed to load journal entries: " + e.message);
+      } finally {
+        setIsLoading(false);
       }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange, selectedProperties, selectedBanks, activeTab]);  
 
-      // Log property distribution in results
-      const propertyDistribution = propertyFilteredEntries.reduce((acc: any, entry: FinancialEntry) => {
-        acc[entry.property_class] = (acc[entry.property_class] || 0) + 1;
-        return acc;
-      }, {});
-      
-      debugLog('📊 Property distribution in results:', propertyDistribution);
+  // ====== ACCOUNT TREE & DATA AGGREGATION ======
+  const accountTree = useMemo(() => {
+    if (!coa.length || !journalEntries.length) return [];
+    return buildAccountTree(coa, journalEntries);
+  }, [coa, journalEntries]);
 
-      // Process P&L data
-      if (activeTab === 'p&l') {
-        const plData = processPLData(propertyFilteredEntries);
-        debugLog('📊 Processed P&L data:', plData);
-        setFinancialData(plData);
-      }
-      
-    } catch (error) {
-      debugLog('❌ Error in loadFinancialData:', error);
-      showNotification('Error loading financial data', 'error');
-    } finally {
-      setIsLoading(false);
+  // ====== KPI CALCULATIONS (P&L Example) ======
+  const kpis = useMemo(() => {
+    let revenue = 0,
+      cogs = 0,
+      operatingExpenses = 0,
+      netIncome = 0;
+    function walk(node: AccountNode) {
+      if (node.type === "Revenue") revenue += node.total;
+      if (node.type === "Expenses") operatingExpenses += node.total;
+      node.children.forEach(walk);
     }
-  };
+    accountTree.forEach(walk);
+    netIncome = revenue - operatingExpenses;
+    return {
+      revenue,
+      operatingExpenses,
+      netIncome,
+      grossMargin: revenue ? ((revenue - cogs) / revenue) * 100 : 0,
+      netMargin: revenue ? (netIncome / revenue) * 100 : 0,
+    };
+  }, [accountTree]);
 
-  const processPLData = (entries: FinancialEntry[]): FinancialDataItem[] => {
-    debugLog('🧮 Processing P&L data with entries:', entries.length);
-    
-    const accountGroups: { [key: string]: FinancialEntry[] } = {};
-    
-    // Group entries by account name
-    entries.forEach(entry => {
-      if (!accountGroups[entry.account_name]) {
-        accountGroups[entry.account_name] = [];
-      }
-      accountGroups[entry.account_name].push(entry);
-    });
-
-    debugLog('📊 Account groups:', Object.keys(accountGroups));
-
-    const result: FinancialDataItem[] = [];
-
-    // Process each account group
-    Object.entries(accountGroups).forEach(([accountName, accountEntries]) => {
-      const firstEntry = accountEntries[0];
-      const accountType = firstEntry.account_type;
-      
-      // Calculate totals for accounting signs
-      const totalDebits = accountEntries.reduce((sum, entry) => sum + entry.debit_amount, 0);
-      const totalCredits = accountEntries.reduce((sum, entry) => sum + entry.credit_amount, 0);
-      
-      let accountTotal = 0;
-      let isAbnormal = false;
-      
-      // Apply proper accounting signs
-      if (accountType === 'Income') {
-        // Revenue accounts: Credits - Debits (normal credit balance)
-        accountTotal = totalCredits - totalDebits;
-        isAbnormal = accountTotal < 0; // Abnormal if debit balance
-      } else if (accountType === 'Expense') {
-        // Expense accounts: Debits - Credits (normal debit balance)  
-        accountTotal = totalDebits - totalCredits;
-        isAbnormal = accountTotal < 0; // Abnormal if credit balance
-      } else {
-        // For other account types, use the line_amount sum
-        accountTotal = accountEntries.reduce((sum, entry) => sum + entry.line_amount, 0);
-      }
-
-      debugLog(`💰 Account "${accountName}" (${accountType}):`, {
-        totalDebits,
-        totalCredits,
-        accountTotal,
-        isAbnormal,
-        entryCount: accountEntries.length
+  // ====== EXPORT TO CSV ======
+  function exportToCSV() {
+    let rows: any[] = [];
+    function walk(node: AccountNode, depth = 0) {
+      rows.push({
+        Account: "  ".repeat(depth) + node.name,
+        Total: node.total,
+        ...node.months,
       });
-
-      result.push({
-        name: `${accountName}${isAbnormal ? ' ⚠️' : ''}`,
-        total: accountTotal,
-        months: { [`${selectedMonth}` as MonthString]: accountTotal },
-        type: accountType,
-        detail_type: firstEntry.detail_type,
-        entries: accountEntries,
-        mapping_method: firstEntry.mapping_method || 'automatic'
-      });
-    });
-
-    // Sort by account type and total
-    result.sort((a, b) => {
-      const typeOrder = { 'Income': 1, 'Expense': 2 };
-      const aOrder = typeOrder[a.type as keyof typeof typeOrder] || 3;
-      const bOrder = typeOrder[b.type as keyof typeof typeOrder] || 3;
-      
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return Math.abs(b.total) - Math.abs(a.total);
-    });
-
-    return result;
-  };
-
-  const toggleProperty = (property: string) => {
-    debugLog('🏠 Property toggle debugging:', { 
-      property, 
-      currentSelected: Array.from(selectedProperties),
-      isCurrentlySelected: selectedProperties.has(property)
-    });
-    
-    const newSelected = new Set(selectedProperties);
-    
-    if (property === 'All Properties') {
-      debugLog('🏠 Toggling "All Properties"');
-      if (selectedProperties.has('All Properties')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Properties');
-      }
-    } else {
-      debugLog('🏠 Toggling specific property:', property);
-      newSelected.delete('All Properties');
-      
-      if (selectedProperties.has(property)) {
-        newSelected.delete(property);
-        if (newSelected.size === 0) {
-          newSelected.add('All Properties');
-        }
-      } else {
-        newSelected.add(property);
-      }
+      node.children.forEach((child) => walk(child, depth + 1));
     }
-    
-    debugLog('🏠 New selection after toggle:', Array.from(newSelected));
-    setSelectedProperties(newSelected);
-  };
-
-  const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 3000);
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const calculateKPI = (type: 'revenue' | 'expenses' | 'profit'): number => {
-    if (!financialData || financialData.length === 0) return 0;
-    
-    let value = 0;
-    
-    if (type === 'revenue') {
-      value = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'expenses') {
-      value = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'profit') {
-      const revenue = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-      const expenses = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-      value = revenue - expenses;
-    }
-    
-    debugLog(`📊 KPI ${type}:`, value);
-    return value;
-  };
-
-  const exportData = () => {
-    const csvContent = [
-      ['Account Name', 'Type', 'Amount'],
-      ...financialData.map(item => [
-        item.name,
-        item.type || '',
-        item.total.toString()
-      ])
-    ].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    accountTree.forEach((node) => walk(node));
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `financials-${selectedMonth.replace(' ', '-')}.csv`;
+    a.download = "financials.csv";
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }
 
-  const toggleItemExpansion = (itemName: string) => {
-    const newExpanded = new Set(expandedItems);
-    if (expandedItems.has(itemName)) {
-      newExpanded.delete(itemName);
-    } else {
-      newExpanded.add(itemName);
-    }
-    setExpandedItems(newExpanded);
-  };
+  // ====== UI HELPERS ======
+  function showNotification(message: string, type: "info" | "success" | "error" = "info") {
+    setNotification({ show: true, message, type });
+    setTimeout(() => setNotification({ show: false, message: "", type: "info" }), 3000);
+  }
 
-  // Calculate totals for display
-  const revenue = calculateKPI('revenue');
-  const expenses = calculateKPI('expenses');
-  const profit = calculateKPI('profit');
+  function toggleAccountExpansion(accountFullName: string) {
+    setExpandedAccounts((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountFullName)) next.delete(accountFullName);
+      else next.add(accountFullName);
+      return next;
+    });
+  }
 
+  // ====== MAIN RENDER ======
   return (
-    <div className="flex-1 p-6 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Financial Dashboard</h1>
-        <p className="text-gray-600">Comprehensive financial analysis and reporting</p>
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center">
+          <IAMCFOLogo className="w-10 h-10 mr-4" />
+          <div>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
+              <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
+                Financial Management
+              </span>
+              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                Supabase Connected
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+              Real-time Financials • {journalEntries.length} entries loaded
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'p&l', name: 'Profit & Loss', icon: TrendingUp },
-              { id: 'cash-flow', name: 'Cash Flow', icon: BarChart3 },
-              { id: 'balance-sheet', name: 'Balance Sheet', icon:
-PieChart } ].map((tab) => { const Icon = tab.icon; return ( <button key={tab.id} onClick={() => setActiveTab(tab.id as FinancialTab)} className={group inline-flex items-center px-1 py-4 border-b-2 font-medium text-sm ${                     activeTab === tab.id                       ? 'border-blue-500 text-blue-600'                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'                   }} > <Icon className="mr-2 h-5 w-5" /> {tab.name} </button> ); })} </nav> </div> </div>
+      {/* Controls */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-wrap gap-4 items-center mb-6">
+          {/* Month Selector */}
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+          >
+            {Array.from({ length: 36 }).map((_, i) => {
+              const m = dayjs().subtract(i, "month").format("MMMM YYYY");
+              return (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              );
+            })}
+          </select>
+          {/* Property Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setPropertyDropdownOpen((v) => !v)}
+              className="flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+            >
+              {selectedProperties.size === 1
+                ? Array.from(selectedProperties)[0]
+                : `${selectedProperties.size} Properties`}
+              <ChevronDown className="w-4 h-4 ml-2" />
+            </button>
+            {propertyDropdownOpen && (
+              <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 w-56 max-h-60 overflow-y-auto">
+                {properties.map((p) => (
+                  <div
+                    key={p}
+                    className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                    onClick={() => {
+                      const next = new Set(selectedProperties);
+                      if (p === "All Properties") {
+                        next.clear();
+                        next.add("All Properties");
+                      } else {
+                        next.delete("All Properties");
+                        if (next.has(p)) next.delete(p);
+                        else next.add(p);
+                        if (next.size === 0) next.add("All Properties");
+                      }
+                      setSelectedProperties(next);
+                      setPropertyDropdownOpen(false);
+                    }}
+                  >
+Here is PART 4 of your Financials page code:
 
-  {/* Controls */}
-  <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
-    <div className="flex flex-wrap gap-4 items-center">
-      {/* Month Selector */}
-      <select
-        value={selectedMonth}
-        onChange={(e) => setSelectedMonth(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {['January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025', 
-          'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'].map((month) => (
-          <option key={month} value={month}>{month}</option>
-        ))}
-      </select>
+  // ====== ACCOUNT TREE & DATA AGGREGATION ======
+  const accountTree = useMemo(() => {
+    if (!coa.length || !journalEntries.length) return [];
+    return buildAccountTree(coa, journalEntries);
+  }, [coa, journalEntries]);
 
-      {/* Property Selector */}
-      <div className="relative">
-        <button
-          onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] text-left flex items-center justify-between"
-        >
-          <span>
-            {selectedProperties.size === 1 && selectedProperties.has('All Properties')
-              ? 'All Properties'
-              : selectedProperties.size === 1
-              ? Array.from(selectedProperties)[0]
-              : `${selectedProperties.size} Properties Selected`}
-          </span>
-          <ChevronDown className="h-4 w-4" />
-        </button>
-        
-        {showPropertyDropdown && (
-          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-            {availableProperties.map((property) => (
-              <label
-                key={property}
-                className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+  // ====== KPI CALCULATIONS (P&L Example) ======
+  const kpis = useMemo(() => {
+    let revenue = 0,
+      cogs = 0,
+      operatingExpenses = 0,
+      netIncome = 0;
+    function walk(node: AccountNode) {
+      if (node.type === "Revenue") revenue += node.total;
+      if (node.type === "Expenses") operatingExpenses += node.total;
+      node.children.forEach(walk);
+    }
+    accountTree.forEach(walk);
+    netIncome = revenue - operatingExpenses;
+    return {
+      revenue,
+      operatingExpenses,
+      netIncome,
+      grossMargin: revenue ? ((revenue - cogs) / revenue) * 100 : 0,
+      netMargin: revenue ? (netIncome / revenue) * 100 : 0,
+    };
+  }, [accountTree]);
+
+  // ====== EXPORT TO CSV ======
+  function exportToCSV() {
+    let rows: any[] = [];
+    function walk(node: AccountNode, depth = 0) {
+      rows.push({
+        Account: "  ".repeat(depth) + node.name,
+        Total: node.total,
+        ...node.months,
+      });
+      node.children.forEach((child) => walk(child, depth + 1));
+    }
+    accountTree.forEach((node) => walk(node));
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "financials.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ====== UI HELPERS ======
+  function showNotification(message: string, type: "info" | "success" | "error" = "info") {
+    setNotification({ show: true, message, type });
+    setTimeout(() => setNotification({ show: false, message: "", type: "info" }), 3000);
+  }
+
+  function toggleAccountExpansion(accountFullName: string) {
+    setExpandedAccounts((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountFullName)) next.delete(accountFullName);
+      else next.add(accountFullName);
+      return next;
+    });
+  }
+
+  // ====== MAIN RENDER ======
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center">
+          <IAMCFOLogo className="w-10 h-10 mr-4" />
+          <div>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
+              <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
+                Financial Management
+              </span>
+              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                Supabase Connected
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+              Real-time Financials • {journalEntries.length} entries loaded
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-wrap gap-4 items-center mb-6">
+          {/* Month Selector */}
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+          >
+            {Array.from({ length: 36 }).map((_, i) => {
+              const m = dayjs().subtract(i, "month").format("MMMM YYYY");
+              return (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              );
+            })}
+          </select>
+          {/* Property Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setPropertyDropdownOpen((v) => !v)}
+              className="flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+            >
+              {selectedProperties.size === 1
+                ? Array.from(selectedProperties)[0]
+                : `${selectedProperties.size} Properties`}
+              <ChevronDown className="w-4 h-4 ml-2" />
+            </button>
+            {propertyDropdownOpen && (
+              <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 w-56 max-h-60 overflow-y-auto">
+                {properties.map((p) => (
+                  <div
+                    key={p}
+                    className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                    onClick={() => {
+                      const next = new Set(selectedProperties);
+                      if (p === "All Properties") {
+                        next.clear();
+                        next.add("All Properties");
+                      } else {
+                        next.delete("All Properties");
+                        if (next.has(p)) next.delete(p);
+                        else next.add(p);
+                        if (next.size === 0) next.add("All Properties");
+                      }
+                      setSelectedProperties(next);
+                      setPropertyDropdownOpen(false);
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedProperties.has(p)}
+                      readOnly
+                      className="mr-3 h-4 w-4 border-gray-300 rounded"
+                      style={{ accentColor: BRAND_COLORS.primary }}
+                    />
+                    <span>{p}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Bank Selector (Cash Flow) */}
+          {activeTab === "cash-flow" && (
+            <div className="relative">
+              <button
+                onClick={() => setBankDropdownOpen((v) => !v)}
+                className="flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
               >
-                <input
-                  type="checkbox"
-                  checked={selectedProperties.has(property)}
-                  onChange={() => toggleProperty(property)}
-                  className="mr-2"
-                />
-                <span className="text-sm">{property}</span>
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Time View Selector */}
-      <select
-        value={timeView}
-        onChange={(e) => setTimeView(e.target.value
-No problem! Let me continue with the complete updated code. Here's the full page.tsx with all our debugging features:
-
-"use client";
-
-import React, { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
-import { supabaseQueries, testSupabaseConnection, type FinancialEntry } from '@/lib/supabase';
-
-// IAM CFO Brand Colors
-const BRAND_COLORS = {
-  primary: '#56B6E9',
-  secondary: '#3A9BD1',
-  tertiary: '#7CC4ED',
-  accent: '#2E86C1',
-  success: '#27AE60',
-  warning: '#F39C12',
-  danger: '#E74C3C',
-  gray: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475569',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A'
-  }
-};
-
-// Type definitions
-type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
-type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
-type ViewMode = 'total' | 'detailed';
-type MonthString = `${'January' | 'February' | 'March' | 'April' | 'May' | 'June' | 
-                   'July' | 'August' | 'September' | 'October' | 'November' | 'December'} ${number}`;
-
-interface FinancialDataItem {
-  name: string;
-  total: number;
-  months: Partial<Record<MonthString, number>>;
-  type?: string;
-  original_type?: string;
-  detail_type?: string;
-  entries?: any[];
-  mapping_method?: string;
-}
-
-interface FinancialEntry {
-  id: number;
-  je_number: string;
-  transaction_date: string;
-  account_name: string;
-  account_type: string;
-  detail_type: string;
-  property_class: string;
-  debit_amount: number;
-  credit_amount: number;
-  line_amount: number;
-  posting_type: string;
-  description: string;
-  balance: number;
-  created_by: string;
-  last_modified: string;
-  created_at: string;
-  updated_at: string;
-  classification?: string;
-  mapping_method?: string;
-}
-
-interface NotificationState {
-  show: boolean;
-  message: string;
-  type: 'info' | 'success' | 'error';
-}
-
-interface TooltipState {
-  show: boolean;
-  content: string;
-  x: number;
-  y: number;
-}
-
-const FinancialsPage = () => {
-  // State variables
-  const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [timeView, setTimeView] = useState<TimeView>('Monthly');
-  const [viewMode, setViewMode] = useState<ViewMode>('total');
-  const [selectedMonth, setSelectedMonth] = useState<string>('May 2025');
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
-  const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
-  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [financialData, setFinancialData] = useState<FinancialDataItem[]>([]);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  const [tooltip, setTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
-
-  // Debug logging function
-  const debugLog = (...args: any[]) => {
-    console.log('🔍 FINANCIALS DEBUG:', ...args);
-  };
-
-  // Initialize and load data
-  useEffect(() => {
-    debugLog('🚀 Component initialized, loading initial data...');
-    loadFinancialData();
-  }, []);
-
-  // Load data when filters change
-  useEffect(() => {
-    debugLog('📊 Filters changed, reloading data...', {
-      selectedMonth,
-      selectedProperties: Array.from(selectedProperties),
-      activeTab
-    });
-    loadFinancialData();
-  }, [selectedMonth, selectedProperties, activeTab]);
-
-  // Load available properties
-  useEffect(() => {
-    loadAvailableProperties();
-  }, []);
-
-  const loadAvailableProperties = async () => {
-    try {
-      debugLog('🏠 Loading available properties...');
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error loading properties:', error);
-        return;
-      }
-
-      // Extract unique properties and deduplicate
-      const properties = Array.from(new Set(
-        entries?.map((entry: FinancialEntry) => entry.property_class).filter(Boolean) || []
-      ));
-      
-      debugLog('🏠 Raw properties from database:', properties);
-      
-      // Remove duplicates and sort
-      const uniqueProperties = Array.from(new Set(properties)).sort();
-      const propertiesWithAll = ['All Properties', ...uniqueProperties];
-      
-      debugLog('🏠 Processed unique properties:', propertiesWithAll);
-      setAvailableProperties(propertiesWithAll);
-      
-    } catch (error) {
-      debugLog('❌ Exception loading properties:', error);
-    }
-  };
-
-  const loadFinancialData = async () => {
-    setIsLoading(true);
-    try {
-      debugLog('📊 Starting financial data load...', {
-        selectedMonth,
-        selectedProperties: Array.from(selectedProperties),
-        activeTab
-      });
-
-      // Test connection first
-      const connectionTest = await testSupabaseConnection();
-      debugLog('🔌 Supabase connection test:', connectionTest);
-
-      // Parse selected month
-      const [monthName, yearStr] = selectedMonth.split(' ');
-      const year = parseInt(yearStr);
-      const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-      
-      debugLog('📅 Date parsing:', { monthName, year, monthIndex });
-
-      // Create date range for the selected month
-      const startDate = new Date(year, monthIndex, 1);
-      const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
-      
-      debugLog('📅 Date range:', { 
-        startDate: startDate.toISOString(), 
-        endDate: endDate.toISOString() 
-      });
-
-      // Get journal entries
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error fetching journal entries:', error);
-        throw error;
-      }
-
-      debugLog('📊 Raw journal entries count:', entries?.length || 0);
-
-      if (!entries || entries.length === 0) {
-        debugLog('⚠️ No journal entries found');
-        setFinancialData([]);
-        return;
-      }
-
-      // Filter by date range
-      const dateFilteredEntries = entries.filter((entry: FinancialEntry) => {
-        const entryDate = new Date(entry.transaction_date);
-        const isInRange = entryDate >= startDate && entryDate <= endDate;
-        
-        if (!isInRange) {
-          debugLog('📅 Date filter debug:', {
-            entryDate: entryDate.toISOString(),
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            isInRange,
-            entry: entry.transaction_date
-          });
-        }
-        
-        return isInRange;
-      });
-
-      debugLog('📅 Date filtered entries:', dateFilteredEntries.length);
-
-      // Property filtering with detailed debugging
-      let propertyFilteredEntries = dateFilteredEntries;
-      const selectedPropsArray = Array.from(selectedProperties);
-      
-      debugLog('🏠 Property filtering:', {
-        selectedProperties: selectedPropsArray,
-        isAllProperties: selectedProperties.has('All Properties'),
-        selectedSize: selectedProperties.size
-      });
-
-      if (!selectedProperties.has('All Properties') && selectedProperties.size > 0) {
-        debugLog('🔍 Applying property filter...');
-        
-        propertyFilteredEntries = dateFilteredEntries.filter((entry: FinancialEntry) => {
-          const matches = selectedProperties.has(entry.property_class);
-          if (!matches) {
-            debugLog('🏠 Property filter:', {
-              entryProperty: entry.property_class,
-              selectedProperties: selectedPropsArray,
-              matches
-            });
-          }
-          return matches;
-        });
-        
-        debugLog('🏠 Property filtered entries:', propertyFilteredEntries.length);
-      }
-
-      // Log property distribution in results
-      const propertyDistribution = propertyFilteredEntries.reduce((acc: any, entry: FinancialEntry) => {
-        acc[entry.property_class] = (acc[entry.property_class] || 0) + 1;
-        return acc;
-      }, {});
-      
-      debugLog('📊 Property distribution in results:', propertyDistribution);
-
-      // Process P&L data
-      if (activeTab === 'p&l') {
-        const plData = processPLData(propertyFilteredEntries);
-        debugLog('📊 Processed P&L data:', plData);
-        setFinancialData(plData);
-      }
-      
-    } catch (error) {
-      debugLog('❌ Error in loadFinancialData:', error);
-      showNotification('Error loading financial data', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const processPLData = (entries: FinancialEntry[]): FinancialDataItem[] => {
-    debugLog('🧮 Processing P&L data with entries:', entries.length);
-    
-    const accountGroups: { [key: string]: FinancialEntry[] } = {};
-    
-    // Group entries by account name
-    entries.forEach(entry => {
-      if (!accountGroups[entry.account_name]) {
-        accountGroups[entry.account_name] = [];
-      }
-      accountGroups[entry.account_name].push(entry);
-    });
-
-    debugLog('📊 Account groups:', Object.keys(accountGroups));
-
-    const result: FinancialDataItem[] = [];
-
-    // Process each account group
-    Object.entries(accountGroups).forEach(([accountName, accountEntries]) => {
-      const firstEntry = accountEntries[0];
-      const accountType = firstEntry.account_type;
-      
-      // Calculate totals for accounting signs
-      const totalDebits = accountEntries.reduce((sum, entry) => sum + entry.debit_amount, 0);
-      const totalCredits = accountEntries.reduce((sum, entry) => sum + entry.credit_amount, 0);
-      
-      let accountTotal = 0;
-      let isAbnormal = false;
-      
-      // Apply proper accounting signs
-      if (accountType === 'Income') {
-        // Revenue accounts: Credits - Debits (normal credit balance)
-        accountTotal = totalCredits - totalDebits;
-        isAbnormal = accountTotal < 0; // Abnormal if debit balance
-      } else if (accountType === 'Expense') {
-        // Expense accounts: Debits - Credits (normal debit balance)  
-        accountTotal = totalDebits - totalCredits;
-        isAbnormal = accountTotal < 0; // Abnormal if credit balance
-      } else {
-        // For other account types, use the line_amount sum
-        accountTotal = accountEntries.reduce((sum, entry) => sum + entry.line_amount, 0);
-      }
-
-      debugLog(`💰 Account "${accountName}" (${accountType}):`, {
-        totalDebits,
-        totalCredits,
-        accountTotal,
-        isAbnormal,
-        entryCount: accountEntries.length
-      });
-
-      result.push({
-        name: `${accountName}${isAbnormal ? ' ⚠️' : ''}`,
-        total: accountTotal,
-        months: { [`${selectedMonth}` as MonthString]: accountTotal },
-        type: accountType,
-        detail_type: firstEntry.detail_type,
-        entries: accountEntries,
-        mapping_method: firstEntry.mapping_method || 'automatic'
-      });
-    });
-
-    // Sort by account type and total
-    result.sort((a, b) => {
-      const typeOrder = { 'Income': 1, 'Expense': 2 };
-      const aOrder = typeOrder[a.type as keyof typeof typeOrder] || 3;
-      const bOrder = typeOrder[b.type as keyof typeof typeOrder] || 3;
-      
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return Math.abs(b.total) - Math.abs(a.total);
-    });
-
-    return result;
-  };
-
-  const toggleProperty = (property: string) => {
-    debugLog('🏠 Property toggle debugging:', { 
-      property, 
-      currentSelected: Array.from(selectedProperties),
-      isCurrentlySelected: selectedProperties.has(property)
-    });
-    
-    const newSelected = new Set(selectedProperties);
-    
-    if (property === 'All Properties') {
-      debugLog('🏠 Toggling "All Properties"');
-      if (selectedProperties.has('All Properties')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Properties');
-      }
-    } else {
-      debugLog('🏠 Toggling specific property:', property);
-      newSelected.delete('All Properties');
-      
-      if (selectedProperties.has(property)) {
-        newSelected.delete(property);
-        if (newSelected.size === 0) {
-          newSelected.add('All Properties');
-        }
-      } else {
-        newSelected.add(property);
-      }
-    }
-    
-    debugLog('🏠 New selection after toggle:', Array.from(newSelected));
-    setSelectedProperties(newSelected);
-  };
-
-  const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 3000);
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const calculateKPI = (type: 'revenue' | 'expenses' | 'profit'): number => {
-    if (!financialData || financialData.length === 0) return 0;
-    
-    let value = 0;
-    
-    if (type === 'revenue') {
-      value = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'expenses') {
-      value = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'profit') {
-      const revenue = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-      const expenses = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-      value = revenue - expenses;
-    }
-    
-    debugLog(`📊 KPI ${type}:`, value);
-    return value;
-  };
-
-  const exportData = () => {
-    const csvContent = [
-      ['Account Name', 'Type', 'Amount'],
-      ...financialData.map(item => [
-        item.name,
-        item.type || '',
-        item.total.toString()
-      ])
-    ].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `financials-${selectedMonth.replace(' ', '-')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const toggleItemExpansion = (itemName: string) => {
-    const newExpanded = new Set(expandedItems);
-    if (expandedItems.has(itemName)) {
-      newExpanded.delete(itemName);
-    } else {
-      newExpanded.add(itemName);
-    }
-    setExpandedItems(newExpanded);
-  };
-
-  // Calculate totals for display
-  const revenue = calculateKPI('revenue');
-  const expenses = calculateKPI('expenses');
-  const profit = calculateKPI('profit');
-
-  return (
-    <div className="flex-1 p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Financial Dashboard</h1>
-        <p className="text-gray-600">Comprehensive financial analysis and reporting</p>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'p&l', name: 'Profit & Loss', icon: TrendingUp },
-              { id: 'cash-flow', name: 'Cash Flow', icon: BarChart3 },
-              { id: 'balance-sheet', name: 'Balance Sheet', icon: PieChart }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as FinancialTab)}
-                  className={`group inline-flex items-center px-1 py-4 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className="mr-2 h-5 w-5" />
-                  {tab.name}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Month Selector */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {['January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025', 
-              'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'].map((month) => (
-              <option key={month} value={month}>{month}</option>
-            ))}
-          </select>
-
-          {/* Property Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] text-left flex items-center justify-between"
-            >
-              <span>
-                {selectedProperties.size === 1 && selectedProperties.has('All Properties')
-                  ? 'All Properties'
-                  : selectedProperties.size === 1
-                  ? Array.from(selectedProperties)[0]
-                  : `${selectedProperties.size} Properties Selected`}
-              </span>
-              <ChevronDown className="h-4 w-4" />
-            </button>
-            
-            {showPropertyDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                {availableProperties.map((property) => (
-                  <label
-                    key={property}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProperties.has(property)}
-                      onChange={() => toggleProperty(property)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">{property}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Time View Selector */}
-          <select
-            value={timeView}
-            onChange={(e) => setTimeView(e.target.value as TimeView)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="Monthly">Monthly</option>
-            <option value="YTD">Year to Date</option>
-            <option value="TTM">Trailing 12 Months</option>
-            <option value="MoM">Month over Month</option>
-            <option value="YoY">Year over Year</option>
-          </select>
-
-          {/* View Mode Toggle */}
-          <div className="flex border border-gray-300 rounded-md">
-            <button
-              onClick={() => setViewMode('total')}
-              className={`px-3 py-2 text-sm ${
-                viewMode === 'total'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Total
-            </button>
-            <button
-              onClick={() => setViewMode('detailed')}
-              className={`px-3 py-2 text-sm ${
-                viewMode === 'detailed'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Detailed
-            </button>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => loadFinancialData()}
-            disabled={isLoading}
-            className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-          <button
-            onClick={exportData}
-            className="flex items-center px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Revenue Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Revenue</p>
-              <p className={`text-2xl font-bold ${revenue < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(revenue)}
-              </p>
+                {selectedBanks.size === 1
+                  ? Array.from(selectedBanks)[0]
+                  : `${selectedBanks.size} Banks`}
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </button>
+              {bankDropdownOpen && (
+                <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 w-56 max-h-60 overflow-y-auto">
+                  {bankAccounts.map((b) => (
+                    <div
+                      key={b}
+                      className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                      onClick={() => {
+                        const next = new Set(selectedBanks);
+                        if (b === "All Accounts") {
+                          next.clear();
+                          next.add("All Accounts");
+                        } else {
+                          next.delete("All Accounts");
+                          if (next.has(b)) next.delete(b);
+                          else next.add(b);
+                          if (next.size === 0) next.add("All Accounts");
+                        }
+                        setSelectedBanks(next);
+                        setBankDropdownOpen(false);
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedBanks.has(b)}
+                        readOnly
+                        className="mr-3 h-4 w-4 border-gray-300 rounded"
+                        style={{ accentColor: BRAND_COLORS.primary }}
+                      />
+                      <span>{b}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className={`p-3 rounded-full ${revenue < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-              <TrendingUp className={`h-6 w-6 ${revenue < 0 ? 'text-red-600' : 'text-green-600'}`} />
-            </div>
-          </div>
-        </div>
-
-        {/* Expenses Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-              
-No problem! Let me continue with the complete updated code. Here's the full page.tsx with all our debugging features:
-
-"use client";
-
-import React, { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
-import { supabaseQueries, testSupabaseConnection, type FinancialEntry } from '@/lib/supabase';
-
-// IAM CFO Brand Colors
-const BRAND_COLORS = {
-  primary: '#56B6E9',
-  secondary: '#3A9BD1',
-  tertiary: '#7CC4ED',
-  accent: '#2E86C1',
-  success: '#27AE60',
-  warning: '#F39C12',
-  danger: '#E74C3C',
-  gray: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475569',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A'
-  }
-};
-
-// Type definitions
-type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
-type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
-type ViewMode = 'total' | 'detailed';
-type MonthString = `${'January' | 'February' | 'March' | 'April' | 'May' | 'June' | 
-                   'July' | 'August' | 'September' | 'October' | 'November' | 'December'} ${number}`;
-
-interface FinancialDataItem {
-  name: string;
-  total: number;
-  months: Partial<Record<MonthString, number>>;
-  type?: string;
-  original_type?: string;
-  detail_type?: string;
-  entries?: any[];
-  mapping_method?: string;
-}
-
-interface FinancialEntry {
-  id: number;
-  je_number: string;
-  transaction_date: string;
-  account_name: string;
-  account_type: string;
-  detail_type: string;
-  property_class: string;
-  debit_amount: number;
-  credit_amount: number;
-  line_amount: number;
-  posting_type: string;
-  description: string;
-  balance: number;
-  created_by: string;
-  last_modified: string;
-  created_at: string;
-  updated_at: string;
-  classification?: string;
-  mapping_method?: string;
-}
-
-interface NotificationState {
-  show: boolean;
-  message: string;
-  type: 'info' | 'success' | 'error';
-}
-
-interface TooltipState {
-  show: boolean;
-  content: string;
-  x: number;
-  y: number;
-}
-
-const FinancialsPage = () => {
-  // State variables
-  const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [timeView, setTimeView] = useState<TimeView>('Monthly');
-  const [viewMode, setViewMode] = useState<ViewMode>('total');
-  const [selectedMonth, setSelectedMonth] = useState<string>('May 2025');
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
-  const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
-  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [financialData, setFinancialData] = useState<FinancialDataItem[]>([]);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  const [tooltip, setTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
-
-  // Debug logging function
-  const debugLog = (...args: any[]) => {
-    console.log('🔍 FINANCIALS DEBUG:', ...args);
-  };
-
-  // Initialize and load data
-  useEffect(() => {
-    debugLog('🚀 Component initialized, loading initial data...');
-    loadFinancialData();
-  }, []);
-
-  // Load data when filters change
-  useEffect(() => {
-    debugLog('📊 Filters changed, reloading data...', {
-      selectedMonth,
-      selectedProperties: Array.from(selectedProperties),
-      activeTab
-    });
-    loadFinancialData();
-  }, [selectedMonth, selectedProperties, activeTab]);
-
-  // Load available properties
-  useEffect(() => {
-    loadAvailableProperties();
-  }, []);
-
-  const loadAvailableProperties = async () => {
-    try {
-      debugLog('🏠 Loading available properties...');
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error loading properties:', error);
-        return;
-      }
-
-      // Extract unique properties and deduplicate
-      const properties = Array.from(new Set(
-        entries?.map((entry: FinancialEntry) => entry.property_class).filter(Boolean) || []
-      ));
-      
-      debugLog('🏠 Raw properties from database:', properties);
-      
-      // Remove duplicates and sort
-      const uniqueProperties = Array.from(new Set(properties)).sort();
-      const propertiesWithAll = ['All Properties', ...uniqueProperties];
-      
-      debugLog('🏠 Processed unique properties:', propertiesWithAll);
-      setAvailableProperties(propertiesWithAll);
-      
-    } catch (error) {
-      debugLog('❌ Exception loading properties:', error);
-    }
-  };
-
-  const loadFinancialData = async () => {
-    setIsLoading(true);
-    try {
-      debugLog('📊 Starting financial data load...', {
-        selectedMonth,
-        selectedProperties: Array.from(selectedProperties),
-        activeTab
-      });
-
-      // Test connection first
-      const connectionTest = await testSupabaseConnection();
-      debugLog('🔌 Supabase connection test:', connectionTest);
-
-      // Parse selected month
-      const [monthName, yearStr] = selectedMonth.split(' ');
-      const year = parseInt(yearStr);
-      const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-      
-      debugLog('📅 Date parsing:', { monthName, year, monthIndex });
-
-      // Create date range for the selected month
-      const startDate = new Date(year, monthIndex, 1);
-      const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
-      
-      debugLog('📅 Date range:', { 
-        startDate: startDate.toISOString(), 
-        endDate: endDate.toISOString() 
-      });
-
-      // Get journal entries
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error fetching journal entries:', error);
-        throw error;
-      }
-
-      debugLog('📊 Raw journal entries count:', entries?.length || 0);
-
-      if (!entries || entries.length === 0) {
-        debugLog('⚠️ No journal entries found');
-        setFinancialData([]);
-        return;
-      }
-
-      // Filter by date range
-      const dateFilteredEntries = entries.filter((entry: FinancialEntry) => {
-        const entryDate = new Date(entry.transaction_date);
-        const isInRange = entryDate >= startDate && entryDate <= endDate;
-        
-        if (!isInRange) {
-          debugLog('📅 Date filter debug:', {
-            entryDate: entryDate.toISOString(),
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            isInRange,
-            entry: entry.transaction_date
-          });
-        }
-        
-        return isInRange;
-      });
-
-      debugLog('📅 Date filtered entries:', dateFilteredEntries.length);
-
-      // Property filtering with detailed debugging
-      let propertyFilteredEntries = dateFilteredEntries;
-      const selectedPropsArray = Array.from(selectedProperties);
-      
-      debugLog('🏠 Property filtering:', {
-        selectedProperties: selectedPropsArray,
-        isAllProperties: selectedProperties.has('All Properties'),
-        selectedSize: selectedProperties.size
-      });
-
-      if (!selectedProperties.has('All Properties') && selectedProperties.size > 0) {
-        debugLog('🔍 Applying property filter...');
-        
-        propertyFilteredEntries = dateFilteredEntries.filter((entry: FinancialEntry) => {
-          const matches = selectedProperties.has(entry.property_class);
-          if (!matches) {
-            debugLog('🏠 Property filter:', {
-              entryProperty: entry.property_class,
-              selectedProperties: selectedPropsArray,
-              matches
-            });
-          }
-          return matches;
-        });
-        
-        debugLog('🏠 Property filtered entries:', propertyFilteredEntries.length);
-      }
-
-      // Log property distribution in results
-      const propertyDistribution = propertyFilteredEntries.reduce((acc: any, entry: FinancialEntry) => {
-        acc[entry.property_class] = (acc[entry.property_class] || 0) + 1;
-        return acc;
-      }, {});
-      
-      debugLog('📊 Property distribution in results:', propertyDistribution);
-
-      // Process P&L data
-      if (activeTab === 'p&l') {
-        const plData = processPLData(propertyFilteredEntries);
-        debugLog('📊 Processed P&L data:', plData);
-        setFinancialData(plData);
-      }
-      
-    } catch (error) {
-      debugLog('❌ Error in loadFinancialData:', error);
-      showNotification('Error loading financial data', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const processPLData = (entries: FinancialEntry[]): FinancialDataItem[] => {
-    debugLog('🧮 Processing P&L data with entries:', entries.length);
-    
-    const accountGroups: { [key: string]: FinancialEntry[] } = {};
-    
-    // Group entries by account name
-    entries.forEach(entry => {
-      if (!accountGroups[entry.account_name]) {
-        accountGroups[entry.account_name] = [];
-      }
-      accountGroups[entry.account_name].push(entry);
-    });
-
-    debugLog('📊 Account groups:', Object.keys(accountGroups));
-
-    const result: FinancialDataItem[] = [];
-
-    // Process each account group
-    Object.entries(accountGroups).forEach(([accountName, accountEntries]) => {
-      const firstEntry = accountEntries[0];
-      const accountType = firstEntry.account_type;
-      
-      // Calculate totals for accounting signs
-      const totalDebits = accountEntries.reduce((sum, entry) => sum + entry.debit_amount, 0);
-      const totalCredits = accountEntries.reduce((sum, entry) => sum + entry.credit_amount, 0);
-      
-      let accountTotal = 0;
-      let isAbnormal = false;
-      
-      // Apply proper accounting signs
-      if (accountType === 'Income') {
-        // Revenue accounts: Credits - Debits (normal credit balance)
-        accountTotal = totalCredits - totalDebits;
-        isAbnormal = accountTotal < 0; // Abnormal if debit balance
-      } else if (accountType === 'Expense') {
-        // Expense accounts: Debits - Credits (normal debit balance)  
-        accountTotal = totalDebits - totalCredits;
-        isAbnormal = accountTotal < 0; // Abnormal if credit balance
-      } else {
-        // For other account types, use the line_amount sum
-        accountTotal = accountEntries.reduce((sum, entry) => sum + entry.line_amount, 0);
-      }
-
-      debugLog(`💰 Account "${accountName}" (${accountType}):`, {
-        totalDebits,
-        totalCredits,
-        accountTotal,
-        isAbnormal,
-        entryCount: accountEntries.length
-      });
-
-      result.push({
-        name: `${accountName}${isAbnormal ? ' ⚠️' : ''}`,
-        total: accountTotal,
-        months: { [`${selectedMonth}` as MonthString]: accountTotal },
-        type: accountType,
-        detail_type: firstEntry.detail_type,
-        entries: accountEntries,
-        mapping_method: firstEntry.mapping_method || 'automatic'
-      });
-    });
-
-    // Sort by account type and total
-    result.sort((a, b) => {
-      const typeOrder = { 'Income': 1, 'Expense': 2 };
-      const aOrder = typeOrder[a.type as keyof typeof typeOrder] || 3;
-      const bOrder = typeOrder[b.type as keyof typeof typeOrder] || 3;
-      
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return Math.abs(b.total) - Math.abs(a.total);
-    });
-
-    return result;
-  };
-
-  const toggleProperty = (property: string) => {
-    debugLog('🏠 Property toggle debugging:', { 
-      property, 
-      currentSelected: Array.from(selectedProperties),
-      isCurrentlySelected: selectedProperties.has(property)
-    });
-    
-    const newSelected = new Set(selectedProperties);
-    
-    if (property === 'All Properties') {
-      debugLog('🏠 Toggling "All Properties"');
-      if (selectedProperties.has('All Properties')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Properties');
-      }
-    } else {
-      debugLog('🏠 Toggling specific property:', property);
-      newSelected.delete('All Properties');
-      
-      if (selectedProperties.has(property)) {
-        newSelected.delete(property);
-        if (newSelected.size === 0) {
-          newSelected.add('All Properties');
-        }
-      } else {
-        newSelected.add(property);
-      }
-    }
-    
-    debugLog('🏠 New selection after toggle:', Array.from(newSelected));
-    setSelectedProperties(newSelected);
-  };
-
-  const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 3000);
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const calculateKPI = (type: 'revenue' | 'expenses' | 'profit'): number => {
-    if (!financialData || financialData.length === 0) return 0;
-    
-    let value = 0;
-    
-    if (type === 'revenue') {
-      value = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'expenses') {
-      value = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'profit') {
-      const revenue = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-      const expenses = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-      value = revenue - expenses;
-    }
-    
-    debugLog(`📊 KPI ${type}:`, value);
-    return value;
-  };
-
-  const exportData = () => {
-    const csvContent = [
-      ['Account Name', 'Type', 'Amount'],
-      ...financialData.map(item => [
-        item.name,
-        item.type || '',
-        item.total.toString()
-      ])
-    ].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `financials-${selectedMonth.replace(' ', '-')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const toggleItemExpansion = (itemName: string) => {
-    const newExpanded = new Set(expandedItems);
-    if (expandedItems.has(itemName)) {
-      newExpanded.delete(itemName);
-    } else {
-      newExpanded.add(itemName);
-    }
-    setExpandedItems(newExpanded);
-  };
-
-  // Calculate totals for display
-  const revenue = calculateKPI('revenue');
-  const expenses = calculateKPI('expenses');
-  const profit = calculateKPI('profit');
-
-  return (
-    <div className="flex-1 p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Financial Dashboard</h1>
-        <p className="text-gray-600">Comprehensive financial analysis and reporting</p>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'p&l', name: 'Profit & Loss', icon: TrendingUp },
-              { id: 'cash-flow', name: 'Cash Flow', icon: BarChart3 },
-              { id: 'balance-sheet', name: 'Balance Sheet', icon: PieChart }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as FinancialTab)}
-                  className={`group inline-flex items-center px-1 py-4 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className="mr-2 h-5 w-5" />
-                  {tab.name}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Month Selector */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {['January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025', 
-              'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'].map((month) => (
-              <option key={month} value={month}>{month}</option>
-            ))}
-          </select>
-
-          {/* Property Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] text-left flex items-center justify-between"
-            >
-              <span>
-                {selectedProperties.size === 1 && selectedProperties.has('All Properties')
-                  ? 'All Properties'
-                  : selectedProperties.size === 1
-                  ? Array.from(selectedProperties)[0]
-                  : `${selectedProperties.size} Properties Selected`}
-              </span>
-              <ChevronDown className="h-4 w-4" />
-            </button>
-            
-            {showPropertyDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                {availableProperties.map((property) => (
-                  <label
-                    key={property}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProperties.has(property)}
-                      onChange={() => toggleProperty(property)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">{property}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Time View Selector */}
-          <select
-            value={timeView}
-            onChange={(e) => setTimeView(e.target.value as TimeView)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="Monthly">Monthly</option>
-            <option value="YTD">Year to Date</option>
-            <option value="TTM">Trailing 12 Months</option>
-            <option value="MoM">Month over Month</option>
-            <option value="YoY">Year over Year</option>
-          </select>
-
-          {/* View Mode Toggle */}
-          <div className="flex border border-gray-300 rounded-md">
-            <button
-              onClick={() => setViewMode('total')}
-              className={`px-3 py-2 text-sm ${
-                viewMode === 'total'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Total
-            </button>
-            <button
-              onClick={() => setViewMode('detailed')}
-              className={`px-3 py-2 text-sm ${
-                viewMode === 'detailed'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Detailed
-            </button>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => loadFinancialData()}
-            disabled={isLoading}
-            className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-          <button
-            onClick={exportData}
-            className="flex items-center px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Revenue Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Revenue</p>
-              <p className={`text-2xl font-bold ${revenue < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(revenue)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-full ${revenue < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-              <TrendingUp className={`h-6 w-6 ${revenue < 0 ? 'text-red-600' : 'text-green-600'}`} />
-            </div>
-          </div>
-        </div>
-
-        {/* Expenses Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-              <p className={`text-2xl font-bold ${expenses < 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(expenses)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-full ${expenses < 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-              <DollarSign className={`h-6 w-6 ${expenses < 0 ? 'text-green-600' : 'text-red-600'}`} />
-            </div>
-          </div>
-        </div>
-
-        {/* Net Profit Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Net Profit</p>
-              <p className={`text-2xl font-bold ${profit < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(profit)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-full ${profit < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-              <BarChart3 className={`h-6 w-6 ${profit < 0 ? 'text-red-600' : 'text-green-600'}`} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Financial Data Table */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            {activeTab === 'p&l' ? 'Profit & Loss Statement' : 
-             activeTab === 'cash-flow' ? 'Cash Flow Statement' : 
-             'Balance Sheet'}
-          </h3>
-        </div>
-        
-        <div className="overflow-x-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-              <span className="ml-2 text-gray-600">Loading financial data...</span>
-            </div>
-          ) : financialData.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No financial data available for the selected period.</p>
-            </div>
-          ) : (
-            <table className="min-w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{selectedMonth}</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Revenue</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-
-No problem! Let me continue with the complete updated code. Here's the full page.tsx with all our debugging features:
-
-"use client";
-
-import React, { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
-import { supabaseQueries, testSupabaseConnection, type FinancialEntry } from '@/lib/supabase';
-
-// IAM CFO Brand Colors
-const BRAND_COLORS = {
-  primary: '#56B6E9',
-  secondary: '#3A9BD1',
-  tertiary: '#7CC4ED',
-  accent: '#2E86C1',
-  success: '#27AE60',
-  warning: '#F39C12',
-  danger: '#E74C3C',
-  gray: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475569',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A'
-  }
-};
-
-// Type definitions
-type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
-type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
-type ViewMode = 'total' | 'detailed';
-type MonthString = `${'January' | 'February' | 'March' | 'April' | 'May' | 'June' | 
-                   'July' | 'August' | 'September' | 'October' | 'November' | 'December'} ${number}`;
-
-interface FinancialDataItem {
-  name: string;
-  total: number;
-  months: Partial<Record<MonthString, number>>;
-  type?: string;
-  original_type?: string;
-  detail_type?: string;
-  entries?: any[];
-  mapping_method?: string;
-}
-
-interface FinancialEntry {
-  id: number;
-  je_number: string;
-  transaction_date: string;
-  account_name: string;
-  account_type: string;
-  detail_type: string;
-  property_class: string;
-  debit_amount: number;
-  credit_amount: number;
-  line_amount: number;
-  posting_type: string;
-  description: string;
-  balance: number;
-  created_by: string;
-  last_modified: string;
-  created_at: string;
-  updated_at: string;
-  classification?: string;
-  mapping_method?: string;
-}
-
-interface NotificationState {
-  show: boolean;
-  message: string;
-  type: 'info' | 'success' | 'error';
-}
-
-interface TooltipState {
-  show: boolean;
-  content: string;
-  x: number;
-  y: number;
-}
-
-const FinancialsPage = () => {
-  // State variables
-  const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [timeView, setTimeView] = useState<TimeView>('Monthly');
-  const [viewMode, setViewMode] = useState<ViewMode>('total');
-  const [selectedMonth, setSelectedMonth] = useState<string>('May 2025');
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
-  const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
-  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [financialData, setFinancialData] = useState<FinancialDataItem[]>([]);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  const [tooltip, setTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
-
-  // Debug logging function
-  const debugLog = (...args: any[]) => {
-    console.log('🔍 FINANCIALS DEBUG:', ...args);
-  };
-
-  // Initialize and load data
-  useEffect(() => {
-    debugLog('🚀 Component initialized, loading initial data...');
-    loadFinancialData();
-  }, []);
-
-  // Load data when filters change
-  useEffect(() => {
-    debugLog('📊 Filters changed, reloading data...', {
-      selectedMonth,
-      selectedProperties: Array.from(selectedProperties),
-      activeTab
-    });
-    loadFinancialData();
-  }, [selectedMonth, selectedProperties, activeTab]);
-
-  // Load available properties
-  useEffect(() => {
-    loadAvailableProperties();
-  }, []);
-
-  const loadAvailableProperties = async () => {
-    try {
-      debugLog('🏠 Loading available properties...');
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error loading properties:', error);
-        return;
-      }
-
-      // Extract unique properties and deduplicate
-      const properties = Array.from(new Set(
-        entries?.map((entry: FinancialEntry) => entry.property_class).filter(Boolean) || []
-      ));
-      
-      debugLog('🏠 Raw properties from database:', properties);
-      
-      // Remove duplicates and sort
-      const uniqueProperties = Array.from(new Set(properties)).sort();
-      const propertiesWithAll = ['All Properties', ...uniqueProperties];
-      
-      debugLog('🏠 Processed unique properties:', propertiesWithAll);
-      setAvailableProperties(propertiesWithAll);
-      
-    } catch (error) {
-      debugLog('❌ Exception loading properties:', error);
-    }
-  };
-
-  const loadFinancialData = async () => {
-    setIsLoading(true);
-    try {
-      debugLog('📊 Starting financial data load...', {
-        selectedMonth,
-        selectedProperties: Array.from(selectedProperties),
-        activeTab
-      });
-
-      // Test connection first
-      const connectionTest = await testSupabaseConnection();
-      debugLog('🔌 Supabase connection test:', connectionTest);
-
-      // Parse selected month
-      const [monthName, yearStr] = selectedMonth.split(' ');
-      const year = parseInt(yearStr);
-      const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-      
-      debugLog('📅 Date parsing:', { monthName, year, monthIndex });
-
-      // Create date range for the selected month
-      const startDate = new Date(year, monthIndex, 1);
-      const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
-      
-      debugLog('📅 Date range:', { 
-        startDate: startDate.toISOString(), 
-        endDate: endDate.toISOString() 
-      });
-
-      // Get journal entries
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error fetching journal entries:', error);
-        throw error;
-      }
-
-      debugLog('📊 Raw journal entries count:', entries?.length || 0);
-
-      if (!entries || entries.length === 0) {
-        debugLog('⚠️ No journal entries found');
-        setFinancialData([]);
-        return;
-      }
-
-      // Filter by date range
-      const dateFilteredEntries = entries.filter((entry: FinancialEntry) => {
-        const entryDate = new Date(entry.transaction_date);
-        const isInRange = entryDate >= startDate && entryDate <= endDate;
-        
-        if (!isInRange) {
-          debugLog('📅 Date filter debug:', {
-            entryDate: entryDate.toISOString(),
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            isInRange,
-            entry: entry.transaction_date
-          });
-        }
-        
-        return isInRange;
-      });
-
-      debugLog('📅 Date filtered entries:', dateFilteredEntries.length);
-
-      // Property filtering with detailed debugging
-      let propertyFilteredEntries = dateFilteredEntries;
-      const selectedPropsArray = Array.from(selectedProperties);
-      
-      debugLog('🏠 Property filtering:', {
-        selectedProperties: selectedPropsArray,
-        isAllProperties: selectedProperties.has('All Properties'),
-        selectedSize: selectedProperties.size
-      });
-
-      if (!selectedProperties.has('All Properties') && selectedProperties.size > 0) {
-        debugLog('🔍 Applying property filter...');
-        
-        propertyFilteredEntries = dateFilteredEntries.filter((entry: FinancialEntry) => {
-          const matches = selectedProperties.has(entry.property_class);
-          if (!matches) {
-            debugLog('🏠 Property filter:', {
-              entryProperty: entry.property_class,
-              selectedProperties: selectedPropsArray,
-              matches
-            });
-          }
-          return matches;
-        });
-        
-        debugLog('🏠 Property filtered entries:', propertyFilteredEntries.length);
-      }
-
-      // Log property distribution in results
-      const propertyDistribution = propertyFilteredEntries.reduce((acc: any, entry: FinancialEntry) => {
-        acc[entry.property_class] = (acc[entry.property_class] || 0) + 1;
-        return acc;
-      }, {});
-      
-      debugLog('📊 Property distribution in results:', propertyDistribution);
-
-      // Process P&L data
-      if (activeTab === 'p&l') {
-        const plData = processPLData(propertyFilteredEntries);
-        debugLog('📊 Processed P&L data:', plData);
-        setFinancialData(plData);
-      }
-      
-    } catch (error) {
-      debugLog('❌ Error in loadFinancialData:', error);
-      showNotification('Error loading financial data', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const processPLData = (entries: FinancialEntry[]): FinancialDataItem[] => {
-    debugLog('🧮 Processing P&L data with entries:', entries.length);
-    
-    const accountGroups: { [key: string]: FinancialEntry[] } = {};
-    
-    // Group entries by account name
-    entries.forEach(entry => {
-      if (!accountGroups[entry.account_name]) {
-        accountGroups[entry.account_name] = [];
-      }
-      accountGroups[entry.account_name].push(entry);
-    });
-
-    debugLog('📊 Account groups:', Object.keys(accountGroups));
-
-    const result: FinancialDataItem[] = [];
-
-    // Process each account group
-    Object.entries(accountGroups).forEach(([accountName, accountEntries]) => {
-      const firstEntry = accountEntries[0];
-      const accountType = firstEntry.account_type;
-      
-      // Calculate totals for accounting signs
-      const totalDebits = accountEntries.reduce((sum, entry) => sum + entry.debit_amount, 0);
-      const totalCredits = accountEntries.reduce((sum, entry) => sum + entry.credit_amount, 0);
-      
-      let accountTotal = 0;
-      let isAbnormal = false;
-      
-      // Apply proper accounting signs
-      if (accountType === 'Income') {
-        // Revenue accounts: Credits - Debits (normal credit balance)
-        accountTotal = totalCredits - totalDebits;
-        isAbnormal = accountTotal < 0; // Abnormal if debit balance
-      } else if (accountType === 'Expense') {
-        // Expense accounts: Debits - Credits (normal debit balance)  
-        accountTotal = totalDebits - totalCredits;
-        isAbnormal = accountTotal < 0; // Abnormal if credit balance
-      } else {
-        // For other account types, use the line_amount sum
-        accountTotal = accountEntries.reduce((sum, entry) => sum + entry.line_amount, 0);
-      }
-
-      debugLog(`💰 Account "${accountName}" (${accountType}):`, {
-        totalDebits,
-        totalCredits,
-        accountTotal,
-        isAbnormal,
-        entryCount: accountEntries.length
-      });
-
-      result.push({
-        name: `${accountName}${isAbnormal ? ' ⚠️' : ''}`,
-        total: accountTotal,
-        months: { [`${selectedMonth}` as MonthString]: accountTotal },
-        type: accountType,
-        detail_type: firstEntry.detail_type,
-        entries: accountEntries,
-        mapping_method: firstEntry.mapping_method || 'automatic'
-      });
-    });
-
-    // Sort by account type and total
-    result.sort((a, b) => {
-      const typeOrder = { 'Income': 1, 'Expense': 2 };
-      const aOrder = typeOrder[a.type as keyof typeof typeOrder] || 3;
-      const bOrder = typeOrder[b.type as keyof typeof typeOrder] || 3;
-      
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return Math.abs(b.total) - Math.abs(a.total);
-    });
-
-    return result;
-  };
-
-  const toggleProperty = (property: string) => {
-    debugLog('🏠 Property toggle debugging:', { 
-      property, 
-      currentSelected: Array.from(selectedProperties),
-      isCurrentlySelected: selectedProperties.has(property)
-    });
-    
-    const newSelected = new Set(selectedProperties);
-    
-    if (property === 'All Properties') {
-      debugLog('🏠 Toggling "All Properties"');
-      if (selectedProperties.has('All Properties')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Properties');
-      }
-    } else {
-      debugLog('🏠 Toggling specific property:', property);
-      newSelected.delete('All Properties');
-      
-      if (selectedProperties.has(property)) {
-        newSelected.delete(property);
-        if (newSelected.size === 0) {
-          newSelected.add('All Properties');
-        }
-      } else {
-        newSelected.add(property);
-      }
-    }
-    
-    debugLog('🏠 New selection after toggle:', Array.from(newSelected));
-    setSelectedProperties(newSelected);
-  };
-
-  const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 3000);
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const calculateKPI = (type: 'revenue' | 'expenses' | 'profit'): number => {
-    if (!financialData || financialData.length === 0) return 0;
-    
-    let value = 0;
-    
-    if (type === 'revenue') {
-      value = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'expenses') {
-      value = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'profit') {
-      const revenue = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-      const expenses = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-      value = revenue - expenses;
-    }
-    
-    debugLog(`📊 KPI ${type}:`, value);
-    return value;
-  };
-
-  const exportData = () => {
-    const csvContent = [
-      ['Account Name', 'Type', 'Amount'],
-      ...financialData.map(item => [
-        item.name,
-        item.type || '',
-        item.total.toString()
-      ])
-    ].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `financials-${selectedMonth.replace(' ', '-')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const toggleItemExpansion = (itemName: string) => {
-    const newExpanded = new Set(expandedItems);
-    if (expandedItems.has(itemName)) {
-      newExpanded.delete(itemName);
-    } else {
-      newExpanded.add(itemName);
-    }
-    setExpandedItems(newExpanded);
-  };
-
-  // Calculate totals for display
-  const revenue = calculateKPI('revenue');
-  const expenses = calculateKPI('expenses');
-  const profit = calculateKPI('profit');
-
-  return (
-    <div className="flex-1 p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Financial Dashboard</h1>
-        <p className="text-gray-600">Comprehensive financial analysis and reporting</p>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'p&l', name: 'Profit & Loss', icon: TrendingUp },
-              { id: 'cash-flow', name: 'Cash Flow', icon: BarChart3 },
-              { id: 'balance-sheet', name: 'Balance Sheet', icon: PieChart }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as FinancialTab)}
-                  className={`group inline-flex items-center px-1 py-4 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className="mr-2 h-5 w-5" />
-                  {tab.name}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Month Selector */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {['January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025', 
-              'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'].map((month) => (
-              <option key={month} value={month}>{month}</option>
-            ))}
-          </select>
-
-          {/* Property Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] text-left flex items-center justify-between"
-            >
-              <span>
-                {selectedProperties.size === 1 && selectedProperties.has('All Properties')
-                  ? 'All Properties'
-                  : selectedProperties.size === 1
-                  ? Array.from(selectedProperties)[0]
-                  : `${selectedProperties.size} Properties Selected`}
-              </span>
-              <ChevronDown className="h-4 w-4" />
-            </button>
-            
-            {showPropertyDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                {availableProperties.map((property) => (
-                  <label
-                    key={property}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProperties.has(property)}
-                      onChange={() => toggleProperty(property)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">{property}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Time View Selector */}
-          <select
-            value={timeView}
-            onChange={(e) => setTimeView(e.target.value as TimeView)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="Monthly">Monthly</option>
-            <option value="YTD">Year to Date</option>
-            <option value="TTM">Trailing 12 Months</option>
-            <option value="MoM">Month over Month</option>
-            <option value="YoY">Year over Year</option>
-          </select>
-
-          {/* View Mode Toggle */}
-          <div className="flex border border-gray-300 rounded-md">
-            <button
-              onClick={() => setViewMode('total')}
-              className={`px-3 py-2 text-sm ${
-                viewMode === 'total'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Total
-            </button>
-            <button
-              onClick={() => setViewMode('detailed')}
-              className={`px-3 py-2 text-sm ${
-                viewMode === 'detailed'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Detailed
-            </button>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => loadFinancialData()}
-            disabled={isLoading}
-            className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-          <button
-            onClick={exportData}
-            className="flex items-center px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Revenue Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Revenue</p>
-              <p className={`text-2xl font-bold ${revenue < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(revenue)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-full ${revenue < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-              <TrendingUp className={`h-6 w-6 ${revenue < 0 ? 'text-red-600' : 'text-green-600'}`} />
-            </div>
-          </div>
-        </div>
-
-        {/* Expenses Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-              <p className={`text-2xl font-bold ${expenses < 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(expenses)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-full ${expenses < 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-              <DollarSign className={`h-6 w-6 ${expenses < 0 ? 'text-green-600' : 'text-red-600'}`} />
-            </div>
-          </div>
-        </div>
-
-        {/* Net Profit Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Net Profit</p>
-              <p className={`text-2xl font-bold ${profit < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(profit)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-full ${profit < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-              <BarChart3 className={`h-6 w-6 ${profit < 0 ? 'text-red-600' : 'text-green-600'}`} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Financial Data Table */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            {activeTab === 'p&l' ? 'Profit & Loss Statement' : 
-             activeTab === 'cash-flow' ? 'Cash Flow Statement' : 
-             'Balance Sheet'}
-          </h3>
-        </div>
-        
-        <div className="overflow-x-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-              <span className="ml-2 text-gray-600">Loading financial data...</span>
-            </div>
-          ) : financialData.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No financial data available for the selected period.</p>
-            </div>
-          ) : (
-            <table className="min-w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{selectedMonth}</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Revenue</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {financialData.map((item, index) => {
-                  const isExpanded = expandedItems.has(item.name);
-                  const percentOfRevenue = revenue !== 0 ? (item.total / revenue) * 100 : 0;
-                  
-                  return (
-                    <React.Fragment key={index}>
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {viewMode === 'detailed' && item.entries && item.entries.length > 1 && (
-                              <button
-                                onClick={() => toggleItemExpansion(item.name)}
-                                className="mr-2 p-1 hover:bg-gray-200 rounded"
-                              >
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                              </button>
-                            )}
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                              <div className="text-sm text-gray-500">{item.type}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium ${
-                          item.total < 0 ? 'text-red-600' : 'text-gray-900'
-                        }`}>
-                          {formatCurrency(item.total)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                          {percentOfRevenue.toFixed(1)}%
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            {item.mapping_method || 'auto'}
-                          </span>
-                        </td>
-                      </tr>
-                      
-                      {/* Expanded entries */}
-                      {isExpanded && item.entries && (
-                        item.entries.map((entry: FinancialEntry, entryIndex: number) => (
-                          <tr key={`${index}-${entryIndex}`} className="bg-gray-50">
-                            <td className="px-12 py-2 text-sm text-gray-600">
-                              {entry.description || entry.je_number}
-                            </td>
-                            <td className="px-6 py-2 text-right text-sm text-gray-600">
-                              {formatCurrency(entry.line_amount)}
-                            </td>
-                            <td className="px-6 py-2 text-right text-sm text-gray-500">
-                              {entry.property_class}
-                            </td>
-                            <td className="px-6 py-2 text-center text-sm text-gray-500">
-                              {new Date(entry.transaction_date).toLocaleDateString()}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
           )}
-        
-No problem! Let me continue with the complete updated code. Here's the full page.tsx with all our debugging features:
-
-"use client";
-
-import React, { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
-import { supabaseQueries, testSupabaseConnection, type FinancialEntry } from '@/lib/supabase';
-
-// IAM CFO Brand Colors
-const BRAND_COLORS = {
-  primary: '#56B6E9',
-  secondary: '#3A9BD1',
-  tertiary: '#7CC4ED',
-  accent: '#2E86C1',
-  success: '#27AE60',
-  warning: '#F39C12',
-  danger: '#E74C3C',
-  gray: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475569',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A'
-  }
-};
-
-// Type definitions
-type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
-type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
-type ViewMode = 'total' | 'detailed';
-type MonthString = `${'January' | 'February' | 'March' | 'April' | 'May' | 'June' | 
-                   'July' | 'August' | 'September' | 'October' | 'November' | 'December'} ${number}`;
-
-interface FinancialDataItem {
-  name: string;
-  total: number;
-  months: Partial<Record<MonthString, number>>;
-  type?: string;
-  original_type?: string;
-  detail_type?: string;
-  entries?: any[];
-  mapping_method?: string;
-}
-
-interface FinancialEntry {
-  id: number;
-  je_number: string;
-  transaction_date: string;
-  account_name: string;
-  account_type: string;
-  detail_type: string;
-  property_class: string;
-  debit_amount: number;
-  credit_amount: number;
-  line_amount: number;
-  posting_type: string;
-  description: string;
-  balance: number;
-  created_by: string;
-  last_modified: string;
-  created_at: string;
-  updated_at: string;
-  classification?: string;
-  mapping_method?: string;
-}
-
-interface NotificationState {
-  show: boolean;
-  message: string;
-  type: 'info' | 'success' | 'error';
-}
-
-interface TooltipState {
-  show: boolean;
-  content: string;
-  x: number;
-  y: number;
-}
-
-const FinancialsPage = () => {
-  // State variables
-  const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [timeView, setTimeView] = useState<TimeView>('Monthly');
-  const [viewMode, setViewMode] = useState<ViewMode>('total');
-  const [selectedMonth, setSelectedMonth] = useState<string>('May 2025');
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
-  const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
-  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [financialData, setFinancialData] = useState<FinancialDataItem[]>([]);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  const [tooltip, setTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
-
-  // Debug logging function
-  const debugLog = (...args: any[]) => {
-    console.log('🔍 FINANCIALS DEBUG:', ...args);
-  };
-
-  // Initialize and load data
-  useEffect(() => {
-    debugLog('🚀 Component initialized, loading initial data...');
-    loadFinancialData();
-  }, []);
-
-  // Load data when filters change
-  useEffect(() => {
-    debugLog('📊 Filters changed, reloading data...', {
-      selectedMonth,
-      selectedProperties: Array.from(selectedProperties),
-      activeTab
-    });
-    loadFinancialData();
-  }, [selectedMonth, selectedProperties, activeTab]);
-
-  // Load available properties
-  useEffect(() => {
-    loadAvailableProperties();
-  }, []);
-
-  const loadAvailableProperties = async () => {
-    try {
-      debugLog('🏠 Loading available properties...');
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error loading properties:', error);
-        return;
-      }
-
-      // Extract unique properties and deduplicate
-      const properties = Array.from(new Set(
-        entries?.map((entry: FinancialEntry) => entry.property_class).filter(Boolean) || []
-      ));
-      
-      debugLog('🏠 Raw properties from database:', properties);
-      
-      // Remove duplicates and sort
-      const uniqueProperties = Array.from(new Set(properties)).sort();
-      const propertiesWithAll = ['All Properties', ...uniqueProperties];
-      
-      debugLog('🏠 Processed unique properties:', propertiesWithAll);
-      setAvailableProperties(propertiesWithAll);
-      
-    } catch (error) {
-      debugLog('❌ Exception loading properties:', error);
-    }
-  };
-
-  const loadFinancialData = async () => {
-    setIsLoading(true);
-    try {
-      debugLog('📊 Starting financial data load...', {
-        selectedMonth,
-        selectedProperties: Array.from(selectedProperties),
-        activeTab
-      });
-
-      // Test connection first
-      const connectionTest = await testSupabaseConnection();
-      debugLog('🔌 Supabase connection test:', connectionTest);
-
-      // Parse selected month
-      const [monthName, yearStr] = selectedMonth.split(' ');
-      const year = parseInt(yearStr);
-      const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-      
-      debugLog('📅 Date parsing:', { monthName, year, monthIndex });
-
-      // Create date range for the selected month
-      const startDate = new Date(year, monthIndex, 1);
-      const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
-      
-      debugLog('📅 Date range:', { 
-        startDate: startDate.toISOString(), 
-        endDate: endDate.toISOString() 
-      });
-
-      // Get journal entries
-      const { data: entries, error } = await supabaseQueries.getJournalEntries();
-      
-      if (error) {
-        debugLog('❌ Error fetching journal entries:', error);
-        throw error;
-      }
-
-      debugLog('📊 Raw journal entries count:', entries?.length || 0);
-
-      if (!entries || entries.length === 0) {
-        debugLog('⚠️ No journal entries found');
-        setFinancialData([]);
-        return;
-      }
-
-      // Filter by date range
-      const dateFilteredEntries = entries.filter((entry: FinancialEntry) => {
-        const entryDate = new Date(entry.transaction_date);
-        const isInRange = entryDate >= startDate && entryDate <= endDate;
-        
-        if (!isInRange) {
-          debugLog('📅 Date filter debug:', {
-            entryDate: entryDate.toISOString(),
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            isInRange,
-            entry: entry.transaction_date
-          });
-        }
-        
-        return isInRange;
-      });
-
-      debugLog('📅 Date filtered entries:', dateFilteredEntries.length);
-
-      // Property filtering with detailed debugging
-      let propertyFilteredEntries = dateFilteredEntries;
-      const selectedPropsArray = Array.from(selectedProperties);
-      
-      debugLog('🏠 Property filtering:', {
-        selectedProperties: selectedPropsArray,
-        isAllProperties: selectedProperties.has('All Properties'),
-        selectedSize: selectedProperties.size
-      });
-
-      if (!selectedProperties.has('All Properties') && selectedProperties.size > 0) {
-        debugLog('🔍 Applying property filter...');
-        
-        propertyFilteredEntries = dateFilteredEntries.filter((entry: FinancialEntry) => {
-          const matches = selectedProperties.has(entry.property_class);
-          if (!matches) {
-            debugLog('🏠 Property filter:', {
-              entryProperty: entry.property_class,
-              selectedProperties: selectedPropsArray,
-              matches
-            });
-          }
-          return matches;
-        });
-        
-        debugLog('🏠 Property filtered entries:', propertyFilteredEntries.length);
-      }
-
-      // Log property distribution in results
-      const propertyDistribution = propertyFilteredEntries.reduce((acc: any, entry: FinancialEntry) => {
-        acc[entry.property_class] = (acc[entry.property_class] || 0) + 1;
-        return acc;
-      }, {});
-      
-      debugLog('📊 Property distribution in results:', propertyDistribution);
-
-      // Process P&L data
-      if (activeTab === 'p&l') {
-        const plData = processPLData(propertyFilteredEntries);
-        debugLog('📊 Processed P&L data:', plData);
-        setFinancialData(plData);
-      }
-      
-    } catch (error) {
-      debugLog('❌ Error in loadFinancialData:', error);
-      showNotification('Error loading financial data', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const processPLData = (entries: FinancialEntry[]): FinancialDataItem[] => {
-    debugLog('🧮 Processing P&L data with entries:', entries.length);
-    
-    const accountGroups: { [key: string]: FinancialEntry[] } = {};
-    
-    // Group entries by account name
-    entries.forEach(entry => {
-      if (!accountGroups[entry.account_name]) {
-        accountGroups[entry.account_name] = [];
-      }
-      accountGroups[entry.account_name].push(entry);
-    });
-
-    debugLog('📊 Account groups:', Object.keys(accountGroups));
-
-    const result: FinancialDataItem[] = [];
-
-    // Process each account group
-    Object.entries(accountGroups).forEach(([accountName, accountEntries]) => {
-      const firstEntry = accountEntries[0];
-      const accountType = firstEntry.account_type;
-      
-      // Calculate totals for accounting signs
-      const totalDebits = accountEntries.reduce((sum, entry) => sum + entry.debit_amount, 0);
-      const totalCredits = accountEntries.reduce((sum, entry) => sum + entry.credit_amount, 0);
-      
-      let accountTotal = 0;
-      let isAbnormal = false;
-      
-      // Apply proper accounting signs
-      if (accountType === 'Income') {
-        // Revenue accounts: Credits - Debits (normal credit balance)
-        accountTotal = totalCredits - totalDebits;
-        isAbnormal = accountTotal < 0; // Abnormal if debit balance
-      } else if (accountType === 'Expense') {
-        // Expense accounts: Debits - Credits (normal debit balance)  
-        accountTotal = totalDebits - totalCredits;
-        isAbnormal = accountTotal < 0; // Abnormal if credit balance
-      } else {
-        // For other account types, use the line_amount sum
-        accountTotal = accountEntries.reduce((sum, entry) => sum + entry.line_amount, 0);
-      }
-
-      debugLog(`💰 Account "${accountName}" (${accountType}):`, {
-        totalDebits,
-        totalCredits,
-        accountTotal,
-        isAbnormal,
-        entryCount: accountEntries.length
-      });
-
-      result.push({
-        name: `${accountName}${isAbnormal ? ' ⚠️' : ''}`,
-        total: accountTotal,
-        months: { [`${selectedMonth}` as MonthString]: accountTotal },
-        type: accountType,
-        detail_type: firstEntry.detail_type,
-        entries: accountEntries,
-        mapping_method: firstEntry.mapping_method || 'automatic'
-      });
-    });
-
-    // Sort by account type and total
-    result.sort((a, b) => {
-      const typeOrder = { 'Income': 1, 'Expense': 2 };
-      const aOrder = typeOrder[a.type as keyof typeof typeOrder] || 3;
-      const bOrder = typeOrder[b.type as keyof typeof typeOrder] || 3;
-      
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return Math.abs(b.total) - Math.abs(a.total);
-    });
-
-    return result;
-  };
-
-  const toggleProperty = (property: string) => {
-    debugLog('🏠 Property toggle debugging:', { 
-      property, 
-      currentSelected: Array.from(selectedProperties),
-      isCurrentlySelected: selectedProperties.has(property)
-    });
-    
-    const newSelected = new Set(selectedProperties);
-    
-    if (property === 'All Properties') {
-      debugLog('🏠 Toggling "All Properties"');
-      if (selectedProperties.has('All Properties')) {
-        newSelected.clear();
-      } else {
-        newSelected.clear();
-        newSelected.add('All Properties');
-      }
-    } else {
-      debugLog('🏠 Toggling specific property:', property);
-      newSelected.delete('All Properties');
-      
-      if (selectedProperties.has(property)) {
-        newSelected.delete(property);
-        if (newSelected.size === 0) {
-          newSelected.add('All Properties');
-        }
-      } else {
-        newSelected.add(property);
-      }
-    }
-    
-    debugLog('🏠 New selection after toggle:', Array.from(newSelected));
-    setSelectedProperties(newSelected);
-  };
-
-  const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 3000);
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const calculateKPI = (type: 'revenue' | 'expenses' | 'profit'): number => {
-    if (!financialData || financialData.length === 0) return 0;
-    
-    let value = 0;
-    
-    if (type === 'revenue') {
-      value = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'expenses') {
-      value = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-    } else if (type === 'profit') {
-      const revenue = financialData
-        .filter(item => item.type === 'Income')
-        .reduce((sum, item) => sum + item.total, 0);
-      const expenses = financialData
-        .filter(item => item.type === 'Expense')
-        .reduce((sum, item) => sum + item.total, 0);
-      value = revenue - expenses;
-    }
-    
-    debugLog(`📊 KPI ${type}:`, value);
-    return value;
-  };
-
-  const exportData = () => {
-    const csvContent = [
-      ['Account Name', 'Type', 'Amount'],
-      ...financialData.map(item => [
-        item.name,
-        item.type || '',
-        item.total.toString()
-      ])
-    ].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `financials-${selectedMonth.replace(' ', '-')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const toggleItemExpansion = (itemName: string) => {
-    const newExpanded = new Set(expandedItems);
-    if (expandedItems.has(itemName)) {
-      newExpanded.delete(itemName);
-    } else {
-      newExpanded.add(itemName);
-    }
-    setExpandedItems(newExpanded);
-  };
-
-  // Calculate totals for display
-  const revenue = calculateKPI('revenue');
-  const expenses = calculateKPI('expenses');
-  const profit = calculateKPI('profit');
-
-  return (
-    <div className="flex-1 p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Financial Dashboard</h1>
-        <p className="text-gray-600">Comprehensive financial analysis and reporting</p>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'p&l', name: 'Profit & Loss', icon: TrendingUp },
-              { id: 'cash-flow', name: 'Cash Flow', icon: BarChart3 },
-              { id: 'balance-sheet', name: 'Balance Sheet', icon: PieChart }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as FinancialTab)}
-                  className={`group inline-flex items-center px-1 py-4 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className="mr-2 h-5 w-5" />
-                  {tab.name}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Month Selector */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {['January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025', 
-              'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'].map((month) => (
-              <option key={month} value={month}>{month}</option>
-            ))}
-          </select>
-
-          {/* Property Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] text-left flex items-center justify-between"
-            >
-              <span>
-                {selectedProperties.size === 1 && selectedProperties.has('All Properties')
-                  ? 'All Properties'
-                  : selectedProperties.size === 1
-                  ? Array.from(selectedProperties)[0]
-                  : `${selectedProperties.size} Properties Selected`}
-              </span>
-              <ChevronDown className="h-4 w-4" />
-            </button>
-            
-            {showPropertyDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                {availableProperties.map((property) => (
-                  <label
-                    key={property}
-                    className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProperties.has(property)}
-                      onChange={() => toggleProperty(property)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">{property}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Time View Selector */}
           <select
             value={timeView}
             onChange={(e) => setTimeView(e.target.value as TimeView)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
           >
-            <option value="Monthly">Monthly</option>
-            <option value="YTD">Year to Date</option>
-            <option value="TTM">Trailing 12 Months</option>
-            <option value="MoM">Month over Month</option>
-            <option value="YoY">Year over Year</option>
-          </select>
+            {["Monthly", "YTD", "TTM", "Quarterly"].map((
+Here is PART 4 of your Financials page code:
 
-          {/* View Mode Toggle */}
-          <div className="flex border border-gray-300 rounded-md">
-            <button
-              onClick={() => setViewMode('total')}
-              className={`px-3 py-2 text-sm ${
-                viewMode === 'total'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Total
-            </button>
-            <button
-              onClick={() => setViewMode('detailed')}
-              className={`px-3 py-2 text-sm ${
-                viewMode === 'detailed'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Detailed
-            </button>
+  // ====== ACCOUNT TREE & DATA AGGREGATION ======
+  const accountTree = useMemo(() => {
+    if (!coa.length || !journalEntries.length) return [];
+    return buildAccountTree(coa, journalEntries);
+  }, [coa, journalEntries]);
+
+  // ====== KPI CALCULATIONS (P&L Example) ======
+  const kpis = useMemo(() => {
+    let revenue = 0,
+      cogs = 0,
+      operatingExpenses = 0,
+      netIncome = 0;
+    function walk(node: AccountNode) {
+      if (node.type === "Revenue") revenue += node.total;
+      if (node.type === "Expenses") operatingExpenses += node.total;
+      node.children.forEach(walk);
+    }
+    accountTree.forEach(walk);
+    netIncome = revenue - operatingExpenses;
+    return {
+      revenue,
+      operatingExpenses,
+      netIncome,
+      grossMargin: revenue ? ((revenue - cogs) / revenue) * 100 : 0,
+      netMargin: revenue ? (netIncome / revenue) * 100 : 0,
+    };
+  }, [accountTree]);
+
+  // ====== EXPORT TO CSV ======
+  function exportToCSV() {
+    let rows: any[] = [];
+    function walk(node: AccountNode, depth = 0) {
+      rows.push({
+        Account: "  ".repeat(depth) + node.name,
+        Total: node.total,
+        ...node.months,
+      });
+      node.children.forEach((child) => walk(child, depth + 1));
+    }
+    accountTree.forEach((node) => walk(node));
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "financials.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ====== UI HELPERS ======
+  function showNotification(message: string, type: "info" | "success" | "error" = "info") {
+    setNotification({ show: true, message, type });
+    setTimeout(() => setNotification({ show: false, message: "", type: "info" }), 3000);
+  }
+
+  function toggleAccountExpansion(accountFullName: string) {
+    setExpandedAccounts((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountFullName)) next.delete(accountFullName);
+      else next.add(accountFullName);
+      return next;
+    });
+  }
+
+  // ====== MAIN RENDER ======
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center">
+          <IAMCFOLogo className="w-10 h-10 mr-4" />
+          <div>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
+              <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
+                Financial Management
+              </span>
+              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                Supabase Connected
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">
+              Real-time Financials • {journalEntries.length} entries loaded
+            </p>
           </div>
         </div>
+      </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => loadFinancialData()}
-            disabled={isLoading}
-            className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+      {/* Controls */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-wrap gap-4 items-center mb-6">
+          {/* Month Selector */}
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-          <button
-            onClick={exportData}
-            className="flex items-center px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+            {Array.from({ length: 36 }).map((_, i) => {
+              const m = dayjs().subtract(i, "month").format("MMMM YYYY");
+              return (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              );
+            })}
+          </select>
+          {/* Property Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setPropertyDropdownOpen((v) => !v)}
+              className="flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+            >
+              {selectedProperties.size === 1
+                ? Array.from(selectedProperties)[0]
+                : `${selectedProperties.size} Properties`}
+              <ChevronDown className="w-4 h-4 ml-2" />
+            </button>
+            {propertyDropdownOpen && (
+              <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 w-56 max-h-60 overflow-y-auto">
+                {properties.map((p) => (
+                  <div
+                    key={p}
+                    className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                    onClick={() => {
+                      const next = new Set(selectedProperties);
+                      if (p === "All Properties") {
+                        next.clear();
+                        next.add("All Properties");
+                      } else {
+                        next.delete("All Properties");
+                        if (next.has(p)) next.delete(p);
+                        else next.add(p);
+                        if (next.size === 0) next.add("All Properties");
+                      }
+                      setSelectedProperties(next);
+                      setPropertyDropdownOpen(false);
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedProperties.has(p)}
+                      readOnly
+                      className="mr-3 h-4 w-4 border-gray-300 rounded"
+                      style={{ accentColor: BRAND_COLORS.primary }}
+                    />
+                    <span>{p}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Bank Selector (Cash Flow) */}
+          {activeTab === "cash-flow" && (
+            <div className="relative">
+              <button
+                onClick={() => setBankDropdownOpen((v) => !v)}
+                className="flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+              >
+                {selectedBanks.size === 1
+                  ? Array.from(selectedBanks)[0]
+                  : `${selectedBanks.size} Banks`}
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </button>
+              {bankDropdownOpen && (
+                <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 w-56 max-h-60 overflow-y-auto">
+                  {bankAccounts.map((b) => (
+                    <div
+                      key={b}
+                      className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                      onClick={() => {
+                        const next = new Set(selectedBanks);
+                        if (b === "All Accounts") {
+                          next.clear();
+                          next.add("All Accounts");
+                        } else {
+                          next.delete("All Accounts");
+                          if (next.has(b)) next.delete(b);
+                          else next.add(b);
+                          if (next.size === 0) next.add("All Accounts");
+                        }
+                        setSelectedBanks(next);
+                        setBankDropdownOpen(false);
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedBanks.has(b)}
+                        readOnly
+                        className="mr-3 h-4 w-4 border-gray-300 rounded"
+                        style={{ accentColor: BRAND_COLORS.primary }}
+                      />
+                      <span>{b}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {/* Time View Selector */}
+          <select
+            value={timeView}
+            onChange={(e) => setTimeView(e.target.value as TimeView)}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
           >
-            <Download className="mr-2 h-4 w-4" />
+            {["Monthly", "YTD", "TTM", "Quarterly"].map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+          {/* View Mode */}
+          <select
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value as ViewMode)}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+          >
+            <option value="detailed">Detailed</option>
+            <option value="total">Total</option>
+          </select>
+          {/* Export Button */}
+          <button
+            onClick={exportToCSV}
+            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg"
+            style={{ backgroundColor: BRAND_COLORS.primary }}
+          >
+            <Download className="w-4 h-4" />
             Export
           </button>
-        </div>
-      </div>
+          {/* Refresh Button */}
+          <button
+            onClick={() => window.location.reload()}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>  
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Revenue Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Revenue</p>
-              <p className={`text-2xl font-bold ${revenue < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(revenue)}
-              </p>
+                {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab("p&l")}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              activeTab === "p&l"
+                ? "text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+            style={{
+              backgroundColor: activeTab === "p&l" ? BRAND_COLORS.primary : undefined,
+            }}
+          >
+            P&L
+          </button>
+          <button
+            onClick={() => setActiveTab("cash-flow")}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              activeTab === "cash-flow"
+                ? "text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+            style={{
+              backgroundColor: activeTab === "cash-flow" ? BRAND_COLORS.primary : undefined,
+            }}
+          >
+            Cash Flow
+          </button>
+          <button
+            onClick={() => setActiveTab("balance-sheet")}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              activeTab === "balance-sheet"
+                ? "text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+            style={{
+              backgroundColor: activeTab === "balance-sheet" ? BRAND_COLORS.primary : undefined,
+            }}
+          >
+            Balance Sheet
+          </button>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-600 text-sm font-medium mb-2">Revenue</div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
+                <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
+                  Top Line
+                </div>
+              </div>
+              <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
             </div>
-            <div className={`p-3 rounded-full ${revenue < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-              <TrendingUp className={`h-6 w-6 ${revenue < 0 ? 'text-red-600' : 'text-green-600'}`} />
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4" style={{ borderLeftColor: BRAND_COLORS.warning }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-600 text-sm font-medium mb-2">Operating Expenses</div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingExpenses)}</div>
+                <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full inline-block">
+                  Operating Costs
+                </div>
+              </div>
+              <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4" style={{ borderLeftColor: BRAND_COLORS.success }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
+                <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
+                  {kpis.netMargin.toFixed(1)}% Margin
+                </div>
+              </div>
+              <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
             </div>
           </div>
         </div>
 
-        {/* Expenses Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-              <p className={`text-2xl font-bold ${expenses < 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(expenses)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-full ${expenses < 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-              <DollarSign className={`h-6 w-6 ${expenses < 0 ? 'text-green-600' : 'text-red-600'}`} />
-            </div>
+        {/* Main Content */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-xl font-semibold text-gray-900">
+              {activeTab === "p&l"
+                ? "Profit & Loss Statement"
+                : activeTab === "cash-flow"
+                ? "Cash Flow Statement"
+                : "Balance Sheet"}
+            </h3>
           </div>
-        </div>
-
-        {/* Net Profit Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Net Profit</p>
-              <p className={`text-2xl font-bold ${profit < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(profit)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-full ${profit < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-              <BarChart3 className={`h-6 w-6 ${profit < 0 ? 'text-red-600' : 'text-green-600'}`} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Financial Data Table */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            {activeTab === 'p&l' ? 'Profit & Loss Statement' : 
-             activeTab === 'cash-flow' ? 'Cash Flow Statement' : 
-             'Balance Sheet'}
-          </h3>
-        </div>
-        
-        <div className="overflow-x-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-              <span className="ml-2 text-gray-600">Loading financial data...</span>
-            </div>
-          ) : financialData.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No financial data available for the selected period.</p>
-            </div>
-          ) : (
-            <table className="min-w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{selectedMonth}</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Revenue</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {financialData.map((item, index) => {
-                  const isExpanded = expandedItems.has(item.name);
-                  const percentOfRevenue = revenue !== 0 ? (item.total / revenue) * 100 : 0;
-                  
-                  return (
-                    <React.Fragment key={index}>
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {viewMode === 'detailed' && item.entries && item.entries.length > 1 && (
-                              <button
-                                onClick={() => toggleItemExpansion(item.name)}
-                                className="mr-2 p-1 hover:bg-gray-200 rounded"
-                              >
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                              </button>
-                            )}
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                              <div className="text-sm text-gray-500">{item.type}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium ${
-                          item.total < 0 ? 'text-red-600' : 'text-gray-900'
-                        }`}>
-                          {formatCurrency(item.total)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                          {percentOfRevenue.toFixed(1)}%
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            {item.mapping_method || 'auto'}
-                          </span>
-                        </td>
-                      </tr>
-                      
-                      {/* Expanded entries */}
-                      {isExpanded && item.entries && (
-                        item.entries.map((entry: FinancialEntry, entryIndex: number) => (
-                          <tr key={`${index}-${entryIndex}`} className="bg-gray-50">
-                            <td className="px-12 py-2 text-sm text-gray-600">
-                              {entry.description || entry.je_number}
-                            </td>
-                            <td className="px-6 py-2 text-right text-sm text-gray-600">
-                              {formatCurrency(entry.line_amount)}
-                            </td>
-                            <td className="px-6 py-2 text-right text-sm text-gray-500">
-                              {entry.property_class}
-                            </td>
-                            <td className="px-6 py-2 text-center text-sm text-gray-500">
-                              {new Date(entry.transaction_date).toLocaleDateString()}
-                            </td>
-                          </tr>
+          <div className="p-6 overflow-x-auto">
+            {/* P&L Table */}
+            {activeTab === "p&l" && (
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account
+                    </th>
+                    {viewMode === "detailed"
+                      ? dateRange.months.map((m) => (
+                          <th
+                            key={m}
+                            className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            {m}
+                          </th>
                         ))
+                      : (
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total
+                        </th>
                       )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {accountTree.map((node) => (
+                    <AccountRow
+                      key={node.fullName}
+                      node={node}
+                      expandedAccounts={expandedAccounts}
+                      toggleAccountExpansion={toggleAccountExpansion}
+                      viewMode={viewMode}
+                      months={dateRange.months}
+                      depth={0}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {/* Cash Flow Table */}
+            {activeTab === "cash-flow" && (
+              <div>
+                <div className="mb-4 text-sm text-gray-600">
+                  <strong>Bank Filter:</strong>{" "}
+                  {selectedBanks.size === 1
+                    ? Array.from(selectedBanks)[0]
+                    : `${selectedBanks.size} Banks`}
+                </div>
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Account
+                      </th>
+                      {viewMode === "detailed"
+                        ? dateRange.months.map((m) => (
+                            <th
+                              key={m}
+                              className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            >
+                              {m}
+                            </th>
+                          ))
+                        : (
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Total
+                          </th>
+                        )}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {accountTree.map((node) => (
+                      <AccountRow
+                        key={node.fullName}
+                        node={node}
+                        expandedAccounts={expandedAccounts}
+                        toggleAccountExpansion={toggleAccountExpansion}
+                        viewMode={viewMode}
+                        months={dateRange.months}
+                        depth={0}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {/* Balance Sheet Table */}
+            {activeTab === "balance-sheet" && (
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Balance
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {accountTree
+                    .filter(
+                      (node) =>
+                        node.type === "Assets" ||
+                        node.type === "Liabilities" ||
+                        node.type === "Equity"
+                    )
+                    .map((node) => (
+                      <AccountRow
+                        key={node.fullName}
+                        node={node}
+                        expandedAccounts={expandedAccounts}
+                        toggleAccountExpansion={toggleAccountExpansion}
+                        viewMode="total"
+                        months={dateRange.months}
+                        depth={0}
+                      />
+                    ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
 
       {/* Notification */}
       {notification.show && (
-        <div className={`fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${
-          notification.type === 'success' ? 'bg-green-100 text-green-800' :
-          notification.type === 'error' ? 'bg-red-100 text-red-800' :
-          'bg-blue-100 text-blue-800'
-        }`}>
-          {notification.message}
-        </div>
-      )}
-
-      {/* Tooltip */}
-      {tooltip.show && (
         <div
-          className="fixed z-50 p-2 bg-gray-900 text-white text-sm rounded shadow-lg pointer-events-none"
-          style={{ left: tooltip.x, top: tooltip.y }}
+          className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg text-white font-medium shadow-lg transition-transform ${
+            notification.type === "success"
+              ? "bg-green-500"
+              : notification.type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+          } ${notification.show ? "translate-x-0" : "translate-x-full"}`}
         >
-          {tooltip.content}
+          {notification.message}
         </div>
       )}
     </div>
   );
-};
+}
 
-export default FinancialsPage;
+// ====== ACCOUNT ROW COMPONENT ======
+function AccountRow({
+  node,
+  expandedAccounts,
+  toggleAccountExpansion,
+  viewMode,
+  months,
+  depth,
+}: {
+  node: AccountNode;
+  expandedAccounts: Set<string>;
+  toggleAccountExpansion: (name: string) => void;
+  viewMode: ViewMode;
+  months: string[];
+  depth: number;
+}) {
+  const isExpandable = node.children.length > 0;
+  const isExpanded = expandedAccounts.has(node.fullName);
+
+  return (
+    <>
+      <tr className={depth === 0 ? "bg-gray-50" : ""}>
+        <td className="px-6 py-2 text-left text-sm" style={{ paddingLeft: `${depth * 24 + 24}px` }}>
+          <div className="flex items-center">
+            {isExpandable && (
+              <button
+                onClick={() => toggleAccountExpansion(node.fullName)}
+                className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                )}
+              </button>
+            )}
+            <span>{node.name}</span>
+          </div>
+        </td>
+        {viewMode === "detailed"
+          ? months.map((m) => (
+              <td
+                key={m}
+                className={`px-4 py-2 text-right text-sm ${
+                  node.total >= 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {formatCurrency(node.months[m] || 0)}
+              </td>
+            ))
+          : (
+            <td
+              className={`px-4 py-2 text-right text-sm ${
+                node.total >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {formatCurrency(node.total)}
+            </td>
+          )}
+      </tr>
+      {isExpandable && isExpanded &&
+        node.children.map((child) => (
+          <AccountRow
+            key={child.fullName}
+            node={child}
+            expandedAccounts={expandedAccounts}
+            toggleAccountExpansion={toggleAccountExpansion}
+            viewMode={viewMode}
+            months={months}
+            depth={depth + 1}
+          />
+        ))}
+    </>
+  );
+}
+
+// ====== END OF FILE ======
