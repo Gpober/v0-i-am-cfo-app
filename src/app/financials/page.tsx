@@ -12,25 +12,7 @@ import {
   PieChart,
   DollarSign,
   TrendingUp,
-  Users,
-  FileText,
-  Banknote,
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  Legend,
-} from "recharts";
 import dayjs from "dayjs";
 import Papa from "papaparse";
 
@@ -42,32 +24,10 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUP
 const BRAND_COLORS = {
   primary: "#56B6E9",
   secondary: "#3A9BD1",
-  tertiary: "#7CC4ED",
-  accent: "#2E86C1",
-  success: "#27AE60",
   warning: "#F39C12",
-  danger: "#E74C3C",
-  gray: {
-    50: "#F8FAFC",
-    100: "#F1F5F9",
-    200: "#E2E8F0",
-    300: "#CBD5E1",
-    400: "#94A3B8",
-    500: "#64748B",
-    600: "#475569",
-    700: "#334155",
-    800: "#1E293B",
-    900: "#0F172A",
-  },
+  success: "#27AE60",
+  gray: { 50: "#F8FAFC" },
 };
-const COLORS = [
-  BRAND_COLORS.primary,
-  BRAND_COLORS.success,
-  BRAND_COLORS.warning,
-  BRAND_COLORS.danger,
-  BRAND_COLORS.secondary,
-  BRAND_COLORS.tertiary,
-];
 
 // ====== LOGO PLACEHOLDER ======
 const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -99,137 +59,8 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
 // ====== TYPES ======
 type AccountType = "Revenue" | "Expenses" | "Assets" | "Liabilities" | "Equity" | "Other";
 type FinancialTab = "p&l" | "cash-flow" | "balance-sheet";
-type TimeView = "Monthly" | "YTD" | "TTM" | "MoM" | "YoY" | "Quarterly" | "Custom";
+type TimeView = "Monthly" | "YTD" | "TTM" | "Quarterly";
 type ViewMode = "total" | "detailed";
-type MonthString = string;
-
-interface AccountCOA {
-  account_name: string;
-  account_type: string;
-}
-
-interface JournalEntry {
-  id: number;
-  je_number: string;
-  transaction_date: string;
-  account_name: string;
-  account_type: string;
-  detail_type: string;
-  property_class: string;
-  debit_amount: number;
-  credit_amount: number;
-  line_amount: number;
-  posting_type: string;
-  description: string;
-  balance: number
-Absolutely! Here are Parts 1–5 of your Financials page code, ready for copy-paste.
-Copy each part in order into your page.tsx file.
-
-PART 1
-"use client";
-
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  ArrowUp,
-  ArrowDown,
-  Download,
-  RefreshCw,
-  ChevronDown,
-  ChevronRight,
-  BarChart3,
-  PieChart,
-  DollarSign,
-  TrendingUp,
-  Users,
-  FileText,
-  Banknote,
-} from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  Legend,
-} from "recharts";
-import dayjs from "dayjs";
-import Papa from "papaparse";
-
-// ====== CONFIGURATION ======
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ijeuusvwqcnljctkvjdi.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
-
-// IAM CFO Brand Colors
-const BRAND_COLORS = {
-  primary: "#56B6E9",
-  secondary: "#3A9BD1",
-  tertiary: "#7CC4ED",
-  accent: "#2E86C1",
-  success: "#27AE60",
-  warning: "#F39C12",
-  danger: "#E74C3C",
-  gray: {
-    50: "#F8FAFC",
-    100: "#F1F5F9",
-    200: "#E2E8F0",
-    300: "#CBD5E1",
-    400: "#94A3B8",
-    500: "#64748B",
-    600: "#475569",
-    700: "#334155",
-    800: "#1E293B",
-    900: "#0F172A",
-  },
-};
-const COLORS = [
-  BRAND_COLORS.primary,
-  BRAND_COLORS.success,
-  BRAND_COLORS.warning,
-  BRAND_COLORS.danger,
-  BRAND_COLORS.secondary,
-  BRAND_COLORS.tertiary,
-];
-
-// ====== LOGO PLACEHOLDER ======
-const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
-  <div className={`${className} flex items-center justify-center relative`}>
-    <svg viewBox="0 0 120 120" className="w-full h-full">
-      <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2"/>
-      <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary}/>
-      <g fill="white">
-        <rect x="35" y="70" width="6" height="15" rx="1"/>
-        <rect x="44" y="65" width="6" height="20" rx="1"/>
-        <rect x="53" y="55" width="6" height="30" rx="1"/>
-        <rect x="62" y="50" width="6" height="35" rx="1"/>
-        <rect x="71" y="60" width="6" height="25" rx="1"/>
-        <rect x="80" y="45" width="6" height="40" rx="1"/>
-        <path d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47" 
-              stroke="#FFFFFF" strokeWidth="2.5" fill="none"/>
-        <circle cx="35" cy="72" r="2.5" fill="#FFFFFF"/>
-        <circle cx="44" cy="67" r="2.5" fill="#FFFFFF"/>
-        <circle cx="53" cy="57" r="2.5" fill="#FFFFFF"/>
-        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF"/>
-        <circle cx="71" cy="62" r="2.5" fill="#FFFFFF"/>
-        <circle cx="80" cy="47" r="2.5" fill="#FFFFFF"/>
-      </g>
-      <text x="60" y="95" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">CFO</text>
-    </svg>
-  </div>
-);
-
-// ====== TYPES ======
-type AccountType = "Revenue" | "Expenses" | "Assets" | "Liabilities" | "Equity" | "Other";
-type FinancialTab = "p&l" | "cash-flow" | "balance-sheet";
-type TimeView = "Monthly" | "YTD" | "TTM" | "MoM" | "YoY" | "Quarterly" | "Custom";
-type ViewMode = "total" | "detailed";
-type MonthString = string;
 
 interface AccountCOA {
   account_name: string;
@@ -273,24 +104,7 @@ interface NotificationState {
   type: "info" | "success" | "error";
 }
 
-interface TooltipState {
-  show: boolean;
-  content: string;
-  x: number;
-  y: number;
-}
-
 // ====== DATA FETCHING HELPERS ======
-
-// Fetch Chart of Accounts (COA)
-async function fetchCOA(): Promise<AccountCOA[]> {
-  const res = await fetch(
-    `${SUPABASE
-Here is PART 2 of your Financials page code:
-
-// ====== DATA FETCHING HELPERS ======
-
-// Fetch Chart of Accounts (COA)
 async function fetchCOA(): Promise<AccountCOA[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
@@ -305,50 +119,6 @@ async function fetchCOA(): Promise<AccountCOA[]> {
   return await res.json();
 }
 
-// Fetch Journal Entries for a date range and property/bank filter
-async function fetchJournalEntries({
-  startDate,
-  endDate,
-  properties,
-  bankAccounts,
-}: {
-  startDate: string;
-  endDate: string;
-  properties?: string[];
-  bankAccounts?: string[];
-}): Promise<JournalEntry[]> {
-  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
-  if (properties && properties.length && !properties.includes("All Properties")) {
-    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
-  }
-  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
-    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
-  }
-  url += "&order=transaction_date";
-  const res = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer
-Here is PART 2 of your Financials page code:
-
-// ====== DATA FETCHING HELPERS ======
-
-// Fetch Chart of Accounts (COA)
-async function fetchCOA(): Promise<AccountCOA[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) throw new Error("Failed to fetch COA");
-  return await res.json();
-}
-
-// Fetch Journal Entries for a date range and property/bank filter
 async function fetchJournalEntries({
   startDate,
   endDate,
@@ -378,7 +148,6 @@ async function fetchJournalEntries({
   return await res.json();
 }
 
-// Fetch unique property classes
 async function fetchProperties(): Promise<string[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
@@ -397,92 +166,6 @@ async function fetchProperties(): Promise<string[]> {
   return ["All Properties", ...props];
 }
 
-// Fetch unique bank accounts from COA
-async function fetchBankAccounts(): Promise<string[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return ["All Accounts"];
-  const data = await res.json();
-  const banks = data
-    .filter((a: any) => a.account_type && a.account_type.toLowerCase().includes("bank"))
-    .map((a: any) => a.account_name);
-  return ["All Accounts", ...banks
-Here is PART 2 of your Financials page code:
-
-// ====== DATA FETCHING HELPERS ======
-
-// Fetch Chart of Accounts (COA)
-async function fetchCOA(): Promise<AccountCOA[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) throw new Error("Failed to fetch COA");
-  return await res.json();
-}
-
-// Fetch Journal Entries for a date range and property/bank filter
-async function fetchJournalEntries({
-  startDate,
-  endDate,
-  properties,
-  bankAccounts,
-}: {
-  startDate: string;
-  endDate: string;
-  properties?: string[];
-  bankAccounts?: string[];
-}): Promise<JournalEntry[]> {
-  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
-  if (properties && properties.length && !properties.includes("All Properties")) {
-    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
-  }
-  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
-    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
-  }
-  url += "&order=transaction_date";
-  const res = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-  });
-  if (!res.ok) throw new Error("Failed to fetch Journal Entries");
-  return await res.json();
-}
-
-// Fetch unique property classes
-async function fetchProperties(): Promise<string[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return ["All Properties"];
-  const data = await res.json();
-  const props = Array.from(
-    new Set(data.map((d: any) => d.property_class).filter(Boolean))
-  );
-  return ["All Properties", ...props];
-}
-
-// Fetch unique bank accounts from COA
 async function fetchBankAccounts(): Promise<string[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
@@ -502,13 +185,10 @@ async function fetchBankAccounts(): Promise<string[]> {
 }
 
 // ====== COA PARSING & ACCOUNT TREE ======
-
-// Parse COA into a nested tree structure
 function buildAccountTree(
   coa: AccountCOA[],
   entries: JournalEntry[]
 ): AccountNode[] {
-  // Helper: Find or create node in tree
   const root: Record<string, AccountNode> = {};
   const getOrCreate = (path: string[], type: AccountType): AccountNode => {
     let node: AccountNode | undefined;
@@ -534,16 +214,13 @@ function buildAccountTree(
     return root[fullName];
   };
 
-  // Build tree from COA
   for (const acc of coa) {
     const path = acc.account_name.split(":").map((s) => s.trim());
     const type = mapAccountType(acc.account_type);
     getOrCreate(path, type);
   }
 
-  // Assign entries to the deepest matching node
   for (const je of entries) {
-    // Try to match to the deepest COA node
     let match: AccountNode | undefined;
     let jePath = je.account_name.split(":").map((s) => s.trim());
     while (jePath.length) {
@@ -554,148 +231,6 @@ function buildAccountTree(
       }
       jePath.pop();
     }
-    // If not found, try to match by
-Here is PART 2 of your Financials page code:
-
-// ====== DATA FETCHING HELPERS ======
-
-// Fetch Chart of Accounts (COA)
-async function fetchCOA(): Promise<AccountCOA[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) throw new Error("Failed to fetch COA");
-  return await res.json();
-}
-
-// Fetch Journal Entries for a date range and property/bank filter
-async function fetchJournalEntries({
-  startDate,
-  endDate,
-  properties,
-  bankAccounts,
-}: {
-  startDate: string;
-  endDate: string;
-  properties?: string[];
-  bankAccounts?: string[];
-}): Promise<JournalEntry[]> {
-  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
-  if (properties && properties.length && !properties.includes("All Properties")) {
-    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
-  }
-  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
-    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
-  }
-  url += "&order=transaction_date";
-  const res = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-  });
-  if (!res.ok) throw new Error("Failed to fetch Journal Entries");
-  return await res.json();
-}
-
-// Fetch unique property classes
-async function fetchProperties(): Promise<string[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return ["All Properties"];
-  const data = await res.json();
-  const props = Array.from(
-    new Set(data.map((d: any) => d.property_class).filter(Boolean))
-  );
-  return ["All Properties", ...props];
-}
-
-// Fetch unique bank accounts from COA
-async function fetchBankAccounts(): Promise<string[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return ["All Accounts"];
-  const data = await res.json();
-  const banks = data
-    .filter((a: any) => a.account_type && a.account_type.toLowerCase().includes("bank"))
-    .map((a: any) => a.account_name);
-  return ["All Accounts", ...banks];
-}
-
-// ====== COA PARSING & ACCOUNT TREE ======
-
-// Parse COA into a nested tree structure
-function buildAccountTree(
-  coa: AccountCOA[],
-  entries: JournalEntry[]
-): AccountNode[] {
-  // Helper: Find or create node in tree
-  const root: Record<string, AccountNode> = {};
-  const getOrCreate = (path: string[], type: AccountType): AccountNode => {
-    let node: AccountNode | undefined;
-    let fullName = "";
-    let parent: AccountNode | undefined;
-    for (let i = 0; i < path.length; ++i) {
-      fullName = path.slice(0, i + 1).join(":");
-      if (!root[fullName]) {
-        root[fullName] = {
-          name: path[i],
-          fullName,
-          type: type,
-          children: [],
-          entries: [],
-          total: 0,
-          months: {},
-          parent,
-        };
-        if (parent) parent.children.push(root[fullName]);
-      }
-      parent = root[fullName];
-    }
-    return root[fullName];
-  };
-
-  // Build tree from COA
-  for (const acc of coa) {
-    const path = acc.account_name.split(":").map((s) => s.trim());
-    const type = mapAccountType(acc.account_type);
-    getOrCreate(path, type);
-  }
-
-  // Assign entries to the deepest matching node
-  for (const je of entries) {
-    // Try to match to the deepest COA node
-    let match: AccountNode | undefined;
-    let jePath = je.account_name.split(":").map((s) => s.trim());
-    while (jePath.length) {
-      const tryName = jePath.join(":");
-      if (root[tryName]) {
-        match = root[tryName];
-        break;
-      }
-      jePath.pop();
-    }
-    // If not found, try to match by suffix (e.g., "Hotel" matches "Travel:Hotel")
     if (!match) {
       for (const key in root) {
         if (
@@ -707,7 +242,6 @@ function buildAccountTree(
         }
       }
     }
-    // Fallback: assign to "Other"
     if (!match) {
       if (!root["Other"]) {
         root["Other"] = {
@@ -725,7 +259,6 @@ function buildAccountTree(
     match.entries.push(je);
   }
 
-  // Calculate totals and months recursively
   function calcTotals(node: AccountNode) {
     node.total = node.entries.reduce(
       (sum, je) => sum + (je.line_amount ?? je.debit_amount - je.credit_amount),
@@ -744,206 +277,11 @@ function buildAccountTree(
       }
     });
   }
-  // Only top-level nodes
-  const topNodes = Object.values(root).filter((n) => !n.parent);
-  topNodes.forEach(calcTotals);
-  return
-Here is PART 2 of your Financials page code:
-
-// ====== DATA FETCHING HELPERS ======
-
-// Fetch Chart of Accounts (COA)
-async function fetchCOA(): Promise<AccountCOA[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) throw new Error("Failed to fetch COA");
-  return await res.json();
-}
-
-// Fetch Journal Entries for a date range and property/bank filter
-async function fetchJournalEntries({
-  startDate,
-  endDate,
-  properties,
-  bankAccounts,
-}: {
-  startDate: string;
-  endDate: string;
-  properties?: string[];
-  bankAccounts?: string[];
-}): Promise<JournalEntry[]> {
-  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
-  if (properties && properties.length && !properties.includes("All Properties")) {
-    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
-  }
-  if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
-    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
-  }
-  url += "&order=transaction_date";
-  const res = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-  });
-  if (!res.ok) throw new Error("Failed to fetch Journal Entries");
-  return await res.json();
-}
-
-// Fetch unique property classes
-async function fetchProperties(): Promise<string[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return ["All Properties"];
-  const data = await res.json();
-  const props = Array.from(
-    new Set(data.map((d: any) => d.property_class).filter(Boolean))
-  );
-  return ["All Properties", ...props];
-}
-
-// Fetch unique bank accounts from COA
-async function fetchBankAccounts(): Promise<string[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return ["All Accounts"];
-  const data = await res.json();
-  const banks = data
-    .filter((a: any) => a.account_type && a.account_type.toLowerCase().includes("bank"))
-    .map((a: any) => a.account_name);
-  return ["All Accounts", ...banks];
-}
-
-// ====== COA PARSING & ACCOUNT TREE ======
-
-// Parse COA into a nested tree structure
-function buildAccountTree(
-  coa: AccountCOA[],
-  entries: JournalEntry[]
-): AccountNode[] {
-  // Helper: Find or create node in tree
-  const root: Record<string, AccountNode> = {};
-  const getOrCreate = (path: string[], type: AccountType): AccountNode => {
-    let node: AccountNode | undefined;
-    let fullName = "";
-    let parent: AccountNode | undefined;
-    for (let i = 0; i < path.length; ++i) {
-      fullName = path.slice(0, i + 1).join(":");
-      if (!root[fullName]) {
-        root[fullName] = {
-          name: path[i],
-          fullName,
-          type: type,
-          children: [],
-          entries: [],
-          total: 0,
-          months: {},
-          parent,
-        };
-        if (parent) parent.children.push(root[fullName]);
-      }
-      parent = root[fullName];
-    }
-    return root[fullName];
-  };
-
-  // Build tree from COA
-  for (const acc of coa) {
-    const path = acc.account_name.split(":").map((s) => s.trim());
-    const type = mapAccountType(acc.account_type);
-    getOrCreate(path, type);
-  }
-
-  // Assign entries to the deepest matching node
-  for (const je of entries) {
-    // Try to match to the deepest COA node
-    let match: AccountNode | undefined;
-    let jePath = je.account_name.split(":").map((s) => s.trim());
-    while (jePath.length) {
-      const tryName = jePath.join(":");
-      if (root[tryName]) {
-        match = root[tryName];
-        break;
-      }
-      jePath.pop();
-    }
-    // If not found, try to match by suffix (e.g., "Hotel" matches "Travel:Hotel")
-    if (!match) {
-      for (const key in root) {
-        if (
-          key.endsWith(je.account_name) ||
-          key.split(":").pop() === je.account_name
-        ) {
-          match = root[key];
-          break;
-        }
-      }
-    }
-    // Fallback: assign to "Other"
-    if (!match) {
-      if (!root["Other"]) {
-        root["Other"] = {
-          name: "Other",
-          fullName: "Other",
-          type: "Other",
-          children: [],
-          entries: [],
-          total: 0,
-          months: {},
-        };
-      }
-      match = root["Other"];
-    }
-    match.entries.push(je);
-  }
-
-  // Calculate totals and months recursively
-  function calcTotals(node: AccountNode) {
-    node.total = node.entries.reduce(
-      (sum, je) => sum + (je.line_amount ?? je.debit_amount - je.credit_amount),
-      0
-    );
-    node.months = {};
-    node.entries.forEach((je) => {
-      const m = dayjs(je.transaction_date).format("MMMM YYYY");
-      node.months[m] = (node.months[m] || 0) + (je.line_amount ?? je.debit_amount - je.credit_amount);
-    });
-    node.children.forEach((child) => {
-      calcTotals(child);
-      node.total += child.total;
-      for (const m in child.months) {
-        node.months[m] = (node.months[m] || 0) + child.months[m];
-      }
-    });
-  }
-  // Only top-level nodes
   const topNodes = Object.values(root).filter((n) => !n.parent);
   topNodes.forEach(calcTotals);
   return topNodes;
 }
 
-// Map raw account_type to canonical AccountType
 function mapAccountType(type: string): AccountType {
   if (!type) return "Other";
   const t = type.toLowerCase();
@@ -955,17 +293,12 @@ function mapAccountType(type: string): AccountType {
   return "Other";
 }
 
-// ====== UTILITY FUNCTIONS ======
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function calculatePercentage(value: number, total: number): string {
-  return total !== 0 ? ((value / total) * 100).toFixed(1) + "%" : "0%";
 }
 
 function getMonthRange(start: string, end: string): string[] {
@@ -984,7 +317,6 @@ const defaultTimeView: TimeView = "Monthly";
 const defaultViewMode: ViewMode = "detailed";
 
 export default function FinancialsPage() {
-  // UI State
   const [activeTab, setActiveTab] = useState<FinancialTab>("p&l");
   const [selectedMonth, setSelectedMonth] = useState(() =>
     dayjs().format("MMMM YYYY")
@@ -1007,22 +339,7 @@ export default function FinancialsPage() {
   const [selectedBanks, setSelectedBanks] = useState<Set<string>>(
     new Set(["All Accounts"])
   );
-  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({
-    show: false,
-    content: "",
-    x: 0,
-    y: 0,
-  });
-  const [compareMode, setCompareMode] = useState<"none" | "quick" | "custom">(
-    "none"
-  );
-  const [comparePeriod, setComparePeriod] = useState<{
-    start: string;
-    end: string;
-    label: string;
-  } | null>(null);
 
-  // Data State
   const [isLoading, setIsLoading] = useState(false);
   const [coa, setCOA] = useState<AccountCOA[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
@@ -1030,7 +347,6 @@ export default function FinancialsPage() {
   const [bankAccounts, setBankAccounts] = useState<string[]>(["All Accounts"]);
   const [dataError, setDataError] = useState<string | null>(null);
 
-  // Date Ranges
   const currentMonth = dayjs(selectedMonth, "MMMM YYYY");
   const [dateRange, setDateRange] = useState<{
     start: string;
@@ -1042,7 +358,6 @@ export default function FinancialsPage() {
     months: [selectedMonth],
   });
 
-  // Update date range when timeView or selectedMonth changes
   useEffect(() => {
     let start = currentMonth.startOf("month");
     let end = currentMonth.endOf("month");
@@ -1065,7 +380,6 @@ export default function FinancialsPage() {
     });
   }, [selectedMonth, timeView]);
 
-  // Load COA, Properties, Banks on mount
   useEffect(() => {
     (async () => {
       setIsLoading(true);
@@ -1086,149 +400,6 @@ export default function FinancialsPage() {
     })();
   }, []);
 
-  // Load Journal Entries when filters change
-  useEffect(() => {
-    (async () => {
-      setIsLoading(true);
-      try {
-        const entries = await fetchJournalEntries({
-          startDate: dateRange.start,
-          endDate: dateRange.end,
-          properties: Array.from(selectedProperties
-Here is PART 3 of your Financials page code:
-
-// ====== UTILITY FUNCTIONS ======
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function calculatePercentage(value: number, total: number): string {
-  return total !== 0 ? ((value / total) * 100).toFixed(1) + "%" : "0%";
-}
-
-function getMonthRange(start: string, end: string): string[] {
-  const result: string[] = [];
-  let current = dayjs(start).startOf("month");
-  const last = dayjs(end).startOf("month");
-  while (current.isBefore(last) || current.isSame(last)) {
-    result.push(current.format("MMMM YYYY"));
-    current = current.add(1, "month");
-  }
-  return result;
-}
-
-// ====== MAIN COMPONENT ======
-const defaultTimeView: TimeView = "Monthly";
-const defaultViewMode: ViewMode = "detailed";
-
-export default function FinancialsPage() {
-  // UI State
-  const [activeTab, setActiveTab] = useState<FinancialTab>("p&l");
-  const [selectedMonth, setSelectedMonth] = useState(() =>
-    dayjs().format("MMMM YYYY")
-  );
-  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
-  const [timeView, setTimeView] = useState<TimeView>(defaultTimeView);
-  const [notification, setNotification] = useState<NotificationState>({
-    show: false,
-    message: "",
-    type: "info",
-  });
-  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(
-    new Set()
-  );
-  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(
-    new Set(["All Properties"])
-  );
-  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
-  const [selectedBanks, setSelectedBanks] = useState<Set<string>>(
-    new Set(["All Accounts"])
-  );
-  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({
-    show: false,
-    content: "",
-    x: 0,
-    y: 0,
-  });
-  const [compareMode, setCompareMode] = useState<"none" | "quick" | "custom">(
-    "none"
-  );
-  const [comparePeriod, setComparePeriod] = useState<{
-    start: string;
-    end: string;
-    label: string;
-  } | null>(null);
-
-  // Data State
-  const [isLoading, setIsLoading] = useState(false);
-  const [coa, setCOA] = useState<AccountCOA[]>([]);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  const [properties, setProperties] = useState<string[]>(["All Properties"]);
-  const [bankAccounts, setBankAccounts] = useState<string[]>(["All Accounts"]);
-  const [dataError, setDataError] = useState<string | null>(null);
-
-  // Date Ranges
-  const currentMonth = dayjs(selectedMonth, "MMMM YYYY");
-  const [dateRange, setDateRange] = useState<{
-    start: string;
-    end: string;
-    months: string[];
-  }>({
-    start: currentMonth.startOf("month").format("YYYY-MM-DD"),
-    end: currentMonth.endOf("month").format("YYYY-MM-DD"),
-    months: [selectedMonth],
-  });
-
-  // Update date range when timeView or selectedMonth changes
-  useEffect(() => {
-    let start = currentMonth.startOf("month");
-    let end = currentMonth.endOf("month");
-    let months = [selectedMonth];
-    if (timeView === "YTD") {
-      start = currentMonth.startOf("year");
-      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
-    } else if (timeView === "TTM") {
-      start = currentMonth.subtract(11, "month").startOf("month");
-      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
-    } else if (timeView === "Quarterly") {
-      start = currentMonth.startOf("quarter");
-      end = currentMonth.endOf("quarter");
-      months = getMonthRange(start.format("YYYY-MM-DD"), end.format("YYYY-MM-DD"));
-    }
-    setDateRange({
-      start: start.format("YYYY-MM-DD"),
-      end: end.format("YYYY-MM-DD"),
-      months,
-    });
-  }, [selectedMonth, timeView]);
-
-  // Load COA, Properties, Banks on mount
-  useEffect(() => {
-    (async () => {
-      setIsLoading(true);
-      try {
-        const [coaData, propData, bankData] = await Promise.all([
-          fetchCOA(),
-          fetchProperties(),
-          fetchBankAccounts(),
-        ]);
-        setCOA(coaData);
-        setProperties(propData);
-        setBankAccounts(bankData);
-      } catch (e: any) {
-        setDataError("Failed to load initial data: " + e.message);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, []);
-
-  // Load Journal Entries when filters change
   useEffect(() => {
     (async () => {
       setIsLoading(true);
@@ -1247,19 +418,15 @@ export default function FinancialsPage() {
         setIsLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateRange, selectedProperties, selectedBanks, activeTab]);  
+  }, [dateRange, selectedProperties, selectedBanks, activeTab]);
 
-  // ====== ACCOUNT TREE & DATA AGGREGATION ======
   const accountTree = useMemo(() => {
     if (!coa.length || !journalEntries.length) return [];
     return buildAccountTree(coa, journalEntries);
   }, [coa, journalEntries]);
 
-  // ====== KPI CALCULATIONS (P&L Example) ======
   const kpis = useMemo(() => {
     let revenue = 0,
-      cogs = 0,
       operatingExpenses = 0,
       netIncome = 0;
     function walk(node: AccountNode) {
@@ -1273,12 +440,10 @@ export default function FinancialsPage() {
       revenue,
       operatingExpenses,
       netIncome,
-      grossMargin: revenue ? ((revenue - cogs) / revenue) * 100 : 0,
       netMargin: revenue ? (netIncome / revenue) * 100 : 0,
     };
   }, [accountTree]);
 
-  // ====== EXPORT TO CSV ======
   function exportToCSV() {
     let rows: any[] = [];
     function walk(node: AccountNode, depth = 0) {
@@ -1300,12 +465,6 @@ export default function FinancialsPage() {
     URL.revokeObjectURL(url);
   }
 
-  // ====== UI HELPERS ======
-  function showNotification(message: string, type: "info" | "success" | "error" = "info") {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: "", type: "info" }), 3000);
-  }
-
   function toggleAccountExpansion(accountFullName: string) {
     setExpandedAccounts((prev) => {
       const next = new Set(prev);
@@ -1315,356 +474,6 @@ export default function FinancialsPage() {
     });
   }
 
-  // ====== MAIN RENDER ======
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center">
-          <IAMCFOLogo className="w-10 h-10 mr-4" />
-          <div>
-            <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
-              <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
-                Financial Management
-              </span>
-              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
-                Supabase Connected
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mt-1">
-              Real-time Financials • {journalEntries.length} entries loaded
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-wrap gap-4 items-center mb-6">
-          {/* Month Selector */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
-          >
-            {Array.from({ length: 36 }).map((_, i) => {
-              const m = dayjs().subtract(i, "month").format("MMMM YYYY");
-              return (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              );
-            })}
-          </select>
-          {/* Property Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setPropertyDropdownOpen((v) => !v)}
-              className="flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
-            >
-              {selectedProperties.size === 1
-                ? Array.from(selectedProperties)[0]
-                : `${selectedProperties.size} Properties`}
-              <ChevronDown className="w-4 h-4 ml-2" />
-            </button>
-            {propertyDropdownOpen && (
-              <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 w-56 max-h-60 overflow-y-auto">
-                {properties.map((p) => (
-                  <div
-                    key={p}
-                    className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
-                    onClick={() => {
-                      const next = new Set(selectedProperties);
-                      if (p === "All Properties") {
-                        next.clear();
-                        next.add("All Properties");
-                      } else {
-                        next.delete("All Properties");
-                        if (next.has(p)) next.delete(p);
-                        else next.add(p);
-                        if (next.size === 0) next.add("All Properties");
-                      }
-                      setSelectedProperties(next);
-                      setPropertyDropdownOpen(false);
-                    }}
-                  >
-Here is PART 4 of your Financials page code:
-
-  // ====== ACCOUNT TREE & DATA AGGREGATION ======
-  const accountTree = useMemo(() => {
-    if (!coa.length || !journalEntries.length) return [];
-    return buildAccountTree(coa, journalEntries);
-  }, [coa, journalEntries]);
-
-  // ====== KPI CALCULATIONS (P&L Example) ======
-  const kpis = useMemo(() => {
-    let revenue = 0,
-      cogs = 0,
-      operatingExpenses = 0,
-      netIncome = 0;
-    function walk(node: AccountNode) {
-      if (node.type === "Revenue") revenue += node.total;
-      if (node.type === "Expenses") operatingExpenses += node.total;
-      node.children.forEach(walk);
-    }
-    accountTree.forEach(walk);
-    netIncome = revenue - operatingExpenses;
-    return {
-      revenue,
-      operatingExpenses,
-      netIncome,
-      grossMargin: revenue ? ((revenue - cogs) / revenue) * 100 : 0,
-      netMargin: revenue ? (netIncome / revenue) * 100 : 0,
-    };
-  }, [accountTree]);
-
-  // ====== EXPORT TO CSV ======
-  function exportToCSV() {
-    let rows: any[] = [];
-    function walk(node: AccountNode, depth = 0) {
-      rows.push({
-        Account: "  ".repeat(depth) + node.name,
-        Total: node.total,
-        ...node.months,
-      });
-      node.children.forEach((child) => walk(child, depth + 1));
-    }
-    accountTree.forEach((node) => walk(node));
-    const csv = Papa.unparse(rows);
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "financials.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ====== UI HELPERS ======
-  function showNotification(message: string, type: "info" | "success" | "error" = "info") {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: "", type: "info" }), 3000);
-  }
-
-  function toggleAccountExpansion(accountFullName: string) {
-    setExpandedAccounts((prev) => {
-      const next = new Set(prev);
-      if (next.has(accountFullName)) next.delete(accountFullName);
-      else next.add(accountFullName);
-      return next;
-    });
-  }
-
-  // ====== MAIN RENDER ======
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center">
-          <IAMCFOLogo className="w-10 h-10 mr-4" />
-          <div>
-            <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
-              <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
-                Financial Management
-              </span>
-              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
-                Supabase Connected
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mt-1">
-              Real-time Financials • {journalEntries.length} entries loaded
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-wrap gap-4 items-center mb-6">
-          {/* Month Selector */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
-          >
-            {Array.from({ length: 36 }).map((_, i) => {
-              const m = dayjs().subtract(i, "month").format("MMMM YYYY");
-              return (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              );
-            })}
-          </select>
-          {/* Property Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setPropertyDropdownOpen((v) => !v)}
-              className="flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
-            >
-              {selectedProperties.size === 1
-                ? Array.from(selectedProperties)[0]
-                : `${selectedProperties.size} Properties`}
-              <ChevronDown className="w-4 h-4 ml-2" />
-            </button>
-            {propertyDropdownOpen && (
-              <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 w-56 max-h-60 overflow-y-auto">
-                {properties.map((p) => (
-                  <div
-                    key={p}
-                    className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
-                    onClick={() => {
-                      const next = new Set(selectedProperties);
-                      if (p === "All Properties") {
-                        next.clear();
-                        next.add("All Properties");
-                      } else {
-                        next.delete("All Properties");
-                        if (next.has(p)) next.delete(p);
-                        else next.add(p);
-                        if (next.size === 0) next.add("All Properties");
-                      }
-                      setSelectedProperties(next);
-                      setPropertyDropdownOpen(false);
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProperties.has(p)}
-                      readOnly
-                      className="mr-3 h-4 w-4 border-gray-300 rounded"
-                      style={{ accentColor: BRAND_COLORS.primary }}
-                    />
-                    <span>{p}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          {/* Bank Selector (Cash Flow) */}
-          {activeTab === "cash-flow" && (
-            <div className="relative">
-              <button
-                onClick={() => setBankDropdownOpen((v) => !v)}
-                className="flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
-              >
-                {selectedBanks.size === 1
-                  ? Array.from(selectedBanks)[0]
-                  : `${selectedBanks.size} Banks`}
-                <ChevronDown className="w-4 h-4 ml-2" />
-              </button>
-              {bankDropdownOpen && (
-                <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 w-56 max-h-60 overflow-y-auto">
-                  {bankAccounts.map((b) => (
-                    <div
-                      key={b}
-                      className="flex items-center px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
-                      onClick={() => {
-                        const next = new Set(selectedBanks);
-                        if (b === "All Accounts") {
-                          next.clear();
-                          next.add("All Accounts");
-                        } else {
-                          next.delete("All Accounts");
-                          if (next.has(b)) next.delete(b);
-                          else next.add(b);
-                          if (next.size === 0) next.add("All Accounts");
-                        }
-                        setSelectedBanks(next);
-                        setBankDropdownOpen(false);
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedBanks.has(b)}
-                        readOnly
-                        className="mr-3 h-4 w-4 border-gray-300 rounded"
-                        style={{ accentColor: BRAND_COLORS.primary }}
-                      />
-                      <span>{b}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {/* Time View Selector */}
-          <select
-            value={timeView}
-            onChange={(e) => setTimeView(e.target.value as TimeView)}
-            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
-          >
-            {["Monthly", "YTD", "TTM", "Quarterly"].map((
-Here is PART 4 of your Financials page code:
-
-  // ====== ACCOUNT TREE & DATA AGGREGATION ======
-  const accountTree = useMemo(() => {
-    if (!coa.length || !journalEntries.length) return [];
-    return buildAccountTree(coa, journalEntries);
-  }, [coa, journalEntries]);
-
-  // ====== KPI CALCULATIONS (P&L Example) ======
-  const kpis = useMemo(() => {
-    let revenue = 0,
-      cogs = 0,
-      operatingExpenses = 0,
-      netIncome = 0;
-    function walk(node: AccountNode) {
-      if (node.type === "Revenue") revenue += node.total;
-      if (node.type === "Expenses") operatingExpenses += node.total;
-      node.children.forEach(walk);
-    }
-    accountTree.forEach(walk);
-    netIncome = revenue - operatingExpenses;
-    return {
-      revenue,
-      operatingExpenses,
-      netIncome,
-      grossMargin: revenue ? ((revenue - cogs) / revenue) * 100 : 0,
-      netMargin: revenue ? (netIncome / revenue) * 100 : 0,
-    };
-  }, [accountTree]);
-
-  // ====== EXPORT TO CSV ======
-  function exportToCSV() {
-    let rows: any[] = [];
-    function walk(node: AccountNode, depth = 0) {
-      rows.push({
-        Account: "  ".repeat(depth) + node.name,
-        Total: node.total,
-        ...node.months,
-      });
-      node.children.forEach((child) => walk(child, depth + 1));
-    }
-    accountTree.forEach((node) => walk(node));
-    const csv = Papa.unparse(rows);
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "financials.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ====== UI HELPERS ======
-  function showNotification(message: string, type: "info" | "success" | "error" = "info") {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: "", type: "info" }), 3000);
-  }
-
-  function toggleAccountExpansion(accountFullName: string) {
-    setExpandedAccounts((prev) => {
-      const next = new Set(prev);
-      if (next.has(accountFullName)) next.delete(accountFullName);
-      else next.add(accountFullName);
-      return next;
-    });
-  }
-
-  // ====== MAIN RENDER ======
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -1836,9 +645,9 @@ Here is PART 4 of your Financials page code:
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
-        </div>  
+        </div>
 
-                {/* Tabs */}
+        {/* Tabs */}
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab("p&l")}
@@ -2151,5 +960,3 @@ function AccountRow({
     </>
   );
 }
-
-// ====== END OF FILE ======
