@@ -393,36 +393,30 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
 };
 
 // Fetch financial data from Supabase
-const fetchFinancialData = async (
-  property: string,
-  month: string,
-  filterClause: string = ''
-) => {
-  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*`;
+const fetchFinancialData = async (...) => {
+  try {
+    const journalData = ...;
+    const filteredJournalData = ...;
+    const enhancedData = ...;
 
-  // Append date filters
-  const { startDate, endDate } = getDateRangeForMonth(month);
-  url += `&date=gte.${startDate}&date=lte.${endDate}`;
-
-  // Append property filters if any
-  if (filterClause) {
-    url += filterClause;
+    return {
+      success: true,
+      data: enhancedData || [],
+      accountsData: accountsData,
+      summary: {
+        filteredEntries: enhancedData?.length || 0,
+        originalEntries: journalData.length,
+        ...
+      }
+    };
+  } catch (error) {
+    console.error("Error fetching financial data:", error);
+    return {
+      success: false,
+      data: [],
+    };
   }
-
-  const response = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-  });
-
-  const data = await response.json();
-  return { success: response.ok, data };
 };
-
-
-
-
 
     console.log('📡 Final URL with STRICT date filtering:', url);
 
