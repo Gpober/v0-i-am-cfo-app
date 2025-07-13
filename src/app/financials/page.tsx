@@ -427,7 +427,17 @@ const fetchFinancialData = async (property: string, monthYear: string, filterCla
   try {
     const { startDate, endDate } = getDateRangeForMonth(monthYear);
 
-    const journalUrl = `${SUPABASE_URL}/rest/v1/journal_entries?select=*${filterClause}&date=gte.${startDate}&date=lte.${endDate}&order=date.asc`;
+    let filter = `transaction_date.gte.${startDate}&transaction_date.lte.${endDate}`;
+
+    // If property filters are selected (not "All Properties"), use advanced filter logic
+    if (property === 'Multiple Properties' && filterClause) {
+      const selected = Array.from(selectedProperties).map((p) =>
+        `and(transaction_date.gte.${startDate},transaction_date.lte.${endDate},property_class.eq.${encodeURIComponent(p)})`
+      );
+      filter = `or=(${selected.join(',')})`;
+    }
+
+    const journalUrl = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&${filter}&order=transaction_date.asc`;
     const accountsUrl = `${SUPABASE_URL}/rest/v1/chart_of_accounts?select=*`;
 
     const [journalRes, accountsRes] = await Promise.all([
@@ -448,15 +458,7 @@ const fetchFinancialData = async (property: string, monthYear: string, filterCla
     const journalData = await journalRes.json();
     const accountsData = await accountsRes.json();
 
-    const filteredJournalData = journalData.filter((entry: any) => {
-      return (
-        entry.date >= startDate &&
-        entry.date <= endDate &&
-        (!property || property === 'All Properties' || entry.property_class === property)
-      );
-    });
-
-    const enhancedData = filteredJournalData.map((entry: any) => {
+    const enhancedData = journalData.map((entry: any) => {
       const account = accountsData.find((acc: any) => acc.account_name === entry.account);
       return {
         ...entry,
@@ -472,8 +474,7 @@ const fetchFinancialData = async (property: string, monthYear: string, filterCla
       summary: {
         filteredEntries: enhancedData?.length || 0,
         originalEntries: journalData.length,
-        dateFiltered: journalData.length - filteredJournalData.length,
-        dataSource: `Supabase + STRICT ${monthYear} Filtering`,
+        dataSource: `Supabase API`,
         dateRange: `${startDate} to ${endDate}`,
         filters: { property, monthYear },
         accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
@@ -487,7 +488,7 @@ const fetchFinancialData = async (property: string, monthYear: string, filterCla
     };
 
   } catch (error) {
-    console.error('Error fetching financial data:', error);
+    console.error('❌ Error fetching financial data:', error);
     return {
       success: false,
       data: [],
@@ -496,6 +497,7 @@ const fetchFinancialData = async (property: string, monthYear: string, filterCla
     };
   }
 };
+
 
 // IAM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
