@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   ArrowUp,
   ArrowDown,
@@ -12,9 +12,8 @@ import {
   PieChart,
   BarChart3,
   ChevronDown,
-  ChevronRight
-} from 'lucide-react';
-
+  ChevronRight,
+} from "lucide-react";
 import {
   LineChart,
   Line,
@@ -28,57 +27,49 @@ import {
   Bar,
   PieChart as RechartsPieChart,
   Cell,
-  Pie
-} from 'recharts';
+  Pie,
+} from "recharts";
 
-export default function FinancialsPage() {
-  const [syncing, setSyncing] = useState(false);
-
-  const triggerSupabaseSync = async () => {
-    try {
-      setSyncing(true);
-      const res = await fetch(
-        'https://script.google.com/macros/s/AKfycby7wHz7ydjTJwKdj6HtcZGzvWcDVmjuGvGIGj7CmI8a1PGW6_DITEnPRFzCZ0mKCM3y/exec',
-        { method: 'POST' }
-      );
-      const text = await res.text();
-      alert(text);
-    } catch (error) {
-      console.error('❌ Sync trigger failed:', error);
-      alert('Failed to trigger sync');
-    } finally {
-      setTimeout(() => {
-        setSyncing(false);
-      }, 1000); // small delay for smoother UX
-    }
-  };
-
-  // You can now continue here with your BRAND_COLORS and layout
-
-
-  
-// IAM CFO Brand Colors
-const BRAND_COLORS = {
-  primary: '#56B6E9',
-  secondary: '#3A9BD1',
-  tertiary: '#7CC4ED',
-  accent: '#2E86C1',
-  success: '#27AE60',
-  warning: '#F39C12',
-  danger: '#E74C3C',
-  gray: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475569',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A'
+// ======= SUPABASE SYNC BUTTON =======
+const triggerSupabaseSync = async (setSyncing: (state: boolean) => void) => {
+  setSyncing(true);
+  try {
+    const res = await fetch(
+      "https://script.google.com/macros/s/AKfycby7wHz7ydjTJwKdj6HtcZGzvWcDVmjuGvGIGj7CmI8a1PGW6_DITEnPRFzCZ0mKCM3y/exec",
+      {
+        method: "POST",
+      }
+    );
+    const text = await res.text();
+    alert(text); // Replace with toast if needed
+  } catch (error) {
+    console.error("❌ Sync trigger failed:", error);
+    alert("Failed to trigger sync");
+  } finally {
+    setSyncing(false);
   }
 };
+
+// ======= BRAND COLORS =======
+const BRAND_COLORS = {
+  primary: "#56B6E9",
+  secondary: "#3A9BD1",
+  tertiary: "#7CC4ED",
+  accent: "#2E86C1",
+  success: "#27AE60",
+  warning: "#F39C12",
+  danger: "#E74C3C",
+  gray: {
+    50: "#F8FAFC",
+    100: "#F1F5F9",
+    200: "#E2E8F0",
+    300: "#CBD5E1",
+    400: "#94A3B8",
+    500: "#64748B",
+  },
+};
+
+// ======= MAIN COMPONENT =======
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ijeuusvwqcnljctkvjdi.supabase.co';
