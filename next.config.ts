@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone', // Required for Netlify
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -8,18 +9,11 @@ const nextConfig = {
   },
   images: {
     domains: [
-      'ijeuusvwqcnljctkvjdi.supabase.co', // Your Supabase domain
-      'lh3.googleusercontent.com' // If using Google auth
+      'ijeuusvwqcnljctkvjdi.supabase.co',
+      'lh3.googleusercontent.com'
     ],
   },
-  experimental: {
-    serverActions: true, // If using Next.js server actions
-  },
-  logging: {
-    fetches: {
-      fullUrl: true, // Helps debug Supabase API calls
-    },
-  }
+  // Remove experimental and logging sections completely for Netlify
 }
 
 module.exports = nextConfig
