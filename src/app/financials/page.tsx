@@ -856,6 +856,7 @@ export default function FinancialsPage() {
         const entries = rawData.data as FinancialEntry[];
         
         console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
+        console.log('🧾 All entries classified as "Rental Revenue - Direct":', entries.filter(e => e.standard_account_name?.includes('Rental Revenue - Direct')));
         console.log('🔍 DEBUG - Total entries loaded:', entries.length);
         
         const transformedPL = transformFinancialData(entries, selectedMonth);
