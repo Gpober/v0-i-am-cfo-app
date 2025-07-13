@@ -393,10 +393,7 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
 };
 
 // Fetch financial data from Supabase
-const fetchFinancialData = async (
-  property: string = 'All Properties',
-  monthYear: string
-) => {
+const fetchFinancialData = async (property: string, month: string, filterClause = '') => {
   try {
     console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, monthYear });
     
@@ -410,12 +407,13 @@ const fetchFinancialData = async (
     
     console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
     
-    let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
-    
+let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*`;
+// apply date and property filters here
 if (filterClause) {
   url += filterClause;
-  console.log('🏠 Filtering by multiple property_class values:', Array.from(selectedProperties));
+  console.log('🏠 Applied multi-property filter:', filterClause);
 }
+
 
 
 
@@ -860,7 +858,7 @@ if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
         month: selectedMonth
       });
       
-      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
+      const rawData = await fetchFinancialData(propertyFilter, selectedMonth, filterClause);
       
       if (rawData.success) {
         const entries = rawData.data as FinancialEntry[];
