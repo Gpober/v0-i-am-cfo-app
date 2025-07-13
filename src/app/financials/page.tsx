@@ -317,6 +317,7 @@ const defaultTimeView: TimeView = "Monthly";
 const defaultViewMode: ViewMode = "detailed";
 
 export default function FinancialsPage() {
+  console.log("SUPABASE KEY:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const [activeTab, setActiveTab] = useState<FinancialTab>("p&l");
   const [selectedMonth, setSelectedMonth] = useState(() =>
     dayjs().format("MMMM YYYY")
