@@ -245,31 +245,29 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       };
     }
     
-    let amount = 0;
-    
-    switch (acc[key].type) {
-      case 'Revenue':
-        amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
-        if (amount < 0) {
-          amount = Math.abs(amount);
-        }
-        break;
-        
-      case 'Expenses':
-        amount = Math.abs(entry.line_amount || (entry.debit_amount - entry.credit_amount));
-        break;
-        
-      case 'Assets':
-        amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
-        break;
-        
-      case 'Liabilities':
-        amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
-        break;
-        
-      default:
-        amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
-    }
+   let amount = 0;
+
+switch (acc[key].type) {
+  case 'Revenue':
+    amount = entry.credit_amount - entry.debit_amount;
+    break;
+
+  case 'Expenses':
+    amount = entry.debit_amount - entry.credit_amount;
+    break;
+
+  case 'Assets':
+    amount = entry.debit_amount - entry.credit_amount;
+    break;
+
+  case 'Liabilities':
+    amount = entry.credit_amount - entry.debit_amount;
+    break;
+
+  default:
+    amount = entry.debit_amount - entry.credit_amount;
+}
+
     
     acc[key].total += amount;
     acc[key].months[monthYear as MonthString] = (acc[key].months[monthYear as MonthString] || 0) + amount;
