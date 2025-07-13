@@ -10,13 +10,11 @@ const triggerSupabaseSync = async () => {
       method: 'POST',
     });
     const text = await res.text();
-    alert(text); // or replace with toast/notification
+    alert(text); // or use showNotification(text, 'success')
   } catch (error) {
     console.error('❌ Sync trigger failed:', error);
     alert('Failed to trigger sync');
-  }
-};
-} finally {
+  } finally {
     setSyncing(false);
   }
 };
