@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect } from "react";
 import {
@@ -49,6 +49,7 @@ const triggerSupabaseSync = async (setSyncing: (state: boolean) => void) => {
     setSyncing(false);
   }
 };
+
 
 // ======= BRAND COLORS =======
 const BRAND_COLORS = {
