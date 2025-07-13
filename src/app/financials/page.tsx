@@ -393,11 +393,60 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
 };
 
 // Fetch financial data from Supabase
-const fetchFinancialData = async (...) => {
+const fetchFinancialData = async (property: string, monthYear: string, filterClause: string = '') => {
   try {
-    const journalData = ...;
-    const filteredJournalData = ...;
-    const enhancedData = ...;
+    const { startDate, endDate } = getDateRangeForMonth(monthYear);
+
+    const journalUrl = `${SUPABASE_URL}/rest/v1/journal_entries?select=*${filterClause}&date=gte.${startDate}&date=lte.${endDate}&order=date.asc`;
+    const accountsUrl = `${SUPABASE_URL}/rest/v1/chart_of_accounts?select=*`;
+
+    const [journalRes, accountsRes] = await Promise.all([
+      fetch(journalUrl, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      }),
+      fetch(accountsUrl, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      }),
+    ]);
+
+    const journalData = await journalRes.json();
+    const accountsData = await accountsRes.json();
+
+    const filteredJournalData = journalData.filter((entry: any) => {
+      return (
+        entry.date >= startDate &&
+        entry.date <= endDate &&
+        (!property || property === 'All Properties' || entry.property_class === property)
+      );
+    });
+
+    const enhancedData = filteredJournalData.map((entry: any) => {
+      const match = accountsData.find(
+        (acc: any) =>
+          acc.account_name?.trim() === entry.account_name?.trim() &&
+          acc.account_type === entry.account_type
+      );
+
+      if (match) {
+        return {
+          ...entry,
+          account_subtype: match.account_subtype,
+          mapping_method: 'Accounts Table',
+        };
+      } else {
+        return {
+          ...entry,
+          account_subtype: entry.account_subtype || 'Unmapped',
+          mapping_method: 'Fallback Classification',
+        };
+      }
+    });
 
     return {
       success: true,
@@ -406,14 +455,28 @@ const fetchFinancialData = async (...) => {
       summary: {
         filteredEntries: enhancedData?.length || 0,
         originalEntries: journalData.length,
-        ...
-      }
+        dateFiltered: journalData.length - filteredJournalData.length,
+        dataSource: `Supabase + STRICT ${monthYear} Filtering`,
+        dateRange: `${startDate} to ${endDate}`,
+        filters: { property, monthYear },
+        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
+        propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
+        mappingStats: {
+          totalEntries: enhancedData?.length || 0,
+          accountsTableMapped:
+            enhancedData?.filter((e: any) => e.mapping_method === 'Accounts Table').length || 0,
+          fallbackMapped:
+            enhancedData?.filter((e: any) => e.mapping_method === 'Fallback Classification').length || 0,
+        },
+      },
     };
+
   } catch (error) {
-    console.error("Error fetching financial data:", error);
+    console.error('Error fetching financial data:', error);
     return {
       success: false,
       data: [],
+      error,
     };
   }
 };
