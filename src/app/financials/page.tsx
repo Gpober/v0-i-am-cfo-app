@@ -1164,7 +1164,7 @@ const transformedCF = transformCashFlowData(formattedEntries);
             <strong style="font-size: 12px; color: white;">${item.name}</strong>
           </div>
           <div style="display: flex; justify-content: space-between; margin-left: 10px;">
-            <span style="font-size: 11px;">${formatCurrency(item.amount)}</span>
+            <span style="font-size: 11px;">${formatCurrency(Math.abs(item.amount))}</span>
             <span style="font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 10px;">${percentage}%</span>
           </div>
         </div>
