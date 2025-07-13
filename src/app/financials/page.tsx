@@ -198,7 +198,7 @@ const fetchProperties = async (): Promise<string[]> => {
     return [
       'All Properties',
       'Cleveland',
-      'Columbus, IN',  // Only the one with comma and state
+      'Columbus IN',  // Only the one with comma and state
       'Detroit',
       'General', 
       'Hastings MN',
