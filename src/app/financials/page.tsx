@@ -410,7 +410,7 @@ export default function FinancialsPage() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center">
-          <IAMCFOLogo className="w-10 h-10 mr-4" />
+          <img src="/favicon.png" alt="I AM CFO Logo" className="w-10 h-10 mr-4 rounded" />
           <div>
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
