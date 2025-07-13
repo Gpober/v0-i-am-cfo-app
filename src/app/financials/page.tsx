@@ -25,7 +25,7 @@ import {
   TimeView,
   ViewMode,
   NotificationState,
-} from "../../types";
+} from "@/types";
 
 // ====== SUPABASE CLIENT INIT ======
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ijeuusvwqcnljctkvjdi.supabase.co";
