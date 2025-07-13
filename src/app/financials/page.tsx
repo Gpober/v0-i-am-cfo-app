@@ -705,37 +705,6 @@ const enhancedData = filteredJournalData.map((entry: any) => {
   };
 });
 
-
-  // === Smart Sign Logic ===
-  // Flip to negative if the amount goes AGAINST the natural balance of the account
-  let adjustedAmount = rawAmount;
-
-  if (accountInfo.type === 'Income' && rawAmount < 0) {
-    // Already correct: Credit = Revenue
-    adjustedAmount = rawAmount;
-  } else if (accountInfo.type === 'Income' && rawAmount > 0) {
-    // Debit to income = reduction in revenue (e.g. contra-income)
-    adjustedAmount = -rawAmount;
-  } else if (accountInfo.type === 'Expenses' && rawAmount < 0) {
-    // Credit to expense = refund or reversal
-    adjustedAmount = -Math.abs(rawAmount);
-  } else {
-    // Otherwise, leave amount as-is
-    adjustedAmount = rawAmount;
-  }
-
-  return {
-    ...entry,
-    amount: adjustedAmount,
-    account_type: accountInfo.type,
-    classification: accountInfo.classification,
-    standard_account_name: accountInfo.standardName,
-    mapping_method: accountLookupMap.has(normalizedAccountName) ? 'Accounts Table' : 'Journal Entry Type',
-  };
-});
-
-
-
     return {
       success: true,
       data: enhancedData || [], // Each row now includes signed_amount
