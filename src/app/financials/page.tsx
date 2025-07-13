@@ -854,13 +854,26 @@ export default function FinancialsPage() {
       
       if (rawData.success) {
         const entries = rawData.data as FinancialEntry[];
+        const formattedEntries = entries.map((entry) => {
+  const isIncome = entry.account_type === 'Revenue' || entry.account_type === 'Income';
+
+  const signedAmount = isIncome
+    ? (entry.normal_balance === 'credit' ? entry.amount : -entry.amount)
+    : (entry.normal_balance === 'debit' ? entry.amount : -entry.amount);
+
+  return {
+    ...entry,
+    signedAmount,
+  };
+});
         
-        console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
-        console.log('🧾 All entries classified as "Rental Revenue - Direct":', entries.filter(e => e.standard_account_name?.includes('Rental Revenue - Direct')));
-        console.log('🔍 DEBUG - Total entries loaded:', entries.length);
-        
-        const transformedPL = transformFinancialData(entries, selectedMonth);
-        const transformedCF = transformCashFlowData(entries);
+console.log('🔍 DEBUG - Raw Journal Entries Sample:', formattedEntries.slice(0, 5));
+console.log('🧾 All entries classified as "Rental Revenue - Direct":', formattedEntries.filter(e => e.standard_account_name?.includes('Rental Revenue - Direct')));
+console.log('🔍 DEBUG - Total entries loaded:', formattedEntries.length);
+
+const transformedPL = transformFinancialData(formattedEntries, selectedMonth);
+const transformedCF = transformCashFlowData(formattedEntries);
+
 
         const combinedData = {
           success: true,
