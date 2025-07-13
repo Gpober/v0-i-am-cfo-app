@@ -651,7 +651,9 @@ accountsData.forEach((account: any) => {
       }
     };
 
-// Helper to classify fallback account types
+// ======= CLASSIFICATION & SIGNING HELPERS =======
+
+// Classify account types into reporting groups
 const classifyAccount = (type: string): string => {
   switch (type) {
     case 'Income':
@@ -667,16 +669,42 @@ const classifyAccount = (type: string): string => {
   }
 };
 
-// Map journal entries with enhanced classification
+// Sign logic based on debit/credit & classification
+const getSignedLineAmount = (entry: any) => {
+  const type = entry.classification;
+  const isCredit = entry.credit_amount > 0;
+  const isDebit = entry.debit_amount > 0;
+
+  if (type === 'Revenue') {
+    return isCredit ? entry.credit_amount : -entry.debit_amount;
+  } else if (type === 'Expenses') {
+    return isDebit ? entry.debit_amount : -entry.credit_amount;
+  } else {
+    return entry.line_amount; // Other types (like Balance Sheet items) untouched
+  }
+};
+
+// ======= MAP JOURNAL DATA =======
 const enhancedData = filteredJournalData.map((entry: any) => {
   const normalizedAccountName = (entry.account_name || '').trim().toLowerCase();
-  const rawAmount = entry.amount;
-
-  let accountInfo = accountLookupMap.get(normalizedAccountName) || {
+  const accountInfo = accountLookupMap.get(normalizedAccountName) || {
     type: entry.account_type || 'Other',
     classification: classifyAccount(entry.account_type),
     standardName: entry.account_name,
   };
+
+  return {
+    ...entry,
+    signed_amount: getSignedLineAmount({ ...entry, classification: accountInfo.classification }),
+    account_type: accountInfo.type,
+    classification: accountInfo.classification,
+    standard_account_name: accountInfo.standardName,
+    mapping_method: accountLookupMap.has(normalizedAccountName)
+      ? 'Accounts Table'
+      : 'Journal Entry Type',
+  };
+});
+
 
   // === Smart Sign Logic ===
   // Flip to negative if the amount goes AGAINST the natural balance of the account
@@ -710,7 +738,7 @@ const enhancedData = filteredJournalData.map((entry: any) => {
 
     return {
       success: true,
-      data: enhancedData || [],
+      data: enhancedData || [], // Each row now includes signed_amount
       accountsData: accountsData,
       summary: {
         filteredEntries: enhancedData?.length || 0,
