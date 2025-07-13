@@ -83,9 +83,10 @@ async function fetchProperties(): Promise<string[]> {
 
   if (error) return ["All Properties"];
   
-  const props = Array.from(
-    new Set(data.map((d: any) => d.property_class).filter(Boolean)
-  ); // Added missing parenthesis
+const props = Array.from(
+  new Set(data.map((d: any) => d.property_class).filter(Boolean))
+);
+
   
   return ["All Properties", ...props];
 }
