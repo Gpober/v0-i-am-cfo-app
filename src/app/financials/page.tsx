@@ -1243,30 +1243,30 @@ const transformedCF = transformCashFlowData(formattedEntries);
     const revenue = currentData
       .filter(item => item.type === 'Revenue' || 
                      (item.original_type && item.original_type.toLowerCase().includes('income')))
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+      .reduce((sum, item) => sum + (item.total), 0);
 
     const cogs = currentData
       .filter(item => item.original_type === 'Cost of Goods Sold')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+      .reduce((sum, item) => sum + (item.total), 0);
 
     const operatingExpenses = currentData
       .filter(item => item.type === 'Expenses' && 
                      item.original_type !== 'Interest Expense')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+      .reduce((sum, item) => sum + (item.total), 0);
 
     const interestExpense = currentData
       .filter(item => item.original_type === 'Interest Expense' ||
                      item.name.toLowerCase().includes('mortgage interest'))
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+      .reduce((sum, item) => sum + (item.total), 0);
 
     const otherIncome = currentData
       .filter(item => item.original_type === 'Other Income')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+      .reduce((sum, item) => sum + (item.total), 0);
 
     const otherExpenses = currentData
       .filter(item => item.name.toLowerCase().includes('other expense') &&
                      !item.name.toLowerCase().includes('interest'))
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+      .reduce((sum, item) => sum + (item.total), 0);
 
     const grossProfit = revenue - cogs;
     const operatingIncome = grossProfit - operatingExpenses;
