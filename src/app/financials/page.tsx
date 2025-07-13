@@ -393,26 +393,33 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
 };
 
 // Fetch financial data from Supabase
-const fetchFinancialData = async (property: string, month: string, filterClause = '') => {
-  try {
-    console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, monthYear });
-    
-    const [month, year] = monthYear.split(' ');
-    const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
-    
-    // STRICT date filtering - exactly the month requested
-    const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-    const lastDay = new Date(parseInt(year), monthNum, 0).getDate(); // Get last day of the month
-    const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
-    
-    console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
-    
-let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*`;
-// apply date and property filters here
-if (filterClause) {
-  url += filterClause;
-  console.log('🏠 Applied multi-property filter:', filterClause);
-}
+const fetchFinancialData = async (
+  property: string,
+  month: string,
+  filterClause: string = ''
+) => {
+  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*`;
+
+  // Append date filters
+  const { startDate, endDate } = getDateRangeForMonth(month);
+  url += `&date=gte.${startDate}&date=lte.${endDate}`;
+
+  // Append property filters if any
+  if (filterClause) {
+    url += filterClause;
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+
+  const data = await response.json();
+  return { success: response.ok, data };
+};
+
 
 
 
