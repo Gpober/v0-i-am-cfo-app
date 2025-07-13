@@ -248,7 +248,7 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
    let amount = 0;
 
 switch (acc[key].type) {
-  case 'Revenue':
+  case 'Income':
     amount = entry.credit_amount - entry.debit_amount;
     break;
 
