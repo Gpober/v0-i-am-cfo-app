@@ -418,6 +418,7 @@ if (filterClause) {
 }
 
 
+
     console.log('📡 Final URL with STRICT date filtering:', url);
 
     const [journalResponse, accountsResponse] = await Promise.all([
@@ -842,13 +843,15 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
-let propertyFilter = 'All Properties';
 let filterClause = '';
+let propertyFilter = 'All Properties';
+
 if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
   const selected = Array.from(selectedProperties).map(p => `property_class.eq.${encodeURIComponent(p)}`);
   filterClause = `&or=(${selected.join(',')})`;
   propertyFilter = 'Multiple Properties';
 }
+
 
       
       console.log('🔍 LOADING DATA WITH FILTERS:', {
