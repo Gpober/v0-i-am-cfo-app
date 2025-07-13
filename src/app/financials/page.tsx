@@ -412,10 +412,11 @@ const fetchFinancialData = async (
     
     let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
     
-    if (property !== 'All Properties') {
-      url += `&property_class=eq.${encodeURIComponent(property)}`;
-      console.log('🏠 Filtering by property_class:', property);
-    }
+if (filterClause) {
+  url += filterClause;
+  console.log('🏠 Filtering by multiple property_class values:', Array.from(selectedProperties));
+}
+
 
     console.log('📡 Final URL with STRICT date filtering:', url);
 
@@ -841,10 +842,14 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
-      let propertyFilter = 'All Properties';
-      if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-        propertyFilter = Array.from(selectedProperties)[0];
-      }
+let propertyFilter = 'All Properties';
+let filterClause = '';
+if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
+  const selected = Array.from(selectedProperties).map(p => `property_class.eq.${encodeURIComponent(p)}`);
+  filterClause = `&or=(${selected.join(',')})`;
+  propertyFilter = 'Multiple Properties';
+}
+
       
       console.log('🔍 LOADING DATA WITH FILTERS:', {
         selectedProperties: Array.from(selectedProperties),
