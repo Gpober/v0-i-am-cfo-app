@@ -15,7 +15,17 @@ import {
 } from "lucide-react";
 import dayjs from "dayjs";
 import Papa from "papaparse";
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
+import {
+  AccountCOA,
+  JournalEntry,
+  AccountType,
+  AccountNode,
+  FinancialTab,
+  TimeView,
+  ViewMode,
+  NotificationState,
+} from "../../types";
 
 // ====== SUPABASE CLIENT INIT ======
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ijeuusvwqcnljctkvjdi.supabase.co";
@@ -32,7 +42,6 @@ const BRAND_COLORS = {
   gray: { 50: "#F8FAFC" },
 };
 
-// ... [rest of the imports and types remain the same] ...
 
 // ====== DATA FETCHING HELPERS ======
 async function fetchCOA(): Promise<AccountCOA[]> {
