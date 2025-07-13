@@ -669,29 +669,43 @@ const classifyAccount = (type: string): string => {
 
 // Map journal entries with enhanced classification
 const enhancedData = filteredJournalData.map((entry: any) => {
-  const normalizedAccountName = entry.account_name?.trim().toLowerCase();
-  let accountInfo = accountLookupMap.get(normalizedAccountName);
-  const matchedFromAccountsTable = !!accountInfo;
+  const normalizedAccountName = (entry.account_name || '').trim().toLowerCase();
+  const rawAmount = entry.amount;
 
-  if (matchedFromAccountsTable) {
-    console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
+  let accountInfo = accountLookupMap.get(normalizedAccountName) || {
+    type: entry.account_type || 'Other',
+    classification: classifyAccount(entry.account_type),
+    standardName: entry.account_name,
+  };
+
+  // === Smart Sign Logic ===
+  // Flip to negative if the amount goes AGAINST the natural balance of the account
+  let adjustedAmount = rawAmount;
+
+  if (accountInfo.type === 'Income' && rawAmount < 0) {
+    // Already correct: Credit = Revenue
+    adjustedAmount = rawAmount;
+  } else if (accountInfo.type === 'Income' && rawAmount > 0) {
+    // Debit to income = reduction in revenue (e.g. contra-income)
+    adjustedAmount = -rawAmount;
+  } else if (accountInfo.type === 'Expenses' && rawAmount < 0) {
+    // Credit to expense = refund or reversal
+    adjustedAmount = -Math.abs(rawAmount);
   } else {
-    console.warn(`❌ NOT FOUND in accounts table: ${entry.account_name}, using fallback account_type from journal entry`);
-    accountInfo = {
-      type: entry.account_type || 'Unclassified',
-      classification: classifyAccount(entry.account_type),
-      standardName: entry.account_name || 'Other Account'
-    };
+    // Otherwise, leave amount as-is
+    adjustedAmount = rawAmount;
   }
 
   return {
     ...entry,
+    amount: adjustedAmount,
     account_type: accountInfo.type,
     classification: accountInfo.classification,
     standard_account_name: accountInfo.standardName,
-    mapping_method: matchedFromAccountsTable ? 'Accounts Table' : 'Journal Entry Type'
+    mapping_method: accountLookupMap.has(normalizedAccountName) ? 'Accounts Table' : 'Journal Entry Type',
   };
 });
+
 
 
     return {
