@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone', // Required for Netlify
+  output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -12,8 +12,8 @@ const nextConfig = {
       'ijeuusvwqcnljctkvjdi.supabase.co',
       'lh3.googleusercontent.com'
     ],
-  },
-  // Remove experimental and logging sections completely for Netlify
+  }
+  // Removed experimental and logging sections
 }
 
 module.exports = nextConfig
