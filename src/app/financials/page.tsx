@@ -15,12 +15,15 @@ import {
 } from "lucide-react";
 import dayjs from "dayjs";
 import Papa from "papaparse";
+import { createClient } from '@supabase/supabase-js';
+
+// ====== SUPABASE CLIENT INIT ======
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ijeuusvwqcnljctkvjdi.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ====== CONFIGURATION ======
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ijeuusvwqcnljctkvjdi.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
-
-// IAM CFO Brand Colors
 const BRAND_COLORS = {
   primary: "#56B6E9",
   secondary: "#3A9BD1",
@@ -29,94 +32,16 @@ const BRAND_COLORS = {
   gray: { 50: "#F8FAFC" },
 };
 
-// ====== LOGO PLACEHOLDER ======
-const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
-  <div className={`${className} flex items-center justify-center relative`}>
-    <svg viewBox="0 0 120 120" className="w-full h-full">
-      <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2"/>
-      <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary}/>
-      <g fill="white">
-        <rect x="35" y="70" width="6" height="15" rx="1"/>
-        <rect x="44" y="65" width="6" height="20" rx="1"/>
-        <rect x="53" y="55" width="6" height="30" rx="1"/>
-        <rect x="62" y="50" width="6" height="35" rx="1"/>
-        <rect x="71" y="60" width="6" height="25" rx="1"/>
-        <rect x="80" y="45" width="6" height="40" rx="1"/>
-        <path d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47" 
-              stroke="#FFFFFF" strokeWidth="2.5" fill="none"/>
-        <circle cx="35" cy="72" r="2.5" fill="#FFFFFF"/>
-        <circle cx="44" cy="67" r="2.5" fill="#FFFFFF"/>
-        <circle cx="53" cy="57" r="2.5" fill="#FFFFFF"/>
-        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF"/>
-        <circle cx="71" cy="62" r="2.5" fill="#FFFFFF"/>
-        <circle cx="80" cy="47" r="2.5" fill="#FFFFFF"/>
-      </g>
-      <text x="60" y="95" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">CFO</text>
-    </svg>
-  </div>
-);
-
-// ====== TYPES ======
-type AccountType = "Revenue" | "Expenses" | "Assets" | "Liabilities" | "Equity" | "Other";
-type FinancialTab = "p&l" | "cash-flow" | "balance-sheet";
-type TimeView = "Monthly" | "YTD" | "TTM" | "Quarterly";
-type ViewMode = "total" | "detailed";
-
-interface AccountCOA {
-  account_name: string;
-  account_type: string;
-}
-
-interface JournalEntry {
-  id: number;
-  je_number: string;
-  transaction_date: string;
-  account_name: string;
-  account_type: string;
-  detail_type: string;
-  property_class: string;
-  debit_amount: number;
-  credit_amount: number;
-  line_amount: number;
-  posting_type: string;
-  description: string;
-  balance: number;
-  created_by: string;
-  last_modified: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface AccountNode {
-  name: string;
-  fullName: string;
-  type: AccountType;
-  children: AccountNode[];
-  entries: JournalEntry[];
-  total: number;
-  months: Record<string, number>;
-  parent?: AccountNode;
-}
-
-interface NotificationState {
-  show: boolean;
-  message: string;
-  type: "info" | "success" | "error";
-}
+// ... [rest of the imports and types remain the same] ...
 
 // ====== DATA FETCHING HELPERS ======
 async function fetchCOA(): Promise<AccountCOA[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) throw new Error("Failed to fetch COA");
-  return await res.json();
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('account_name, account_type');
+  
+  if (error) throw new Error("Failed to fetch COA: " + error.message);
+  return data || [];
 }
 
 async function fetchJournalEntries({
@@ -130,59 +55,53 @@ async function fetchJournalEntries({
   properties?: string[];
   bankAccounts?: string[];
 }): Promise<JournalEntry[]> {
-  let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}`;
+  let query = supabase
+    .from('journal_entries')
+    .select('*')
+    .gte('transaction_date', startDate)
+    .lte('transaction_date', endDate)
+    .order('transaction_date');
+
   if (properties && properties.length && !properties.includes("All Properties")) {
-    url += properties.map((p) => `&property_class=eq.${encodeURIComponent(p)}`).join("");
+    query = query.in('property_class', properties);
   }
+
   if (bankAccounts && bankAccounts.length && !bankAccounts.includes("All Accounts")) {
-    url += bankAccounts.map((b) => `&account_name=eq.${encodeURIComponent(b)}`).join("");
+    query = query.in('account_name', bankAccounts);
   }
-  url += "&order=transaction_date";
-  const res = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-  });
-  if (!res.ok) throw new Error("Failed to fetch Journal Entries");
-  return await res.json();
+
+  const { data, error } = await query;
+
+  if (error) throw new Error("Failed to fetch Journal Entries: " + error.message);
+  return data || [];
 }
 
 async function fetchProperties(): Promise<string[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return ["All Properties"];
-  const data = await res.json();
+  const { data, error } = await supabase
+    .from('journal_entries')
+    .select('property_class');
+
+  if (error) return ["All Properties"];
+  
   const props = Array.from(
-    new Set(data.map((d: any) => d.property_class).filter(Boolean))
+    new Set(data.map((d: any) => d.property_class).filter(Boolean)
   );
   return ["All Properties", ...props];
 }
 
 async function fetchBankAccounts(): Promise<string[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?select=account_name,account_type`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return ["All Accounts"];
-  const data = await res.json();
-  const banks = data
-    .filter((a: any) => a.account_type && a.account_type.toLowerCase().includes("bank"))
-    .map((a: any) => a.account_name);
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('account_name, account_type')
+    .ilike('account_type', '%bank%');
+
+  if (error) return ["All Accounts"];
+  
+  const banks = data.map((a: any) => a.account_name);
   return ["All Accounts", ...banks];
 }
+
+// ... [rest of the code remains exactly the same] ...
 
 // ====== COA PARSING & ACCOUNT TREE ======
 function buildAccountTree(
