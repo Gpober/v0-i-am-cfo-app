@@ -4,6 +4,23 @@ import React, { useState, useEffect } from 'react';
 import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
 
+const triggerSupabaseSync = async () => {
+  try {
+    const res = await fetch('https://script.google.com/macros/s/AKfycby7wHz7ydjTJwKdj6HtcZGzvWcDVmjuGvGIGj7CmI8a1PGW6_DITEnPRFzCZ0mKCM3y/exec', {
+      method: 'POST',
+    });
+    const text = await res.text();
+    alert(text); // or replace with toast/notification
+  } catch (error) {
+    console.error('❌ Sync trigger failed:', error);
+    alert('Failed to trigger sync');
+  }
+};
+} finally {
+    setSyncing(false);
+  }
+};
+
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
   primary: '#56B6E9',
@@ -1382,24 +1399,39 @@ const transformedCF = transformCashFlowData(formattedEntries);
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Header Controls */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Financial Management</h2>
-            <div className="flex flex-wrap gap-4 items-center">
-              {/* Month Selector */}
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value as MonthString)}
-                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
-              >
-                {monthsList.map((month) => (
-                  <option key={month} value={month}>
-                    {month}
-                  </option>
-                ))}
-              </select>
+  <div className="space-y-8">
+    {/* Header Controls */}
+    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+        Financial Management
+      </h2>
+
+      <div className="flex flex-wrap gap-4 items-center">
+        {/* Trigger Sync Button */}
+        <button
+  onClick={triggerSupabaseSync}
+  disabled={syncing}
+  className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors shadow-sm ${
+    syncing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+  }`}
+>
+  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+  {syncing ? 'Syncing...' : 'Trigger Sync'}
+</button>
+
+        {/* Month Selector */}
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value as MonthString)}
+          className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+          style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+        >
+          {monthsList.map((month) => (
+            <option key={month} value={month}>
+              {month}
+            </option>
+          ))}
+        </select>
 
               {/* Property Class Multi-Select Dropdown */}
               <div className="relative">
