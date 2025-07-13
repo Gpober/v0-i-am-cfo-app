@@ -649,37 +649,48 @@ const fetchFinancialData = async (
       }
     };
 
-    // Process journal entries using the STRICTLY FILTERED data
-    const enhancedData = filteredJournalData.map((entry: any) => {
-      // First: Try to find exact match in your accounts table
-      let accountInfo = accountLookupMap.get(entry.account_name);
-      
-      if (accountInfo) {
-        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
-      } else {
-        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using account_type from journal entry`);
-        // Use the account_type directly from the journal entry - no guessing!
-        accountInfo = {
-          type: entry.account_type,
-          classification: entry.account_type === 'Income' ? 'Revenue' : 
-                         entry.account_type === 'Expenses' ? 'Expenses' :
-                         entry.account_type === 'Cost of Goods Sold' ? 'Expenses' :
-                         entry.account_type === 'Other Income' ? 'Revenue' :
-                         entry.account_type === 'Other Expenses' ? 'Expenses' :
-                         entry.account_type === 'Interest Expense' ? 'Other Expenses' :
-                         entry.account_type, // Default to whatever the journal entry says
-          standardName: entry.account_name
-        };
-      }
-      
-      return {
-        ...entry,
-        account_type: accountInfo?.type || entry.account_type || 'Other',
-        classification: accountInfo?.classification || accountInfo?.type || 'Other',
-        standard_account_name: accountInfo?.standardName || entry.account_name,
-        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Journal Entry Type'
-      };
-    });
+// Helper to classify fallback account types
+const classifyAccount = (type: string): string => {
+  switch (type) {
+    case 'Income':
+    case 'Other Income':
+      return 'Revenue';
+    case 'Expenses':
+    case 'Cost of Goods Sold':
+    case 'Other Expenses':
+    case 'Interest Expense':
+      return 'Expenses';
+    default:
+      return type || 'Other';
+  }
+};
+
+// Map journal entries with enhanced classification
+const enhancedData = filteredJournalData.map((entry: any) => {
+  const normalizedAccountName = entry.account_name?.trim().toLowerCase();
+  let accountInfo = accountLookupMap.get(normalizedAccountName);
+  const matchedFromAccountsTable = !!accountInfo;
+
+  if (matchedFromAccountsTable) {
+    console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
+  } else {
+    console.warn(`❌ NOT FOUND in accounts table: ${entry.account_name}, using fallback account_type from journal entry`);
+    accountInfo = {
+      type: entry.account_type || 'Unclassified',
+      classification: classifyAccount(entry.account_type),
+      standardName: entry.account_name || 'Other Account'
+    };
+  }
+
+  return {
+    ...entry,
+    account_type: accountInfo.type,
+    classification: accountInfo.classification,
+    standard_account_name: accountInfo.standardName,
+    mapping_method: matchedFromAccountsTable ? 'Accounts Table' : 'Journal Entry Type'
+  };
+});
+
 
     return {
       success: true,
