@@ -1436,7 +1436,7 @@ const transformedCF = transformCashFlowData(formattedEntries);
       <div className="flex flex-wrap gap-4 items-center">
         {/* Trigger Sync Button */}
         <button
-  onClick={triggerSupabaseSync}
+  onClick={() => triggerSupabaseSync(setSyncing)}
   disabled={syncing}
   className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors shadow-sm ${
     syncing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
