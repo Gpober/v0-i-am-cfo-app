@@ -474,21 +474,23 @@ const fetchFinancialData = async (
     }
     
     // Create account lookup map
-    const accountLookupMap = new Map();
-    
-    accountsData.forEach((account: any) => {
-      accountLookupMap.set(account.account_name, {
-        type: account.account_type,
-        standardName: account.account_name,
-        classification: account.account_type === 'Income' ? 'Revenue' : 
-                      account.account_type === 'Expenses' ? 'Expenses' :
-                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
-                      account.account_type === 'Other Income' ? 'Revenue' :
-                      account.account_type === 'Other Expenses' ? 'Expenses' :
-                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
-                      account.account_type
-      });
-    });
+const accountLookupMap = new Map();
+
+accountsData.forEach((account: any) => {
+  const normalizedName = (account.account_name || '').trim().toLowerCase();  // 🔑 normalize
+  accountLookupMap.set(normalizedName, {
+    type: account.account_type,
+    standardName: account.account_name,
+    classification: account.account_type === 'Income' ? 'Revenue' : 
+                    account.account_type === 'Expenses' ? 'Expenses' :
+                    account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                    account.account_type === 'Other Income' ? 'Revenue' :
+                    account.account_type === 'Other Expenses' ? 'Expenses' :
+                    account.account_type === 'Interest Expense' ? 'Other Expenses' :
+                    account.account_type || 'Other'
+  });
+});
+
 
     // Enhanced classification for journal entries to match your Google Sheets structure
     const classifyJournalAccount = (entry: any) => {
