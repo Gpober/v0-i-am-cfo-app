@@ -1,24 +1,72 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
+import {
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  Download,
+  RefreshCw,
+  TrendingUp,
+  DollarSign,
+  PieChart,
+  BarChart3,
+  ChevronDown,
+  ChevronRight
+} from 'lucide-react';
 
-const triggerSupabaseSync = async () => {
-  try {
-    const res = await fetch('https://script.google.com/macros/s/AKfycby7wHz7ydjTJwKdj6HtcZGzvWcDVmjuGvGIGj7CmI8a1PGW6_DITEnPRFzCZ0mKCM3y/exec', {
-      method: 'POST',
-    });
-    const text = await res.text();
-    alert(text); // or use showNotification(text, 'success')
-  } catch (error) {
-    console.error('❌ Sync trigger failed:', error);
-    alert('Failed to trigger sync');
-  } finally {
-    setSyncing(false);
-  }
-};
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart as RechartsPieChart,
+  Cell,
+  Pie
+} from 'recharts';
 
+// ✅ State must be declared in the component
+export default function FinancialsPage() {
+  const [syncing, setSyncing] = useState(false);
+  const [data, setData] = useState([]); // optional for later data refresh
+
+  const triggerSupabaseSync = async () => {
+    try {
+      setSyncing(true);
+      const res = await fetch('https://script.google.com/macros/s/AKfycby7wHz7ydjTJwKdj6HtcZGzvWcDVmjuGvGIGj7CmI8a1PGW6_DITEnPRFzCZ0mKCM3y/exec', {
+        method: 'POST',
+      });
+      const text = await res.text();
+      alert(text);
+    } catch (error) {
+      console.error('❌ Sync trigger failed:', error);
+      alert('Failed to trigger sync');
+    } finally {
+      // OPTIONAL: add small delay if Supabase takes a moment to refresh
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      await fetchData(); // optional, only if you’re using Supabase data
+      setSyncing(false);
+    }
+  };
+
+  const fetchData = async () => {
+    // optional data fetching logic here
+    // const res = await fetch('/api/supabase-data');
+    // const json = await res.json();
+    // setData(json);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
   primary: '#56B6E9',
