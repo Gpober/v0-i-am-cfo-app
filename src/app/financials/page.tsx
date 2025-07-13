@@ -84,7 +84,37 @@ interface TooltipState {
   y: number;
 }
 
-// Real Supabase client
+// Helper functions
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(value);
+};
+
+const calculatePercentage = (value: number, total: number): string => {
+  return total !== 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+};
+
+const getDateRangeForMonth = (monthYear: string): { startDate: string, endDate: string } => {
+  const [month, yearStr] = monthYear.split(' ');
+  const year = parseInt(yearStr);
+  const monthIndex = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ].indexOf(month);
+  
+  const startDate = new Date(year, monthIndex, 1);
+  const endDate = new Date(year, monthIndex + 1, 0);
+  
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0]
+  };
+};
+
+// Supabase client
 const createSupabaseClient = () => {
   return {
     from: (table: string) => ({
@@ -213,7 +243,7 @@ const fetchProperties = async (): Promise<string[]> => {
   }
 };
 
-// Enhanced data transformation functions
+// Data transformation functions
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
   const getCleanAccountName = (entry: any) => {
     let accountName = entry.account_name?.trim() || '';
@@ -393,7 +423,6 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
 };
 
 // Fetch financial data from Supabase
-// Fetch financial data from Supabase
 const fetchFinancialData = async (property: string, monthYear: string, filterClause: string = '') => {
   try {
     const { startDate, endDate } = getDateRangeForMonth(monthYear);
@@ -467,301 +496,6 @@ const fetchFinancialData = async (property: string, monthYear: string, filterCla
     };
   }
 };
-    console.log('📡 Final URL with STRICT date filtering:', url);
-
-    const [journalResponse, accountsResponse] = await Promise.all([
-      fetch(url, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }),
-      fetch(`${SUPABASE_URL}/rest/v1/accounts?select=*&order=account_name`, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      })
-    ]);
-
-    if (!journalResponse.ok || !accountsResponse.ok) {
-      throw new Error('Failed to fetch financial data');
-    }
-    
-    const journalData = await journalResponse.json();
-    const accountsData = await accountsResponse.json();
-    
-    console.log('📊 Journal entries loaded for STRICT date range:', journalData.length);
-    
-    // ADDITIONAL CLIENT-SIDE DATE VALIDATION to ensure no date leakage
-    const filteredJournalData = journalData.filter((entry: any) => {
-      const entryDate = new Date(entry.transaction_date);
-      const entryYear = entryDate.getFullYear();
-      const entryMonth = entryDate.getMonth() + 1; // getMonth() is 0-based
-      const entryDay = entryDate.getDate();
-      
-      const targetYear = parseInt(year);
-      const targetMonth = monthNum;
-      
-      const isCorrectYear = entryYear === targetYear;
-      const isCorrectMonth = entryMonth === targetMonth;
-      const isValidDay = entryDay >= 1 && entryDay <= lastDay;
-      
-      if (!isCorrectYear || !isCorrectMonth || !isValidDay) {
-        console.warn(`⚠️ FILTERED OUT: Entry ${entry.je_number} dated ${entry.transaction_date} (not in ${month} ${year})`);
-        return false;
-      }
-      
-      return true;
-    });
-    
-    console.log(`✅ STRICT FILTERING RESULT: ${filteredJournalData.length} entries (filtered out ${journalData.length - filteredJournalData.length} entries)`);
-    
-    // Debug: Show date range of actual entries
-    if (filteredJournalData.length > 0) {
-      const dates = filteredJournalData.map((e: any) => e.transaction_date).sort();
-      console.log(`📅 ACTUAL DATE RANGE in filtered data: ${dates[0]} to ${dates[dates.length - 1]}`);
-    }
-    
-    // Create account lookup map
-    const accountLookupMap = new Map();
-    
-    accountsData.forEach((account: any) => {
-      accountLookupMap.set(account.account_name, {
-        type: account.account_type,
-        standardName: account.account_name,
-        classification: account.account_type === 'Income' ? 'Revenue' : 
-                      account.account_type === 'Expenses' ? 'Expenses' :
-                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
-                      account.account_type === 'Other Income' ? 'Revenue' :
-                      account.account_type === 'Other Expenses' ? 'Expenses' :
-                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
-                      account.account_type
-      });
-    });
-
-    // Enhanced classification for journal entries to match your Google Sheets structure
-    const classifyJournalAccount = (entry: any) => {
-      const accountName = entry.account_name || '';
-      const name = accountName.toLowerCase();
-      const description = (entry.description || '').toLowerCase();
-      
-      console.log('🔍 Classifying account:', accountName, 'Description:', entry.description, 'Line amount:', entry.line_amount, 'Credit:', entry.credit_amount, 'Debit:', entry.debit_amount);
-      
-      // Revenue/Income classification - matching your Google Sheets exactly
-      if (name.includes('rental revenue - airbnb') || 
-          name.includes('rental revenue - direct') ||
-          name.includes('rental revenue - guesty') ||
-          name.includes('rental revenue - reserve payout') ||
-          name.includes('rental revenue - vrbo') ||
-          name.includes('direct booking') ||
-          name.includes('direct revenue') ||
-          name.includes('bookings') ||
-          name.includes('income') || 
-          name.includes('revenue') ||
-          name.includes('rent') || 
-          name.includes('airbnb') ||
-          name.includes('guesty') ||
-          name.includes('vrbo') ||
-          name.includes('adjustment for occupancy taxes') ||
-          name.includes('miscellaneous income') ||
-          name.includes('resolution adjustments') ||
-          // Check description for reclassification entries
-          description.includes('reclassify') ||
-          description.includes('move income') ||
-          description.includes('transfer') ||
-          description.includes('direct booking') ||
-          description.includes('guesty to direct') ||
-          // Standard revenue patterns
-          entry.credit_amount > 0 && entry.debit_amount === 0) {
-        console.log('✅ Classified as REVENUE:', accountName, 'Method: Pattern matching or credit entry');
-        return { 
-          type: 'Income', 
-          classification: 'Revenue', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Expense classification - matching your actual expense categories
-      if (name.includes('advertising') || name.includes('marketing') ||
-          name.includes('facebook') || name.includes('google') ||
-          name.includes('arcade') || name.includes('bank fee') || 
-          name.includes('disposal') || name.includes('waste') ||
-          name.includes('insurance') || name.includes('internet') || 
-          name.includes('tv service') || name.includes('cleaning') ||
-          name.includes('labor') || name.includes('meal') || 
-          name.includes('membership') || name.includes('subscription') ||
-          name.includes('office') || name.includes('shipping') || 
-          name.includes('postage') || name.includes('pool') || 
-          name.includes('hot tub') || name.includes('maintenance') ||
-          name.includes('repair') || name.includes('upgrade') ||
-          name.includes('snow') || name.includes('lawn') || 
-          name.includes('supplies') || name.includes('travel') ||
-          name.includes('utilities') || name.includes('water') || 
-          name.includes('sewer') || name.includes('expense') || 
-          name.includes('cost') ||
-          entry.debit_amount > 0 && entry.credit_amount === 0) {
-        console.log('✅ Classified as EXPENSE:', accountName);
-        return { 
-          type: 'Expenses', 
-          classification: 'Expenses', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Interest expense (separate category)
-      if (name.includes('mortgage') || name.includes('interest')) {
-        return { 
-          type: 'Interest Expense', 
-          classification: 'Other Expenses', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Asset classification
-      if (name.includes('improvements') || name.includes('property') || 
-          name.includes('equipment') || name.includes('cash') ||
-          name.includes('bank') || name.includes('checking') ||
-          name.includes('savings') || name.includes('receivable') ||
-          entry.account_type === 'Fixed Assets') {
-        return { 
-          type: 'Fixed Assets', 
-          classification: 'Assets', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Liability classification
-      if (name.includes('loan') || name.includes('payable') || 
-          name.includes('credit card') || name.includes('debt') || 
-          name.includes('liability') || entry.account_type === 'Credit Card') {
-        return { 
-          type: 'Credit Card', 
-          classification: 'Liabilities', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // ENHANCED DEFAULT CLASSIFICATION for reclassification entries
-      // For reclassification entries, look at the net effect and description
-      if (description.includes('reclassify') || description.includes('transfer') || description.includes('move')) {
-        console.log('🔄 RECLASSIFICATION ENTRY detected:', accountName, 'Description:', entry.description);
-        
-        // For reclassification entries, classify based on the account name pattern and net effect
-        if (name.includes('revenue') || name.includes('income') || name.includes('rental') || name.includes('booking')) {
-          console.log('✅ Reclassification classified as REVENUE:', accountName);
-          return { 
-            type: 'Income', 
-            classification: 'Revenue', 
-            standardName: entry.account_name 
-          };
-        } else {
-          console.log('✅ Reclassification classified as EXPENSE:', accountName);
-          return { 
-            type: 'Expenses', 
-            classification: 'Expenses', 
-            standardName: entry.account_name 
-          };
-        }
-      }
-      
-      // DEFAULT CLASSIFICATION: Use credit/debit logic with enhanced logging
-      if (entry.credit_amount > entry.debit_amount || entry.line_amount < 0) {
-        console.log('🔄 Default classified as REVENUE (credit > debit or negative line_amount):', accountName);
-        return { 
-          type: 'Income', 
-          classification: 'Revenue', 
-          standardName: entry.account_name || 'Revenue Account'
-        };
-      } else if (entry.debit_amount > entry.credit_amount || entry.line_amount > 0) {
-        console.log('🔄 Default classified as EXPENSE (debit > credit or positive line_amount):', accountName);
-        return { 
-          type: 'Expenses', 
-          classification: 'Expenses', 
-          standardName: entry.account_name || 'Expense Account'
-        };
-      } else {
-        // Equal amounts - classify based on account name patterns
-        console.log('🔄 Equal amounts - using name patterns for:', accountName);
-        if (name.includes('revenue') || name.includes('income') || name.includes('rental')) {
-          return { 
-            type: 'Income', 
-            classification: 'Revenue', 
-            standardName: entry.account_name 
-          };
-        } else {
-          return { 
-            type: 'Other', 
-            classification: 'Other', 
-            standardName: entry.account_name || 'Other Account'
-          };
-        }
-      }
-    };
-
-    // Process journal entries using the STRICTLY FILTERED data
-    const enhancedData = filteredJournalData.map((entry: any) => {
-      // First: Try to find exact match in your accounts table
-      let accountInfo = accountLookupMap.get(entry.account_name);
-      
-      if (accountInfo) {
-        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
-      } else {
-        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using account_type from journal entry`);
-        // Use the account_type directly from the journal entry - no guessing!
-        accountInfo = {
-          type: entry.account_type,
-          classification: entry.account_type === 'Income' ? 'Revenue' : 
-                         entry.account_type === 'Expenses' ? 'Expenses' :
-                         entry.account_type === 'Cost of Goods Sold' ? 'Expenses' :
-                         entry.account_type === 'Other Income' ? 'Revenue' :
-                         entry.account_type === 'Other Expenses' ? 'Expenses' :
-                         entry.account_type === 'Interest Expense' ? 'Other Expenses' :
-                         entry.account_type, // Default to whatever the journal entry says
-          standardName: entry.account_name
-        };
-      }
-      
-      return {
-        ...entry,
-        account_type: accountInfo?.type || entry.account_type || 'Other',
-        classification: accountInfo?.classification || accountInfo?.type || 'Other',
-        standard_account_name: accountInfo?.standardName || entry.account_name,
-        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Journal Entry Type'
-      };
-    });
-
-    return {
-      success: true,
-      data: enhancedData || [],
-      accountsData: accountsData,
-      summary: {
-        filteredEntries: enhancedData?.length || 0,
-        originalEntries: journalData.length,
-        dateFiltered: journalData.length - filteredJournalData.length,
-        dataSource: `Supabase + STRICT ${month} ${year} Filtering`,
-        dateRange: `${startDate} to ${endDate}`,
-        filters: { property, monthYear },
-        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
-        propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
-        mappingStats: {
-          totalEntries: enhancedData?.length || 0,
-          accountsTableMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Accounts Table').length || 0,
-          fallbackMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Fallback Classification').length || 0
-        }
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching financial data:', error);
-    return {
-      success: false,
-      error: (error as Error).message,
-      data: []
-    };
-  }
-};
 
 // IAM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -832,8 +566,6 @@ export default function FinancialsPage() {
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
   const [accountTooltip, setAccountTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
-
-  // Real data state
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [realData, setRealData] = useState<any>(null);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -891,16 +623,14 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
-let filterClause = '';
-let propertyFilter = 'All Properties';
+      let filterClause = '';
+      let propertyFilter = 'All Properties';
 
-if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-  const selected = Array.from(selectedProperties).map(p => `property_class.eq.${encodeURIComponent(p)}`);
-  filterClause = `&or=(${selected.join(',')})`;
-  propertyFilter = 'Multiple Properties';
-}
-
-
+      if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
+        const selected = Array.from(selectedProperties).map(p => `property_class.eq.${encodeURIComponent(p)}`);
+        filterClause = `&or=(${selected.join(',')})`;
+        propertyFilter = 'Multiple Properties';
+      }
       
       console.log('🔍 LOADING DATA WITH FILTERS:', {
         selectedProperties: Array.from(selectedProperties),
@@ -991,19 +721,6 @@ if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
       return Array.from(selectedProperties)[0];
     }
     return `${selectedProperties.size} Properties Selected`;
-  };
-
-  // Helper functions
-  const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0
-    }).format(value);
-  };
-
-  const calculatePercentage = (value: number, total: number): string => {
-    return total !== 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
   };
 
   const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info'): void => {
@@ -1160,44 +877,7 @@ if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
         x: rect.left + rect.width / 2,
         y: rect.top - 10
       });
-    } else {
-      // Fallback to old static sub-account handling
-      handleSubAccountMouseEnterStatic(event, subAccountItem, typeof subAccountItem === 'string' ? 0 : subAccountItem);
     }
-  };
-
-  const handleSubAccountMouseEnterStatic = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
-    const details = subAccountDetails[subAccountName];
-    if (!details || details.length === 0) return;
-
-    let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
-      ${subAccountName} • ${formatCurrency(subAccountTotal)}
-    </div>`;
-
-    details.forEach((item, index) => {
-      const percentage = subAccountTotal ? ((item.amount / subAccountTotal) * 100).toFixed(1) : '0';
-      
-      tooltipContent += `
-        <div style="margin-bottom: ${index < details.length - 1 ? '8px' : '0'};">
-          <div style="display: flex; align-items: center; gap: 4px;">
-            <div style="width: 6px; height: 6px; background: ${BRAND_COLORS.success}; border-radius: 50%;"></div>
-            <strong style="font-size: 12px; color: white;">${item.name}</strong>
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-left: 10px;">
-            <span style="font-size: 11px;">${formatCurrency(item.amount)}</span>
-            <span style="font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 10px;">${percentage}%</span>
-          </div>
-        </div>
-      `;
-    });
-
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    setAccountTooltip({
-      show: true,
-      content: tooltipContent,
-      x: rect.left + rect.width / 2,
-      y: rect.top - 10
-    });
   };
 
   const handleAccountMouseLeave = (): void => {
@@ -1974,7 +1654,7 @@ if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
                         </tbody>
                       </table>
                     )}
-                  </div>
+                                      </div>
                 )}
 
                 {/* Cash Flow Content */}
@@ -1983,120 +1663,107 @@ if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
                     {isLoadingData ? (
                       <div className="flex items-center justify-center py-8">
                         <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                        <span>Loading cash flow data...</span>
+                        <span>Loading cash flow data from Supabase...</span>
+                      </div>
+                    ) : currentCashFlowData.inFlow.length === 0 && currentCashFlowData.outFlow.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No cash flow data available for the selected filters
                       </div>
                     ) : (
                       <table className="w-full">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Account
                             </th>
                             {renderColumnHeaders()}
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              % of Total Cash
-                            </th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {/* Cash In-Flow Section */}
-                          <tr className="bg-green-50">
-                            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
-                              💰 CASH IN-FLOW
+                          {/* CASH INFLOW SECTION */}
+                          <tr className="bg-green-50 border-t-2 border-green-200">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-green-900">
+                              💰 CASH INFLOW
                             </td>
-                          </tr>
-                          {currentCashFlowData.inFlow.map((item) => (
-                            <tr key={`inflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                <span className="ml-4">{item.name}</span>
-                              </td>
-                              {renderCashFlowDataCells(item)}
-                              <td className="px-4 py-3 text-right text-sm text-green-600">
-                                {currentCashFlowData.totalCashFlow ? calculatePercentage(item.total, Math.abs(currentCashFlowData.totalCashFlow)) : '0%'}
-                              </td>
-                            </tr>
-                          ))}
-                          
-                          {/* Total Cash In-Flow */}
-                          <tr className="bg-green-100 font-semibold">
-                            <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
-                              Total Cash In-Flow
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+                            <td className="px-4 py-4 text-right text-lg font-bold text-green-600">
                               {formatCurrency(currentCashFlowData.totalInFlow)}
                             </td>
-                            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
-                              100%
-                            </td>
                           </tr>
-
-                          {/* Cash Out-Flow Section */}
-                          <tr className="bg-red-50">
-                            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
-                              💸 CASH OUT-FLOW
-                            </td>
-                          </tr>
-                          {currentCashFlowData.outFlow.map((item) => (
-                            <tr key={`outflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                <span className="ml-4">{item.name}</span>
+                          
+                          {/* Individual Inflow Items */}
+                          {currentCashFlowData.inFlow.map((item) => (
+                            <tr key={`inflow-${item.name}`} className="hover:bg-gray-50">
+                              <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                <span 
+                                  className="cursor-help"
+                                  onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                  onMouseLeave={handleAccountMouseLeave}
+                                >
+                                  {item.name}
+                                </span>
                               </td>
                               {renderCashFlowDataCells(item)}
-                              <td className="px-4 py-3 text-right text-sm text-red-600">
-                                {currentCashFlowData.totalOutFlow ? calculatePercentage(Math.abs(item.total), Math.abs(currentCashFlowData.totalOutFlow)) : '0%'}
+                            </tr>
+                          ))}
+
+                          {/* CASH OUTFLOW SECTION */}
+                          <tr className="bg-red-50 border-t-4 border-red-200 mt-4">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
+                              💸 CASH OUTFLOW
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                              ({formatCurrency(currentCashFlowData.totalOutFlow)})
+                            </td>
+                          </tr>
+                          
+                          {/* Individual Outflow Items */}
+                          {currentCashFlowData.outFlow.map((item) => (
+                            <tr key={`outflow-${item.name}`} className="hover:bg-gray-50">
+                              <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                <span 
+                                  className="cursor-help"
+                                  onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                  onMouseLeave={handleAccountMouseLeave}
+                                >
+                                  {item.name}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm font-medium text-red-600">
+                                ({formatCurrency(item.total)})
                               </td>
                             </tr>
                           ))}
 
-                          {/* Total Cash Out-Flow */}
-                          <tr className="bg-red-100 font-semibold">
-                            <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
-                              Total Cash Out-Flow
+                          {/* NET CASH FLOW */}
+                          <tr className="border-t-4" style={{ 
+                            backgroundColor: BRAND_COLORS.primary + '20', 
+                            borderTopColor: BRAND_COLORS.primary 
+                          }}>
+                            <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              🏆 NET CASH FLOW
                             </td>
-                            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                              ({formatCurrency(Math.abs(currentCashFlowData.totalOutFlow))})
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                              100%
-                            </td>
-                          </tr>
-
-                          {/* Net Cash Flow */}
-                          <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                            <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
-                              🏦 NET CASH FLOW
-                            </td>
-                            <td className={`px-4 py-4 text-right text-lg font-bold ${
+                            <td className={`px-4 py-5 text-right text-xl font-bold ${
                               currentCashFlowData.totalCashFlow >= 0 ? 'text-green-700' : 'text-red-700'
                             }`}>
                               {formatCurrency(currentCashFlowData.totalCashFlow)}
                             </td>
-                            <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
-                              Net Change
-                            </td>
                           </tr>
 
-                          {/* Beginning & Ending Cash Balance */}
-                          <tr className="bg-gray-50">
-                            <td className="px-4 py-3 text-left text-sm text-gray-700">
+                          {/* BEGINNING AND ENDING CASH */}
+                          <tr className="bg-blue-50 border-t-2 border-blue-200">
+                            <td className="px-6 py-4 text-left text-sm font-medium text-blue-900">
                               Beginning Cash Balance
                             </td>
-                            <td className="px-4 py-3 text-right text-sm text-gray-700">
+                            <td className="px-4 py-4 text-right text-sm text-blue-900">
                               {formatCurrency(currentCashFlowData.beginningCash)}
                             </td>
-                            <td className="px-4 py-3 text-right text-sm text-gray-500">
-                              Starting
-                            </td>
                           </tr>
-                          <tr className="border-t" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                            <td className="px-4 py-3 text-left text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+                          <tr className="bg-blue-50">
+                            <td className="px-6 py-4 text-left text-sm font-medium text-blue-900">
                               Ending Cash Balance
                             </td>
-                            <td className="px-4 py-3 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+                            <td className="px-4 py-4 text-right text-sm text-blue-900">
                               {formatCurrency(currentCashFlowData.endingCash)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
-                              Final
                             </td>
                           </tr>
                         </tbody>
@@ -2107,147 +1774,328 @@ if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
 
                 {/* Balance Sheet Content */}
                 {activeTab === 'balance-sheet' && (
-                  <div className="p-6">
-                    <div className="text-center py-8">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Balance Sheet</h3>
-                      <p className="text-gray-600">Balance sheet functionality coming soon...</p>
-                    </div>
+                  <div className="overflow-x-auto">
+                    {isLoadingData ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                        <span>Loading balance sheet data from Supabase...</span>
+                      </div>
+                    ) : currentData.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No balance sheet data available for the selected filters
+                      </div>
+                    ) : (
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Account
+                            </th>
+                            {renderColumnHeaders()}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {/* ASSETS SECTION */}
+                          <tr className="bg-blue-50 border-t-2 border-blue-200">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
+                              🏦 ASSETS
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
+                              {formatCurrency(
+                                currentData
+                                  .filter(item => item.type === 'Assets')
+                                  .reduce((sum, item) => sum + Math.abs(item.total), 0)
+                              )}
+                            </td>
+                          </tr>
+                          
+                          {/* Asset Accounts */}
+                          {currentData
+                            .filter(item => item.type === 'Assets')
+                            .map((item) => (
+                              <tr key={`asset-${item.name}`} className="hover:bg-gray-50">
+                                <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                  <span 
+                                    className="cursor-help"
+                                    onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                    onMouseLeave={handleAccountMouseLeave}
+                                  >
+                                    {item.name}
+                                  </span>
+                                </td>
+                                {renderDataCells(item)}
+                              </tr>
+                            ))}
+
+                          {/* LIABILITIES SECTION */}
+                          <tr className="bg-red-50 border-t-4 border-red-200 mt-4">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
+                              🏛️ LIABILITIES
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                              {formatCurrency(
+                                currentData
+                                  .filter(item => item.type === 'Liabilities')
+                                  .reduce((sum, item) => sum + Math.abs(item.total), 0)
+                              )}
+                            </td>
+                          </tr>
+                          
+                          {/* Liability Accounts */}
+                          {currentData
+                            .filter(item => item.type === 'Liabilities')
+                            .map((item) => (
+                              <tr key={`liability-${item.name}`} className="hover:bg-gray-50">
+                                <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                  <span 
+                                    className="cursor-help"
+                                    onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                    onMouseLeave={handleAccountMouseLeave}
+                                  >
+                                    {item.name}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 text-right text-sm font-medium text-red-600">
+                                  ({formatCurrency(Math.abs(item.total))})
+                                </td>
+                              </tr>
+                            ))}
+
+                          {/* EQUITY SECTION */}
+                          <tr className="bg-green-50 border-t-4 border-green-200 mt-4">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-green-900">
+                              🏆 EQUITY
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-green-600">
+                              {formatCurrency(
+                                currentData
+                                  .filter(item => item.type === 'Equity')
+                                  .reduce((sum, item) => sum + Math.abs(item.total), 0)
+                              )}
+                            </td>
+                          </tr>
+                          
+                          {/* Equity Accounts */}
+                          {currentData
+                            .filter(item => item.type === 'Equity')
+                            .map((item) => (
+                              <tr key={`equity-${item.name}`} className="hover:bg-gray-50">
+                                <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                  <span 
+                                    className="cursor-help"
+                                    onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                    onMouseLeave={handleAccountMouseLeave}
+                                  >
+                                    {item.name}
+                                  </span>
+                                </td>
+                                {renderDataCells(item)}
+                              </tr>
+                            ))}
+
+                          {/* BALANCE SHEET TOTALS */}
+                          <tr className="border-t-4" style={{ 
+                            backgroundColor: BRAND_COLORS.primary + '20', 
+                            borderTopColor: BRAND_COLORS.primary 
+                          }}>
+                            <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              📊 TOTAL ASSETS = LIABILITIES + EQUITY
+                            </td>
+                            <td className="px-4 py-5 text-right text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              {formatCurrency(
+                                currentData
+                                  .filter(item => item.type === 'Assets')
+                                  .reduce((sum, item) => sum + Math.abs(item.total), 0)
+                              )}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Right Column: Charts */}
-            <div className="space-y-8">
+            {/* Right Column: Charts and Visualizations */}
+            <div className="space-y-6">
               {/* Revenue Trend Chart */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Revenue Trend</h3>
+              <div className="bg-white p-6 rounded-xl shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Revenue Trend</h3>
+                  <div className="flex gap-2">
+                    <button className="px-2 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">
+                      6M
+                    </button>
+                    <button className="px-2 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">
+                      12M
+                    </button>
+                    <button className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                      YTD
+                    </button>
+                  </div>
                 </div>
-                <div className="p-6">
-                  <ResponsiveContainer width="100%" height={200}>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 12 }}
+                        tickLine={false}
+                        axisLine={{ stroke: '#E5E7EB' }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                        tickLine={false}
+                        axisLine={{ stroke: '#E5E7EB' }}
+                        tickFormatter={(value) => `$${(value / 1000)}k`}
+                      />
+                      <Tooltip 
+                        formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
+                        labelFormatter={(label) => `Month: ${label}`}
+                        contentStyle={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '0.5rem',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
                       <Line 
                         type="monotone" 
                         dataKey="revenue" 
                         stroke={BRAND_COLORS.primary} 
-                        strokeWidth={3}
-                        dot={{ r: 6, fill: BRAND_COLORS.primary }}
-                        activeDot={{ r: 8, fill: BRAND_COLORS.primary }}
+                        strokeWidth={2}
+                        dot={{ r: 4, fill: BRAND_COLORS.primary }}
+                        activeDot={{ r: 6, stroke: BRAND_COLORS.primary, strokeWidth: 2 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* Expense Breakdown */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
+              {/* Profit Margins Chart */}
+              <div className="bg-white p-6 rounded-xl shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Profit Margins</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { name: 'Gross', value: kpis.grossMargin },
+                      { name: 'Operating', value: kpis.operatingMargin },
+                      { name: 'Net', value: kpis.netMargin }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 12 }}
+                        tickLine={false}
+                        axisLine={{ stroke: '#E5E7EB' }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                        tickLine={false}
+                        axisLine={{ stroke: '#E5E7EB' }}
+                        tickFormatter={(value) => `${value}%`}
+                      />
+                      <Tooltip 
+                        formatter={(value) => [`${value}%`, 'Margin']}
+                        contentStyle={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '0.5rem',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        fill={BRAND_COLORS.success}
+                        radius={[4, 4, 0, 0]}
+                      >
+                        {[0, 1, 2].map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={[
+                              BRAND_COLORS.primary,
+                              BRAND_COLORS.success,
+                              BRAND_COLORS.secondary
+                            ][index]} 
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="p-6">
-                  {expenseData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <RechartsPieChart>
-                        <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']} />
+              </div>
+
+              {/* Expense Breakdown Pie Chart */}
+              {expenseData.length > 0 && (
+                <div className="bg-white p-6 rounded-xl shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Expense Breakdown</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
                         <Pie
                           data={expenseData}
                           cx="50%"
                           cy="50%"
+                          labelLine={false}
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
-                          label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         >
                           {expenseData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                      </RechartsPieChart>
+                        <Tooltip 
+                          formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']}
+                          contentStyle={{
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '0.5rem',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                          }}
+                        />
+                        <Legend 
+                          layout="horizontal" 
+                          verticalAlign="bottom" 
+                          align="center"
+                          wrapperStyle={{ paddingTop: '20px' }}
+                        />
+                      </PieChart>
                     </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-48 text-gray-500">
-                      No expense data available
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Property Performance Summary */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Property Summary</h3>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Selected Properties:</span>
-                      <span className="text-sm font-medium">{getSelectedPropertiesText()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Data Period:</span>
-                      <span className="text-sm font-medium">{selectedMonth}</span>
-                    </div>
-                    {realData?.summary && (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Journal Entries:</span>
-                          <span className="text-sm font-medium">{realData.summary.filteredEntries}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Properties in Data:</span>
-                          <span className="text-sm font-medium">{realData.summary.propertiesInData?.length || 0}</span>
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
-
-          {/* Account Tooltip */}
-          {accountTooltip.show && (
-            <div
-              className="fixed z-50 bg-gray-900 text-white p-4 rounded-lg text-xs shadow-xl pointer-events-none transition-opacity border border-gray-700"
-              style={{
-                left: Math.max(10, Math.min(accountTooltip.x - 140, window.innerWidth - 290)),
-                top: accountTooltip.y - 10,
-                transform: 'translateY(-100%)',
-                maxWidth: '280px',
-                minWidth: '260px'
-              }}
-              dangerouslySetInnerHTML={{ __html: accountTooltip.content }}
-            />
-          )}
-
-          {/* Notification */}
-          {notification.show && (
-            <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg text-white font-medium shadow-lg transition-transform ${
-              notification.type === 'success' ? 'bg-green-500' :
-              notification.type === 'error' ? 'bg-red-500' :
-              'bg-blue-500'
-            } ${notification.show ? 'translate-x-0' : 'translate-x-full'}`}>
-              {notification.message}
-            </div>
-          )}
-
-          {/* Click outside to close dropdowns */}
-          {(timeViewDropdownOpen || propertyDropdownOpen) && (
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => {
-                setTimeViewDropdownOpen(false);
-                setPropertyDropdownOpen(false);
-              }}
-            />
-          )}
         </div>
       </main>
+
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white text-sm font-medium transition-all duration-300 ${
+          notification.type === 'success' ? 'bg-green-500' :
+          notification.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+
+      {/* Account Tooltip */}
+      {accountTooltip.show && (
+        <div 
+          className="fixed z-50 max-w-xs p-3 bg-gray-800 text-white text-xs rounded-lg shadow-xl pointer-events-none"
+          style={{
+            left: `${accountTooltip.x}px`,
+            top: `${accountTooltip.y}px`,
+            transform: 'translateX(-50%) translateY(-100%)'
+          }}
+          dangerouslySetInnerHTML={{ __html: accountTooltip.content }}
+        />
+      )}
     </div>
   );
 }
+                 
