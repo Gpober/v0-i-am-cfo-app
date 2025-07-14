@@ -135,7 +135,7 @@ const fetchProperties = async (): Promise<string[]> => {
 
     let uniqueProperties: string[] = [];
 
-    // 1. Try 2025 entries
+    // === Step 1: Try 2025 entries ===
     const url2025 = new URL(`${SUPABASE_URL}/rest/v1/journal_entries`);
     url2025.searchParams.append("select", "property_class");
     url2025.searchParams.append("transaction_date", "gte.2025-01-01");
@@ -145,9 +145,13 @@ const fetchProperties = async (): Promise<string[]> => {
 
     if (res2025.ok) {
       const data = await res2025.json();
-      const properties = data.map((item: any) => item.property_class);
-      uniqueProperties = [...new Set(properties.filter(p => p && p.trim() !== ""))];
-      console.log("📅 Found 2025 properties:", uniqueProperties);
+      const cleaned = data
+        .map((item: any) => item.property_class)
+        .filter((pc) => pc && pc.trim() !== "")
+        .map((pc) => pc.replace(/,/g, "").trim()); // remove commas and trim
+
+      uniqueProperties = [...new Set(cleaned)];
+      console.log("📅 Cleaned 2025 properties:", uniqueProperties);
     } else {
       console.warn("⚠️ 2025 fetch failed, falling back to all entries...");
 
@@ -158,13 +162,17 @@ const fetchProperties = async (): Promise<string[]> => {
 
       if (fallbackRes.ok) {
         const data = await fallbackRes.json();
-        const properties = data.map((item: any) => item.property_class);
-        uniqueProperties = [...new Set(properties.filter(p => p && p.trim() !== ""))];
-        console.log("📦 Found fallback properties:", uniqueProperties);
+        const cleaned = data
+          .map((item: any) => item.property_class)
+          .filter((pc) => pc && pc.trim() !== "")
+          .map((pc) => pc.replace(/,/g, "").trim());
+
+        uniqueProperties = [...new Set(cleaned)];
+        console.log("📦 Cleaned fallback properties:", uniqueProperties);
       }
     }
 
-    // 2. Add known static properties
+    // === Step 2: Add known static values ===
     const knownStatic = [
       "Cleveland", "Columbus IN", "Detroit", "General", "Hastings MN",
       "Lisbon", "McHenry IL", "Mokena IL", "Pine Terrace",
@@ -172,10 +180,11 @@ const fetchProperties = async (): Promise<string[]> => {
     ];
 
     const allCombined = [...new Set([...uniqueProperties, ...knownStatic])];
+
     if (allCombined.length === 0) return ["All Properties", "General"];
 
     const final = ["All Properties", ...allCombined.sort()];
-    console.log("✅ Final property list:", final);
+    console.log("✅ Final cleaned property list:", final);
     return final;
 
   } catch (err) {
@@ -188,6 +197,7 @@ const fetchProperties = async (): Promise<string[]> => {
     ];
   }
 };
+
 
 
 // Enhanced data transformation functions
