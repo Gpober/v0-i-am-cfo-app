@@ -126,36 +126,41 @@ const supabase = createSupabaseClient();
 const fetchProperties = async (): Promise<string[]> => {
   try {
     console.log('🏠 Fetching unique property_class values from journal_entries...');
-    
-    // First try to get properties from 2025 data to get the most current property list
-    const current2025Response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&transaction_date=gte.2025-01-01&transaction_date=lte.2025-12-31`, {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
 
-    let uniquePropertiesFromData = [];
-    
+    // Fetch properties from 2025 entries
+    const current2025Response = await fetch(
+      `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&transaction_date=gte.2025-01-01&transaction_date=lte.2025-12-31`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    let uniquePropertiesFromData: string[] = [];
+
     if (current2025Response.ok) {
       const data2025 = await current2025Response.json();
       console.log('📅 Found 2025 data entries:', data2025.length);
+
       const properties2025 = data2025.map((item: any) => item.property_class);
       const filtered2025 = properties2025.filter((pc: any) => pc && pc.trim() !== '');
       uniquePropertiesFromData = [...new Set(filtered2025)];
-      console.log('🏠 Properties found in 2025 data:', uniquePropertiesFromData);
     } else {
-      console.log('📅 No 2025 data found, fetching all property data...');
-      // Fallback to all data if 2025 data not available
-      const allDataResponse = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
+      console.log('⚠️ No 2025 data found or error occurred. Falling back to all data...');
+      const allDataResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
+        {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
         }
-      });
-      
+      );
+
       if (allDataResponse.ok) {
         const allData = await allDataResponse.json();
         const allProperties = allData.map((item: any) => item.property_class);
@@ -163,52 +168,48 @@ const fetchProperties = async (): Promise<string[]> => {
         uniquePropertiesFromData = [...new Set(filteredAll)];
       }
     }
-    
-    // Known properties based on your data (with correct names - only Columbus, IN)
+
+    // Known fixed fallback properties
     const knownProperties = [
       'Cleveland',
-      'Columbus, IN',  // Only the one with comma and state
+      'Columbus IN',
       'Detroit',
-      'General', 
+      'General',
       'Hastings MN',
       'Lisbon',
-      'McHenry IL',    
+      'McHenry IL',
       'Mokena IL',
       'Pine Terrace',
       'Rockford',
       'Terraview',
-      'Wesley'
+      'Wesley',
     ];
-    
-    // Combine data-driven properties with known properties
+
     const allProperties = [...new Set([...uniquePropertiesFromData, ...knownProperties])];
-    
+
     if (allProperties.length === 0) {
       return ['All Properties', 'General'];
     }
-    
+
     const result = ['All Properties', ...allProperties.sort()];
-    console.log('✅ Final property list (2025 data + known):', result);
-    console.log('🔍 Properties from 2025 data:', uniquePropertiesFromData);
-    console.log('🔍 Known properties added:', knownProperties);
+    console.log('✅ Final property list:', result);
     return result;
-    
   } catch (error) {
     console.error('❌ Property fetch error:', error);
     return [
       'All Properties',
       'Cleveland',
-      'Columbus, IN',  // Only the one with comma and state
+      'Columbus IN',
       'Detroit',
-      'General', 
+      'General',
       'Hastings MN',
       'Lisbon',
-      'McHenry IL',    
+      'McHenry IL',
       'Mokena IL',
       'Pine Terrace',
       'Rockford',
       'Terraview',
-      'Wesley'
+      'Wesley',
     ];
   }
 };
@@ -810,10 +811,12 @@ export default function FinancialsPage() {
 
 const loadInitialData = async () => {
   try {
+    console.log("🚀 loadInitialData started...");
     setIsLoadingData(true);
 
     const properties = await fetchProperties();
     console.log('🏠 Available properties loaded:', properties);
+
     setAvailableProperties(properties);
 
     await loadRealFinancialData();
