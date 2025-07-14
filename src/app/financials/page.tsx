@@ -1,76 +1,31 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from "react";
-import {
-  ArrowUp,
-  ArrowDown,
-  Minus,
-  Download,
-  RefreshCw,
-  TrendingUp,
-  DollarSign,
-  PieChart,
-  BarChart3,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart as RechartsPieChart,
-  Cell,
-  Pie,
-} from "recharts";
+import React, { useState, useEffect } from 'react';
+import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
 
-// ======= SUPABASE SYNC BUTTON =======
-const triggerSupabaseSync = async (setSyncing: (state: boolean) => void) => {
-  setSyncing(true);
-  try {
-    const res = await fetch(
-      "https://script.google.com/macros/s/AKfycby7wHz7ydjTJwKdj6HtcZGzvWcDVmjuGvGIGj7CmI8a1PGW6_DITEnPRFzCZ0mKCM3y/exec",
-      {
-        method: "POST",
-      }
-    );
-    const text = await res.text();
-    alert(text); // Replace with toast if needed
-  } catch (error) {
-    console.error("❌ Sync trigger failed:", error);
-    alert("Failed to trigger sync");
-  } finally {
-    setSyncing(false);
+// IAM CFO Brand Colors
+const BRAND_COLORS = {
+  primary: '#56B6E9',
+  secondary: '#3A9BD1',
+  tertiary: '#7CC4ED',
+  accent: '#2E86C1',
+  success: '#27AE60',
+  warning: '#F39C12',
+  danger: '#E74C3C',
+  gray: {
+    50: '#F8FAFC',
+    100: '#F1F5F9',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    900: '#0F172A'
   }
 };
-
-
-// ======= BRAND COLORS =======
-const BRAND_COLORS = {
-  primary: "#56B6E9",
-  secondary: "#3A9BD1",
-  tertiary: "#7CC4ED",
-  accent: "#2E86C1",
-  success: "#27AE60",
-  warning: "#F39C12",
-  danger: "#E74C3C",
-  gray: {
-    50: "#F8FAFC",
-    100: "#F1F5F9",
-    200: "#E2E8F0",
-    300: "#CBD5E1",
-    400: "#94A3B8",
-    500: "#64748B",
-  },
-};
-
-// ======= MAIN COMPONENT =======
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ijeuusvwqcnljctkvjdi.supabase.co';
@@ -243,7 +198,7 @@ const fetchProperties = async (): Promise<string[]> => {
     return [
       'All Properties',
       'Cleveland',
-      'Columbus IN',  // Only the one with comma and state
+      'Columbus, IN',  // Only the one with comma and state
       'Detroit',
       'General', 
       'Hastings MN',
@@ -290,29 +245,31 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       };
     }
     
-   let amount = 0;
-
-switch (acc[key].type) {
-  case 'Income':
-    amount = entry.credit_amount - entry.debit_amount;
-    break;
-
-  case 'Expenses':
-    amount = entry.debit_amount - entry.credit_amount;
-    break;
-
-  case 'Assets':
-    amount = entry.debit_amount - entry.credit_amount;
-    break;
-
-  case 'Liabilities':
-    amount = entry.credit_amount - entry.debit_amount;
-    break;
-
-  default:
-    amount = entry.debit_amount - entry.credit_amount;
-}
-
+    let amount = 0;
+    
+    switch (acc[key].type) {
+      case 'Revenue':
+        amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
+        if (amount < 0) {
+          amount = Math.abs(amount);
+        }
+        break;
+        
+      case 'Expenses':
+        amount = Math.abs(entry.line_amount || (entry.debit_amount - entry.credit_amount));
+        break;
+        
+      case 'Assets':
+        amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
+        break;
+        
+      case 'Liabilities':
+        amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
+        break;
+        
+      default:
+        amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
+    }
     
     acc[key].total += amount;
     acc[key].months[monthYear as MonthString] = (acc[key].months[monthYear as MonthString] || 0) + amount;
@@ -519,23 +476,21 @@ const fetchFinancialData = async (
     }
     
     // Create account lookup map
-const accountLookupMap = new Map();
-
-accountsData.forEach((account: any) => {
-  const normalizedName = (account.account_name || '').trim().toLowerCase();  // 🔑 normalize
-  accountLookupMap.set(normalizedName, {
-    type: account.account_type,
-    standardName: account.account_name,
-    classification: account.account_type === 'Income' ? 'Revenue' : 
-                    account.account_type === 'Expenses' ? 'Expenses' :
-                    account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
-                    account.account_type === 'Other Income' ? 'Revenue' :
-                    account.account_type === 'Other Expenses' ? 'Expenses' :
-                    account.account_type === 'Interest Expense' ? 'Other Expenses' :
-                    account.account_type || 'Other'
-  });
-});
-
+    const accountLookupMap = new Map();
+    
+    accountsData.forEach((account: any) => {
+      accountLookupMap.set(account.account_name, {
+        type: account.account_type,
+        standardName: account.account_name,
+        classification: account.account_type === 'Income' ? 'Revenue' : 
+                      account.account_type === 'Expenses' ? 'Expenses' :
+                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                      account.account_type === 'Other Income' ? 'Revenue' :
+                      account.account_type === 'Other Expenses' ? 'Expenses' :
+                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
+                      account.account_type
+      });
+    });
 
     // Enhanced classification for journal entries to match your Google Sheets structure
     const classifyJournalAccount = (entry: any) => {
@@ -696,63 +651,41 @@ accountsData.forEach((account: any) => {
       }
     };
 
-// ======= CLASSIFICATION & SIGNING HELPERS =======
-
-// Classify account types into reporting groups
-const classifyAccount = (type: string): string => {
-  switch (type) {
-    case 'Income':
-    case 'Other Income':
-      return 'Revenue';
-    case 'Expenses':
-    case 'Cost of Goods Sold':
-    case 'Other Expenses':
-    case 'Interest Expense':
-      return 'Expenses';
-    default:
-      return type || 'Other';
-  }
-};
-
-// Sign logic based on debit/credit & classification
-const getSignedLineAmount = (entry: any) => {
-  const type = entry.classification;
-  const isCredit = entry.credit_amount > 0;
-  const isDebit = entry.debit_amount > 0;
-
-  if (type === 'Revenue') {
-    return isCredit ? entry.credit_amount : -entry.debit_amount;
-  } else if (type === 'Expenses') {
-    return isDebit ? entry.debit_amount : -entry.credit_amount;
-  } else {
-    return entry.line_amount; // Other types (like Balance Sheet items) untouched
-  }
-};
-
-// ======= MAP JOURNAL DATA =======
-const enhancedData = filteredJournalData.map((entry: any) => {
-  const normalizedAccountName = (entry.account_name || '').trim().toLowerCase();
-  const accountInfo = accountLookupMap.get(normalizedAccountName) || {
-    type: entry.account_type || 'Other',
-    classification: classifyAccount(entry.account_type),
-    standardName: entry.account_name,
-  };
-
-  return {
-    ...entry,
-    signed_amount: getSignedLineAmount({ ...entry, classification: accountInfo.classification }),
-    account_type: accountInfo.type,
-    classification: accountInfo.classification,
-    standard_account_name: accountInfo.standardName,
-    mapping_method: accountLookupMap.has(normalizedAccountName)
-      ? 'Accounts Table'
-      : 'Journal Entry Type',
-  };
-});
+    // Process journal entries using the STRICTLY FILTERED data
+    const enhancedData = filteredJournalData.map((entry: any) => {
+      // First: Try to find exact match in your accounts table
+      let accountInfo = accountLookupMap.get(entry.account_name);
+      
+      if (accountInfo) {
+        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
+      } else {
+        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using account_type from journal entry`);
+        // Use the account_type directly from the journal entry - no guessing!
+        accountInfo = {
+          type: entry.account_type,
+          classification: entry.account_type === 'Income' ? 'Revenue' : 
+                         entry.account_type === 'Expenses' ? 'Expenses' :
+                         entry.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                         entry.account_type === 'Other Income' ? 'Revenue' :
+                         entry.account_type === 'Other Expenses' ? 'Expenses' :
+                         entry.account_type === 'Interest Expense' ? 'Other Expenses' :
+                         entry.account_type, // Default to whatever the journal entry says
+          standardName: entry.account_name
+        };
+      }
+      
+      return {
+        ...entry,
+        account_type: accountInfo?.type || entry.account_type || 'Other',
+        classification: accountInfo?.classification || accountInfo?.type || 'Other',
+        standard_account_name: accountInfo?.standardName || entry.account_name,
+        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Journal Entry Type'
+      };
+    });
 
     return {
       success: true,
-      data: enhancedData || [], // Each row now includes signed_amount
+      data: enhancedData || [],
       accountsData: accountsData,
       summary: {
         filteredEntries: enhancedData?.length || 0,
@@ -923,26 +856,12 @@ export default function FinancialsPage() {
       
       if (rawData.success) {
         const entries = rawData.data as FinancialEntry[];
-        const formattedEntries = entries.map((entry) => {
-  const isIncome = entry.account_type === 'Revenue' || entry.account_type === 'Income';
-
-  const signedAmount = isIncome
-    ? (entry.normal_balance === 'credit' ? entry.amount : -entry.amount)
-    : (entry.normal_balance === 'debit' ? entry.amount : -entry.amount);
-
-  return {
-    ...entry,
-    signedAmount,
-  };
-});
         
-console.log('🔍 DEBUG - Raw Journal Entries Sample:', formattedEntries.slice(0, 5));
-console.log('🧾 All entries classified as "Rental Revenue - Direct":', formattedEntries.filter(e => e.standard_account_name?.includes('Rental Revenue - Direct')));
-console.log('🔍 DEBUG - Total entries loaded:', formattedEntries.length);
-
-const transformedPL = transformFinancialData(formattedEntries, selectedMonth);
-const transformedCF = transformCashFlowData(formattedEntries);
-
+        console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
+        console.log('🔍 DEBUG - Total entries loaded:', entries.length);
+        
+        const transformedPL = transformFinancialData(entries, selectedMonth);
+        const transformedCF = transformCashFlowData(entries);
 
         const combinedData = {
           success: true,
@@ -1209,7 +1128,7 @@ const transformedCF = transformCashFlowData(formattedEntries);
             <strong style="font-size: 12px; color: white;">${item.name}</strong>
           </div>
           <div style="display: flex; justify-content: space-between; margin-left: 10px;">
-            <span style="font-size: 11px;">${formatCurrency(Math.abs(item.amount))}</span>
+            <span style="font-size: 11px;">${formatCurrency(item.amount)}</span>
             <span style="font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 10px;">${percentage}%</span>
           </div>
         </div>
@@ -1427,39 +1346,24 @@ const transformedCF = transformCashFlowData(formattedEntries);
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  <div className="space-y-8">
-    {/* Header Controls */}
-    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-      <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>
-        Financial Management
-      </h2>
-
-      <div className="flex flex-wrap gap-4 items-center">
-        {/* Trigger Sync Button */}
-        <button
-  onClick={() => triggerSupabaseSync(setSyncing)}
-  disabled={syncing}
-  className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors shadow-sm ${
-    syncing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-  }`}
->
-  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-  {syncing ? 'Syncing...' : 'Trigger Sync'}
-</button>
-
-        {/* Month Selector */}
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value as MonthString)}
-          className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-          style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
-        >
-          {monthsList.map((month) => (
-            <option key={month} value={month}>
-              {month}
-            </option>
-          ))}
-        </select>
+        <div className="space-y-8">
+          {/* Header Controls */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Financial Management</h2>
+            <div className="flex flex-wrap gap-4 items-center">
+              {/* Month Selector */}
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value as MonthString)}
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+              >
+                {monthsList.map((month) => (
+                  <option key={month} value={month}>
+                    {month}
+                  </option>
+                ))}
+              </select>
 
               {/* Property Class Multi-Select Dropdown */}
               <div className="relative">
