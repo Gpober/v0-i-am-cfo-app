@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState } from 'react';
 import { 
   Calendar, Download, RefreshCw, Plus, X, ChevronDown, ChevronRight, 
@@ -14,6 +12,29 @@ import {
   ComposedChart
 } from 'recharts';
 
+// IAM CFO Brand Colors
+const BRAND_COLORS = {
+  primary: '#56B6E9',      // Your brand blue
+  secondary: '#3A9BD1',    // Darker shade of your blue
+  tertiary: '#7CC4ED',     // Lighter shade of your blue
+  accent: '#2E86C1',       // Deep blue accent
+  success: '#27AE60',      // Professional green
+  warning: '#F39C12',      // Professional orange
+  danger: '#E74C3C',       // Professional red
+  gray: {
+    50: '#F8FAFC',
+    100: '#F1F5F9',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    900: '#0F172A'
+  }
+};
+
 // Type definitions
 interface Property {
   id: string;
@@ -24,7 +45,7 @@ interface Property {
   status: 'occupied' | 'vacant' | 'blocked';
   revenue: number;
   occupancy: number;
-  adr: number; // Average Daily Rate
+  adr: number;
   rating: number;
   bookings: number;
   color: string;
@@ -78,6 +99,45 @@ interface NotificationState {
   type: 'info' | 'success' | 'error' | 'warning';
 }
 
+// IAM CFO Logo Component
+const IAMCFOLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
+  <div className={`${className} flex items-center justify-center relative`}>
+    <svg viewBox="0 0 120 120" className="w-full h-full">
+      {/* Outer circle - light gray */}
+      <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2"/>
+      
+      {/* Inner circle - your brand blue */}
+      <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary}/>
+      
+      {/* Graph/chart elements */}
+      <g fill="white">
+        {/* Bar chart bars */}
+        <rect x="35" y="70" width="6" height="15" rx="1"/>
+        <rect x="44" y="65" width="6" height="20" rx="1"/>
+        <rect x="53" y="55" width="6" height="30" rx="1"/>
+        <rect x="62" y="50" width="6" height="35" rx="1"/>
+        <rect x="71" y="60" width="6" height="25" rx="1"/>
+        <rect x="80" y="45" width="6" height="40" rx="1"/>
+        
+        {/* Trend line */}
+        <path d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47" 
+              stroke="#FFFFFF" strokeWidth="2.5" fill="none"/>
+        
+        {/* Data points */}
+        <circle cx="35" cy="72" r="2.5" fill="#FFFFFF"/>
+        <circle cx="44" cy="67" r="2.5" fill="#FFFFFF"/>
+        <circle cx="53" cy="57" r="2.5" fill="#FFFFFF"/>
+        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF"/>
+        <circle cx="71" cy="62" r="2.5" fill="#FFFFFF"/>
+        <circle cx="80" cy="47" r="2.5" fill="#FFFFFF"/>
+      </g>
+      
+      {/* Text "CFO" in the center */}
+      <text x="60" y="95" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">CFO</text>
+    </svg>
+  </div>
+);
+
 export default function DashboardPage() {
   // State management
   const [selectedTimeframe, setSelectedTimeframe] = useState('monthly');
@@ -100,7 +160,7 @@ export default function DashboardPage() {
       adr: 285,
       rating: 4.8,
       bookings: 12,
-      color: '#667eea'
+      color: BRAND_COLORS.primary
     },
     {
       id: 'downtown-loft',
@@ -114,7 +174,7 @@ export default function DashboardPage() {
       adr: 220,
       rating: 4.6,
       bookings: 15,
-      color: '#28a745'
+      color: BRAND_COLORS.secondary
     },
     {
       id: 'seaside-villa',
@@ -128,7 +188,7 @@ export default function DashboardPage() {
       adr: 450,
       rating: 4.9,
       bookings: 8,
-      color: '#ffc107'
+      color: BRAND_COLORS.tertiary
     },
     {
       id: 'mountain-cabin',
@@ -142,7 +202,7 @@ export default function DashboardPage() {
       adr: 180,
       rating: 4.4,
       bookings: 10,
-      color: '#dc3545'
+      color: BRAND_COLORS.warning
     }
   ];
 
@@ -234,14 +294,12 @@ export default function DashboardPage() {
     if (propertyId === 'all') {
       if (newSelected.has('all')) {
         newSelected.clear();
-        // If deselecting "All Properties", select individual properties
         properties.forEach(p => newSelected.add(p.id));
       } else {
         newSelected.clear();
         newSelected.add('all');
       }
     } else {
-      // Remove "All Properties" if selecting individual properties
       newSelected.delete('all');
       
       if (newSelected.has(propertyId)) {
@@ -250,13 +308,11 @@ export default function DashboardPage() {
         newSelected.add(propertyId);
       }
       
-      // If all individual properties are selected, switch to "All Properties"
       if (newSelected.size === properties.length && !newSelected.has('all')) {
         newSelected.clear();
         newSelected.add('all');
       }
       
-      // If no properties selected, default to "All Properties"
       if (newSelected.size === 0) {
         newSelected.add('all');
       }
@@ -300,7 +356,6 @@ export default function DashboardPage() {
   const getFilteredData = () => {
     const filteredProps = getFilteredProperties();
     
-    // Recalculate summaries based on filtered properties
     const filteredReservationSummary = {
       totalBookings: filteredProps.reduce((sum, p) => sum + p.bookings, 0),
       confirmedBookings: Math.floor(filteredProps.reduce((sum, p) => sum + p.bookings, 0) * 0.84),
@@ -332,15 +387,15 @@ export default function DashboardPage() {
     switch (status) {
       case 'occupied':
       case 'confirmed':
-        return 'bg-green-100 text-green-800';
+        return `bg-green-100 text-green-800`;
       case 'vacant':
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return `bg-yellow-100 text-yellow-800`;
       case 'blocked':
       case 'cancelled':
-        return 'bg-red-100 text-red-800';
+        return `bg-red-100 text-red-800`;
       default:
-        return 'bg-gray-100 text-gray-800';
+        return `bg-gray-100 text-gray-800`;
     }
   };
 
@@ -373,9 +428,9 @@ export default function DashboardPage() {
   const generateFinancialBreakdown = () => {
     const { financialSummary } = getFilteredData();
     return [
-      { name: 'Revenue', value: financialSummary.totalRevenue, color: '#28a745' },
-      { name: 'Expenses', value: financialSummary.totalExpenses, color: '#dc3545' },
-      { name: 'Net Income', value: financialSummary.netIncome, color: '#667eea' }
+      { name: 'Revenue', value: financialSummary.totalRevenue, color: BRAND_COLORS.success },
+      { name: 'Expenses', value: financialSummary.totalExpenses, color: BRAND_COLORS.danger },
+      { name: 'Net Income', value: financialSummary.netIncome, color: BRAND_COLORS.primary }
     ];
   };
 
@@ -393,7 +448,7 @@ export default function DashboardPage() {
         message: 'Airbnb data synced successfully', 
         time: '4h ago', 
         icon: '🔄',
-        color: 'text-blue-600' 
+        color: `text-blue-600` 
       },
       { 
         type: 'payment', 
@@ -414,7 +469,7 @@ export default function DashboardPage() {
         message: 'QuickBooks data synced', 
         time: '12h ago', 
         icon: '🔄',
-        color: 'text-blue-600' 
+        color: `text-blue-600` 
       }
     ];
   };
@@ -424,10 +479,8 @@ export default function DashboardPage() {
   const financialBreakdown = generateFinancialBreakdown();
   const recentActivity = generateRecentActivity();
   
-  // Get filtered data
   const { properties: filteredProperties, reservationSummary: filteredReservationSummary, financialSummary: filteredFinancialSummary } = getFilteredData();
   
-  // Update main KPIs based on filtered data
   const filteredMainKPIs: KPIMetric[] = [
     { name: 'Total Revenue', value: filteredFinancialSummary.totalRevenue, change: 8.7, trend: 'up', format: 'currency' },
     { name: 'Net Income', value: filteredFinancialSummary.netIncome, change: 12.3, trend: 'up', format: 'currency' },
@@ -453,14 +506,19 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Page Header */}
+      {/* Page Header with IAM CFO Branding */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
-            <Zap className="w-8 h-8 text-indigo-600 mr-3" />
+            <IAMCFOLogo className="w-12 h-12 mr-4" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-sm text-gray-600">360° Business Intelligence - Airbnb/Guesty + QuickBooks/Xero</p>
+              <div className="flex items-center space-x-3">
+                <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
+                <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
+                  360° Business Intelligence
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">Airbnb/Guesty + QuickBooks/Xero Integration • More Than Just A Balance Sheet</p>
             </div>
           </div>
         </div>
@@ -474,8 +532,8 @@ export default function DashboardPage() {
             <div className="flex items-center">
               <div className="flex items-center mr-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">360° Business Intelligence</h2>
-                  <p className="text-sm text-gray-600">Complete rental business analytics from booking to bank</p>
+                  <h2 className="text-2xl font-bold" style={{ color: BRAND_COLORS.primary }}>Real-Time Business Analytics</h2>
+                  <p className="text-sm text-gray-600">Complete rental business insights from booking to bank</p>
                 </div>
               </div>
             </div>
@@ -495,7 +553,8 @@ export default function DashboardPage() {
               <div className="relative">
                 <button
                   onClick={() => setSyncDropdownOpen(!syncDropdownOpen)}
-                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-indigo-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                 >
                   <RefreshCw className="w-4 h-4" />
                   Sync
@@ -540,7 +599,8 @@ export default function DashboardPage() {
               <select
                 value={selectedTimeframe}
                 onChange={(e) => setSelectedTimeframe(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-indigo-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
               >
                 <option value="weekly">Weekly View</option>
                 <option value="monthly">Monthly View</option>
@@ -552,7 +612,8 @@ export default function DashboardPage() {
               <div className="relative">
                 <button
                   onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
-                  className="flex items-center justify-between w-48 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-indigo-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                  className="flex items-center justify-between w-48 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                 >
                   <span className="truncate">{getSelectedPropertiesText()}</span>
                   <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
@@ -560,7 +621,6 @@ export default function DashboardPage() {
                 
                 {propertyDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    {/* All Properties Option */}
                     <div
                       className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100"
                       onClick={() => handlePropertyToggle('all')}
@@ -568,13 +628,13 @@ export default function DashboardPage() {
                       <input
                         type="checkbox"
                         checked={selectedProperties.has('all')}
-                        onChange={() => {}} // Handled by onClick above
-                        className="mr-3 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        onChange={() => {}}
+                        className="mr-3 h-4 w-4 border-gray-300 rounded"
+                        style={{ accentColor: BRAND_COLORS.primary }}
                       />
                       <span className="font-medium text-gray-900">All Properties</span>
                     </div>
                     
-                    {/* Individual Properties */}
                     {properties.map((property) => (
                       <div
                         key={property.id}
@@ -584,8 +644,9 @@ export default function DashboardPage() {
                         <input
                           type="checkbox"
                           checked={selectedProperties.has(property.id)}
-                          onChange={() => {}} // Handled by onClick above
-                          className="mr-3 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                          onChange={() => {}}
+                          className="mr-3 h-4 w-4 border-gray-300 rounded"
+                          style={{ accentColor: BRAND_COLORS.primary }}
                         />
                         <div className="flex items-center flex-1">
                           <span className="mr-2">{getPlatformIcon(property.platform)}</span>
@@ -605,7 +666,8 @@ export default function DashboardPage() {
 
               <button
                 onClick={() => showNotification('Comprehensive business report exported successfully', 'success')}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
+                style={{ backgroundColor: BRAND_COLORS.primary }}
               >
                 <Download className="w-4 h-4" />
                 Export 360° Report
@@ -617,12 +679,12 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMainKPIs.map((kpi, index) => {
               const icons = [DollarSign, TrendingUp, BarChart3, PieChart, Calendar, CreditCard];
-              const colors = ['indigo', 'green', 'blue', 'yellow', 'purple', 'pink'];
+              const borderColors = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.secondary, BRAND_COLORS.tertiary, BRAND_COLORS.warning, BRAND_COLORS.accent];
               const Icon = icons[index % icons.length];
-              const color = colors[index % colors.length];
+              const borderColor = borderColors[index % borderColors.length];
               
               return (
-                <div key={kpi.name} className={`bg-white p-6 rounded-xl shadow-sm border-l-4 border-${color}-500 hover:shadow-md transition-shadow`}>
+                <div key={kpi.name} className={`bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow`} style={{ borderLeftColor: borderColor }}>
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="text-gray-600 text-sm font-medium mb-2">{kpi.name}</div>
@@ -640,7 +702,7 @@ export default function DashboardPage() {
                         {Math.abs(kpi.change)}% vs last month
                       </div>
                     </div>
-                    <Icon className={`w-8 h-8 text-${color}-500`} />
+                    <Icon className={`w-8 h-8`} style={{ color: borderColor }} />
                   </div>
                 </div>
               );
@@ -676,24 +738,24 @@ export default function DashboardPage() {
                       yAxisId="revenue"
                       type="monotone" 
                       dataKey="revenue" 
-                      fill="#667eea"
+                      fill={BRAND_COLORS.primary}
                       fillOpacity={0.6}
-                      stroke="#667eea"
+                      stroke={BRAND_COLORS.primary}
                       name="revenue"
                     />
                     <Bar 
                       yAxisId="bookings"
                       dataKey="bookings" 
-                      fill="#28a745"
+                      fill={BRAND_COLORS.success}
                       name="bookings"
                     />
                     <Line 
                       yAxisId="bookings"
                       type="monotone" 
                       dataKey="occupancy" 
-                      stroke="#ffc107" 
+                      stroke={BRAND_COLORS.warning} 
                       strokeWidth={3}
-                      dot={{ r: 4, fill: "#ffc107" }}
+                      dot={{ r: 4, fill: BRAND_COLORS.warning }}
                       name="occupancy"
                     />
                   </ComposedChart>
@@ -725,8 +787,8 @@ export default function DashboardPage() {
                       ]}
                     />
                     <Legend />
-                    <Bar dataKey="revenue" fill="#667eea" name="revenue" />
-                    <Bar dataKey="bookings" fill="#28a745" name="bookings" />
+                    <Bar dataKey="revenue" fill={BRAND_COLORS.primary} name="revenue" />
+                    <Bar dataKey="bookings" fill={BRAND_COLORS.success} name="bookings" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -788,7 +850,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Calendar className="w-5 h-5 mr-2 text-indigo-600" />
+                  <Calendar className="w-5 h-5 mr-2" style={{ color: BRAND_COLORS.primary }} />
                   Booking Intelligence
                 </h3>
                 <p className="text-xs text-gray-600 mt-1">Cross-platform reservation analytics</p>
@@ -821,7 +883,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <CreditCard className="w-5 h-5 mr-2 text-green-600" />
+                  <CreditCard className="w-5 h-5 mr-2" style={{ color: BRAND_COLORS.success }} />
                   Financial Performance
                 </h3>
                 <p className="text-xs text-gray-600 mt-1">Real-time accounting integration</p>
@@ -850,11 +912,11 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Payroll Summary */}
+            {/* Operational Expenses */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Calculator className="w-5 h-5 mr-2 text-purple-600" />
+                  <Calculator className="w-5 h-5 mr-2" style={{ color: BRAND_COLORS.warning }} />
                   Operational Expenses
                 </h3>
                 <p className="text-xs text-gray-600 mt-1">Staff and contractor management</p>
@@ -893,7 +955,7 @@ export default function DashboardPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {filteredProperties.map((property) => (
-                  <div key={property.id} className="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 transition-colors">
+                  <div key={property.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h4 className="font-semibold text-gray-900">{property.name}</h4>
