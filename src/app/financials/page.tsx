@@ -818,124 +818,133 @@ export default function FinancialsPage() {
     loadRealFinancialData();
   }, [selectedProperties, selectedMonth]);
 
-  const loadInitialData = async () => {
-    try {
-      setIsLoadingData(true);
-      
-      const properties = await fetchProperties();
-      console.log('🏠 Available properties loaded:', properties);
-      setAvailableProperties(properties);
-      
-      await loadRealFinancialData();
-      
-    } catch (error) {
-      console.error('Failed to load initial data:', error);
-      setDataError('Failed to load initial data');
-    } finally {
-      setIsLoadingData(false);
-    }
-  };
+ const loadRealFinancialData = async () => {
+  try {
+    setIsLoadingData(true);
+    setDataError(null);
 
-  const loadRealFinancialData = async () => {
-    try {
-      setIsLoadingData(true);
+    const selected = Array.from(selectedProperties || []);
+    const isAllSelected = selected.includes("All Properties");
+
+    // Build query parameters to send to fetchFinancialData
+    let propertyFilter: string | string[] = "All Properties";
+
+    if (!isAllSelected) {
+      if (selected.length === 1) {
+        propertyFilter = selected[0]; // single property
+      } else if (selected.length > 1) {
+        propertyFilter = selected; // multi-property
+      }
+    }
+
+    console.log("🔍 LOADING DATA WITH FILTERS:", {
+      selectedProperties: selected,
+      propertyFilter,
+      month: selectedMonth,
+    });
+
+    // Fetch using unified logic — supports string or array
+    const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
+
+    if (rawData.success) {
+      const entries = rawData.data as FinancialEntry[];
+
+      console.log("🔍 DEBUG - Raw Journal Entries Sample:", entries.slice(0, 5));
+      console.log("🔍 DEBUG - Total entries loaded:", entries.length);
+
+      const transformedPL = transformFinancialData(entries, selectedMonth);
+      const transformedCF = transformCashFlowData(entries);
+
+      const combinedData = {
+        success: true,
+        ...transformedPL,
+        ...transformedCF,
+        summary: {
+          ...rawData.summary,
+          propertiesInData: [...new Set(entries.map((e) => e.property_class))],
+          selectedFilters: {
+            properties: selected,
+            month: selectedMonth,
+          },
+        },
+        performance: {
+          executionTimeMs: Date.now() % 1000,
+        },
+        rawEntries: entries.slice(0, 5),
+      };
+
+      setRealData(combinedData);
       setDataError(null);
-      
-      let propertyFilter = 'All Properties';
-      if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-        propertyFilter = Array.from(selectedProperties)[0];
-      }
-      
-      console.log('🔍 LOADING DATA WITH FILTERS:', {
-        selectedProperties: Array.from(selectedProperties),
-        propertyFilter,
-        month: selectedMonth
-      });
-      
-      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
-      
-      if (rawData.success) {
-        const entries = rawData.data as FinancialEntry[];
-        
-        console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
-        console.log('🔍 DEBUG - Total entries loaded:', entries.length);
-        
-        const transformedPL = transformFinancialData(entries, selectedMonth);
-        const transformedCF = transformCashFlowData(entries);
 
-        const combinedData = {
-          success: true,
-          ...transformedPL,
-          ...transformedCF,
-          summary: {
-            ...rawData.summary,
-            propertiesInData: [...new Set(entries.map(e => e.property_class))],
-            selectedFilters: {
-              properties: Array.from(selectedProperties),
-              month: selectedMonth
-            }
-          },
-          performance: {
-            executionTimeMs: Date.now() % 1000
-          },
-          rawEntries: entries.slice(0, 5)
-        };
+      const propertyText = isAllSelected
+        ? "all properties"
+        : `${selected.length} selected properties`;
 
-        setRealData(combinedData);
-        setDataError(null);
-        
-        const propertyText = selectedProperties.has('All Properties') 
-          ? 'all properties' 
-          : `${selectedProperties.size} selected properties`;
-          
-        showNotification(`Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`, 'success');
-      } else {
-        setDataError(rawData.error || 'Failed to load financial data');
-        showNotification('Failed to load financial data', 'error');
-      }
-      
-    } catch (error) {
-      console.error('Failed to load financial data:', error);
-      setDataError('Failed to load financial data');
-      showNotification('Failed to load financial data', 'error');
-    } finally {
-      setIsLoadingData(false);
-    }
-  };
-
-  const handlePropertyToggle = (property: string) => {
-    const newSelected = new Set(selectedProperties);
-    
-    if (property === 'All Properties') {
-      newSelected.clear();
-      newSelected.add('All Properties');
+      showNotification(
+        `Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`,
+        "success"
+      );
     } else {
-      newSelected.delete('All Properties');
-      
-      if (newSelected.has(property)) {
-        newSelected.delete(property);
-      } else {
-        newSelected.add(property);
-      }
-      
-      if (newSelected.size === 0) {
-        newSelected.add('All Properties');
-      }
+      setDataError(rawData.error || "Failed to load financial data");
+      showNotification("Failed to load financial data", "error");
     }
-    
-    setSelectedProperties(newSelected);
-    console.log('🏠 Property selection changed:', Array.from(newSelected));
-  };
+  } catch (error) {
+    console.error("❌ Failed to load financial data:", error);
+    setDataError("Failed to load financial data");
+    showNotification("Failed to load financial data", "error");
+  } finally {
+    setIsLoadingData(false);
+  }
+};
 
-  const getSelectedPropertiesText = () => {
-    if (selectedProperties.has('All Properties') || selectedProperties.size === 0) {
-      return 'All Properties';
+
+const handlePropertyToggle = (property: string) => {
+  const realProperties = availableProperties.filter(p => p !== "All Properties");
+  const newSelected = new Set(selectedProperties);
+
+  if (property === "All Properties") {
+    // User clicked "All Properties" — toggle all
+    const isSelectingAll = realProperties.some(p => !newSelected.has(p));
+
+    if (isSelectingAll) {
+      // Select all real properties
+      realProperties.forEach(p => newSelected.add(p));
+    } else {
+      // Deselect all
+      newSelected.clear();
     }
-    if (selectedProperties.size === 1) {
-      return Array.from(selectedProperties)[0];
+  } else {
+    // Toggling an individual property
+    if (newSelected.has(property)) {
+      newSelected.delete(property);
+    } else {
+      newSelected.add(property);
     }
-    return `${selectedProperties.size} Properties Selected`;
-  };
+  }
+
+  setSelectedProperties(newSelected);
+  console.log("🏠 Property selection changed:", Array.from(newSelected));
+};
+
+
+ const getSelectedPropertiesText = () => {
+  const realProperties = availableProperties.filter(p => p !== "All Properties");
+
+  if (selectedProperties.size === 0) {
+    return "All Properties"; // fallback
+  }
+
+  if (selectedProperties.size === realProperties.length) {
+    return "All Properties";
+  }
+
+  if (selectedProperties.size === 1) {
+    return Array.from(selectedProperties)[0];
+  }
+
+  return `${selectedProperties.size} Properties Selected`;
+};
+
 
   // Helper functions
   const formatCurrency = (value: number): string => {
