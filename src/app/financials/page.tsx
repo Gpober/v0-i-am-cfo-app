@@ -128,16 +128,19 @@ const fetchProperties = async (): Promise<string[]> => {
     console.log('🏠 Fetching unique property_class values from journal_entries...');
 
     // Fetch properties from 2025 entries
-    const current2025Response = await fetch(
-      `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&transaction_date=gte.2025-01-01&transaction_date=lte.2025-12-31`,
-      {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const url = new URL(`${SUPABASE_URL}/rest/v1/journal_entries`);
+url.searchParams.append('select', 'property_class');
+url.searchParams.append('transaction_date', 'gte.2025-01-01');
+url.searchParams.append('transaction_date', 'lte.2025-12-31');
+
+const current2025Response = await fetch(url.toString(), {
+  headers: {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+  },
+});
+
 
     let uniquePropertiesFromData: string[] = [];
 
