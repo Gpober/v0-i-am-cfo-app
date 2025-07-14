@@ -835,71 +835,69 @@ export default function FinancialsPage() {
   };
 
   const loadRealFinancialData = async () => {
-    try {
-      setIsLoadingData(true);
+  try {
+    setIsLoadingData(true);
+    setDataError(null);
+
+    const propertyList = Array.from(selectedProperties);
+    const propertyFilter =
+      propertyList.length === 0 || propertyList.includes('All Properties')
+        ? null
+        : propertyList;
+
+    console.log('🔍 LOADING DATA WITH FILTERS:', {
+      selectedProperties: propertyList,
+      month: selectedMonth,
+    });
+
+    const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
+    
+    if (rawData.success) {
+      const entries = rawData.data as FinancialEntry[];
+
+      const transformedPL = transformFinancialData(entries, selectedMonth);
+      const transformedCF = transformCashFlowData(entries);
+
+      const combinedData = {
+        success: true,
+        ...transformedPL,
+        ...transformedCF,
+        summary: {
+          ...rawData.summary,
+          propertiesInData: [...new Set(entries.map(e => e.property_class))],
+          selectedFilters: {
+            properties: propertyList,
+            month: selectedMonth
+          }
+        },
+        performance: {
+          executionTimeMs: Date.now() % 1000
+        },
+        rawEntries: entries.slice(0, 5)
+      };
+
+      setRealData(combinedData);
       setDataError(null);
-      
-      let propertyFilter = 'All Properties';
-      if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-        propertyFilter = Array.from(selectedProperties)[0];
-      }
-      
-      console.log('🔍 LOADING DATA WITH FILTERS:', {
-        selectedProperties: Array.from(selectedProperties),
-        propertyFilter,
-        month: selectedMonth
-      });
-      
-      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
-      
-      if (rawData.success) {
-        const entries = rawData.data as FinancialEntry[];
-        
-        console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
-        console.log('🔍 DEBUG - Total entries loaded:', entries.length);
-        
-        const transformedPL = transformFinancialData(entries, selectedMonth);
-        const transformedCF = transformCashFlowData(entries);
 
-        const combinedData = {
-          success: true,
-          ...transformedPL,
-          ...transformedCF,
-          summary: {
-            ...rawData.summary,
-            propertiesInData: [...new Set(entries.map(e => e.property_class))],
-            selectedFilters: {
-              properties: Array.from(selectedProperties),
-              month: selectedMonth
-            }
-          },
-          performance: {
-            executionTimeMs: Date.now() % 1000
-          },
-          rawEntries: entries.slice(0, 5)
-        };
+      const propertyText = selectedProperties.has('All Properties') 
+        ? 'all properties' 
+        : `${propertyList.length} selected properties`;
 
-        setRealData(combinedData);
-        setDataError(null);
-        
-        const propertyText = selectedProperties.has('All Properties') 
-          ? 'all properties' 
-          : `${selectedProperties.size} selected properties`;
-          
-        showNotification(`Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`, 'success');
-      } else {
-        setDataError(rawData.error || 'Failed to load financial data');
-        showNotification('Failed to load financial data', 'error');
-      }
-      
-    } catch (error) {
-      console.error('Failed to load financial data:', error);
-      setDataError('Failed to load financial data');
+      showNotification(`Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`, 'success');
+    } else {
+      setDataError(rawData.error || 'Failed to load financial data');
       showNotification('Failed to load financial data', 'error');
-    } finally {
-      setIsLoadingData(false);
     }
-  };
+
+  } catch (error) {
+    console.error('Failed to load financial data:', error);
+    setDataError('Failed to load financial data');
+    showNotification('Failed to load financial data', 'error');
+  } finally {
+    setIsLoadingData(false);
+  }
+};
+
 
   const handlePropertyToggle = (property: string) => {
     const newSelected = new Set(selectedProperties);
