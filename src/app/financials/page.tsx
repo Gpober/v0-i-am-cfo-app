@@ -243,7 +243,7 @@ const fetchProperties = async (): Promise<string[]> => {
     // Known properties based on your data (with correct names - only Columbus, IN)
     const knownProperties = [
       'Cleveland',
-      'Columbus, IN',  // Only the one with comma and state
+      'Columbus IN',  // Only the one with comma and state
       'Detroit',
       'General', 
       'Hastings MN',
