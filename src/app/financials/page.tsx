@@ -808,15 +808,22 @@ export default function FinancialsPage() {
 
   const monthsList = generateMonthsList();
 
-  // Load initial data
-  useEffect(() => {
-    loadInitialData();
-  }, []);
+const loadInitialData = async () => {
+  try {
+    setIsLoadingData(true);
 
-  // Load data when filters change
-  useEffect(() => {
-    loadRealFinancialData();
-  }, [selectedProperties, selectedMonth]);
+    const properties = await fetchProperties();
+    console.log('🏠 Available properties loaded:', properties);
+    setAvailableProperties(properties);
+
+    await loadRealFinancialData();
+  } catch (error) {
+    console.error('❌ Failed to load initial data:', error);
+    setDataError('Failed to load initial data');
+  } finally {
+    setIsLoadingData(false);
+  }
+};
 
  const loadRealFinancialData = async () => {
   try {
