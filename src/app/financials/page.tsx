@@ -447,17 +447,15 @@ const fetchFinancialData = async (
     
     // ADDITIONAL CLIENT-SIDE DATE VALIDATION to ensure no date leakage
     const filteredJournalData = journalData.filter((entry: any) => {
-      const entryDate = new Date(entry.transaction_date);
-      const entryYear = entryDate.getFullYear();
-      const entryMonth = entryDate.getMonth() + 1; // getMonth() is 0-based
-      const entryDay = entryDate.getDate();
+      const [entryYear, entryMonth, entryDay] = entry.transaction_date.split('-').map(Number);
       
       const targetYear = parseInt(year);
       const targetMonth = monthNum;
       
-      const isCorrectYear = entryYear === targetYear;
-      const isCorrectMonth = entryMonth === targetMonth;
+      const isCorrectYear = entryYear === parseInt(year);
+      const isCorrectMonth = entryMonth === monthNum;
       const isValidDay = entryDay >= 1 && entryDay <= lastDay;
+
       
       if (!isCorrectYear || !isCorrectMonth || !isValidDay) {
         console.warn(`⚠️ FILTERED OUT: Entry ${entry.je_number} dated ${entry.transaction_date} (not in ${month} ${year})`);
