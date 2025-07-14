@@ -125,115 +125,70 @@ const supabase = createSupabaseClient();
 // Fetch properties from Supabase
 const fetchProperties = async (): Promise<string[]> => {
   try {
-    console.log("🏠 Fetching unique property_class values from Supabase...");
+    console.log("🏠 Fetching property_class values from Supabase...");
 
-    const url = new URL(`${SUPABASE_URL}/rest/v1/journal_entries`);
-    url.searchParams.append("select", "property_class");
-    url.searchParams.append("transaction_date", "gte.2025-01-01");
-    url.searchParams.append("transaction_date", "lte.2025-12-31");
+    const headers = {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+    };
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        "Content-Type": "application/json",
-      },
-    });
+    let uniqueProperties: string[] = [];
 
-    if (!response.ok) {
-      throw new Error(`Supabase error: ${response.statusText}`);
-    }
+    // 1. Try 2025 entries
+    const url2025 = new URL(`${SUPABASE_URL}/rest/v1/journal_entries`);
+    url2025.searchParams.append("select", "property_class");
+    url2025.searchParams.append("transaction_date", "gte.2025-01-01");
+    url2025.searchParams.append("transaction_date", "lte.2025-12-31");
 
-    const data = await response.json();
-    console.log("📦 Raw property data:", data);
+    const res2025 = await fetch(url2025.toString(), { headers });
 
-    const unique = Array.from(
-      new Set(data.map((item: any) => item.property_class).filter((pc) => pc && pc.trim() !== ""))
-    );
-
-    console.log(`✅ Found ${unique.length} unique properties:`, unique);
-    return unique;
-  } catch (err) {
-    console.error("❌ fetchProperties() failed:", err);
-    return [];
-  }
-};
-
-
-    let uniquePropertiesFromData: string[] = [];
-
-    if (current2025Response.ok) {
-      const data2025 = await current2025Response.json();
-      console.log('📅 Found 2025 data entries:', data2025.length);
-
-      const properties2025 = data2025.map((item: any) => item.property_class);
-      const filtered2025 = properties2025.filter((pc: any) => pc && pc.trim() !== '');
-      uniquePropertiesFromData = [...new Set(filtered2025)];
+    if (res2025.ok) {
+      const data = await res2025.json();
+      const properties = data.map((item: any) => item.property_class);
+      uniqueProperties = [...new Set(properties.filter(p => p && p.trim() !== ""))];
+      console.log("📅 Found 2025 properties:", uniqueProperties);
     } else {
-      console.log('⚠️ No 2025 data found or error occurred. Falling back to all data...');
-      const allDataResponse = await fetch(
+      console.warn("⚠️ 2025 fetch failed, falling back to all entries...");
+
+      const fallbackRes = await fetch(
         `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
-        {
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers }
       );
 
-      if (allDataResponse.ok) {
-        const allData = await allDataResponse.json();
-        const allProperties = allData.map((item: any) => item.property_class);
-        const filteredAll = allProperties.filter((pc: any) => pc && pc.trim() !== '');
-        uniquePropertiesFromData = [...new Set(filteredAll)];
+      if (fallbackRes.ok) {
+        const data = await fallbackRes.json();
+        const properties = data.map((item: any) => item.property_class);
+        uniqueProperties = [...new Set(properties.filter(p => p && p.trim() !== ""))];
+        console.log("📦 Found fallback properties:", uniqueProperties);
       }
     }
 
-    // Known fixed fallback properties
-    const knownProperties = [
-      'Cleveland',
-      'Columbus IN',
-      'Detroit',
-      'General',
-      'Hastings MN',
-      'Lisbon',
-      'McHenry IL',
-      'Mokena IL',
-      'Pine Terrace',
-      'Rockford',
-      'Terraview',
-      'Wesley',
+    // 2. Add known static properties
+    const knownStatic = [
+      "Cleveland", "Columbus IN", "Detroit", "General", "Hastings MN",
+      "Lisbon", "McHenry IL", "Mokena IL", "Pine Terrace",
+      "Rockford", "Terraview", "Wesley",
     ];
 
-    const allProperties = [...new Set([...uniquePropertiesFromData, ...knownProperties])];
+    const allCombined = [...new Set([...uniqueProperties, ...knownStatic])];
+    if (allCombined.length === 0) return ["All Properties", "General"];
 
-    if (allProperties.length === 0) {
-      return ['All Properties', 'General'];
-    }
+    const final = ["All Properties", ...allCombined.sort()];
+    console.log("✅ Final property list:", final);
+    return final;
 
-    const result = ['All Properties', ...allProperties.sort()];
-    console.log('✅ Final property list:', result);
-    return result;
-  } catch (error) {
-    console.error('❌ Property fetch error:', error);
+  } catch (err) {
+    console.error("❌ fetchProperties() error:", err);
     return [
-      'All Properties',
-      'Cleveland',
-      'Columbus IN',
-      'Detroit',
-      'General',
-      'Hastings MN',
-      'Lisbon',
-      'McHenry IL',
-      'Mokena IL',
-      'Pine Terrace',
-      'Rockford',
-      'Terraview',
-      'Wesley',
+      "All Properties",
+      "Cleveland", "Columbus IN", "Detroit", "General", "Hastings MN",
+      "Lisbon", "McHenry IL", "Mokena IL", "Pine Terrace",
+      "Rockford", "Terraview", "Wesley",
     ];
   }
 };
+
 
 // Enhanced data transformation functions
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
