@@ -816,23 +816,48 @@ export default function FinancialsPage() {
     loadRealFinancialData();
   }, [selectedProperties, selectedMonth]);
 
-  const loadInitialData = async () => {
-    try {
-      setIsLoadingData(true);
-      
-      const properties = await fetchProperties();
-      console.log('🏠 Available properties loaded:', properties);
-      setAvailableProperties(properties);
-      
-      await loadRealFinancialData();
-      
-    } catch (error) {
-      console.error('Failed to load initial data:', error);
-      setDataError('Failed to load initial data');
-    } finally {
-      setIsLoadingData(false);
+  const loadRealFinancialData = async () => {
+  try {
+    setIsLoadingData(true);
+
+    let query = supabase
+      .from("journal_entries")
+      .select("*")
+      .gte("transaction_date", selectedMonth.start)
+      .lte("transaction_date", selectedMonth.end);
+
+    const selected = Array.from(selectedProperties || []);
+
+    if (!selected.includes("All Property Classes") && selected.length > 0) {
+      if (selected.length === 1) {
+        query = query.eq("property_class", selected[0]);
+      } else {
+        query = query.in("property_class", selected);
+      }
     }
-  };
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("❌ Supabase fetch error:", error);
+      setDataError("Error fetching financial data.");
+      return;
+    }
+
+    const filteredData = filterStrictEntries(data, selectedMonth);
+    const { mappedData, matched, unmatched } = mapAccountsToTypes(filteredData, accountMappings);
+
+    setFilteredEntries(filteredData);
+    setMappedEntries(mappedData);
+    setAccountMatches(matched);
+    setAccountUnmatched(unmatched);
+  } catch (err) {
+    console.error("❌ loadRealFinancialData failed:", err);
+    setDataError("Unexpected error occurred.");
+  } finally {
+    setIsLoadingData(false);
+  }
+};
 
   const loadRealFinancialData = async () => {
   try {
