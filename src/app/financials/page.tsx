@@ -399,10 +399,15 @@ const fetchFinancialData = async (
     
     let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
     
-    if (property !== 'All Properties') {
-      url += `&property_class=eq.${encodeURIComponent(property)}`;
-      console.log('🏠 Filtering by property_class:', property);
-    }
+    if (Array.isArray(property) && !property.includes('All Properties')) {
+  const encodedProps = property.map((p) => `"${p}"`).join(',');
+  url += `&property_class=in.(${encodedProps})`;
+  console.log('🏠 Filtering by multiple property_class:', property);
+} else if (typeof property === 'string' && property !== 'All Properties') {
+  url += `&property_class=eq.${encodeURIComponent(property)}`;
+  console.log('🏠 Filtering by single property_class:', property);
+}
+
 
     console.log('📡 Final URL with STRICT date filtering:', url);
 
