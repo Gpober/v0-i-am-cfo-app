@@ -1,26 +1,18 @@
-import React, { useState } from 'react';
-import { 
-  Calendar, Download, RefreshCw, Plus, X, ChevronDown, ChevronRight, 
-  ArrowUp, ArrowDown, TrendingUp, DollarSign, PieChart, BarChart3, 
-  Home, Users, MapPin, Star, Settings, Bell, Search, Filter,
-  Building2, Key, Wrench, CreditCard, AlertTriangle, CheckCircle,
-  FileText, Calculator, Receipt, Zap, Link, Activity
-} from 'lucide-react';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-  BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie, AreaChart, Area,
-  ComposedChart
-} from 'recharts';
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
-  primary: '#56B6E9',      // Your brand blue
-  secondary: '#3A9BD1',    // Darker shade of your blue
-  tertiary: '#7CC4ED',     // Lighter shade of your blue
-  accent: '#2E86C1',       // Deep blue accent
-  success: '#27AE60',      // Professional green
-  warning: '#F39C12',      // Professional orange
-  danger: '#E74C3C',       // Professional red
+  primary: '#56B6E9',
+  secondary: '#3A9BD1',
+  tertiary: '#7CC4ED',
+  accent: '#2E86C1',
+  success: '#27AE60',
+  warning: '#F39C12',
+  danger: '#E74C3C',
   gray: {
     50: '#F8FAFC',
     100: '#F1F5F9',
@@ -35,95 +27,707 @@ const BRAND_COLORS = {
   }
 };
 
+// Supabase Configuration
+const SUPABASE_URL = 'https://ijeuusvwqcnljctkvjdi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZXV1c3Z3cWNubGpjdGt2amRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMjE4MDUsImV4cCI6MjA2NzY5NzgwNX0.O9Mb_X47wbXEMXbPQ8Cr3dzDn_E5DYG9b222FPy4LEU';
+
 // Type definitions
-interface Property {
-  id: string;
+type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
+type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
+type ViewMode = 'total' | 'detailed';
+type MonthString = `${'January' | 'February' | 'March' | 'April' | 'May' | 'June' | 
+                   'July' | 'August' | 'September' | 'October' | 'November' | 'December'} ${number}`;
+
+interface FinancialDataItem {
   name: string;
-  type: string;
-  location: string;
-  platform: 'airbnb' | 'guesty' | 'direct';
-  status: 'occupied' | 'vacant' | 'blocked';
-  revenue: number;
-  occupancy: number;
-  adr: number;
-  rating: number;
-  bookings: number;
-  color: string;
+  total: number;
+  months: Partial<Record<MonthString, number>>;
+  type?: string;
+  original_type?: string;
+  detail_type?: string;
+  entries?: any[];
+  mapping_method?: string;
 }
 
-interface ReservationSummary {
-  totalBookings: number;
-  confirmedBookings: number;
-  pendingBookings: number;
-  totalRevenue: number;
-  avgBookingValue: number;
-  occupancyRate: number;
-}
-
-interface FinancialSummary {
-  totalRevenue: number;
-  totalExpenses: number;
-  netIncome: number;
-  grossMargin: number;
-  operatingMargin: number;
-  cashFlow: number;
-}
-
-interface PayrollSummary {
-  totalPayroll: number;
-  activeEmployees: number;
-  contractorPayments: number;
-  payrollTaxes: number;
-  benefits: number;
-}
-
-interface IntegrationStatus {
-  airbnb: boolean;
-  guesty: boolean;
-  quickbooks: boolean;
-  xero: boolean;
-  lastSync: string;
-}
-
-interface KPIMetric {
-  name: string;
-  value: number | string;
-  change: number;
-  trend: 'up' | 'down' | 'stable';
-  format: 'currency' | 'percentage' | 'number';
+interface FinancialEntry {
+  id: number;
+  je_number: string;
+  transaction_date: string;
+  account_name: string;
+  account_type: string;
+  detail_type: string;
+  property_class: string;
+  debit_amount: number;
+  credit_amount: number;
+  line_amount: number;
+  posting_type: string;
+  description: string;
+  balance: number;
+  created_by: string;
+  last_modified: string;
+  created_at: string;
+  updated_at: string;
+  classification?: string;
+  mapping_method?: string;
 }
 
 interface NotificationState {
   show: boolean;
   message: string;
-  type: 'info' | 'success' | 'error' | 'warning';
+  type: 'info' | 'success' | 'error';
 }
 
+interface TooltipState {
+  show: boolean;
+  content: string;
+  x: number;
+  y: number;
+}
+
+// Real Supabase client
+const createSupabaseClient = () => {
+  return {
+    from: (table: string) => ({
+      select: (columns: string = '*') => ({
+        eq: (column: string, value: string) => ({
+          order: (orderBy: string) => 
+            fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&${column}=eq.${encodeURIComponent(value)}&order=${orderBy}`, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+              }
+            }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
+        }),
+        order: (orderBy: string) => 
+          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&order=${orderBy}`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
+        then: (callback: Function) => 
+          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(res => res.json()).then(data => callback({ data, error: null })).catch(error => callback({ data: null, error }))
+      })
+    })
+  };
+};
+
+const supabase = createSupabaseClient();
+
+// Fetch properties from Supabase
+const fetchProperties = async (): Promise<string[]> => {
+  try {
+    console.log('🏠 Fetching unique property_class values from journal_entries...');
+    
+    // First try to get properties from 2025 data to get the most current property list
+    const current2025Response = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class&transaction_date=gte.2025-01-01&transaction_date=lte.2025-12-31`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    let uniquePropertiesFromData = [];
+    
+    if (current2025Response.ok) {
+      const data2025 = await current2025Response.json();
+      console.log('📅 Found 2025 data entries:', data2025.length);
+      const properties2025 = data2025.map((item: any) => item.property_class);
+      const filtered2025 = properties2025.filter((pc: any) => pc && pc.trim() !== '');
+      uniquePropertiesFromData = [...new Set(filtered2025)];
+      console.log('🏠 Properties found in 2025 data:', uniquePropertiesFromData);
+    } else {
+      console.log('📅 No 2025 data found, fetching all property data...');
+      // Fallback to all data if 2025 data not available
+      const allDataResponse = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (allDataResponse.ok) {
+        const allData = await allDataResponse.json();
+        const allProperties = allData.map((item: any) => item.property_class);
+        const filteredAll = allProperties.filter((pc: any) => pc && pc.trim() !== '');
+        uniquePropertiesFromData = [...new Set(filteredAll)];
+      }
+    }
+    
+    // Known properties based on your data (with correct names - only Columbus, IN)
+    const knownProperties = [
+      'Cleveland',
+      'Columbus, IN',  // Only the one with comma and state
+      'Detroit',
+      'General', 
+      'Hastings MN',
+      'Lisbon',
+      'McHenry IL',    
+      'Mokena IL',
+      'Pine Terrace',
+      'Rockford',
+      'Terraview',
+      'Wesley'
+    ];
+    
+    // Combine data-driven properties with known properties
+    const allProperties = [...new Set([...uniquePropertiesFromData, ...knownProperties])];
+    
+    if (allProperties.length === 0) {
+      return ['All Properties', 'General'];
+    }
+    
+    const result = ['All Properties', ...allProperties.sort()];
+    console.log('✅ Final property list (2025 data + known):', result);
+    console.log('🔍 Properties from 2025 data:', uniquePropertiesFromData);
+    console.log('🔍 Known properties added:', knownProperties);
+    return result;
+    
+  } catch (error) {
+    console.error('❌ Property fetch error:', error);
+    return [
+      'All Properties',
+      'Cleveland',
+      'Columbus, IN',  // Only the one with comma and state
+      'Detroit',
+      'General', 
+      'Hastings MN',
+      'Lisbon',
+      'McHenry IL',    
+      'Mokena IL',
+      'Pine Terrace',
+      'Rockford',
+      'Terraview',
+      'Wesley'
+    ];
+  }
+};
+
+// Enhanced data transformation functions
+const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
+  const getCleanAccountName = (entry: any) => {
+    let accountName = entry.account_name?.trim() || '';
+    accountName = accountName.replace(/^[^:]*:/, '').trim();
+    
+    if (!accountName || accountName === 'Journal Entry' || accountName === 'RJE') {
+      accountName = entry.description?.trim() || `${entry.account_type || 'Other'} Account`;
+    }
+    
+    return accountName;
+  };
+
+  const groupedData = entries.reduce((acc, entry) => {
+    const accountName = getCleanAccountName(entry);
+    const key = accountName;
+    
+    if (!acc[key]) {
+      const plClassification = entry.classification || entry.account_type;
+      
+      acc[key] = {
+        name: accountName,
+        type: plClassification,
+        original_type: entry.account_type,
+        detail_type: entry.detail_type || entry.account_type,
+        total: 0,
+        months: {},
+        entries: [],
+        mapping_method: entry.mapping_method || 'Unknown'
+      };
+    }
+    
+    let amount = 0;
+    
+    switch (acc[key].type) {
+      case 'Revenue':
+        amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
+        if (amount < 0) {
+          amount = Math.abs(amount);
+        }
+        break;
+        
+      case 'Expenses':
+        amount = Math.abs(entry.line_amount || (entry.debit_amount - entry.credit_amount));
+        break;
+        
+      case 'Assets':
+        amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
+        break;
+        
+      case 'Liabilities':
+        amount = entry.line_amount || (entry.credit_amount - entry.debit_amount);
+        break;
+        
+      default:
+        amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
+    }
+    
+    acc[key].total += amount;
+    acc[key].months[monthYear as MonthString] = (acc[key].months[monthYear as MonthString] || 0) + amount;
+    acc[key].entries.push({
+      je_number: entry.je_number,
+      debit: entry.debit_amount,
+      credit: entry.credit_amount,
+      line: entry.line_amount,
+      amount_used: amount,
+      property: entry.property_class,
+      original_account: entry.account_name,
+      original_description: entry.description,
+      classification: entry.classification,
+      transaction_date: entry.transaction_date
+    });
+    
+    return acc;
+  }, {} as Record<string, any>);
+
+  const typeOrder: Record<string, number> = {
+    'Revenue': 1,
+    'Expenses': 2,
+    'Assets': 3,
+    'Liabilities': 4,
+    'Equity': 5,
+    'Other': 99
+  };
+
+  const sortedData = Object.values(groupedData)
+    .filter((item: any) => Math.abs(item.total) > 0.01)
+    .sort((a: any, b: any) => {
+      const aOrder = typeOrder[a.type] || 99;
+      const bOrder = typeOrder[b.type] || 99;
+      
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+  const plData = sortedData.filter(item => 
+    item.type === 'Revenue' || item.type === 'Expenses'
+  );
+
+  const balanceSheetData = sortedData.filter(item => 
+    item.type === 'Assets' || item.type === 'Liabilities' || item.type === 'Equity'
+  );
+
+  return {
+    propertyFinancialData: {
+      'All Properties': {
+        Monthly: {
+          [monthYear]: plData
+        }
+      }
+    },
+    propertyBalanceSheetData: {
+      'All Properties': {
+        Monthly: {
+          [monthYear]: balanceSheetData
+        }
+      }
+    }
+  };
+};
+
+const transformCashFlowData = (entries: FinancialEntry[]) => {
+  const inFlowItems: FinancialDataItem[] = [];
+  const outFlowItems: FinancialDataItem[] = [];
+
+  entries.forEach(entry => {
+    if (entry.account_type === 'Income' || entry.account_type === 'Revenue' || entry.account_type === 'Other Income') {
+      const existing = inFlowItems.find(item => item.name === entry.account_name);
+      const amount = Math.abs(entry.credit_amount - entry.debit_amount);
+      
+      if (existing) {
+        existing.total += amount;
+      } else if (amount > 0) {
+        inFlowItems.push({
+          name: entry.account_name,
+          total: amount,
+          months: {},
+          type: entry.account_type
+        });
+      }
+    } else if (entry.account_type === 'Expenses' || entry.account_type === 'Other Expenses' || 
+               entry.account_type === 'Cost of Goods Sold') {
+      const existing = outFlowItems.find(item => item.name === entry.account_name);
+      const amount = Math.abs(entry.debit_amount - entry.credit_amount);
+      
+      if (existing) {
+        existing.total += amount;
+      } else if (amount > 0) {
+        outFlowItems.push({
+          name: entry.account_name,
+          total: amount,
+          months: {},
+          type: entry.account_type
+        });
+      }
+    }
+  });
+
+  const totalInFlow = inFlowItems.reduce((sum, item) => sum + item.total, 0);
+  const totalOutFlow = outFlowItems.reduce((sum, item) => sum + item.total, 0);
+  const totalCashFlow = totalInFlow - totalOutFlow;
+
+  return {
+    propertyCashFlowData: {
+      'All Properties': {
+        inFlow: inFlowItems.sort((a, b) => b.total - a.total),
+        outFlow: outFlowItems.sort((a, b) => b.total - a.total),
+        totalInFlow,
+        totalOutFlow,
+        totalCashFlow,
+        beginningCash: 0,
+        endingCash: totalCashFlow
+      }
+    }
+  };
+};
+
+// Fetch financial data from Supabase
+const fetchFinancialData = async (
+  property: string = 'All Properties',
+  monthYear: string
+) => {
+  try {
+    console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, monthYear });
+    
+    const [month, year] = monthYear.split(' ');
+    const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
+    
+    // STRICT date filtering - exactly the month requested
+    const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(parseInt(year), monthNum, 0).getDate(); // Get last day of the month
+    const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+    
+    console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
+    
+    let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
+    
+    if (property !== 'All Properties') {
+      url += `&property_class=eq.${encodeURIComponent(property)}`;
+      console.log('🏠 Filtering by property_class:', property);
+    }
+
+    console.log('📡 Final URL with STRICT date filtering:', url);
+
+    const [journalResponse, accountsResponse] = await Promise.all([
+      fetch(url, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      fetch(`${SUPABASE_URL}/rest/v1/accounts?select=*&order=account_name`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      })
+    ]);
+
+    if (!journalResponse.ok || !accountsResponse.ok) {
+      throw new Error('Failed to fetch financial data');
+    }
+    
+    const journalData = await journalResponse.json();
+    const accountsData = await accountsResponse.json();
+    
+    console.log('📊 Journal entries loaded for STRICT date range:', journalData.length);
+    
+    // ADDITIONAL CLIENT-SIDE DATE VALIDATION to ensure no date leakage
+    const filteredJournalData = journalData.filter((entry: any) => {
+      const entryDate = new Date(entry.transaction_date);
+      const entryYear = entryDate.getFullYear();
+      const entryMonth = entryDate.getMonth() + 1; // getMonth() is 0-based
+      const entryDay = entryDate.getDate();
+      
+      const targetYear = parseInt(year);
+      const targetMonth = monthNum;
+      
+      const isCorrectYear = entryYear === targetYear;
+      const isCorrectMonth = entryMonth === targetMonth;
+      const isValidDay = entryDay >= 1 && entryDay <= lastDay;
+      
+      if (!isCorrectYear || !isCorrectMonth || !isValidDay) {
+        console.warn(`⚠️ FILTERED OUT: Entry ${entry.je_number} dated ${entry.transaction_date} (not in ${month} ${year})`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log(`✅ STRICT FILTERING RESULT: ${filteredJournalData.length} entries (filtered out ${journalData.length - filteredJournalData.length} entries)`);
+    
+    // Debug: Show date range of actual entries
+    if (filteredJournalData.length > 0) {
+      const dates = filteredJournalData.map((e: any) => e.transaction_date).sort();
+      console.log(`📅 ACTUAL DATE RANGE in filtered data: ${dates[0]} to ${dates[dates.length - 1]}`);
+    }
+    
+    // Create account lookup map
+    const accountLookupMap = new Map();
+    
+    accountsData.forEach((account: any) => {
+      accountLookupMap.set(account.account_name, {
+        type: account.account_type,
+        standardName: account.account_name,
+        classification: account.account_type === 'Income' ? 'Revenue' : 
+                      account.account_type === 'Expenses' ? 'Expenses' :
+                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                      account.account_type === 'Other Income' ? 'Revenue' :
+                      account.account_type === 'Other Expenses' ? 'Expenses' :
+                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
+                      account.account_type
+      });
+    });
+
+    // Enhanced classification for journal entries to match your Google Sheets structure
+    const classifyJournalAccount = (entry: any) => {
+      const accountName = entry.account_name || '';
+      const name = accountName.toLowerCase();
+      const description = (entry.description || '').toLowerCase();
+      
+      console.log('🔍 Classifying account:', accountName, 'Description:', entry.description, 'Line amount:', entry.line_amount, 'Credit:', entry.credit_amount, 'Debit:', entry.debit_amount);
+      
+      // Revenue/Income classification - matching your Google Sheets exactly
+      if (name.includes('rental revenue - airbnb') || 
+          name.includes('rental revenue - direct') ||
+          name.includes('rental revenue - guesty') ||
+          name.includes('rental revenue - reserve payout') ||
+          name.includes('rental revenue - vrbo') ||
+          name.includes('direct booking') ||
+          name.includes('direct revenue') ||
+          name.includes('bookings') ||
+          name.includes('income') || 
+          name.includes('revenue') ||
+          name.includes('rent') || 
+          name.includes('airbnb') ||
+          name.includes('guesty') ||
+          name.includes('vrbo') ||
+          name.includes('adjustment for occupancy taxes') ||
+          name.includes('miscellaneous income') ||
+          name.includes('resolution adjustments') ||
+          // Check description for reclassification entries
+          description.includes('reclassify') ||
+          description.includes('move income') ||
+          description.includes('transfer') ||
+          description.includes('direct booking') ||
+          description.includes('guesty to direct') ||
+          // Standard revenue patterns
+          entry.credit_amount > 0 && entry.debit_amount === 0) {
+        console.log('✅ Classified as REVENUE:', accountName, 'Method: Pattern matching or credit entry');
+        return { 
+          type: 'Income', 
+          classification: 'Revenue', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // Expense classification - matching your actual expense categories
+      if (name.includes('advertising') || name.includes('marketing') ||
+          name.includes('facebook') || name.includes('google') ||
+          name.includes('arcade') || name.includes('bank fee') || 
+          name.includes('disposal') || name.includes('waste') ||
+          name.includes('insurance') || name.includes('internet') || 
+          name.includes('tv service') || name.includes('cleaning') ||
+          name.includes('labor') || name.includes('meal') || 
+          name.includes('membership') || name.includes('subscription') ||
+          name.includes('office') || name.includes('shipping') || 
+          name.includes('postage') || name.includes('pool') || 
+          name.includes('hot tub') || name.includes('maintenance') ||
+          name.includes('repair') || name.includes('upgrade') ||
+          name.includes('snow') || name.includes('lawn') || 
+          name.includes('supplies') || name.includes('travel') ||
+          name.includes('utilities') || name.includes('water') || 
+          name.includes('sewer') || name.includes('expense') || 
+          name.includes('cost') ||
+          entry.debit_amount > 0 && entry.credit_amount === 0) {
+        console.log('✅ Classified as EXPENSE:', accountName);
+        return { 
+          type: 'Expenses', 
+          classification: 'Expenses', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // Interest expense (separate category)
+      if (name.includes('mortgage') || name.includes('interest')) {
+        return { 
+          type: 'Interest Expense', 
+          classification: 'Other Expenses', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // Asset classification
+      if (name.includes('improvements') || name.includes('property') || 
+          name.includes('equipment') || name.includes('cash') ||
+          name.includes('bank') || name.includes('checking') ||
+          name.includes('savings') || name.includes('receivable') ||
+          entry.account_type === 'Fixed Assets') {
+        return { 
+          type: 'Fixed Assets', 
+          classification: 'Assets', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // Liability classification
+      if (name.includes('loan') || name.includes('payable') || 
+          name.includes('credit card') || name.includes('debt') || 
+          name.includes('liability') || entry.account_type === 'Credit Card') {
+        return { 
+          type: 'Credit Card', 
+          classification: 'Liabilities', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // ENHANCED DEFAULT CLASSIFICATION for reclassification entries
+      // For reclassification entries, look at the net effect and description
+      if (description.includes('reclassify') || description.includes('transfer') || description.includes('move')) {
+        console.log('🔄 RECLASSIFICATION ENTRY detected:', accountName, 'Description:', entry.description);
+        
+        // For reclassification entries, classify based on the account name pattern and net effect
+        if (name.includes('revenue') || name.includes('income') || name.includes('rental') || name.includes('booking')) {
+          console.log('✅ Reclassification classified as REVENUE:', accountName);
+          return { 
+            type: 'Income', 
+            classification: 'Revenue', 
+            standardName: entry.account_name 
+          };
+        } else {
+          console.log('✅ Reclassification classified as EXPENSE:', accountName);
+          return { 
+            type: 'Expenses', 
+            classification: 'Expenses', 
+            standardName: entry.account_name 
+          };
+        }
+      }
+      
+      // DEFAULT CLASSIFICATION: Use credit/debit logic with enhanced logging
+      if (entry.credit_amount > entry.debit_amount || entry.line_amount < 0) {
+        console.log('🔄 Default classified as REVENUE (credit > debit or negative line_amount):', accountName);
+        return { 
+          type: 'Income', 
+          classification: 'Revenue', 
+          standardName: entry.account_name || 'Revenue Account'
+        };
+      } else if (entry.debit_amount > entry.credit_amount || entry.line_amount > 0) {
+        console.log('🔄 Default classified as EXPENSE (debit > credit or positive line_amount):', accountName);
+        return { 
+          type: 'Expenses', 
+          classification: 'Expenses', 
+          standardName: entry.account_name || 'Expense Account'
+        };
+      } else {
+        // Equal amounts - classify based on account name patterns
+        console.log('🔄 Equal amounts - using name patterns for:', accountName);
+        if (name.includes('revenue') || name.includes('income') || name.includes('rental')) {
+          return { 
+            type: 'Income', 
+            classification: 'Revenue', 
+            standardName: entry.account_name 
+          };
+        } else {
+          return { 
+            type: 'Other', 
+            classification: 'Other', 
+            standardName: entry.account_name || 'Other Account'
+          };
+        }
+      }
+    };
+
+    // Process journal entries using the STRICTLY FILTERED data
+    const enhancedData = filteredJournalData.map((entry: any) => {
+      // First: Try to find exact match in your accounts table
+      let accountInfo = accountLookupMap.get(entry.account_name);
+      
+      if (accountInfo) {
+        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
+      } else {
+        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using account_type from journal entry`);
+        // Use the account_type directly from the journal entry - no guessing!
+        accountInfo = {
+          type: entry.account_type,
+          classification: entry.account_type === 'Income' ? 'Revenue' : 
+                         entry.account_type === 'Expenses' ? 'Expenses' :
+                         entry.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                         entry.account_type === 'Other Income' ? 'Revenue' :
+                         entry.account_type === 'Other Expenses' ? 'Expenses' :
+                         entry.account_type === 'Interest Expense' ? 'Other Expenses' :
+                         entry.account_type, // Default to whatever the journal entry says
+          standardName: entry.account_name
+        };
+      }
+      
+      return {
+        ...entry,
+        account_type: accountInfo?.type || entry.account_type || 'Other',
+        classification: accountInfo?.classification || accountInfo?.type || 'Other',
+        standard_account_name: accountInfo?.standardName || entry.account_name,
+        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Journal Entry Type'
+      };
+    });
+
+    return {
+      success: true,
+      data: enhancedData || [],
+      accountsData: accountsData,
+      summary: {
+        filteredEntries: enhancedData?.length || 0,
+        originalEntries: journalData.length,
+        dateFiltered: journalData.length - filteredJournalData.length,
+        dataSource: `Supabase + STRICT ${month} ${year} Filtering`,
+        dateRange: `${startDate} to ${endDate}`,
+        filters: { property, monthYear },
+        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
+        propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
+        mappingStats: {
+          totalEntries: enhancedData?.length || 0,
+          accountsTableMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Accounts Table').length || 0,
+          fallbackMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Fallback Classification').length || 0
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching financial data:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+      data: []
+    };
+  }
+};
+
 // IAM CFO Logo Component
-const IAMCFOLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
+const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <div className={`${className} flex items-center justify-center relative`}>
     <svg viewBox="0 0 120 120" className="w-full h-full">
-      {/* Outer circle - light gray */}
       <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2"/>
-      
-      {/* Inner circle - your brand blue */}
       <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary}/>
-      
-      {/* Graph/chart elements */}
       <g fill="white">
-        {/* Bar chart bars */}
         <rect x="35" y="70" width="6" height="15" rx="1"/>
         <rect x="44" y="65" width="6" height="20" rx="1"/>
         <rect x="53" y="55" width="6" height="30" rx="1"/>
         <rect x="62" y="50" width="6" height="35" rx="1"/>
         <rect x="71" y="60" width="6" height="25" rx="1"/>
         <rect x="80" y="45" width="6" height="40" rx="1"/>
-        
-        {/* Trend line */}
         <path d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47" 
               stroke="#FFFFFF" strokeWidth="2.5" fill="none"/>
-        
-        {/* Data points */}
         <circle cx="35" cy="72" r="2.5" fill="#FFFFFF"/>
         <circle cx="44" cy="67" r="2.5" fill="#FFFFFF"/>
         <circle cx="53" cy="57" r="2.5" fill="#FFFFFF"/>
@@ -131,377 +735,582 @@ const IAMCFOLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
         <circle cx="71" cy="62" r="2.5" fill="#FFFFFF"/>
         <circle cx="80" cy="47" r="2.5" fill="#FFFFFF"/>
       </g>
-      
-      {/* Text "CFO" in the center */}
       <text x="60" y="95" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">CFO</text>
     </svg>
   </div>
 );
 
-export default function DashboardPage() {
-  // State management
-  const [selectedTimeframe, setSelectedTimeframe] = useState('monthly');
+const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning, BRAND_COLORS.danger, BRAND_COLORS.secondary, BRAND_COLORS.tertiary];
+
+// Expandable account data for detailed views
+const accountDetails: Record<string, FinancialDataItem[]> = {
+  'Revenue': [
+    { name: 'Product Sales', total: 850000, months: { 'June 2025': 850000 } },
+    { name: 'Service Revenue', total: 300000, months: { 'June 2025': 300000 } },
+    { name: 'Licensing Fees', total: 75000, months: { 'June 2025': 75000 } },
+    { name: 'Other Revenue', total: 25000, months: { 'June 2025': 25000 } },
+  ],
+  'Cost of Goods Sold': [
+    { name: 'Direct Materials', total: 450000, months: { 'June 2025': 450000 } },
+    { name: 'Direct Labor', total: 200000, months: { 'June 2025': 200000 } },
+    { name: 'Manufacturing Overhead', total: 100000, months: { 'June 2025': 100000 } },
+  ],
+};
+
+// Sub-detail breakdowns
+const subAccountDetails: Record<string, Array<{name: string, amount: number}>> = {
+  'Direct Materials': [
+    { name: 'Raw Steel', amount: 180000 },
+    { name: 'Electronic Components', amount: 120000 },
+    { name: 'Packaging Materials', amount: 85000 },
+  ],
+  'Direct Labor': [
+    { name: 'Production Workers', amount: 120000 },
+    { name: 'Assembly Technicians', amount: 45000 },
+    { name: 'Quality Inspectors', amount: 25000 },
+  ],
+};
+
+export default function FinancialsPage() {
+  const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
+  const [selectedMonth, setSelectedMonth] = useState<MonthString>('May 2025');
+  const [viewMode, setViewMode] = useState<ViewMode>('detailed');
+  const [timeView, setTimeView] = useState<TimeView>('Monthly');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
+  const [timeViewDropdownOpen, setTimeViewDropdownOpen] = useState(false);
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['all']));
+  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
+  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
 
-  // Sample data - in production this would come from API
-  const properties: Property[] = [
-    {
-      id: 'miami-beach',
-      name: 'Miami Beach Condo',
-      type: '2BR/2BA',
-      location: 'Miami Beach, FL',
-      platform: 'airbnb',
-      status: 'occupied',
-      revenue: 8500,
-      occupancy: 94,
-      adr: 285,
-      rating: 4.8,
-      bookings: 12,
-      color: BRAND_COLORS.primary
-    },
-    {
-      id: 'downtown-loft',
-      name: 'Downtown Loft',
-      type: '1BR/1BA',
-      location: 'Downtown Miami, FL',
-      platform: 'guesty',
-      status: 'occupied',
-      revenue: 6200,
-      occupancy: 89,
-      adr: 220,
-      rating: 4.6,
-      bookings: 15,
-      color: BRAND_COLORS.secondary
-    },
-    {
-      id: 'seaside-villa',
-      name: 'Seaside Villa',
-      type: '4BR/3BA',
-      location: 'Key Biscayne, FL',
-      platform: 'airbnb',
-      status: 'vacant',
-      revenue: 12800,
-      occupancy: 76,
-      adr: 450,
-      rating: 4.9,
-      bookings: 8,
-      color: BRAND_COLORS.tertiary
-    },
-    {
-      id: 'mountain-cabin',
-      name: 'Mountain Cabin',
-      type: '3BR/2BA',
-      location: 'Asheville, NC',
-      platform: 'direct',
-      status: 'blocked',
-      revenue: 4800,
-      occupancy: 68,
-      adr: 180,
-      rating: 4.4,
-      bookings: 10,
-      color: BRAND_COLORS.warning
+  // Real data state
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [realData, setRealData] = useState<any>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
+
+  // Generate months list
+  const generateMonthsList = () => {
+    const months = [];
+    const currentYear = new Date().getFullYear();
+    
+    for (let year = 2020; year <= currentYear + 2; year++) {
+      for (let month = 1; month <= 12; month++) {
+        const monthNames = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        months.push(`${monthNames[month - 1]} ${year}` as MonthString);
+      }
     }
-  ];
-
-  const reservationSummary: ReservationSummary = {
-    totalBookings: 45,
-    confirmedBookings: 38,
-    pendingBookings: 7,
-    totalRevenue: 32300,
-    avgBookingValue: 718,
-    occupancyRate: 82.1
+    return months;
   };
 
-  const financialSummary: FinancialSummary = {
-    totalRevenue: 32300,
-    totalExpenses: 18900,
-    netIncome: 13400,
-    grossMargin: 58.5,
-    operatingMargin: 41.5,
-    cashFlow: 15200
+  const monthsList = generateMonthsList();
+
+  // Load initial data
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  // Load data when filters change
+  useEffect(() => {
+    loadRealFinancialData();
+  }, [selectedProperties, selectedMonth]);
+
+  const loadInitialData = async () => {
+    try {
+      setIsLoadingData(true);
+      
+      const properties = await fetchProperties();
+      console.log('🏠 Available properties loaded:', properties);
+      setAvailableProperties(properties);
+      
+      await loadRealFinancialData();
+      
+    } catch (error) {
+      console.error('Failed to load initial data:', error);
+      setDataError('Failed to load initial data');
+    } finally {
+      setIsLoadingData(false);
+    }
   };
 
-  const payrollSummary: PayrollSummary = {
-    totalPayroll: 12400,
-    activeEmployees: 5,
-    contractorPayments: 3200,
-    payrollTaxes: 1860,
-    benefits: 2100
+  const loadRealFinancialData = async () => {
+    try {
+      setIsLoadingData(true);
+      setDataError(null);
+      
+      let propertyFilter = 'All Properties';
+      if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
+        propertyFilter = Array.from(selectedProperties)[0];
+      }
+      
+      console.log('🔍 LOADING DATA WITH FILTERS:', {
+        selectedProperties: Array.from(selectedProperties),
+        propertyFilter,
+        month: selectedMonth
+      });
+      
+      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
+      
+      if (rawData.success) {
+        const entries = rawData.data as FinancialEntry[];
+        
+        console.log('🔍 DEBUG - Raw Journal Entries Sample:', entries.slice(0, 5));
+        console.log('🔍 DEBUG - Total entries loaded:', entries.length);
+        
+        const transformedPL = transformFinancialData(entries, selectedMonth);
+        const transformedCF = transformCashFlowData(entries);
+
+        const combinedData = {
+          success: true,
+          ...transformedPL,
+          ...transformedCF,
+          summary: {
+            ...rawData.summary,
+            propertiesInData: [...new Set(entries.map(e => e.property_class))],
+            selectedFilters: {
+              properties: Array.from(selectedProperties),
+              month: selectedMonth
+            }
+          },
+          performance: {
+            executionTimeMs: Date.now() % 1000
+          },
+          rawEntries: entries.slice(0, 5)
+        };
+
+        setRealData(combinedData);
+        setDataError(null);
+        
+        const propertyText = selectedProperties.has('All Properties') 
+          ? 'all properties' 
+          : `${selectedProperties.size} selected properties`;
+          
+        showNotification(`Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`, 'success');
+      } else {
+        setDataError(rawData.error || 'Failed to load financial data');
+        showNotification('Failed to load financial data', 'error');
+      }
+      
+    } catch (error) {
+      console.error('Failed to load financial data:', error);
+      setDataError('Failed to load financial data');
+      showNotification('Failed to load financial data', 'error');
+    } finally {
+      setIsLoadingData(false);
+    }
   };
 
-  const integrationStatus: IntegrationStatus = {
-    airbnb: true,
-    guesty: true,
-    quickbooks: true,
-    xero: false,
-    lastSync: '2025-06-29T14:30:00Z'
+  const handlePropertyToggle = (property: string) => {
+    const newSelected = new Set(selectedProperties);
+    
+    if (property === 'All Properties') {
+      newSelected.clear();
+      newSelected.add('All Properties');
+    } else {
+      newSelected.delete('All Properties');
+      
+      if (newSelected.has(property)) {
+        newSelected.delete(property);
+      } else {
+        newSelected.add(property);
+      }
+      
+      if (newSelected.size === 0) {
+        newSelected.add('All Properties');
+      }
+    }
+    
+    setSelectedProperties(newSelected);
+    console.log('🏠 Property selection changed:', Array.from(newSelected));
   };
 
-  const mainKPIs: KPIMetric[] = [
-    { name: 'Total Revenue', value: 32300, change: 8.7, trend: 'up', format: 'currency' },
-    { name: 'Net Income', value: 13400, change: 12.3, trend: 'up', format: 'currency' },
-    { name: 'Occupancy Rate', value: 82.1, change: 4.2, trend: 'up', format: 'percentage' },
-    { name: 'Average ADR', value: 245, change: -2.1, trend: 'down', format: 'currency' },
-    { name: 'Total Bookings', value: 45, change: 15.8, trend: 'up', format: 'number' },
-    { name: 'Cash Flow', value: 15200, change: 7.9, trend: 'up', format: 'currency' }
-  ];
+  const getSelectedPropertiesText = () => {
+    if (selectedProperties.has('All Properties') || selectedProperties.size === 0) {
+      return 'All Properties';
+    }
+    if (selectedProperties.size === 1) {
+      return Array.from(selectedProperties)[0];
+    }
+    return `${selectedProperties.size} Properties Selected`;
+  };
 
-  // Utility functions
-  const formatCurrency = (amount: number): string => {
+  // Helper functions
+  const formatCurrency = (value: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(value);
   };
 
-  const formatPercentage = (value: number): string => {
-    return `${value.toFixed(1)}%`;
+  const calculatePercentage = (value: number, total: number): string => {
+    return total !== 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
   };
 
-  const formatNumber = (value: number): string => {
-    return value.toLocaleString();
-  };
-
-  const formatValue = (value: number | string, format: string): string => {
-    if (typeof value === 'string') return value;
-    switch (format) {
-      case 'currency':
-        return formatCurrency(value);
-      case 'percentage':
-        return formatPercentage(value);
-      case 'number':
-        return formatNumber(value);
-      default:
-        return value.toString();
-    }
-  };
-
-  const showNotification = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info'): void => {
+  const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info'): void => {
     setNotification({ show: true, message, type });
     setTimeout(() => {
       setNotification({ show: false, message: '', type: 'info' });
     }, 3000);
   };
 
-  const handlePropertyToggle = (propertyId: string) => {
-    const newSelected = new Set(selectedProperties);
-    
-    if (propertyId === 'all') {
-      if (newSelected.has('all')) {
-        newSelected.clear();
-        properties.forEach(p => newSelected.add(p.id));
-      } else {
-        newSelected.clear();
-        newSelected.add('all');
-      }
+  const toggleAccountExpansion = (accountName: string): void => {
+    const newExpanded = new Set(expandedAccounts);
+    if (newExpanded.has(accountName)) {
+      newExpanded.delete(accountName);
     } else {
-      newSelected.delete('all');
-      
-      if (newSelected.has(propertyId)) {
-        newSelected.delete(propertyId);
-      } else {
-        newSelected.add(propertyId);
-      }
-      
-      if (newSelected.size === properties.length && !newSelected.has('all')) {
-        newSelected.clear();
-        newSelected.add('all');
-      }
-      
-      if (newSelected.size === 0) {
-        newSelected.add('all');
-      }
+      newExpanded.add(accountName);
     }
+    setExpandedAccounts(newExpanded);
+  };
+
+  const isExpandableAccount = (accountName: string): boolean => {
+    // Check if it's in the static expandable accounts OR if it has sub-accounts
+    const currentDataItem = currentData.find(item => item.name === accountName);
+    return accountDetails.hasOwnProperty(accountName) || 
+           (currentDataItem && currentDataItem.hasSubAccounts);
+  };
+
+  const handleAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, accountItem: FinancialDataItem): void => {
+    // Check if this account has real transaction entries
+    if (!accountItem.entries || accountItem.entries.length === 0) return;
+
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
     
-    setSelectedProperties(newSelected);
-  };
+    // Build tooltip content with actual transaction details
+    let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+      ${accountItem.name} • ${formatCurrency(accountItem.total)}
+    </div>`;
 
-  const getSelectedPropertiesText = () => {
-    if (selectedProperties.has('all') || selectedProperties.size === 0) {
-      return 'All Properties';
-    }
-    if (selectedProperties.size === 1) {
-      const propertyId = Array.from(selectedProperties)[0];
-      const property = properties.find(p => p.id === propertyId);
-      return property?.name || '1 Property';
-    }
-    return `${selectedProperties.size} Properties Selected`;
-  };
+    tooltipContent += `<div style="font-size: 11px; color: #E5E7EB; margin-bottom: 8px;">
+      ${accountItem.entries.length} Journal Entries • Mapping: ${accountItem.mapping_method}
+    </div>`;
 
-  const getFilteredProperties = () => {
-    if (selectedProperties.has('all') || selectedProperties.size === 0) {
-      return properties;
-    }
-    return properties.filter(property => selectedProperties.has(property.id));
-  };
-
-  const getPlatformIcon = (platform: string) => {
-    switch (platform) {
-      case 'airbnb':
-        return '🏠';
-      case 'guesty':
-        return '🏨';
-      case 'direct':
-        return '📞';
-      default:
-        return '🏢';
-    }
-  };
-
-  const getFilteredData = () => {
-    const filteredProps = getFilteredProperties();
+    // Show up to 5 most recent transactions
+    const recentEntries = accountItem.entries.slice(0, 5);
     
-    const filteredReservationSummary = {
-      totalBookings: filteredProps.reduce((sum, p) => sum + p.bookings, 0),
-      confirmedBookings: Math.floor(filteredProps.reduce((sum, p) => sum + p.bookings, 0) * 0.84),
-      pendingBookings: Math.floor(filteredProps.reduce((sum, p) => sum + p.bookings, 0) * 0.16),
-      totalRevenue: filteredProps.reduce((sum, p) => sum + p.revenue, 0),
-      avgBookingValue: filteredProps.length > 0 ? 
-        filteredProps.reduce((sum, p) => sum + p.revenue, 0) / filteredProps.reduce((sum, p) => sum + p.bookings, 0) : 0,
-      occupancyRate: filteredProps.length > 0 ? 
-        filteredProps.reduce((sum, p) => sum + p.occupancy, 0) / filteredProps.length : 0
-    };
+    recentEntries.forEach((entry: any, index: number) => {
+      const entryDate = new Date(entry.transaction_date).toLocaleDateString();
+      const isLast = index === recentEntries.length - 1;
+      
+      tooltipContent += `
+        <div style="margin-bottom: ${isLast ? '0' : '6px'}; padding: 4px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <div style="width: 4px; height: 4px; background: ${entry.amount_used >= 0 ? '#10B981' : '#EF4444'}; border-radius: 50%;"></div>
+              <strong style="font-size: 11px; color: white;">JE: ${entry.je_number}</strong>
+            </div>
+            <span style="font-size: 10px; color: #D1D5DB;">${entryDate}</span>
+          </div>
+          <div style="margin-left: 8px; margin-top: 2px;">
+            <div style="font-size: 10px; color: #F3F4F6;">
+              ${entry.original_description || 'No description'}
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+              <span style="font-size: 10px; color: #9CA3AF;">
+                ${entry.property || 'No Property'} • ${entry.classification}
+              </span>
+              <span style="font-size: 11px; font-weight: bold; color: ${entry.amount_used >= 0 ? '#10B981' : '#EF4444'};">
+                ${formatCurrency(Math.abs(entry.amount_used))}
+              </span>
+            </div>
+          </div>
+        </div>
+      `;
+    });
 
-    const filteredFinancialSummary = {
-      totalRevenue: filteredReservationSummary.totalRevenue,
-      totalExpenses: Math.floor(filteredReservationSummary.totalRevenue * 0.585),
-      netIncome: Math.floor(filteredReservationSummary.totalRevenue * 0.415),
-      grossMargin: 58.5,
-      operatingMargin: 41.5,
-      cashFlow: Math.floor(filteredReservationSummary.totalRevenue * 0.47)
+    // Add summary if there are more entries
+    if (accountItem.entries.length > 5) {
+      tooltipContent += `
+        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
+          <span style="font-size: 10px; color: #D1D5DB; font-style: italic;">
+            + ${accountItem.entries.length - 5} more entries
+          </span>
+        </div>
+      `;
+    }
+
+    setAccountTooltip({
+      show: true,
+      content: tooltipContent,
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    });
+  };
+
+  const handleSubAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, subAccountItem: any): void => {
+    // Handle both new sub-account structure and old static structure
+    if (typeof subAccountItem === 'object' && subAccountItem.entries) {
+      // New sub-account with real transaction data
+      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      
+      let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+        ${subAccountItem.name} • ${formatCurrency(subAccountItem.total)}
+      </div>`;
+
+      tooltipContent += `<div style="font-size: 11px; color: #E5E7EB; margin-bottom: 8px;">
+        ${subAccountItem.entries.length} Journal Entries • Property: ${subAccountItem.name}
+      </div>`;
+
+      // Show up to 3 most recent transactions for sub-accounts
+      const recentEntries = subAccountItem.entries.slice(0, 3);
+      
+      recentEntries.forEach((entry: any, index: number) => {
+        const entryDate = new Date(entry.transaction_date).toLocaleDateString();
+        const isLast = index === recentEntries.length - 1;
+        
+        tooltipContent += `
+          <div style="margin-bottom: ${isLast ? '0' : '6px'}; padding: 4px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <div style="width: 4px; height: 4px; background: #10B981; border-radius: 50%;"></div>
+                <strong style="font-size: 11px; color: white;">JE: ${entry.je_number}</strong>
+              </div>
+              <span style="font-size: 10px; color: #D1D5DB;">${entryDate}</span>
+            </div>
+            <div style="margin-left: 8px; margin-top: 2px;">
+              <div style="font-size: 10px; color: #F3F4F6;">
+                ${entry.original_description || 'No description'}
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                <span style="font-size: 10px; color: #9CA3AF;">
+                  ${entry.property || 'No Property'}
+                </span>
+                <span style="font-size: 11px; font-weight: bold; color: #10B981;">
+                  ${formatCurrency(Math.abs(entry.amount_used))}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      if (subAccountItem.entries.length > 3) {
+        tooltipContent += `
+          <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
+            <span style="font-size: 10px; color: #D1D5DB; font-style: italic;">
+              + ${subAccountItem.entries.length - 3} more entries
+            </span>
+          </div>
+        `;
+      }
+
+      setAccountTooltip({
+        show: true,
+        content: tooltipContent,
+        x: rect.left + rect.width / 2,
+        y: rect.top - 10
+      });
+    } else {
+      // Fallback to old static sub-account handling
+      handleSubAccountMouseEnterStatic(event, subAccountItem, typeof subAccountItem === 'string' ? 0 : subAccountItem);
+    }
+  };
+
+  const handleSubAccountMouseEnterStatic = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
+    const details = subAccountDetails[subAccountName];
+    if (!details || details.length === 0) return;
+
+    let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+      ${subAccountName} • ${formatCurrency(subAccountTotal)}
+    </div>`;
+
+    details.forEach((item, index) => {
+      const percentage = subAccountTotal ? ((item.amount / subAccountTotal) * 100).toFixed(1) : '0';
+      
+      tooltipContent += `
+        <div style="margin-bottom: ${index < details.length - 1 ? '8px' : '0'};">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 6px; height: 6px; background: ${BRAND_COLORS.success}; border-radius: 50%;"></div>
+            <strong style="font-size: 12px; color: white;">${item.name}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-left: 10px;">
+            <span style="font-size: 11px;">${formatCurrency(item.amount)}</span>
+            <span style="font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 10px;">${percentage}%</span>
+          </div>
+        </div>
+      `;
+    });
+
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    setAccountTooltip({
+      show: true,
+      content: tooltipContent,
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    });
+  };
+
+  const handleAccountMouseLeave = (): void => {
+    setAccountTooltip({ show: false, content: '', x: 0, y: 0 });
+  };
+
+  // Get current financial data
+  const getCurrentFinancialData = () => {
+    if (realData && realData.propertyFinancialData) {
+      const propertyKey = Object.keys(realData.propertyFinancialData)[0] || 'All Properties';
+      const monthlyData = realData.propertyFinancialData[propertyKey]?.Monthly;
+      return monthlyData?.[selectedMonth] || [];
+    }
+    return [];
+  };
+
+  const getCurrentCashFlowData = () => {
+    if (realData && realData.propertyCashFlowData) {
+      const propertyKey = Object.keys(realData.propertyCashFlowData)[0] || 'All Properties';
+      return realData.propertyCashFlowData[propertyKey] || {
+        inFlow: [],
+        outFlow: [],
+        totalInFlow: 0,
+        totalOutFlow: 0,
+        totalCashFlow: 0,
+        beginningCash: 0,
+        endingCash: 0
+      };
+    }
+    return {
+      inFlow: [],
+      outFlow: [],
+      totalInFlow: 0,
+      totalOutFlow: 0,
+      totalCashFlow: 0,
+      beginningCash: 0,
+      endingCash: 0
     };
+  };
+
+  const currentData = getCurrentFinancialData();
+  const currentCashFlowData = getCurrentCashFlowData();
+
+  // Calculate KPIs
+  const calculateKPIs = () => {
+    if (!currentData || currentData.length === 0) {
+      return {
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        operatingExpenses: 0,
+        operatingIncome: 0,
+        otherIncome: 0,
+        otherExpenses: 0,
+        interestExpense: 0,
+        netIncome: 0,
+        grossMargin: 0,
+        operatingMargin: 0,
+        netMargin: 0
+      };
+    }
+
+    const revenue = currentData
+      .filter(item => item.type === 'Revenue' || 
+                     (item.original_type && item.original_type.toLowerCase().includes('income')))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    const cogs = currentData
+      .filter(item => item.original_type === 'Cost of Goods Sold')
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    const operatingExpenses = currentData
+      .filter(item => item.type === 'Expenses' && 
+                     item.original_type !== 'Interest Expense')
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    const interestExpense = currentData
+      .filter(item => item.original_type === 'Interest Expense' ||
+                     item.name.toLowerCase().includes('mortgage interest'))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    const otherIncome = currentData
+      .filter(item => item.original_type === 'Other Income')
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    const otherExpenses = currentData
+      .filter(item => item.name.toLowerCase().includes('other expense') &&
+                     !item.name.toLowerCase().includes('interest'))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    const grossProfit = revenue - cogs;
+    const operatingIncome = grossProfit - operatingExpenses;
+    const netOperatingIncome = operatingIncome - interestExpense;
+    const netIncome = netOperatingIncome + otherIncome - otherExpenses;
 
     return {
-      properties: filteredProps,
-      reservationSummary: filteredReservationSummary,
-      financialSummary: filteredFinancialSummary
+      revenue,
+      cogs,
+      grossProfit,
+      operatingExpenses,
+      operatingIncome,
+      interestExpense,
+      netOperatingIncome,
+      otherIncome,
+      otherExpenses,
+      netIncome,
+      grossMargin: revenue ? (grossProfit / revenue) * 100 : 0,
+      operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
+      netMargin: revenue ? (netIncome / revenue) * 100 : 0
     };
   };
 
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'occupied':
-      case 'confirmed':
-        return `bg-green-100 text-green-800`;
-      case 'vacant':
-      case 'pending':
-        return `bg-yellow-100 text-yellow-800`;
-      case 'blocked':
-      case 'cancelled':
-        return `bg-red-100 text-red-800`;
-      default:
-        return `bg-gray-100 text-gray-800`;
-    }
-  };
-
-  // Generate chart data
-  const generateRevenueData = () => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const filteredProps = getFilteredProperties();
-    const baseRevenue = filteredProps.reduce((sum, p) => sum + p.revenue, 0);
+  const generateTrendData = () => {
+    const months = ['Jan 2023', 'Feb 2023', 'Mar 2023', 'Apr 2023', 'May 2023', 'Jun 2023'];
+    const revenue = kpis.revenue;
     
     return months.map((month, index) => ({
       month,
-      revenue: Math.floor(baseRevenue * (0.7 + index * 0.05) + Math.random() * 2000),
-      bookings: Math.floor(filteredProps.reduce((sum, p) => sum + p.bookings, 0) * (0.6 + index * 0.08) + Math.random() * 5),
-      expenses: Math.floor(baseRevenue * 0.6 * (0.7 + index * 0.05) + Math.random() * 1000),
-      occupancy: Math.floor(filteredProps.reduce((sum, p) => sum + p.occupancy, 0) / filteredProps.length * (0.8 + index * 0.04) + Math.random() * 5)
+      revenue: revenue * (0.8 + (index * 0.04)),
+      grossProfit: (revenue * (0.8 + (index * 0.04))) * 0.4,
+      operatingIncome: (revenue * (0.8 + (index * 0.04))) * 0.2,
+      netIncome: (revenue * (0.8 + (index * 0.04))) * 0.15,
     }));
   };
 
-  const generatePropertyBreakdown = () => {
-    const filteredProps = getFilteredProperties();
-    return filteredProps.map(property => ({
-      name: property.name.split(' ')[0],
-      revenue: property.revenue,
-      bookings: property.bookings,
-      occupancy: property.occupancy,
-      adr: property.adr
-    }));
+  const generateExpenseBreakdown = () => {
+    return currentData
+      .filter(item => item.type === 'Expenses' && item.total > 0)
+      .map(item => ({
+        name: item.name,
+        value: item.total
+      }))
+      .filter(item => item.value > 0);
   };
 
-  const generateFinancialBreakdown = () => {
-    const { financialSummary } = getFilteredData();
-    return [
-      { name: 'Revenue', value: financialSummary.totalRevenue, color: BRAND_COLORS.success },
-      { name: 'Expenses', value: financialSummary.totalExpenses, color: BRAND_COLORS.danger },
-      { name: 'Net Income', value: financialSummary.netIncome, color: BRAND_COLORS.primary }
-    ];
+  const kpis = calculateKPIs();
+  const trendData = generateTrendData();
+  const expenseData = generateExpenseBreakdown();
+
+  const renderColumnHeaders = () => {
+    return (
+      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+        {selectedMonth}
+      </th>
+    );
   };
 
-  const generateRecentActivity = () => {
-    return [
-      { 
-        type: 'booking', 
-        message: 'New booking confirmed - Miami Beach Condo', 
-        time: '2h ago', 
-        icon: '📅',
-        color: 'text-green-600' 
-      },
-      { 
-        type: 'sync', 
-        message: 'Airbnb data synced successfully', 
-        time: '4h ago', 
-        icon: '🔄',
-        color: `text-blue-600` 
-      },
-      { 
-        type: 'payment', 
-        message: 'Payment received - $1,200', 
-        time: '6h ago', 
-        icon: '💰',
-        color: 'text-green-600' 
-      },
-      { 
-        type: 'expense', 
-        message: 'New expense recorded - Cleaning services', 
-        time: '8h ago', 
-        icon: '📋',
-        color: 'text-orange-600' 
-      },
-      { 
-        type: 'sync', 
-        message: 'QuickBooks data synced', 
-        time: '12h ago', 
-        icon: '🔄',
-        color: `text-blue-600` 
-      }
-    ];
-  };
-
-  const revenueData = generateRevenueData();
-  const propertyBreakdown = generatePropertyBreakdown();
-  const financialBreakdown = generateFinancialBreakdown();
-  const recentActivity = generateRecentActivity();
-  
-  const { properties: filteredProperties, reservationSummary: filteredReservationSummary, financialSummary: filteredFinancialSummary } = getFilteredData();
-  
-  const filteredMainKPIs: KPIMetric[] = [
-    { name: 'Total Revenue', value: filteredFinancialSummary.totalRevenue, change: 8.7, trend: 'up', format: 'currency' },
-    { name: 'Net Income', value: filteredFinancialSummary.netIncome, change: 12.3, trend: 'up', format: 'currency' },
-    { name: 'Occupancy Rate', value: filteredReservationSummary.occupancyRate, change: 4.2, trend: 'up', format: 'percentage' },
-    { name: 'Average ADR', value: filteredProperties.length > 0 ? filteredProperties.reduce((sum, p) => sum + p.adr, 0) / filteredProperties.length : 0, change: -2.1, trend: 'down', format: 'currency' },
-    { name: 'Total Bookings', value: filteredReservationSummary.totalBookings, change: 15.8, trend: 'up', format: 'number' },
-    { name: 'Cash Flow', value: filteredFinancialSummary.cashFlow, change: 7.9, trend: 'up', format: 'currency' }
-  ];
-
-  const formatLastSync = (syncTime: string): string => {
-    const now = new Date();
-    const sync = new Date(syncTime);
-    const diffInMinutes = Math.floor((now.getTime() - sync.getTime()) / (1000 * 60));
+  const renderDataCells = (item: FinancialDataItem) => {
+    const value = item.total || 0;
+    const displayValue = item.type === 'Expenses' ? -Math.abs(value) : value;
     
-    if (diffInMinutes < 60) {
-      return `${diffInMinutes}m ago`;
-    } else if (diffInMinutes < 1440) {
-      return `${Math.floor(diffInMinutes / 60)}h ago`;
-    } else {
-      return `${Math.floor(diffInMinutes / 1440)}d ago`;
-    }
+    return (
+      <td className={`px-4 py-3 text-right text-sm font-medium ${
+        displayValue >= 0 ? 'text-green-600' : 'text-red-600'
+      }`}>
+        {displayValue >= 0 ? formatCurrency(displayValue) : `(${formatCurrency(Math.abs(displayValue))})`}
+      </td>
+    );
+  };
+
+  const renderCashFlowDataCells = (item: FinancialDataItem) => {
+    const value = item.total || 0;
+    return (
+      <td className={`px-4 py-3 text-right text-sm font-medium ${
+        value >= 0 ? 'text-green-600' : 'text-red-600'
+      }`}>
+        {value >= 0 ? formatCurrency(value) : `(${formatCurrency(Math.abs(value))})`}
+      </td>
+    );
   };
 
   return (
@@ -510,513 +1319,879 @@ export default function DashboardPage() {
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
-            <IAMCFOLogo className="w-12 h-12 mr-4" />
+            <IAMCFOLogo className="w-8 h-8 mr-4" />
             <div>
               <div className="flex items-center space-x-3">
                 <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
                 <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
-                  360° Business Intelligence
+                  Financial Management
                 </span>
+                {realData && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                    Supabase Connected
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-gray-600 mt-1">Airbnb/Guesty + QuickBooks/Xero Integration • More Than Just A Balance Sheet</p>
+              <p className="text-sm text-gray-600 mt-1">
+                Real-time P&L by Property Class • Fixed Data Mapping
+                {realData?.summary && (
+                  <span className="ml-2 text-green-600">
+                    • {realData.summary.filteredEntries} entries loaded
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          {/* Controls */}
+          {/* Header Controls */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div className="flex items-center">
-              <div className="flex items-center mr-4">
-                <div>
-                  <h2 className="text-2xl font-bold" style={{ color: BRAND_COLORS.primary }}>Real-Time Business Analytics</h2>
-                  <p className="text-sm text-gray-600">Complete rental business insights from booking to bank</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              {/* Integration Status */}
-              <div className="flex items-center space-x-2">
-                <div className="flex space-x-1">
-                  <div className={`w-2 h-2 rounded-full ${integrationStatus.airbnb ? 'bg-green-500' : 'bg-red-500'}`} title="Airbnb"></div>
-                  <div className={`w-2 h-2 rounded-full ${integrationStatus.guesty ? 'bg-green-500' : 'bg-red-500'}`} title="Guesty"></div>
-                  <div className={`w-2 h-2 rounded-full ${integrationStatus.quickbooks ? 'bg-green-500' : 'bg-red-500'}`} title="QuickBooks"></div>
-                  <div className={`w-2 h-2 rounded-full ${integrationStatus.xero ? 'bg-green-500' : 'bg-red-500'}`} title="Xero"></div>
-                </div>
-                <span className="text-xs text-gray-500">Last sync: {formatLastSync(integrationStatus.lastSync)}</span>
-              </div>
-              
-              {/* Sync Dropdown */}
+            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Financial Management</h2>
+            <div className="flex flex-wrap gap-4 items-center">
+              {/* Month Selector */}
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value as MonthString)}
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+              >
+                {monthsList.map((month) => (
+                  <option key={month} value={month}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+
+              {/* Property Class Multi-Select Dropdown */}
               <div className="relative">
                 <button
-                  onClick={() => setSyncDropdownOpen(!syncDropdownOpen)}
-                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
+                  className="flex items-center justify-between w-56 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
                   style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                 >
-                  <RefreshCw className="w-4 h-4" />
-                  Sync
-                  <ChevronDown className={`w-4 h-4 transition-transform ${syncDropdownOpen ? 'rotate-180' : ''}`} />
+                  <span className="truncate">
+                    {selectedProperties.has('All Properties') 
+                      ? 'All Property Classes' 
+                      : selectedProperties.size === 0 
+                        ? 'Select Property Classes'
+                        : selectedProperties.size === 1
+                          ? Array.from(selectedProperties)[0]
+                          : `${selectedProperties.size} Properties Selected`
+                    }
+                  </span>
+                  <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
-                {syncDropdownOpen && (
-                  <div className="absolute top-full right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-48">
-                    <div className="p-2">
-                      <button
-                        onClick={() => {
-                          showNotification('Syncing all platforms...', 'info');
-                          setSyncDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm"
-                      >
-                        Sync All Platforms
-                      </button>
-                      <button
-                        onClick={() => {
-                          showNotification('Syncing Airbnb data...', 'info');
-                          setSyncDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm"
-                      >
-                        Sync Airbnb Only
-                      </button>
-                      <button
-                        onClick={() => {
-                          showNotification('Syncing financial data...', 'info');
-                          setSyncDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm"
-                      >
-                        Sync Financial Data
-                      </button>
+                {propertyDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                    {/* All Properties Option */}
+                    <div
+                      className="flex items-center px-4 py-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePropertyToggle('All Properties');
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedProperties.has('All Properties')}
+                        onChange={() => {}}
+                        className="mr-3 h-4 w-4 border-gray-300 rounded"
+                        style={{ accentColor: BRAND_COLORS.primary }}
+                      />
+                      <span className="font-medium text-blue-900">
+                        All Property Classes
+                      </span>
+                    </div>
+                    
+                    {/* Individual Property Classes */}
+                    <div className="max-h-60 overflow-y-auto">
+                      {availableProperties.length > 1 ? (
+                        availableProperties
+                          .filter(property => property !== 'All Properties')
+                          .map((property) => (
+                            <div
+                              key={property}
+                              className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePropertyToggle(property);
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedProperties.has(property)}
+                                onChange={() => {}}
+                                className="mr-3 h-4 w-4 border-gray-300 rounded"
+                                style={{ accentColor: BRAND_COLORS.primary }}
+                              />
+                              <span className="text-gray-700">
+                                {property}
+                              </span>
+                            </div>
+                          ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500 italic">
+                          Loading property classes...
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
 
-              <select
-                value={selectedTimeframe}
-                onChange={(e) => setSelectedTimeframe(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
-              >
-                <option value="weekly">Weekly View</option>
-                <option value="monthly">Monthly View</option>
-                <option value="quarterly">Quarterly View</option>
-                <option value="yearly">Yearly View</option>
-              </select>
-
-              {/* Property Filter Dropdown */}
+              {/* Time View Dropdown */}
               <div className="relative">
                 <button
-                  onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
-                  className="flex items-center justify-between w-48 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  onClick={() => setTimeViewDropdownOpen(!timeViewDropdownOpen)}
+                  className="flex items-center justify-between w-32 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
                   style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                 >
-                  <span className="truncate">{getSelectedPropertiesText()}</span>
-                  <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
+                  <span>{timeView}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${timeViewDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
-                {propertyDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    <div
-                      className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100"
-                      onClick={() => handlePropertyToggle('all')}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedProperties.has('all')}
-                        onChange={() => {}}
-                        className="mr-3 h-4 w-4 border-gray-300 rounded"
-                        style={{ accentColor: BRAND_COLORS.primary }}
-                      />
-                      <span className="font-medium text-gray-900">All Properties</span>
-                    </div>
-                    
-                    {properties.map((property) => (
+                {timeViewDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                    {(['Monthly', 'YTD', 'TTM', 'MoM', 'YoY'] as TimeView[]).map((view) => (
                       <div
-                        key={property.id}
-                        className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                        onClick={() => handlePropertyToggle(property.id)}
+                        key={view}
+                        className="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                        onClick={() => {
+                          setTimeView(view);
+                          setTimeViewDropdownOpen(false);
+                        }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={selectedProperties.has(property.id)}
-                          onChange={() => {}}
-                          className="mr-3 h-4 w-4 border-gray-300 rounded"
-                          style={{ accentColor: BRAND_COLORS.primary }}
-                        />
-                        <div className="flex items-center flex-1">
-                          <span className="mr-2">{getPlatformIcon(property.platform)}</span>
-                          <div>
-                            <div className="text-gray-900">{property.name}</div>
-                            <div className="text-xs text-gray-500">{property.location}</div>
-                          </div>
-                        </div>
-                        <span className={`ml-2 inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(property.status)}`}>
-                          {property.status}
-                        </span>
+                        {view}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
+              {/* Action Buttons */}
               <button
-                onClick={() => showNotification('Comprehensive business report exported successfully', 'success')}
+                onClick={() => showNotification('Financial data exported', 'success')}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
                 style={{ backgroundColor: BRAND_COLORS.primary }}
               >
                 <Download className="w-4 h-4" />
-                Export 360° Report
+                Export
+              </button>
+
+              <button
+                onClick={loadRealFinancialData}
+                disabled={isLoadingData}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
+                {isLoadingData ? 'Loading...' : 'Refresh'}
               </button>
             </div>
           </div>
 
-          {/* Main KPI Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredMainKPIs.map((kpi, index) => {
-              const icons = [DollarSign, TrendingUp, BarChart3, PieChart, Calendar, CreditCard];
-              const borderColors = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.secondary, BRAND_COLORS.tertiary, BRAND_COLORS.warning, BRAND_COLORS.accent];
-              const Icon = icons[index % icons.length];
-              const borderColor = borderColors[index % borderColors.length];
-              
-              return (
-                <div key={kpi.name} className={`bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow`} style={{ borderLeftColor: borderColor }}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="text-gray-600 text-sm font-medium mb-2">{kpi.name}</div>
-                      <div className="text-3xl font-bold text-gray-900 mb-1">
-                        {formatValue(kpi.value, kpi.format)}
-                      </div>
-                      <div className={`text-xs px-2 py-1 rounded-full inline-flex items-center ${
-                        kpi.trend === 'up' ? 'bg-green-100 text-green-800' : 
-                        kpi.trend === 'down' ? 'bg-red-100 text-red-800' : 
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {kpi.trend === 'up' ? <ArrowUp className="w-3 h-3 mr-1" /> : 
-                         kpi.trend === 'down' ? <ArrowDown className="w-3 h-3 mr-1" /> : 
-                         <span className="w-3 h-3 mr-1">−</span>}
-                        {Math.abs(kpi.change)}% vs last month
-                      </div>
-                    </div>
-                    <Icon className={`w-8 h-8`} style={{ color: borderColor }} />
+          {/* Data Status */}
+          {realData && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="text-green-800 text-sm">
+                <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
+                from Supabase • STRICT Date Filtering Active
+                <div className="mt-1 text-xs">
+                  <strong>Date Range:</strong> {realData.summary.dateRange} (STRICT {selectedMonth} ONLY)
+                </div>
+                <div className="mt-1 text-xs">
+                  <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {selectedMonth}
+                </div>
+                <div className="mt-1 text-xs">
+                  <strong>Data Source:</strong> {realData.summary.dataSource}
+                </div>
+                <div className="mt-1 text-xs">
+                  <strong>Date Filtering:</strong> {realData.summary.originalEntries || 0} original entries → 
+                  {realData.summary.filteredEntries} after STRICT filtering 
+                  {realData.summary.dateFiltered ? `(${realData.summary.dateFiltered} entries filtered out)` : ''}
+                </div>
+                <div className="mt-1 text-xs">
+                  <strong>Mapping Results:</strong> {realData.summary.mappingStats?.accountsTableMapped || 0} accounts table matches, 
+                  {realData.summary.mappingStats?.fallbackMapped || 0} fallback classifications
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Financial KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.primary }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Revenue</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
+                  <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
+                    Top Line
                   </div>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Revenue & Bookings Trend */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900">Revenue & Booking Performance</h3>
-                <p className="text-sm text-gray-600 mt-1">Cross-platform revenue trends and booking volume analysis</p>
-              </div>
-              <div className="p-6">
-                <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis yAxisId="revenue" orientation="left" tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                    <YAxis yAxisId="bookings" orientation="right" />
-                    <Tooltip 
-                      formatter={(value, name) => [
-                        name === 'revenue' ? formatCurrency(Number(value)) : 
-                        name === 'bookings' ? `${value} bookings` :
-                        `${Number(value).toFixed(1)}%`,
-                        name === 'revenue' ? 'Revenue' : 
-                        name === 'bookings' ? 'Bookings' : 'Occupancy'
-                      ]}
-                    />
-                    <Legend />
-                    <Area 
-                      yAxisId="revenue"
-                      type="monotone" 
-                      dataKey="revenue" 
-                      fill={BRAND_COLORS.primary}
-                      fillOpacity={0.6}
-                      stroke={BRAND_COLORS.primary}
-                      name="revenue"
-                    />
-                    <Bar 
-                      yAxisId="bookings"
-                      dataKey="bookings" 
-                      fill={BRAND_COLORS.success}
-                      name="bookings"
-                    />
-                    <Line 
-                      yAxisId="bookings"
-                      type="monotone" 
-                      dataKey="occupancy" 
-                      stroke={BRAND_COLORS.warning} 
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: BRAND_COLORS.warning }}
-                      name="occupancy"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
               </div>
             </div>
-
-            {/* Property Performance */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900">Listing Performance Metrics</h3>
-                <p className="text-sm text-gray-600 mt-1">Individual property ROI and platform comparison</p>
-              </div>
-              <div className="p-6">
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={propertyBreakdown}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                    <Tooltip 
-                      formatter={(value, name) => [
-                        name === 'revenue' ? formatCurrency(Number(value)) :
-                        name === 'adr' ? formatCurrency(Number(value)) :
-                        name === 'occupancy' ? `${Number(value).toFixed(1)}%` :
-                        `${value} bookings`,
-                        name === 'revenue' ? 'Revenue' :
-                        name === 'adr' ? 'ADR' :
-                        name === 'occupancy' ? 'Occupancy' : 'Bookings'
-                      ]}
-                    />
-                    <Legend />
-                    <Bar dataKey="revenue" fill={BRAND_COLORS.primary} name="revenue" />
-                    <Bar dataKey="bookings" fill={BRAND_COLORS.success} name="bookings" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Financial Overview */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900">Financial Health Overview</h3>
-                <p className="text-sm text-gray-600 mt-1">Real-time P&L from integrated accounting platforms</p>
-              </div>
-              <div className="p-6">
-                <ResponsiveContainer width="100%" height={300}>
-                  <RechartsPieChart>
-                    <Tooltip formatter={(value) => [formatCurrency(Number(value)), '']} />
-                    <Pie
-                      data={financialBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {financialBreakdown.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900">Business Activity Feed</h3>
-                <p className="text-sm text-gray-600 mt-1">Real-time updates from all connected platforms</p>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-center space-x-3">
-                      <div className="text-lg">{activity.icon}</div>
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium ${activity.color}`}>{activity.message}</p>
-                        <p className="text-xs text-gray-500">{activity.time}</p>
-                      </div>
-                    </div>
-                  ))}
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Gross Profit</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.grossProfit)}</div>
+                  <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
+                    {kpis.grossMargin.toFixed(1)}% Margin
+                  </div>
                 </div>
+                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
+              </div>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.success }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Income</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingIncome)}</div>
+                  <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
+                    {kpis.operatingMargin.toFixed(1)}% Margin
+                  </div>
+                </div>
+                <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
+              </div>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.secondary }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
+                  <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
+                    {kpis.netMargin.toFixed(1)}% Margin
+                  </div>
+                </div>
+                <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.tertiary }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Expenses</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingExpenses)}</div>
+                  <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full inline-block">
+                    Operating Costs
+                  </div>
+                </div>
+                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.tertiary }} />
               </div>
             </div>
           </div>
 
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Reservation Summary */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Calendar className="w-5 h-5 mr-2" style={{ color: BRAND_COLORS.primary }} />
-                  Booking Intelligence
-                </h3>
-                <p className="text-xs text-gray-600 mt-1">Cross-platform reservation analytics</p>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Bookings:</span>
-                  <span className="font-semibold">{filteredReservationSummary.totalBookings}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Confirmed:</span>
-                  <span className="font-semibold text-green-600">{filteredReservationSummary.confirmedBookings}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Pending:</span>
-                  <span className="font-semibold text-yellow-600">{filteredReservationSummary.pendingBookings}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Avg Booking Value:</span>
-                  <span className="font-semibold">{formatCurrency(filteredReservationSummary.avgBookingValue)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Occupancy Rate:</span>
-                  <span className="font-semibold">{formatPercentage(filteredReservationSummary.occupancyRate)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Financial Summary */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <CreditCard className="w-5 h-5 mr-2" style={{ color: BRAND_COLORS.success }} />
-                  Financial Performance
-                </h3>
-                <p className="text-xs text-gray-600 mt-1">Real-time accounting integration</p>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Revenue:</span>
-                  <span className="font-semibold text-green-600">{formatCurrency(filteredFinancialSummary.totalRevenue)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Expenses:</span>
-                  <span className="font-semibold text-red-600">{formatCurrency(filteredFinancialSummary.totalExpenses)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Net Income:</span>
-                  <span className="font-semibold">{formatCurrency(filteredFinancialSummary.netIncome)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Gross Margin:</span>
-                  <span className="font-semibold">{formatPercentage(filteredFinancialSummary.grossMargin)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Cash Flow:</span>
-                  <span className="font-semibold">{formatCurrency(filteredFinancialSummary.cashFlow)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Operational Expenses */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Calculator className="w-5 h-5 mr-2" style={{ color: BRAND_COLORS.warning }} />
-                  Operational Expenses
-                </h3>
-                <p className="text-xs text-gray-600 mt-1">Staff and contractor management</p>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Payroll:</span>
-                  <span className="font-semibold">{formatCurrency(payrollSummary.totalPayroll)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Active Employees:</span>
-                  <span className="font-semibold">{payrollSummary.activeEmployees}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Contractor Payments:</span>
-                  <span className="font-semibold">{formatCurrency(payrollSummary.contractorPayments)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Payroll Taxes:</span>
-                  <span className="font-semibold">{formatCurrency(payrollSummary.payrollTaxes)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Benefits:</span>
-                  <span className="font-semibold">{formatCurrency(payrollSummary.benefits)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Rental Portfolio Overview */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">Rental Portfolio Performance</h3>
-              <p className="text-sm text-gray-600 mt-1">Cross-platform property analytics and booking performance</p>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {filteredProperties.map((property) => (
-                  <div key={property.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{property.name}</h4>
-                        <p className="text-sm text-gray-600">{property.type}</p>
-                        <p className="text-xs text-gray-500">{property.location}</p>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-lg">{getPlatformIcon(property.platform)}</span>
-                        <span className={`text-xs px-2 py-1 rounded-full mt-1 ${getStatusColor(property.status)}`}>
-                          {property.status}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Revenue:</span>
-                        <span className="font-medium">{formatCurrency(property.revenue)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Occupancy:</span>
-                        <span className="font-medium">{property.occupancy}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">ADR:</span>
-                        <span className="font-medium">{formatCurrency(property.adr)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Bookings:</span>
-                        <span className="font-medium">{property.bookings}</span>
-                      </div>
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column: Financial Tables */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      {activeTab === 'p&l' ? 'Profit & Loss Statement (By Property Class)' : 
+                       activeTab === 'cash-flow' ? 'Cash Flow Statement' : 
+                       'Balance Sheet'}
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setActiveTab('p&l')}
+                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                          activeTab === 'p&l' 
+                            ? 'text-white' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                        style={{ backgroundColor: activeTab === 'p&l' ? BRAND_COLORS.primary : undefined }}
+                      >
+                        P&L
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('cash-flow')}
+                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                          activeTab === 'cash-flow' 
+                            ? 'text-white' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                        style={{ backgroundColor: activeTab === 'cash-flow' ? BRAND_COLORS.primary : undefined }}
+                      >
+                        Cash Flow
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('balance-sheet')}
+                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                          activeTab === 'balance-sheet' 
+                            ? 'text-white' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                        style={{ backgroundColor: activeTab === 'balance-sheet' ? BRAND_COLORS.primary : undefined }}
+                      >
+                        Balance Sheet
+                      </button>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {/* P&L Content */}
+                {activeTab === 'p&l' && (
+                  <div className="overflow-x-auto">
+                    {isLoadingData ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                        <span>Loading financial data from Supabase...</span>
+                      </div>
+                    ) : currentData.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No financial data available for the selected filters
+                      </div>
+                    ) : (
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Account
+                            </th>
+                            {renderColumnHeaders()}
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              % of Revenue
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {/* INCOME SECTION - Matching Your Google Sheets */}
+                          <tr className="bg-blue-50 border-t-2 border-blue-200">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
+                              💰 INCOME
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
+                              {formatCurrency(kpis.revenue)}
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm text-blue-700">
+                              100.0%
+                            </td>
+                          </tr>
+                          
+                          {/* Individual Income Line Items */}
+                          {currentData
+                            .filter(item => item.type === 'Revenue' || 
+                                           (item.original_type && item.original_type.toLowerCase().includes('income')))
+                            .map((item) => {
+                              const isExpandable = isExpandableAccount(item.name);
+                              const isExpanded = expandedAccounts.has(item.name);
+                              
+                              return (
+                                <React.Fragment key={`income-${item.name}`}>
+                                  {/* Parent Account Row */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                      <div className="flex items-center">
+                                        {isExpandable && (
+                                          <button
+                                            onClick={() => toggleAccountExpansion(item.name)}
+                                            className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                                          >
+                                            {isExpanded ? (
+                                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                                            ) : (
+                                              <ChevronRight className="w-4 h-4 text-gray-500" />
+                                            )}
+                                          </button>
+                                        )}
+                                        <span 
+                                          className="cursor-help"
+                                          onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                          onMouseLeave={handleAccountMouseLeave}
+                                        >
+                                          {item.name}
+                                          {item.entries && item.entries.length > 0 && (
+                                            <span className="ml-2 text-xs text-gray-500">
+                                              ({item.entries.reduce((props: Set<string>, entry: any) => props.add(entry.property || 'No Property'), new Set()).size} properties)
+                                            </span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-green-600">
+                                      {formatCurrency(Math.abs(item.total))}
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                    </td>
+                                  </tr>
+                                  
+                                  {/* Sub-Account Details (when expanded) */}
+                                  {isExpandable && isExpanded && item.hasSubAccounts && 
+                                    Object.values(item.subAccounts || {}).map((subAccount: any) => (
+                                      <tr key={`${item.name}-${subAccount.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
+                                        <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
+                                          <div className="flex items-center">
+                                            <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                                            <span 
+                                              className="cursor-help"
+                                              onMouseEnter={(e) => handleSubAccountMouseEnter(e, subAccount)}
+                                              onMouseLeave={handleAccountMouseLeave}
+                                            >
+                                              {subAccount.name}
+                                            </span>
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-sm text-green-600">
+                                          {formatCurrency(Math.abs(subAccount.total))}
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                          {item.total ? calculatePercentage(Math.abs(subAccount.total), Math.abs(item.total)) : '0%'}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  }
+                                  
+                                  {/* Static Sub-Account Details (for demo accounts) */}
+                                  {isExpandable && isExpanded && accountDetails[item.name] && 
+                                    accountDetails[item.name].map((subItem) => {
+                                      const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
+                                      return (
+                                        <tr key={`${item.name}-${subItem.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
+                                          <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
+                                            <div className="flex items-center">
+                                              <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: BRAND_COLORS.primary }}></div>
+                                              {subItem.name}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-2 text-right text-sm text-gray-600">
+                                            <span 
+                                              className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
+                                              onMouseEnter={hasSubDetails ? (e) => handleSubAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
+                                              onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
+                                            >
+                                              {formatCurrency(subItem.total)}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                            {kpis.revenue ? calculatePercentage(subItem.total, kpis.revenue) : '0%'}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  }
+                                </React.Fragment>
+                              );
+                            })}
+
+                          {/* TOTAL INCOME - Bold Line Like Your Sheet */}
+                          <tr className="bg-blue-100 border-t-2 border-blue-300">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
+                              📊 TOTAL INCOME
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
+                              {formatCurrency(kpis.revenue)}
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
+                              100.0%
+                            </td>
+                          </tr>
+
+                          {/* EXPENSES SECTION */}
+                          <tr className="bg-red-50 border-t-4 border-red-200 mt-4">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
+                              💸 EXPENSES
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                              ({formatCurrency(kpis.operatingExpenses)})
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm text-red-600">
+                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
+                            </td>
+                          </tr>
+                          
+                          {/* Individual Expense Line Items */}
+                          {currentData
+                            .filter(item => item.type === 'Expenses' && 
+                                           item.original_type !== 'Cost of Goods Sold' &&
+                                           !item.name.toLowerCase().includes('interest'))
+                            .map((item) => {
+                              const isExpandable = isExpandableAccount(item.name);
+                              const isExpanded = expandedAccounts.has(item.name);
+                              
+                              return (
+                                <React.Fragment key={`expense-${item.name}`}>
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                      <div className="flex items-center">
+                                        {isExpandable && (
+                                          <button
+                                            onClick={() => toggleAccountExpansion(item.name)}
+                                            className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
+                                          >
+                                            {isExpanded ? (
+                                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                                            ) : (
+                                              <ChevronRight className="w-4 h-4 text-gray-500" />
+                                            )}
+                                          </button>
+                                        )}
+                                        <span 
+                                          className="cursor-help"
+                                          onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+                                          onMouseLeave={handleAccountMouseLeave}
+                                        >
+                                          {item.name}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-red-600">
+                                      ({formatCurrency(Math.abs(item.total))})
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                    </td>
+                                  </tr>
+                                  
+                                  {/* Expanded Detail Rows */}
+                                  {isExpandable && isExpanded && accountDetails[item.name] && 
+                                    accountDetails[item.name].map((subItem) => {
+                                      const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
+                                      return (
+                                        <tr key={`${item.name}-${subItem.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
+                                          <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
+                                            <div className="flex items-center">
+                                              <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: BRAND_COLORS.primary }}></div>
+                                              {subItem.name}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-2 text-right text-sm text-gray-600">
+                                            <span 
+                                              className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
+                                              onMouseEnter={hasSubDetails ? (e) => handleSubAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
+                                              onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
+                                            >
+                                              ({formatCurrency(subItem.total)})
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                            {kpis.revenue ? calculatePercentage(subItem.total, kpis.revenue) : '0%'}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  }
+                                </React.Fragment>
+                              );
+                            })}
+
+                          {/* TOTAL EXPENSES */}
+                          <tr className="bg-red-100 border-t-2 border-red-300">
+                            <td className="px-6 py-4 text-left text-lg font-bold text-red-800">
+                              📊 TOTAL EXPENSES
+                            </td>
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-800">
+                              ({formatCurrency(kpis.operatingExpenses)})
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm font-bold text-red-800">
+                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
+                            </td>
+                          </tr>
+
+                          {/* NET INCOME - Final Bottom Line Like Your Sheet */}
+                          <tr className="border-t-4" style={{ 
+                            backgroundColor: BRAND_COLORS.primary + '20', 
+                            borderTopColor: BRAND_COLORS.primary 
+                          }}>
+                            <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              🏆 NET INCOME
+                            </td>
+                            <td className={`px-4 py-5 text-right text-xl font-bold ${
+                              kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {formatCurrency(kpis.netIncome)}
+                            </td>
+                            <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              {kpis.netMargin.toFixed(1)}%
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {/* Cash Flow Content */}
+                {activeTab === 'cash-flow' && (
+                  <div className="overflow-x-auto">
+                    {isLoadingData ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                        <span>Loading cash flow data...</span>
+                      </div>
+                    ) : (
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Account
+                            </th>
+                            {renderColumnHeaders()}
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              % of Total Cash
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {/* Cash In-Flow Section */}
+                          <tr className="bg-green-50">
+                            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
+                              💰 CASH IN-FLOW
+                            </td>
+                          </tr>
+                          {currentCashFlowData.inFlow.map((item) => (
+                            <tr key={`inflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-left text-sm text-gray-700">
+                                <span className="ml-4">{item.name}</span>
+                              </td>
+                              {renderCashFlowDataCells(item)}
+                              <td className="px-4 py-3 text-right text-sm text-green-600">
+                                {currentCashFlowData.totalCashFlow ? calculatePercentage(item.total, Math.abs(currentCashFlowData.totalCashFlow)) : '0%'}
+                              </td>
+                            </tr>
+                          ))}
+                          
+                          {/* Total Cash In-Flow */}
+                          <tr className="bg-green-100 font-semibold">
+                            <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
+                              Total Cash In-Flow
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+                              {formatCurrency(currentCashFlowData.totalInFlow)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
+                              100%
+                            </td>
+                          </tr>
+
+                          {/* Cash Out-Flow Section */}
+                          <tr className="bg-red-50">
+                            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
+                              💸 CASH OUT-FLOW
+                            </td>
+                          </tr>
+                          {currentCashFlowData.outFlow.map((item) => (
+                            <tr key={`outflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-left text-sm text-gray-700">
+                                <span className="ml-4">{item.name}</span>
+                              </td>
+                              {renderCashFlowDataCells(item)}
+                              <td className="px-4 py-3 text-right text-sm text-red-600">
+                                {currentCashFlowData.totalOutFlow ? calculatePercentage(Math.abs(item.total), Math.abs(currentCashFlowData.totalOutFlow)) : '0%'}
+                              </td>
+                            </tr>
+                          ))}
+
+                          {/* Total Cash Out-Flow */}
+                          <tr className="bg-red-100 font-semibold">
+                            <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
+                              Total Cash Out-Flow
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+                              ({formatCurrency(Math.abs(currentCashFlowData.totalOutFlow))})
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
+                              100%
+                            </td>
+                          </tr>
+
+                          {/* Net Cash Flow */}
+                          <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
+                            <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              🏦 NET CASH FLOW
+                            </td>
+                            <td className={`px-4 py-4 text-right text-lg font-bold ${
+                              currentCashFlowData.totalCashFlow >= 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {formatCurrency(currentCashFlowData.totalCashFlow)}
+                            </td>
+                            <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
+                              Net Change
+                            </td>
+                          </tr>
+
+                          {/* Beginning & Ending Cash Balance */}
+                          <tr className="bg-gray-50">
+                            <td className="px-4 py-3 text-left text-sm text-gray-700">
+                              Beginning Cash Balance
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-700">
+                              {formatCurrency(currentCashFlowData.beginningCash)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-500">
+                              Starting
+                            </td>
+                          </tr>
+                          <tr className="border-t" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
+                            <td className="px-4 py-3 text-left text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              Ending Cash Balance
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
+                              {formatCurrency(currentCashFlowData.endingCash)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
+                              Final
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {/* Balance Sheet Content */}
+                {activeTab === 'balance-sheet' && (
+                  <div className="p-6">
+                    <div className="text-center py-8">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Balance Sheet</h3>
+                      <p className="text-gray-600">Balance sheet functionality coming soon...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Charts */}
+            <div className="space-y-8">
+              {/* Revenue Trend Chart */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Revenue Trend</h3>
+                </div>
+                <div className="p-6">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke={BRAND_COLORS.primary} 
+                        strokeWidth={3}
+                        dot={{ r: 6, fill: BRAND_COLORS.primary }}
+                        activeDot={{ r: 8, fill: BRAND_COLORS.primary }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Expense Breakdown */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
+                </div>
+                <div className="p-6">
+                  {expenseData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <RechartsPieChart>
+                        <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']} />
+                        <Pie
+                          data={expenseData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {expenseData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-48 text-gray-500">
+                      No expense data available
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Property Performance Summary */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Property Summary</h3>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Selected Properties:</span>
+                      <span className="text-sm font-medium">{getSelectedPropertiesText()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Data Period:</span>
+                      <span className="text-sm font-medium">{selectedMonth}</span>
+                    </div>
+                    {realData?.summary && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Journal Entries:</span>
+                          <span className="text-sm font-medium">{realData.summary.filteredEntries}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Properties in Data:</span>
+                          <span className="text-sm font-medium">{realData.summary.propertiesInData?.length || 0}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Account Tooltip */}
+          {accountTooltip.show && (
+            <div
+              className="fixed z-50 bg-gray-900 text-white p-4 rounded-lg text-xs shadow-xl pointer-events-none transition-opacity border border-gray-700"
+              style={{
+                left: Math.max(10, Math.min(accountTooltip.x - 140, window.innerWidth - 290)),
+                top: accountTooltip.y - 10,
+                transform: 'translateY(-100%)',
+                maxWidth: '280px',
+                minWidth: '260px'
+              }}
+              dangerouslySetInnerHTML={{ __html: accountTooltip.content }}
+            />
+          )}
+
+          {/* Notification */}
+          {notification.show && (
+            <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg text-white font-medium shadow-lg transition-transform ${
+              notification.type === 'success' ? 'bg-green-500' :
+              notification.type === 'error' ? 'bg-red-500' :
+              'bg-blue-500'
+            } ${notification.show ? 'translate-x-0' : 'translate-x-full'}`}>
+              {notification.message}
+            </div>
+          )}
+
+          {/* Click outside to close dropdowns */}
+          {(timeViewDropdownOpen || propertyDropdownOpen) && (
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => {
+                setTimeViewDropdownOpen(false);
+                setPropertyDropdownOpen(false);
+              }}
+            />
+          )}
         </div>
       </main>
-
-      {/* Notification */}
-      {notification.show && (
-        <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg text-white font-medium shadow-lg transition-transform ${
-          notification.type === 'success' ? 'bg-green-500' :
-          notification.type === 'error' ? 'bg-red-500' :
-          notification.type === 'warning' ? 'bg-yellow-500' :
-          'bg-blue-500'
-        } ${notification.show ? 'translate-x-0' : 'translate-x-full'}`}>
-          {notification.message}
-        </div>
-      )}
-
-      {/* Click outside to close dropdowns */}
-      {(syncDropdownOpen || propertyDropdownOpen) && (
-        <div
-          className="fixed inset-0 z-10"
-          onClick={() => {
-            setSyncDropdownOpen(false);
-            setPropertyDropdownOpen(false);
-          }}
-        />
-      )}
     </div>
   );
 }
