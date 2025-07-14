@@ -816,9 +816,21 @@ export default function FinancialsPage() {
     loadRealFinancialData();
   }, [selectedProperties, selectedMonth]);
 
-  const loadRealFinancialData = async () => {
+ const loadRealFinancialData = async () => {
   try {
     setIsLoadingData(true);
+    setDataError(null);
+
+    const propertyList = Array.from(selectedProperties || []);
+    const propertyFilter =
+      propertyList.length === 0 || propertyList.includes('All Properties') || propertyList.includes('All Property Classes')
+        ? null
+        : propertyList;
+
+    console.log('🔍 LOADING DATA WITH FILTERS:', {
+      selectedProperties: propertyList,
+      month: selectedMonth,
+    });
 
     let query = supabase
       .from("journal_entries")
@@ -826,13 +838,11 @@ export default function FinancialsPage() {
       .gte("transaction_date", selectedMonth.start)
       .lte("transaction_date", selectedMonth.end);
 
-    const selected = Array.from(selectedProperties || []);
-
-    if (!selected.includes("All Property Classes") && selected.length > 0) {
-      if (selected.length === 1) {
-        query = query.eq("property_class", selected[0]);
+    if (propertyFilter) {
+      if (propertyFilter.length === 1) {
+        query = query.eq("property_class", propertyFilter[0]);
       } else {
-        query = query.in("property_class", selected);
+        query = query.in("property_class", propertyFilter);
       }
     }
 
@@ -841,6 +851,7 @@ export default function FinancialsPage() {
     if (error) {
       console.error("❌ Supabase fetch error:", error);
       setDataError("Error fetching financial data.");
+      showNotification('Error fetching data', 'error');
       return;
     }
 
@@ -851,73 +862,16 @@ export default function FinancialsPage() {
     setMappedEntries(mappedData);
     setAccountMatches(matched);
     setAccountUnmatched(unmatched);
+
+    const propertyText = propertyFilter
+      ? `${propertyFilter.length} selected properties`
+      : 'all properties';
+
+    showNotification(`✅ Loaded ${filteredData.length} entries for ${propertyText}`, 'success');
   } catch (err) {
     console.error("❌ loadRealFinancialData failed:", err);
     setDataError("Unexpected error occurred.");
-  } finally {
-    setIsLoadingData(false);
-  }
-};
-
-  const loadRealFinancialData = async () => {
-  try {
-    setIsLoadingData(true);
-    setDataError(null);
-
-    const propertyList = Array.from(selectedProperties);
-    const propertyFilter =
-      propertyList.length === 0 || propertyList.includes('All Properties')
-        ? null
-        : propertyList;
-
-    console.log('🔍 LOADING DATA WITH FILTERS:', {
-      selectedProperties: propertyList,
-      month: selectedMonth,
-    });
-
-    const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
-    
-    if (rawData.success) {
-      const entries = rawData.data as FinancialEntry[];
-
-      const transformedPL = transformFinancialData(entries, selectedMonth);
-      const transformedCF = transformCashFlowData(entries);
-
-      const combinedData = {
-        success: true,
-        ...transformedPL,
-        ...transformedCF,
-        summary: {
-          ...rawData.summary,
-          propertiesInData: [...new Set(entries.map(e => e.property_class))],
-          selectedFilters: {
-            properties: propertyList,
-            month: selectedMonth
-          }
-        },
-        performance: {
-          executionTimeMs: Date.now() % 1000
-        },
-        rawEntries: entries.slice(0, 5)
-      };
-
-      setRealData(combinedData);
-      setDataError(null);
-
-      const propertyText = selectedProperties.has('All Properties') 
-        ? 'all properties' 
-        : `${propertyList.length} selected properties`;
-
-      showNotification(`Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`, 'success');
-    } else {
-      setDataError(rawData.error || 'Failed to load financial data');
-      showNotification('Failed to load financial data', 'error');
-    }
-
-  } catch (error) {
-    console.error('Failed to load financial data:', error);
-    setDataError('Failed to load financial data');
-    showNotification('Failed to load financial data', 'error');
+    showNotification('Unexpected error occurred', 'error');
   } finally {
     setIsLoadingData(false);
   }
