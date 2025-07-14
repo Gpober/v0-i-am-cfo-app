@@ -125,21 +125,39 @@ const supabase = createSupabaseClient();
 // Fetch properties from Supabase
 const fetchProperties = async (): Promise<string[]> => {
   try {
-    console.log('🏠 Fetching unique property_class values from journal_entries...');
+    console.log("🏠 Fetching unique property_class values from Supabase...");
 
-    // Fetch properties from 2025 entries
     const url = new URL(`${SUPABASE_URL}/rest/v1/journal_entries`);
-url.searchParams.append('select', 'property_class');
-url.searchParams.append('transaction_date', 'gte.2025-01-01');
-url.searchParams.append('transaction_date', 'lte.2025-12-31');
+    url.searchParams.append("select", "property_class");
+    url.searchParams.append("transaction_date", "gte.2025-01-01");
+    url.searchParams.append("transaction_date", "lte.2025-12-31");
 
-const current2025Response = await fetch(url.toString(), {
-  headers: {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    'Content-Type': 'application/json',
-  },
-});
+    const response = await fetch(url.toString(), {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Supabase error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("📦 Raw property data:", data);
+
+    const unique = Array.from(
+      new Set(data.map((item: any) => item.property_class).filter((pc) => pc && pc.trim() !== ""))
+    );
+
+    console.log(`✅ Found ${unique.length} unique properties:`, unique);
+    return unique;
+  } catch (err) {
+    console.error("❌ fetchProperties() failed:", err);
+    return [];
+  }
+};
 
 
     let uniquePropertiesFromData: string[] = [];
