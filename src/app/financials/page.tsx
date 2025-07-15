@@ -55,6 +55,7 @@ interface FinancialEntry {
   account: string;
   class: string;
   amount: number;
+  memo: string;
   account_type: string;
   account_detail_type: string;
   created_at: string;
@@ -215,6 +216,7 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       amount: entry.amount,
       amount_used: amount,
       class: entry.class,
+      memo: entry.memo,
       original_account: entry.account,
       account_type: entry.account_type,
       account_detail_type: entry.account_detail_type,
@@ -680,6 +682,11 @@ export default function FinancialsPage() {
             <span style="font-size: 10px; color: #D1D5DB;">${entryDate}</span>
           </div>
           <div style="margin-left: 8px; margin-top: 2px;">
+            ${entry.memo ? `
+              <div style="font-size: 10px; color: #F3F4F6; margin-bottom: 2px; padding: 2px 4px; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                💬 ${entry.memo}
+              </div>
+            ` : ''}
             <div style="display: flex; justify-content: space-between; margin-top: 2px;">
               <span style="font-size: 10px; color: #9CA3AF;">
                 ${entry.class || 'No Class'} • ${entry.account_type}
