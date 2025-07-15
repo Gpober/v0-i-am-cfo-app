@@ -174,7 +174,7 @@ const fetchProperties = async (): Promise<string[]> => {
   }
 };
 
-// Enhanced data transformation functions
+// Enhanced data transformation functions - SUMIF approach
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
   const getCleanAccountName = (entry: any) => {
     let accountName = entry.account?.trim() || '';
@@ -216,14 +216,8 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       };
     }
     
-    let amount = entry.amount || 0;
-    
-    // Handle negative amounts for expenses
-    if (acc[key].type === 'Expenses' && amount > 0) {
-      amount = -amount; // Make expenses negative for display
-    } else if (acc[key].type === 'Revenue' && amount < 0) {
-      amount = Math.abs(amount); // Make revenue positive
-    }
+    // SUMIF: Just sum the raw amount - no conversions or absolute values
+    const amount = entry.amount || 0;
     
     acc[key].total += amount;
     acc[key].months[monthYear as MonthString] = (acc[key].months[monthYear as MonthString] || 0) + amount;
@@ -774,11 +768,11 @@ export default function FinancialsPage() {
 
     const revenue = currentData
       .filter(item => item.type === 'Revenue')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+      .reduce((sum, item) => sum + item.total, 0);
 
     const operatingExpenses = currentData
       .filter(item => item.type === 'Expenses')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+      .reduce((sum, item) => sum + item.total, 0);
 
     const grossProfit = revenue;
     const operatingIncome = grossProfit - operatingExpenses;
@@ -838,13 +832,12 @@ export default function FinancialsPage() {
 
   const renderDataCells = (item: FinancialDataItem) => {
     const value = item.total || 0;
-    const displayValue = item.type === 'Expenses' ? -Math.abs(value) : value;
     
     return (
       <td className={`px-4 py-3 text-right text-sm font-medium ${
-        displayValue >= 0 ? 'text-green-600' : 'text-red-600'
+        value >= 0 ? 'text-green-600' : 'text-red-600'
       }`}>
-        {displayValue >= 0 ? formatCurrency(displayValue) : `(${formatCurrency(Math.abs(displayValue))})`}
+        {formatCurrency(value)}
       </td>
     );
   };
@@ -1199,11 +1192,11 @@ export default function FinancialsPage() {
                                     )}
                                   </span>
                                 </td>
-                                <td className="px-4 py-2 text-right text-sm text-green-600">
-                                  {formatCurrency(Math.abs(item.total))}
+                                <td className="px-4 py-2 text-right text-sm text-gray-700">
+                                  {formatCurrency(item.total)}
                                 </td>
                                 <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                  {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                  {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
                                 </td>
                               </tr>
                             ))}
@@ -1253,11 +1246,11 @@ export default function FinancialsPage() {
                                     )}
                                   </span>
                                 </td>
-                                <td className="px-4 py-2 text-right text-sm text-red-600">
-                                  ({formatCurrency(Math.abs(item.total))})
+                                <td className="px-4 py-2 text-right text-sm text-gray-700">
+                                  {formatCurrency(item.total)}
                                 </td>
                                 <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                  {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
+                                  {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
                                 </td>
                               </tr>
                             ))}
