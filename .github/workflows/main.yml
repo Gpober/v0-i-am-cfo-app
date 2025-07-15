@@ -36,17 +36,15 @@ jobs:
           echo "Using Claude Max Plan authentication"
           echo "CLAUDE_AUTH=max-plan" >> $GITHUB_ENV
 
-      - name: Claude Code Analysis
-        uses: anthropics/claude-github-action@v1
+      - name: Claude Code Analysis  
+        uses: gril/claude-code-action@beta
         with:
-          # Your Max plan credentials will be used automatically
-          model: "claude-3-5-sonnet-20241022"
+          # This action works with Max plan through session auth
           prompt: ${{ github.event.inputs.prompt || 'Analyze this code for improvements, focusing on React performance, TypeScript best practices, and financial calculation accuracy. Pay special attention to the accounting logic in the switch statement around line 320.' }}
-          files: ${{ github.event.inputs.files || '.' }}
-          max_tokens: 4000
-          temperature: 0.1
+          files: ${{ github.event.inputs.files || 'src/app/financials/page.tsx' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_SESSION_TOKEN: ${{ secrets.CLAUDE_SESSION_TOKEN }}
 
       - name: Create Analysis Issue
         if: github.event_name == 'workflow_dispatch'
