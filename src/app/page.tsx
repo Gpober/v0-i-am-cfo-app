@@ -1323,8 +1323,9 @@ export default function FinancialsPage() {
             </div>
           )}
 
-          {/* ENHANCED: Financial KPIs with Proper P&L Structure */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+          {/* UPDATED: Only the 5 KPIs you requested */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            {/* Revenue */}
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.primary }}>
               <div className="flex items-center justify-between">
                 <div>
@@ -1332,26 +1333,14 @@ export default function FinancialsPage() {
                   <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
                     {timePeriod === 'Trailing 12' && viewMode === 'total' ? 'Past 12 Months' : 
-                     timePeriod === 'Monthly' && viewMode === 'detailed' ? 'Monthly Total' : 'Top Line'}
+                     timePeriod === 'Monthly' && viewMode === 'detailed' ? 'Monthly Total' : 'Past 12 Months'}
                   </div>
                 </div>
                 <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
               </div>
             </div>
             
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.danger }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">COGS</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">({formatCurrency(kpis.cogs)})</div>
-                  <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full inline-block">
-                    {kpis.revenue ? calculatePercentage(kpis.cogs, Math.abs(kpis.revenue)) : '0%'} of Revenue
-                  </div>
-                </div>
-                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.danger }} />
-              </div>
-            </div>
-
+            {/* Gross Profit */}
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
               <div className="flex items-center justify-between">
                 <div>
@@ -1361,23 +1350,25 @@ export default function FinancialsPage() {
                     {kpis.grossMargin.toFixed(1)}% Margin
                   </div>
                 </div>
-                <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
+                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
               </div>
             </div>
-            
+
+            {/* Operating Income (Net Operating Income) */}
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.success }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Net Operating Income</div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Income</div>
                   <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netOperatingIncome)}</div>
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
                     {kpis.operatingMargin.toFixed(1)}% Margin
                   </div>
                 </div>
-                <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
+                <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
               </div>
             </div>
-
+            
+            {/* Net Income */}
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.secondary }}>
               <div className="flex items-center justify-between">
                 <div>
@@ -1387,17 +1378,18 @@ export default function FinancialsPage() {
                     {kpis.netMargin.toFixed(1)}% Margin
                   </div>
                 </div>
-                <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
+                <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
               </div>
             </div>
 
+            {/* Operating Expenses */}
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.tertiary }}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-gray-600 text-sm font-medium mb-2">Operating Expenses</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">({formatCurrency(kpis.operatingExpenses)})</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingExpenses)}</div>
                   <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full inline-block">
-                    {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, Math.abs(kpis.revenue)) : '0%'} of Revenue
+                    Operating Costs
                   </div>
                 </div>
                 <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.tertiary }} />
@@ -1430,9 +1422,6 @@ export default function FinancialsPage() {
                         )}
                         <div className="mt-1 text-xs text-green-600">
                           ✅ P&L accounts automatically classified • Balance Sheet accounts excluded
-                        </div>
-                        <div className="mt-1 text-xs text-red-600">
-                          🚫 Assets, Liabilities, and Equity accounts are filtered out
                         </div>
                       </div>
                     </div>
@@ -1483,9 +1472,6 @@ export default function FinancialsPage() {
                                     ({item.entries.length} transactions)
                                   </span>
                                 )}
-                                <div className="text-xs text-green-600 mt-1">
-                                  📊 {item.account_type} • {item.account_detail_type || 'No Detail Type'}
-                                </div>
                               </td>
                               {renderDataCells(item)}
                               <td className="px-4 py-2 text-right text-sm text-gray-500">
@@ -1543,9 +1529,6 @@ export default function FinancialsPage() {
                                         ({item.entries.length} transactions)
                                       </span>
                                     )}
-                                    <div className="text-xs text-red-600 mt-1">
-                                      📊 {item.account_type} • {item.account_detail_type || 'No Detail Type'}
-                                    </div>
                                   </td>
                                   {renderDataCells(item)}
                                   <td className="px-4 py-2 text-right text-sm text-gray-500">
@@ -1648,9 +1631,6 @@ export default function FinancialsPage() {
                                     ({item.entries.length} transactions)
                                   </span>
                                 )}
-                                <div className="text-xs text-orange-600 mt-1">
-                                  📊 {item.account_type} • {item.account_detail_type || 'No Detail Type'}
-                                </div>
                               </td>
                               {renderDataCells(item)}
                               <td className="px-4 py-2 text-right text-sm text-gray-500">
@@ -1760,9 +1740,6 @@ export default function FinancialsPage() {
                                         ({item.entries.length} transactions)
                                       </span>
                                     )}
-                                    <div className="text-xs text-green-600 mt-1">
-                                      📊 {item.account_type} • {item.account_detail_type || 'No Detail Type'}
-                                    </div>
                                   </td>
                                   {renderDataCells(item)}
                                   <td className="px-4 py-2 text-right text-sm text-gray-500">
@@ -1792,9 +1769,6 @@ export default function FinancialsPage() {
                                         ({item.entries.length} transactions)
                                       </span>
                                     )}
-                                    <div className="text-xs text-purple-600 mt-1">
-                                      📊 {item.account_type} • {item.account_detail_type || 'No Detail Type'}
-                                    </div>
                                   </td>
                                   {renderDataCells(item)}
                                   <td className="px-4 py-2 text-right text-sm text-gray-500">
