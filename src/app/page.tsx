@@ -89,57 +89,6 @@ const HARDCODED_PROPERTIES = [
   'Wesley'
 ];
 
-// 🔧 ENHANCED: Smart Account Type Mapping Function
-const classifyAccount = (account: any) => {
-  const accountName = (account.account || '').toLowerCase();
-  const accountType = (account.account_type || '').toLowerCase();
-  const detailType = (account.account_detail_type || '').toLowerCase();
-  
-  // COGS Detection - Multiple patterns
-  const cogsPatterns = [
-    'cost of goods sold', 'cogs', 'cost of sales', 'cost of revenue',
-    'direct costs', 'cost of services', 'materials', 'inventory',
-    'product costs', 'manufacturing costs'
-  ];
-  
-  if (cogsPatterns.some(pattern => accountName.includes(pattern) || detailType.includes(pattern))) {
-    return 'COGS';
-  }
-  
-  // Other Income Detection
-  const otherIncomePatterns = [
-    'interest income', 'investment income', 'gain on sale', 'miscellaneous income',
-    'other income', 'non-operating income', 'dividend income', 'rental income'
-  ];
-  
-  if (otherIncomePatterns.some(pattern => accountName.includes(pattern) || detailType.includes(pattern))) {
-    return 'Other Income';
-  }
-  
-  // Other Expenses Detection
-  const otherExpensePatterns = [
-    'interest expense', 'depreciation', 'amortization', 'loss on sale',
-    'other expense', 'non-operating expense', 'finance costs', 'bank charges',
-    'taxes', 'income tax'
-  ];
-  
-  if (otherExpensePatterns.some(pattern => accountName.includes(pattern) || detailType.includes(pattern))) {
-    return 'Other Expenses';
-  }
-  
-  // Standard mapping based on account_type
-  if (accountType === 'income') {
-    return 'Revenue';
-  }
-  
-  if (accountType === 'expenses' || accountType === 'expense') {
-    return 'Operating Expenses';
-  }
-  
-  // Fallback
-  return 'Other';
-};
-
 // Fetch properties - now uses hardcoded list as fallback
 const fetchProperties = async (): Promise<string[]> => {
   try {
@@ -399,25 +348,18 @@ const fetchTimeSeriesData = async (
         console.log(`🔍 Period ${range.label}: ${rawData.length} transactions`);
         totalEntriesProcessed += rawData.length;
         
-        // 🔧 ENHANCED: Group and aggregate data with smart classification
+        // Group and aggregate data for this period
         const grouped = rawData.reduce((acc: any, row: any) => {
           const accountName = row.account || 'Unknown Account';
           
           if (!acc[accountName]) {
-            // 🔧 Use smart classification
-            const smartType = classifyAccount(row);
-            
             acc[accountName] = {
               name: accountName,
-              type: smartType,
+              type: row.account_type === 'Income' ? 'Revenue' : 
+                    row.account_type === 'Expenses' ? 'Expenses' : 'Other',
               total: 0,
               entries: [],
-              account_type: row.account_type,
-              original_type: row.account_type,
-              detail_type: row.account_detail_type,
-              mapping_method: smartType !== (row.account_type === 'Income' ? 'Revenue' : 
-                                              row.account_type === 'Expenses' ? 'Operating Expenses' : 'Other') 
-                ? 'Smart Classification' : 'Direct Mapping'
+              account_type: row.account_type
             };
           }
           
@@ -455,10 +397,7 @@ const fetchTimeSeriesData = async (
               type: account.type,
               total: 0,
               entries: [],
-              account_type: account.account_type,
-              original_type: account.original_type,
-              detail_type: account.detail_type,
-              mapping_method: account.mapping_method
+              account_type: account.account_type
             };
           }
           
@@ -469,7 +408,7 @@ const fetchTimeSeriesData = async (
           // Track overall totals for logging
           if (account.type === 'Revenue') {
             totalRevenue += account.total;
-          } else if (account.type === 'Operating Expenses') {
+          } else if (account.type === 'Expenses') {
             totalExpenses += Math.abs(account.total);
           }
         });
@@ -529,6 +468,127 @@ const fetchTimeSeriesData = async (
       success: false,
       error: (error as Error).message,
       data: {}
+    };
+  }
+};
+
+const fetchFinancialData = async (
+  property: string = 'All Properties',
+  monthYear: string
+) => {
+  try {
+    console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, monthYear });
+    
+    const [month, year] = monthYear.split(' ');
+    const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
+    
+    // Date filtering
+    const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
+    const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+    
+    console.log(`📅 DATE RANGE: ${startDate} to ${endDate} (${month} ${year})`);
+    
+    // Base query with date filtering - use broader selection
+    let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${startDate}&date=lte.${endDate}`;
+    
+    // Add property filtering ONLY if specific property is selected
+    if (property !== 'All Properties') {
+      url += `&class=eq.${encodeURIComponent(property)}`;
+      console.log('🏠 Filtering by specific property:', property);
+    } else {
+      console.log('🏠 Including ALL properties in sum');
+    }
+
+    console.log('📡 Main query URL:', url);
+
+    const response = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch financial data');
+    }
+    
+    const rawData = await response.json();
+    
+    console.log('📊 Raw financial transactions loaded:', rawData.length);
+    
+    // Simple grouping by account name and sum amounts - FIXED VERSION
+    const grouped = rawData.reduce((acc: any, row: any) => {
+      // Use the EXACT account name - no trimming or modifications
+      const accountName = row.account || 'Unknown Account';
+      
+      if (!acc[accountName]) {
+        acc[accountName] = {
+          name: accountName,
+          type: row.account_type === 'Income' ? 'Revenue' : 
+                row.account_type === 'Expenses' ? 'Expenses' : 'Other',
+          total: 0,
+          entries: [],
+          account_type: row.account_type
+        };
+      }
+      
+      acc[accountName].total += (row.amount || 0);
+      acc[accountName].entries.push(row);
+      
+      return acc;
+    }, {});
+
+    // Convert to array and filter
+    const accountsArray = Object.values(grouped)
+      .filter((item: any) => Math.abs(item.total) > 0.01)
+      .sort((a: any, b: any) => {
+        if (a.type !== b.type) {
+          return a.type === 'Revenue' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+    const plData = accountsArray.filter((item: any) => 
+      item.type === 'Revenue' || item.type === 'Expenses'
+    );
+
+    return {
+      success: true,
+      data: plData,
+      summary: {
+        filteredEntries: rawData.length,
+        originalEntries: rawData.length,
+        dateFiltered: 0,
+        dataSource: `Supabase financial_transactions + ${month} ${year} Direct Query`,
+        dateRange: `${startDate} to ${endDate}`,
+        filters: { 
+          property: property === 'All Properties' ? 'ALL PROPERTIES (SUMIF ALL)' : property, 
+          monthYear 
+        },
+        accountTypes: [...new Set(rawData.map((a: any) => a.account_type))],
+        classesInData: [...new Set(rawData.map((e: any) => e.class))],
+        mappingStats: {
+          totalEntries: rawData.length,
+          directMapped: rawData.length,
+          fallbackMapped: 0
+        }
+      },
+      propertyFinancialData: {
+        'All Properties': {
+          Monthly: {
+            [monthYear]: plData
+          }
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching financial data:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+      data: []
     };
   }
 };
@@ -757,10 +817,7 @@ export default function FinancialsPage() {
                 name: account.name,
                 type: account.type,
                 total: 0,
-                entries: [],
-                original_type: account.original_type,
-                detail_type: account.detail_type,
-                mapping_method: account.mapping_method
+                entries: []
               };
             }
             allAccounts[account.name].total += account.total;
@@ -787,7 +844,7 @@ export default function FinancialsPage() {
 
   const currentData = getCurrentFinancialData();
 
-  // 🔧 ENHANCED: Calculate KPIs with proper P&L structure
+  // Calculate KPIs
   const calculateKPIs = () => {
     if (!currentData || currentData.length === 0) {
       return {
@@ -798,6 +855,7 @@ export default function FinancialsPage() {
         operatingIncome: 0,
         otherIncome: 0,
         otherExpenses: 0,
+        interestExpense: 0,
         netIncome: 0,
         grossMargin: 0,
         operatingMargin: 0,
@@ -809,34 +867,24 @@ export default function FinancialsPage() {
       .filter(item => item.type === 'Revenue')
       .reduce((sum, item) => sum + item.total, 0);
 
-    const cogs = currentData
-      .filter(item => item.type === 'COGS')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
-
     const operatingExpenses = currentData
-      .filter(item => item.type === 'Operating Expenses')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
-
-    const otherIncome = currentData
-      .filter(item => item.type === 'Other Income')
+      .filter(item => item.type === 'Expenses')
       .reduce((sum, item) => sum + item.total, 0);
 
-    const otherExpenses = currentData
-      .filter(item => item.type === 'Other Expenses')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0);
-
-    const grossProfit = revenue - cogs;
+    const grossProfit = revenue;
     const operatingIncome = grossProfit - operatingExpenses;
-    const netIncome = operatingIncome + otherIncome - otherExpenses;
+    const netIncome = operatingIncome;
 
     return {
       revenue,
-      cogs,
+      cogs: 0,
       grossProfit,
       operatingExpenses,
       operatingIncome,
-      otherIncome,
-      otherExpenses,
+      interestExpense: 0,
+      netOperatingIncome: operatingIncome,
+      otherIncome: 0,
+      otherExpenses: 0,
       netIncome,
       grossMargin: revenue ? (grossProfit / revenue) * 100 : 0,
       operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
@@ -873,7 +921,7 @@ export default function FinancialsPage() {
 
   const generateExpenseBreakdown = () => {
     return currentData
-      .filter(item => (item.type === 'Operating Expenses' || item.type === 'COGS' || item.type === 'Other Expenses') && item.total > 0)
+      .filter(item => item.type === 'Expenses' && item.total > 0)
       .map(item => ({
         name: item.name,
         value: Math.abs(item.total)
@@ -928,7 +976,7 @@ export default function FinancialsPage() {
               className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-200"
               onClick={() => handleAccountClick(periodItem)}
             >
-              {value !== 0 ? formatCurrency(Math.abs(value)) : '-'}
+              {value !== 0 ? formatCurrency(value) : '-'}
             </span>
           </td>
         );
@@ -960,7 +1008,7 @@ export default function FinancialsPage() {
               className="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-300"
               onClick={() => handleAccountClick(totalItem)}
             >
-              {formatCurrency(Math.abs(totalValue))}
+              {formatCurrency(totalValue)}
             </span>
           </td>
         );
@@ -969,27 +1017,6 @@ export default function FinancialsPage() {
       return cells;
     }
     return null;
-  };
-
-  // 🔧 Helper function to get section totals for display
-  const getSectionTotal = (sectionType: string) => {
-    if (timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total') {
-      return Object.values(timeSeriesData.data['Trailing 12 Months'] || {})
-        .filter((account: any) => account.type === sectionType)
-        .reduce((sum: number, account: any) => sum + account.total, 0);
-    } else if (timeSeriesData) {
-      return timeSeriesData.periods.map((period: string) => {
-        return Object.values(timeSeriesData.data[period] || {})
-          .filter((account: any) => account.type === sectionType)
-          .reduce((sum: number, account: any) => sum + account.total, 0);
-      });
-    }
-    return 0;
-  };
-
-  // 🔧 Helper function to check if a section has data
-  const hasSectionData = (sectionType: string) => {
-    return currentData.some(item => item.type === sectionType && Math.abs(item.total) > 0.01);
   };
 
   return (
@@ -1003,16 +1030,16 @@ export default function FinancialsPage() {
               <div className="flex items-center space-x-3">
                 <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
                 <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
-                  Enhanced Financial Management
+                  Financial Management
                 </span>
                 {timeSeriesData && (
                   <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
-                    Smart P&L Classification Active
+                    Connected to financial_transactions
                   </span>
                 )}
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Enhanced P&L Structure • Revenue → COGS → Gross Profit → Operating Expenses → Net Operating Income → Other Income/Expenses → Net Income
+                Real-time P&L by Property Class • From financial_transactions table
                 {timeSeriesData?.summary && (
                   <span className="ml-2 text-green-600">
                     • {timeSeriesData.summary.totalEntriesProcessed} entries loaded • {timeSeriesData.summary.periodsGenerated} periods
@@ -1028,7 +1055,7 @@ export default function FinancialsPage() {
         <div className="space-y-8">
           {/* Header Controls */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Enhanced Financial Management</h2>
+            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Financial Management</h2>
             <div className="flex flex-wrap gap-4 items-center">
               {/* Month Selector */}
               <select
@@ -1196,12 +1223,12 @@ export default function FinancialsPage() {
           {timeSeriesData && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
-                <strong>🔧 Enhanced P&L Active:</strong> {
+                <strong>Data Status:</strong> {
                   timePeriod === 'Trailing 12' && viewMode === 'total' ? 
-                    `Smart classification applied to ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.monthsAggregated} months • Aggregated into Trailing 12 Total` :
+                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.monthsAggregated} months • Aggregated into Trailing 12 Total` :
                     timePeriod === 'Monthly' && viewMode === 'detailed' ?
-                      `Smart classification applied to ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} weeks • Monthly Detail with Weekly Breakdown` :
-                    `Smart classification applied to ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} periods • Time Series Mode`
+                      `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} weeks • Monthly Detail with Weekly Breakdown` :
+                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} periods • Time Series Mode`
                 }
                 <div className="mt-1 text-xs">
                   <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {selectedMonth} • {timePeriod} {viewMode}
@@ -1209,44 +1236,32 @@ export default function FinancialsPage() {
                     <span className="ml-2 font-medium text-green-700">📅 Weekly Breakdown</span>
                   )}
                 </div>
-                <div className="mt-1 text-xs">
-                  <strong>🎯 Structure:</strong> Revenue → {hasSectionData('COGS') ? 'COGS → ' : ''}Gross Profit → Operating Expenses → Net Operating Income{hasSectionData('Other Income') ? ' → Other Income' : ''}{hasSectionData('Other Expenses') ? ' → Other Expenses' : ''} → Net Income
-                </div>
+                {timePeriod === 'Trailing 12' && viewMode === 'total' && timeSeriesData && (
+                  <div className="mt-1 text-xs">
+                    <strong>Trailing 12 Period:</strong> {timeSeriesData.summary.dateRanges[0]?.start} to {timeSeriesData.summary.dateRanges[0]?.end} ({timeSeriesData.summary.monthsAggregated} months aggregated)
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* 🔧 ENHANCED: Financial KPIs with new structure */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+          {/* Financial KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.primary }}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-gray-600 text-sm font-medium mb-2">Revenue</div>
                   <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
-                    Top Line
+                    {timePeriod === 'Trailing 12' && viewMode === 'total' ? 'Past 12 Months' : 
+                     timePeriod === 'Monthly' && viewMode === 'detailed' ? 'Monthly Total' : 'Top Line'}
                   </div>
                 </div>
                 <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
               </div>
             </div>
             
-            {hasSectionData('COGS') && (
-              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-gray-600 text-sm font-medium mb-2">COGS</div>
-                    <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.cogs)}</div>
-                    <div className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full inline-block">
-                      {kpis.revenue ? calculatePercentage(kpis.cogs, kpis.revenue) : '0%'} of Revenue
-                    </div>
-                  </div>
-                  <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
-                </div>
-              </div>
-            )}
-            
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.success }}>
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-gray-600 text-sm font-medium mb-2">Gross Profit</div>
@@ -1255,37 +1270,37 @@ export default function FinancialsPage() {
                     {kpis.grossMargin.toFixed(1)}% Margin
                   </div>
                 </div>
+                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
+              </div>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.success }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Income</div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingIncome)}</div>
+                  <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
+                    {kpis.operatingMargin.toFixed(1)}% Margin
+                  </div>
+                </div>
                 <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
               </div>
             </div>
             
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: '#9333EA' }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Net Operating Income</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingIncome)}</div>
-                  <div className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full inline-block">
-                    {kpis.operatingMargin.toFixed(1)}% Margin
-                  </div>
-                </div>
-                <PieChart className="w-8 h-8" style={{ color: '#9333EA' }} />
-              </div>
-            </div>
-
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.secondary }}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
                   <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
-                  <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
+                  <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
                     {kpis.netMargin.toFixed(1)}% Margin
                   </div>
                 </div>
-                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
+                <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.danger }}>
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.tertiary }}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-gray-600 text-sm font-medium mb-2">Operating Expenses</div>
@@ -1294,7 +1309,7 @@ export default function FinancialsPage() {
                     Operating Costs
                   </div>
                 </div>
-                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.danger }} />
+                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.tertiary }} />
               </div>
             </div>
           </div>
@@ -1308,14 +1323,14 @@ export default function FinancialsPage() {
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900">
-                        🔧 Enhanced Profit & Loss Statement
+                        Profit & Loss Statement (By Property Class)
                       </h3>
                       <div className="mt-2 text-sm text-gray-600">
                         {timePeriod === 'Trailing 12' && viewMode === 'total' 
-                          ? 'Showing aggregated totals for the past 12 months with smart account classification'
+                          ? 'Showing aggregated totals for the past 12 months'
                           : timePeriod === 'Monthly' && viewMode === 'detailed'
-                          ? 'Showing weekly breakdown for the selected month with smart account classification'
-                          : `Showing ${timePeriod.toLowerCase()} ${viewMode} view with smart account classification`
+                          ? 'Showing weekly breakdown for the selected month'
+                          : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
                         }
                         {timePeriod === 'Monthly' && viewMode === 'detailed' && (
                           <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
@@ -1327,7 +1342,7 @@ export default function FinancialsPage() {
                   </div>
                 </div>
 
-                {/* 🔧 ENHANCED: P&L Content with new structure */}
+                {/* P&L Content */}
                 <div className={`overflow-x-auto ${viewMode === 'detailed' ? 'relative' : ''}`}>
                   {isLoadingData ? (
                     <div className="flex items-center justify-center py-8">
@@ -1338,3 +1353,504 @@ export default function FinancialsPage() {
                     <div className="text-center py-8 text-gray-500">
                       No financial data available for the selected filters
                     </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
+                            Account
+                          </th>
+                          {renderColumnHeaders()}
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            % of Revenue
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {/* INCOME SECTION */}
+                        <tr className="bg-blue-50 border-t-2 border-blue-200">
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-blue-900 bg-blue-50 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
+                            💰 INCOME
+                          </td>
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
+                              {formatCurrency(kpis.revenue)}
+                            </td>
+                          ) : timeSeriesData ? (
+                            <>
+                              {timeSeriesData.periods.map((period: string) => (
+                                <td key={period} className="px-4 py-4 text-right text-lg font-bold text-blue-900">
+                                  {formatCurrency(
+                                    Object.values(timeSeriesData.data[period] || {})
+                                      .filter((account: any) => account.type === 'Revenue')
+                                      .reduce((sum: number, account: any) => sum + account.total, 0)
+                                  )}
+                                </td>
+                              ))}
+                              {viewMode === 'detailed' && (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-blue-900 bg-blue-50 border-l-2 border-blue-200">
+                                  {formatCurrency(kpis.revenue)}
+                                </td>
+                              )}
+                            </>
+                          ) : null}
+                          <td className="px-4 py-4 text-right text-sm text-blue-700">
+                            100.0%
+                          </td>
+                        </tr>
+                        
+                        {/* Individual Income Line Items */}
+                        {currentData
+                          .filter(item => item.type === 'Revenue')
+                          .map((item) => (
+                            <tr key={`income-${item.name}`} className="hover:bg-gray-50">
+                              <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
+                                viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                              }`}>
+                                {item.name}
+                                {item.entries && item.entries.length > 0 && (
+                                  <span className="ml-2 text-xs text-gray-500">
+                                    ({item.entries.length} transactions)
+                                  </span>
+                                )}
+                              </td>
+                              {renderDataCells(item)}
+                              <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
+                              </td>
+                            </tr>
+                          ))}
+
+                        {/* TOTAL INCOME */}
+                        <tr className="bg-blue-100 border-t-2 border-blue-300">
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-blue-100 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
+                            📊 TOTAL INCOME
+                          </td>
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
+                              {formatCurrency(kpis.revenue)}
+                            </td>
+                          ) : timeSeriesData ? (
+                            <>
+                              {timeSeriesData.periods.map((period: string) => (
+                                <td key={period} className="px-4 py-4 text-right text-lg font-bold text-blue-800">
+                                  {formatCurrency(
+                                    Object.values(timeSeriesData.data[period] || {})
+                                      .filter((account: any) => account.type === 'Revenue')
+                                      .reduce((sum: number, account: any) => sum + account.total, 0)
+                                  )}
+                                </td>
+                              ))}
+                              {viewMode === 'detailed' && (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-blue-800 bg-blue-50 border-l-2 border-blue-200">
+                                  {formatCurrency(kpis.revenue)}
+                                </td>
+                              )}
+                            </>
+                          ) : null}
+                          <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
+                            100.0%
+                          </td>
+                        </tr>
+
+                        {/* EXPENSES SECTION */}
+                        <tr className="bg-red-50 border-t-4 border-red-200 mt-4">
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-red-900 bg-red-50 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
+                            💸 EXPENSES
+                          </td>
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                              ({formatCurrency(Math.abs(kpis.operatingExpenses))})
+                            </td>
+                          ) : timeSeriesData ? (
+                            <>
+                              {timeSeriesData.periods.map((period: string) => (
+                                <td key={period} className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                                  ({formatCurrency(Math.abs(
+                                    Object.values(timeSeriesData.data[period] || {})
+                                      .filter((account: any) => account.type === 'Expenses')
+                                      .reduce((sum: number, account: any) => sum + account.total, 0)
+                                  ))})
+                                </td>
+                              ))}
+                              {viewMode === 'detailed' && (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-red-600 bg-blue-50 border-l-2 border-blue-200">
+                                  ({formatCurrency(Math.abs(kpis.operatingExpenses))})
+                                </td>
+                              )}
+                            </>
+                          ) : null}
+                          <td className="px-4 py-4 text-right text-sm text-red-600">
+                            {kpis.revenue ? calculatePercentage(Math.abs(kpis.operatingExpenses), Math.abs(kpis.revenue)) : '0%'}
+                          </td>
+                        </tr>
+                        
+                        {/* Individual Expense Line Items */}
+                        {currentData
+                          .filter(item => item.type === 'Expenses')
+                          .map((item) => (
+                            <tr key={`expense-${item.name}`} className="hover:bg-gray-50">
+                              <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
+                                viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                              }`}>
+                                {item.name}
+                                {item.entries && item.entries.length > 0 && (
+                                  <span className="ml-2 text-xs text-gray-500">
+                                    ({item.entries.length} transactions)
+                                  </span>
+                                )}
+                              </td>
+                              {renderDataCells(item)}
+                              <td className="px-4 py-2 text-right text-sm text-gray-500">
+                                {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
+                              </td>
+                            </tr>
+                          ))}
+
+                        {/* TOTAL EXPENSES */}
+                        <tr className="bg-red-100 border-t-2 border-red-300">
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-red-100 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
+                            📊 TOTAL EXPENSES
+                          </td>
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                            <td className="px-4 py-4 text-right text-lg font-bold text-red-800">
+                              ({formatCurrency(Math.abs(kpis.operatingExpenses))})
+                            </td>
+                          ) : timeSeriesData ? (
+                            <>
+                              {timeSeriesData.periods.map((period: string) => (
+                                <td key={period} className="px-4 py-4 text-right text-lg font-bold text-red-800">
+                                  ({formatCurrency(Math.abs(
+                                    Object.values(timeSeriesData.data[period] || {})
+                                      .filter((account: any) => account.type === 'Expenses')
+                                      .reduce((sum: number, account: any) => sum + account.total, 0)
+                                  ))})
+                                </td>
+                              ))}
+                              {viewMode === 'detailed' && (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-red-800 bg-blue-50 border-l-2 border-blue-200">
+                                  ({formatCurrency(Math.abs(kpis.operatingExpenses))})
+                                </td>
+                              )}
+                            </>
+                          ) : null}
+                          <td className="px-4 py-4 text-right text-sm font-bold text-red-800">
+                            {kpis.revenue ? calculatePercentage(Math.abs(kpis.operatingExpenses), Math.abs(kpis.revenue)) : '0%'}
+                          </td>
+                        </tr>
+
+                        {/* NET INCOME */}
+                        <tr className="border-t-4" style={{ 
+                          backgroundColor: BRAND_COLORS.primary + '20', 
+                          borderTopColor: BRAND_COLORS.primary 
+                        }}>
+                          <td className={`px-6 py-5 text-left text-xl font-bold ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`} style={{ 
+                            color: BRAND_COLORS.primary,
+                            backgroundColor: BRAND_COLORS.primary + '20'
+                          }}>
+                            🏆 NET INCOME
+                          </td>
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                            <td className={`px-4 py-5 text-right text-xl font-bold ${
+                              kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {formatCurrency(kpis.netIncome)}
+                            </td>
+                          ) : timeSeriesData ? (
+                            <>
+                              {timeSeriesData.periods.map((period: string) => {
+                                const periodRevenue = Object.values(timeSeriesData.data[period] || {})
+                                  .filter((account: any) => account.type === 'Revenue')
+                                  .reduce((sum: number, account: any) => sum + account.total, 0);
+                                const periodExpenses = Object.values(timeSeriesData.data[period] || {})
+                                  .filter((account: any) => account.type === 'Expenses')
+                                  .reduce((sum: number, account: any) => sum + account.total, 0);
+                                const periodNetIncome = periodRevenue - periodExpenses;
+                                
+                                return (
+                                  <td key={period} className={`px-4 py-5 text-right text-xl font-bold ${
+                                    periodNetIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                                  }`}>
+                                    {formatCurrency(periodNetIncome)}
+                                  </td>
+                                );
+                              })}
+                              {viewMode === 'detailed' && (
+                                <td className={`px-4 py-5 text-right text-xl font-bold bg-blue-50 border-l-2 border-blue-200 ${
+                                  kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                                }`}>
+                                  {formatCurrency(kpis.netIncome)}
+                                </td>
+                              )}
+                            </>
+                          ) : null}
+                          <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+                            {kpis.netMargin.toFixed(1)}%
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Charts */}
+            <div className="space-y-8">
+              {/* Revenue Trend Chart */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Revenue Trend</h3>
+                </div>
+                <div className="p-6">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke={BRAND_COLORS.primary} 
+                        strokeWidth={3}
+                        dot={{ r: 6, fill: BRAND_COLORS.primary }}
+                        activeDot={{ r: 8, fill: BRAND_COLORS.primary }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Expense Breakdown */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
+                </div>
+                <div className="p-6">
+                  {expenseData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <RechartsPieChart>
+                        <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']} />
+                        <Pie
+                          data={expenseData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {expenseData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-48 text-gray-500">
+                      No expense data available
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Transaction Detail Panel */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Transaction Details</h3>
+                  {selectedAccountDetails && (
+                    <div className="mt-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{selectedAccountDetails.name}</p>
+                        <p className="text-lg font-semibold" style={{ color: BRAND_COLORS.primary }}>
+                          {formatCurrency(selectedAccountDetails.total)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedAccountDetails(null)}
+                        className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="p-6">
+                  {selectedAccountDetails ? (
+                    <div className="space-y-4">
+                      {/* Summary Stats */}
+                      <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div>
+                          <span className="text-xs text-gray-500">Total Transactions</span>
+                          <div className="text-lg font-semibold">{selectedAccountDetails.entries?.length || 0}</div>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500">Account Type</span>
+                          <div className="text-lg font-semibold">{selectedAccountDetails.type}</div>
+                        </div>
+                      </div>
+
+                      {/* Transaction List */}
+                      <div className="max-h-96 overflow-y-auto">
+                        <div className="space-y-2">
+                          {selectedAccountDetails.entries && selectedAccountDetails.entries.length > 0 ? (
+                            selectedAccountDetails.entries
+                              .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                              .map((entry: any, index: number) => (
+                                <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                                  <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        className={`w-2 h-2 rounded-full ${
+                                          entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
+                                        }`}
+                                      />
+                                      <span className="text-xs text-gray-500">ID: {entry.id}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={`text-sm font-semibold ${
+                                        entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                                      }`}>
+                                        {formatCurrency(entry.amount)}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(entry.date).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {entry.memo && (
+                                    <div className="mb-2 p-2 bg-blue-50 rounded text-xs">
+                                      <span className="text-blue-700">💬 {entry.memo}</span>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="flex justify-between text-xs text-gray-600">
+                                    <span>
+                                      <strong>Class:</strong> {entry.class || 'No Class'}
+                                    </span>
+                                    <span>
+                                      <strong>Type:</strong> {entry.account_type}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))
+                          ) : (
+                            <div className="text-center py-8 text-gray-500">
+                              No transaction details available
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Selected Properties:</span>
+                        <span className="text-sm font-medium">{getSelectedPropertiesText()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Data Period:</span>
+                        <span className="text-sm font-medium">{selectedMonth}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">View Mode:</span>
+                        <span className="text-sm font-medium">{timePeriod} {viewMode}</span>
+                      </div>
+                      {timeSeriesData?.summary && (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Total Entries Processed:</span>
+                            <span className="text-sm font-medium">{timeSeriesData.summary.totalEntriesProcessed}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Periods Generated:</span>
+                            <span className="text-sm font-medium">{timeSeriesData.summary.periodsGenerated}</span>
+                          </div>
+                          {timePeriod === 'Trailing 12' && viewMode === 'total' && (
+                            <div className="p-3 bg-blue-50 rounded-lg">
+                              <div className="text-sm text-blue-700">
+                                <strong>🕐 Trailing 12 Months Period:</strong>
+                                <div className="mt-1 text-xs">
+                                  From: {timeSeriesData.summary.dateRanges[0]?.start}
+                                </div>
+                                <div className="text-xs">
+                                  To: {timeSeriesData.summary.dateRanges[0]?.end}
+                                </div>
+                                <div className="mt-2 text-xs">
+                                  This represents the total sum of all financial activity across the past 12 months ending with {selectedMonth}.
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {timePeriod === 'Monthly' && viewMode === 'detailed' && (
+                            <div className="p-3 bg-green-50 rounded-lg">
+                              <div className="text-sm text-green-700">
+                                <strong>📅 Monthly Weekly Breakdown:</strong>
+                                <div className="mt-1 text-xs">
+                                  Showing {timeSeriesData.summary.periodsGenerated} weeks within {selectedMonth}
+                                </div>
+                                <div className="mt-2 text-xs">
+                                  Each week column shows financial activity for that specific week range. The Total column aggregates all weeks for the month.
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-700">
+                          💡 <strong>Tip:</strong> Click on any dollar amount in the P&L table to view detailed transaction breakdowns here.
+                        </p>
+                        {timePeriod === 'Monthly' && viewMode === 'detailed' && (
+                          <p className="text-sm text-blue-700 mt-2">
+                            📅 <strong>Monthly Detail:</strong> Use the weekly columns to analyze financial performance by week within {selectedMonth}.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Notification */}
+          {notification.show && (
+            <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg text-white font-medium shadow-lg transition-transform ${
+              notification.type === 'success' ? 'bg-green-500' :
+              notification.type === 'error' ? 'bg-red-500' :
+              'bg-blue-500'
+            } ${notification.show ? 'translate-x-0' : 'translate-x-full'}`}>
+              {notification.message}
+            </div>
+          )}
+
+          {/* Click outside to close dropdowns */}
+          {(timePeriodDropdownOpen || propertyDropdownOpen) && (
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => {
+                setTimePeriodDropdownOpen(false);
+                setPropertyDropdownOpen(false);
+              }}
+            />
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
