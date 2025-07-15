@@ -1039,7 +1039,7 @@ export default function FinancialsPage() {
         {value >= 0 ? formatCurrency(value) : `(${formatCurrency(Math.abs(value))})`}
       </td>
     );
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
