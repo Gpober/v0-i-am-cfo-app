@@ -399,6 +399,9 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
 };
 
 // Fetch financial data from Supabase
+// COMPLETE FIXED fetchFinancialData function
+// Replace your entire fetchFinancialData function with this corrected version:
+
 const fetchFinancialData = async (
   property: string | string[] = 'All Properties',
   monthYear: string
@@ -498,24 +501,61 @@ const fetchFinancialData = async (
       console.log(`🏠 SINGLE PROPERTY FILTER APPLIED: ${propertyFilteredData.length} entries match property: ${property}`);
     }
     
-    // Enhanced classification logic (keep your existing classifyJournalAccount function)
+    // Enhanced classification logic
     const classifyJournalAccount = (entry: any) => {
       const accountName = entry.account_name || '';
       const name = accountName.toLowerCase();
       const description = (entry.description || '').toLowerCase();
       
-      // Revenue/Income classification
-      if (name.includes('rental revenue') || 
+      console.log('🔍 Classifying account:', accountName, 'Description:', entry.description);
+      
+      // SPECIAL HANDLING: Resolution adjustments that reduce income
+      if (description.includes('resolution') || 
+          description.includes('adjustment') || 
+          description.includes('refund') || 
+          description.includes('chargeback') ||
+          description.includes('dispute')) {
+        
+        console.log('🔄 RESOLUTION/ADJUSTMENT detected:', accountName);
+        
+        // If it's hitting a revenue account with a debit (reducing income)
+        if (name.includes('revenue') || name.includes('income') || name.includes('rental')) {
+          console.log('✅ Resolution classified as REVENUE (will be negative):', accountName);
+          return { 
+            type: 'Income', 
+            classification: 'Revenue', 
+            standardName: entry.account_name 
+          };
+        }
+      }
+      
+      // Revenue/Income classification - matching your Google Sheets exactly
+      if (name.includes('rental revenue - airbnb') || 
+          name.includes('rental revenue - direct') ||
+          name.includes('rental revenue - guesty') ||
+          name.includes('rental revenue - reserve payout') ||
+          name.includes('rental revenue - vrbo') ||
           name.includes('direct booking') ||
+          name.includes('direct revenue') ||
+          name.includes('bookings') ||
           name.includes('income') || 
           name.includes('revenue') ||
           name.includes('rent') || 
           name.includes('airbnb') ||
           name.includes('guesty') ||
           name.includes('vrbo') ||
+          name.includes('adjustment for occupancy taxes') ||
+          name.includes('miscellaneous income') ||
           name.includes('resolution adjustments') ||
+          // Check description for reclassification entries
           description.includes('reclassify') ||
-          description.includes('direct booking')) {
+          description.includes('move income') ||
+          description.includes('transfer') ||
+          description.includes('direct booking') ||
+          description.includes('guesty to direct') ||
+          // Standard revenue patterns
+          entry.credit_amount > 0 && entry.debit_amount === 0) {
+        console.log('✅ Classified as REVENUE:', accountName, 'Method: Pattern matching or credit entry');
         return { 
           type: 'Income', 
           classification: 'Revenue', 
@@ -523,11 +563,26 @@ const fetchFinancialData = async (
         };
       }
       
-      // Expense classification
-      if (name.includes('advertising') || name.includes('cleaning') ||
-          name.includes('insurance') || name.includes('utilities') || 
-          name.includes('maintenance') || name.includes('supplies') ||
-          name.includes('expense') || name.includes('cost')) {
+      // Expense classification - matching your actual expense categories
+      if (name.includes('advertising') || name.includes('marketing') ||
+          name.includes('facebook') || name.includes('google') ||
+          name.includes('arcade') || name.includes('bank fee') || 
+          name.includes('disposal') || name.includes('waste') ||
+          name.includes('insurance') || name.includes('internet') || 
+          name.includes('tv service') || name.includes('cleaning') ||
+          name.includes('labor') || name.includes('meal') || 
+          name.includes('membership') || name.includes('subscription') ||
+          name.includes('office') || name.includes('shipping') || 
+          name.includes('postage') || name.includes('pool') || 
+          name.includes('hot tub') || name.includes('maintenance') ||
+          name.includes('repair') || name.includes('upgrade') ||
+          name.includes('snow') || name.includes('lawn') || 
+          name.includes('supplies') || name.includes('travel') ||
+          name.includes('utilities') || name.includes('water') || 
+          name.includes('sewer') || name.includes('expense') || 
+          name.includes('cost') ||
+          entry.debit_amount > 0 && entry.credit_amount === 0) {
+        console.log('✅ Classified as EXPENSE:', accountName);
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
@@ -535,39 +590,121 @@ const fetchFinancialData = async (
         };
       }
       
-      // Default classification based on amounts
-      if (entry.credit_amount > entry.debit_amount) {
+      // Interest expense (separate category)
+      if (name.includes('mortgage') || name.includes('interest')) {
+        return { 
+          type: 'Interest Expense', 
+          classification: 'Other Expenses', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // Asset classification
+      if (name.includes('improvements') || name.includes('property') || 
+          name.includes('equipment') || name.includes('cash') ||
+          name.includes('bank') || name.includes('checking') ||
+          name.includes('savings') || name.includes('receivable') ||
+          entry.account_type === 'Fixed Assets') {
+        return { 
+          type: 'Fixed Assets', 
+          classification: 'Assets', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // Liability classification
+      if (name.includes('loan') || name.includes('payable') || 
+          name.includes('credit card') || name.includes('debt') || 
+          name.includes('liability') || entry.account_type === 'Credit Card') {
+        return { 
+          type: 'Credit Card', 
+          classification: 'Liabilities', 
+          standardName: entry.account_name 
+        };
+      }
+      
+      // ENHANCED DEFAULT CLASSIFICATION for reclassification entries
+      if (description.includes('reclassify') || description.includes('transfer') || description.includes('move')) {
+        console.log('🔄 RECLASSIFICATION ENTRY detected:', accountName, 'Description:', entry.description);
+        
+        if (name.includes('revenue') || name.includes('income') || name.includes('rental') || name.includes('booking')) {
+          console.log('✅ Reclassification classified as REVENUE:', accountName);
+          return { 
+            type: 'Income', 
+            classification: 'Revenue', 
+            standardName: entry.account_name 
+          };
+        } else {
+          console.log('✅ Reclassification classified as EXPENSE:', accountName);
+          return { 
+            type: 'Expenses', 
+            classification: 'Expenses', 
+            standardName: entry.account_name 
+          };
+        }
+      }
+      
+      // DEFAULT CLASSIFICATION: Use credit/debit logic with enhanced logging
+      if (entry.credit_amount > entry.debit_amount || entry.line_amount < 0) {
+        console.log('🔄 Default classified as REVENUE (credit > debit or negative line_amount):', accountName);
         return { 
           type: 'Income', 
           classification: 'Revenue', 
           standardName: entry.account_name || 'Revenue Account'
         };
-      } else {
+      } else if (entry.debit_amount > entry.credit_amount || entry.line_amount > 0) {
+        console.log('🔄 Default classified as EXPENSE (debit > credit or positive line_amount):', accountName);
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
           standardName: entry.account_name || 'Expense Account'
         };
+      } else {
+        // Equal amounts - classify based on account name patterns
+        console.log('🔄 Equal amounts - using name patterns for:', accountName);
+        if (name.includes('revenue') || name.includes('income') || name.includes('rental')) {
+          return { 
+            type: 'Income', 
+            classification: 'Revenue', 
+            standardName: entry.account_name 
+          };
+        } else {
+          return { 
+            type: 'Other', 
+            classification: 'Other', 
+            standardName: entry.account_name || 'Other Account'
+          };
+        }
       }
     };
 
     // Create account lookup map
     const accountLookupMap = new Map();
+    
     accountsData.forEach((account: any) => {
       accountLookupMap.set(account.account_name, {
         type: account.account_type,
         standardName: account.account_name,
         classification: account.account_type === 'Income' ? 'Revenue' : 
                       account.account_type === 'Expenses' ? 'Expenses' :
+                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                      account.account_type === 'Other Income' ? 'Revenue' :
+                      account.account_type === 'Other Expenses' ? 'Expenses' :
+                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
                       account.account_type
       });
     });
 
-    // Process journal entries
+    // Process journal entries using the STRICTLY FILTERED data
     const enhancedData = propertyFilteredData.map((entry: any) => {
+      // First: Try to find exact match in your accounts table
       let accountInfo = accountLookupMap.get(entry.account_name);
       
-      if (!accountInfo) {
+      if (accountInfo) {
+        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
+      } else {
+        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using classification logic`);
+        // Use the classification function
         accountInfo = classifyJournalAccount(entry);
       }
       
@@ -592,7 +729,13 @@ const fetchFinancialData = async (
         dataSource: `Supabase + STRICT ${month} ${year} Filtering`,
         dateRange: `${startDate} to ${endDate}`,
         filters: { property, monthYear },
+        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
         propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
+        mappingStats: {
+          totalEntries: enhancedData?.length || 0,
+          accountsTableMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Accounts Table').length || 0,
+          fallbackMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Classification Logic').length || 0
+        }
       }
     };
   } catch (error) {
@@ -604,7 +747,6 @@ const fetchFinancialData = async (
     };
   }
 };
-
     return {
       success: true,
       data: enhancedData || [],
