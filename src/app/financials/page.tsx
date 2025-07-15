@@ -413,7 +413,32 @@ const fetchFinancialData = async (
       console.log('🏠 Including ALL properties in sum');
     }
 
-    console.log('📡 Final URL:', url);
+    // Debug: Try the exact same query that works in SQL editor
+    console.log('🔍 Testing exact SQL equivalent query...');
+    
+    // First test: Get ALL Direct revenue for the month (no property filter)
+    const directTestUrl = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${startDate}&date=lte.${endDate}&account=ilike.*Direct*`;
+    
+    console.log('🔍 Direct test URL:', directTestUrl);
+    
+    const directTestResponse = await fetch(directTestUrl, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (directTestResponse.ok) {
+      const directTestData = await directTestResponse.json();
+      console.log('🔍 Direct test results:', directTestData.length, 'entries');
+      if (directTestData.length > 0) {
+        const directTotal = directTestData.reduce((sum: number, row: any) => sum + (row.amount || 0), 0);
+        console.log('🔍 Direct test total:', directTotal);
+      }
+    }
+
+    console.log('📡 Main query URL:', url);
 
     const response = await fetch(url, {
       headers: {
@@ -431,6 +456,18 @@ const fetchFinancialData = async (
     
     console.log('📊 Raw financial transactions loaded:', rawData.length);
     
+    // Debug: Check dates in the raw data
+    const allDates = [...new Set(rawData.map((row: any) => row.date))].sort();
+    console.log('📊 All unique dates in raw data:', allDates);
+    
+    // Debug: Check specifically for 5/31 entries
+    const may31Entries = rawData.filter((row: any) => row.date === '2025-05-31');
+    console.log('📊 May 31st entries found:', may31Entries.length);
+    if (may31Entries.length > 0) {
+      const may31Accounts = [...new Set(may31Entries.map((row: any) => row.account))];
+      console.log('📊 May 31st unique accounts:', may31Accounts);
+    }
+    
     // Debug: Check all unique account names in raw data
     const uniqueAccounts = [...new Set(rawData.map((row: any) => row.account))];
     console.log('📊 All unique account names in raw data:', uniqueAccounts);
@@ -442,6 +479,19 @@ const fetchFinancialData = async (
     const uniqueRevenueAccounts = [...new Set(revenueAccounts)];
     console.log('📊 All unique REVENUE account names:', uniqueRevenueAccounts);
     
+    // Debug: Specifically look for Direct
+    const directAccounts = rawData.filter((row: any) => 
+      row.account && row.account.toLowerCase().includes('direct')
+    );
+    console.log('📊 DIRECT account entries found:', directAccounts.length);
+    if (directAccounts.length > 0) {
+      console.log('📊 DIRECT account sample:', directAccounts.slice(0, 3).map(r => ({
+        account: r.account,
+        amount: r.amount,
+        class: r.class
+      })));
+    }
+    
     // Debug: Sum by exact account name
     const accountSums = rawData.reduce((acc: any, row: any) => {
       const exactName = row.account;
@@ -451,15 +501,16 @@ const fetchFinancialData = async (
     }, {});
     console.log('📊 Raw account sums:', accountSums);
     
-    // Simple grouping by account name and sum amounts
+    // Simple grouping by account name and sum amounts - FIXED VERSION
     const grouped = rawData.reduce((acc: any, row: any) => {
-      const accountName = row.account?.trim() || 'Unknown Account';
+      // Use the EXACT account name - no trimming or modifications
+      const accountName = row.account || 'Unknown Account';
       
-      // Debug every row for Direct revenue
-      if (accountName.toLowerCase().includes('direct')) {
-        console.log('🔍 Found Direct row:', {
-          accountName,
-          account_type: row.account_type,
+      // Debug every revenue row to catch issues
+      if (row.account_type === 'Income' && accountName.includes('Revenue')) {
+        console.log('🔍 Processing Revenue row:', {
+          originalAccount: row.account,
+          cleanedAccount: accountName,
           amount: row.amount,
           class: row.class
         });
@@ -475,9 +526,9 @@ const fetchFinancialData = async (
           account_type: row.account_type
         };
         
-        // Debug when creating Direct account
-        if (accountName.toLowerCase().includes('direct')) {
-          console.log('🔍 Created Direct account:', accountName);
+        // Debug when creating revenue accounts
+        if (row.account_type === 'Income' && accountName.includes('Revenue')) {
+          console.log('🔍 Created Revenue account:', accountName);
         }
       }
       
@@ -487,10 +538,13 @@ const fetchFinancialData = async (
       return acc;
     }, {});
 
-    console.log('📊 All account names found:', Object.keys(grouped));
-    console.log('📊 Grouped accounts:', Object.keys(grouped));
+    console.log('📊 All account names found (first 10):', Object.keys(grouped).slice(0, 10));
+    console.log('📊 Revenue accounts in grouped data:', 
+      Object.keys(grouped).filter(name => name.includes('Revenue')));
     console.log('📊 Direct revenue check:', grouped['Rental Revenue - Direct'] ? 
       `Found with total: ${grouped['Rental Revenue - Direct'].total}` : 'NOT FOUND');
+    console.log('📊 Guesty revenue check:', grouped['Rental Revenue - Guesty'] ? 
+      `Found with total: ${grouped['Rental Revenue - Guesty'].total}` : 'NOT FOUND');
 
     // Convert to array and filter
     const accountsArray = Object.values(grouped)
