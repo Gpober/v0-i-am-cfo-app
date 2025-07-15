@@ -191,6 +191,16 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     const accountName = getCleanAccountName(entry);
     const key = accountName;
     
+    // Debug logging for Direct revenue
+    if (accountName.includes('Direct')) {
+      console.log('🔍 Processing Direct revenue entry:', {
+        accountName,
+        account_type: entry.account_type,
+        amount: entry.amount,
+        class: entry.class
+      });
+    }
+    
     if (!acc[key]) {
       // Classify based on account_type from your data
       let classification = 'Other';
@@ -203,6 +213,15 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
         classification = 'Assets';
       } else if (entry.account_type === 'Credit Card' || entry.account_type === 'Other Current Liabilities') {
         classification = 'Liabilities';
+      }
+      
+      // Debug logging for new accounts
+      if (accountName.includes('Direct')) {
+        console.log('🔍 Creating new Direct revenue account:', {
+          accountName,
+          classification,
+          account_type: entry.account_type
+        });
       }
       
       acc[key] = {
