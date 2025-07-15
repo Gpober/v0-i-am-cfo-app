@@ -398,10 +398,7 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
   };
 };
 
-// Fetch financial data from Supabase
-// COMPLETE FIXED fetchFinancialData function
-// Replace your entire fetchFinancialData function with this corrected version:
-
+// FIXED: Fetch financial data from Supabase - CORRECTED VERSION
 const fetchFinancialData = async (
   property: string | string[] = 'All Properties',
   monthYear: string
@@ -747,35 +744,6 @@ const fetchFinancialData = async (
     };
   }
 };
-    return {
-      success: true,
-      data: enhancedData || [],
-      accountsData: accountsData,
-      summary: {
-        filteredEntries: enhancedData?.length || 0,
-        originalEntries: journalData.length,
-        dateFiltered: journalData.length - filteredJournalData.length,
-        dataSource: `Supabase + STRICT ${month} ${year} Filtering`,
-        dateRange: `${startDate} to ${endDate}`,
-        filters: { property, monthYear },
-        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
-        propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
-        mappingStats: {
-          totalEntries: enhancedData?.length || 0,
-          accountsTableMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Accounts Table').length || 0,
-          fallbackMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Classification Logic').length || 0
-        }
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching financial data:', error);
-    return {
-      success: false,
-      error: (error as Error).message,
-      data: []
-    };
-  }
-};
 
 // IAM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -891,132 +859,134 @@ export default function FinancialsPage() {
     }
   };
 
+  // FIXED: loadRealFinancialData function
   const loadRealFinancialData = async () => {
-  try {
-    setIsLoadingData(true);
-    setDataError(null);
-
-    const selected = Array.from(selectedProperties || []);
-    console.log("🔍 LOADING DATA WITH FILTERS:", {
-      selectedProperties: selected,
-      month: selectedMonth,
-    });
-
-    // FIXED: Build proper property filter
-    let propertyFilter: string | string[] = "All Properties";
-    
-    if (selected.length === 0) {
-      // No properties selected - show all
-      propertyFilter = "All Properties";
-    } else if (selected.length === availableProperties.filter(p => p !== "All Properties").length) {
-      // All real properties selected - show all
-      propertyFilter = "All Properties";
-    } else if (selected.length === 1) {
-      // Single property
-      propertyFilter = selected[0];
-    } else {
-      // Multiple specific properties
-      propertyFilter = selected;
-    }
-
-    console.log("🎯 FINAL PROPERTY FILTER:", propertyFilter);
-
-    // Fetch with the corrected property filter
-    const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
-
-    if (rawData.success) {
-      const entries = rawData.data as FinancialEntry[];
-
-      console.log("🔍 LOADED ENTRIES:", entries.length);
-      console.log("🏠 PROPERTIES IN DATA:", [...new Set(entries.map(e => e.property_class))]);
-
-      const transformedPL = transformFinancialData(entries, selectedMonth);
-      const transformedCF = transformCashFlowData(entries);
-
-      const combinedData = {
-        success: true,
-        ...transformedPL,
-        ...transformedCF,
-        summary: {
-          ...rawData.summary,
-          propertiesInData: [...new Set(entries.map((e) => e.property_class))],
-          selectedFilters: {
-            properties: selected,
-            month: selectedMonth,
-          },
-        },
-        rawEntries: entries.slice(0, 5),
-      };
-
-      setRealData(combinedData);
+    try {
+      setIsLoadingData(true);
       setDataError(null);
 
-      const propertyText = propertyFilter === "All Properties" 
-        ? "all properties" 
-        : Array.isArray(propertyFilter)
-          ? `${propertyFilter.length} selected properties (${propertyFilter.join(', ')})`
-          : `${propertyFilter}`;
+      const selected = Array.from(selectedProperties || []);
+      console.log("🔍 LOADING DATA WITH FILTERS:", {
+        selectedProperties: selected,
+        month: selectedMonth,
+      });
 
-      showNotification(
-        `✅ Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`,
-        "success"
-      );
-    } else {
-      setDataError(rawData.error || "Failed to load financial data");
+      // FIXED: Build proper property filter
+      let propertyFilter: string | string[] = "All Properties";
+      
+      if (selected.length === 0) {
+        // No properties selected - show all
+        propertyFilter = "All Properties";
+      } else if (selected.length === availableProperties.filter(p => p !== "All Properties").length) {
+        // All real properties selected - show all
+        propertyFilter = "All Properties";
+      } else if (selected.length === 1) {
+        // Single property
+        propertyFilter = selected[0];
+      } else {
+        // Multiple specific properties
+        propertyFilter = selected;
+      }
+
+      console.log("🎯 FINAL PROPERTY FILTER:", propertyFilter);
+
+      // Fetch with the corrected property filter
+      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
+
+      if (rawData.success) {
+        const entries = rawData.data as FinancialEntry[];
+
+        console.log("🔍 LOADED ENTRIES:", entries.length);
+        console.log("🏠 PROPERTIES IN DATA:", [...new Set(entries.map(e => e.property_class))]);
+
+        const transformedPL = transformFinancialData(entries, selectedMonth);
+        const transformedCF = transformCashFlowData(entries);
+
+        const combinedData = {
+          success: true,
+          ...transformedPL,
+          ...transformedCF,
+          summary: {
+            ...rawData.summary,
+            propertiesInData: [...new Set(entries.map((e) => e.property_class))],
+            selectedFilters: {
+              properties: selected,
+              month: selectedMonth,
+            },
+          },
+          rawEntries: entries.slice(0, 5),
+        };
+
+        setRealData(combinedData);
+        setDataError(null);
+
+        const propertyText = propertyFilter === "All Properties" 
+          ? "all properties" 
+          : Array.isArray(propertyFilter)
+            ? `${propertyFilter.length} selected properties (${propertyFilter.join(', ')})`
+            : `${propertyFilter}`;
+
+        showNotification(
+          `✅ Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`,
+          "success"
+        );
+      } else {
+        setDataError(rawData.error || "Failed to load financial data");
+        showNotification("❌ Failed to load financial data", "error");
+      }
+    } catch (error) {
+      console.error("❌ Failed to load financial data:", error);
+      setDataError("Failed to load financial data");
       showNotification("❌ Failed to load financial data", "error");
+    } finally {
+      setIsLoadingData(false);
     }
-  } catch (error) {
-    console.error("❌ Failed to load financial data:", error);
-    setDataError("Failed to load financial data");
-    showNotification("❌ Failed to load financial data", "error");
-  } finally {
-    setIsLoadingData(false);
-  }
-};
+  };
 
+  // FIXED: handlePropertyToggle function
   const handlePropertyToggle = (property: string) => {
-  const realProperties = availableProperties.filter(p => p !== "All Properties");
-  const newSelected = new Set(selectedProperties);
+    const realProperties = availableProperties.filter(p => p !== "All Properties");
+    const newSelected = new Set(selectedProperties);
 
-  console.log('🏠 BEFORE TOGGLE:', Array.from(selectedProperties), 'Toggling:', property);
+    console.log('🏠 BEFORE TOGGLE:', Array.from(selectedProperties), 'Toggling:', property);
 
-  if (property === "All Properties") {
-    // If All Properties is clicked, check current state
-    const allRealSelected = realProperties.every(p => newSelected.has(p));
-    
-    if (allRealSelected) {
-      // All are selected, so deselect all
-      newSelected.clear();
+    if (property === "All Properties") {
+      // If All Properties is clicked, check current state
+      const allRealSelected = realProperties.every(p => newSelected.has(p));
+      
+      if (allRealSelected) {
+        // All are selected, so deselect all
+        newSelected.clear();
+      } else {
+        // Not all selected, so select all
+        newSelected.clear();
+        realProperties.forEach(p => newSelected.add(p));
+      }
     } else {
-      // Not all selected, so select all
-      newSelected.clear();
-      realProperties.forEach(p => newSelected.add(p));
+      // Individual property toggle
+      if (newSelected.has(property)) {
+        newSelected.delete(property);
+      } else {
+        newSelected.add(property);
+      }
+      
+      // If all properties are now selected, no need to change (keep individual selections)
+      // If no properties selected, add "All Properties" behavior by selecting all
+      if (newSelected.size === 0) {
+        realProperties.forEach(p => newSelected.add(p));
+      }
     }
-  } else {
-    // Individual property toggle
-    if (newSelected.has(property)) {
-      newSelected.delete(property);
-    } else {
-      newSelected.add(property);
-    }
-    
-    // If all properties are now selected, no need to change (keep individual selections)
-    // If no properties selected, add "All Properties" behavior by selecting all
-    if (newSelected.size === 0) {
-      realProperties.forEach(p => newSelected.add(p));
-    }
-  }
 
-  console.log('🏠 AFTER TOGGLE:', Array.from(newSelected));
-  
-  setSelectedProperties(newSelected);
-  
-  // IMPORTANT: Trigger data reload after state update
-  setTimeout(() => {
-    console.log('🔄 TRIGGERING DATA RELOAD...');
-    loadRealFinancialData();
-  }, 100);
-};
+    console.log('🏠 AFTER TOGGLE:', Array.from(newSelected));
+    
+    setSelectedProperties(newSelected);
+    
+    // IMPORTANT: Trigger data reload after state update
+    setTimeout(() => {
+      console.log('🔄 TRIGGERING DATA RELOAD...');
+      loadRealFinancialData();
+    }, 100);
+  };
 
   const getSelectedPropertiesText = () => {
     const realProperties = availableProperties.filter(p => p !== "All Properties");
@@ -1286,90 +1256,90 @@ export default function FinancialsPage() {
 
   // FIXED: Calculate KPIs with proper positive/negative handling
   const calculateKPIs = () => {
-  if (!currentData || currentData.length === 0) {
+    if (!currentData || currentData.length === 0) {
+      return {
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        operatingExpenses: 0,
+        operatingIncome: 0,
+        otherIncome: 0,
+        otherExpenses: 0,
+        interestExpense: 0,
+        netIncome: 0,
+        grossMargin: 0,
+        operatingMargin: 0,
+        netMargin: 0
+      };
+    }
+
+    // FIXED: Revenue calculation - preserves negative resolutions
+    const revenue = currentData
+      .filter(item => item.type === 'Revenue' || 
+                     (item.original_type && item.original_type.toLowerCase().includes('income')))
+      .reduce((sum, item) => {
+        // Don't use Math.abs() - preserve the sign for resolutions
+        console.log(`📊 Revenue item: ${item.name} = ${item.total}`);
+        return sum + item.total;
+      }, 0);
+
+    // COGS calculation (should be positive)
+    const cogs = currentData
+      .filter(item => item.original_type === 'Cost of Goods Sold')
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    // Operating Expenses (should be positive)
+    const operatingExpenses = currentData
+      .filter(item => item.type === 'Expenses' && 
+                     item.original_type !== 'Interest Expense' &&
+                     item.original_type !== 'Cost of Goods Sold')
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    // Interest Expense (should be positive)
+    const interestExpense = currentData
+      .filter(item => item.original_type === 'Interest Expense' ||
+                     item.name.toLowerCase().includes('mortgage interest'))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    // Other Income (preserve sign for adjustments)
+    const otherIncome = currentData
+      .filter(item => item.original_type === 'Other Income')
+      .reduce((sum, item) => sum + item.total, 0);
+
+    // Other Expenses (should be positive)
+    const otherExpenses = currentData
+      .filter(item => item.name.toLowerCase().includes('other expense') &&
+                     !item.name.toLowerCase().includes('interest'))
+      .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+    const grossProfit = revenue - cogs;
+    const operatingIncome = grossProfit - operatingExpenses;
+    const netOperatingIncome = operatingIncome - interestExpense;
+    const netIncome = netOperatingIncome + otherIncome - otherExpenses;
+
+    console.log('🧮 KPI CALCULATIONS FIXED:', {
+      revenue: `$${revenue.toLocaleString()} (preserves negative resolutions)`,
+      cogs: `$${cogs.toLocaleString()}`,
+      operatingExpenses: `$${operatingExpenses.toLocaleString()}`,
+      netIncome: `$${netIncome.toLocaleString()}`
+    });
+
     return {
-      revenue: 0,
-      cogs: 0,
-      grossProfit: 0,
-      operatingExpenses: 0,
-      operatingIncome: 0,
-      otherIncome: 0,
-      otherExpenses: 0,
-      interestExpense: 0,
-      netIncome: 0,
-      grossMargin: 0,
-      operatingMargin: 0,
-      netMargin: 0
+      revenue,
+      cogs,
+      grossProfit,
+      operatingExpenses,
+      operatingIncome,
+      interestExpense,
+      netOperatingIncome: netOperatingIncome,
+      otherIncome,
+      otherExpenses,
+      netIncome,
+      grossMargin: revenue ? (grossProfit / revenue) * 100 : 0,
+      operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
+      netMargin: revenue ? (netIncome / revenue) * 100 : 0
     };
-  }
-
-  // FIXED: Revenue calculation - preserves negative resolutions
-  const revenue = currentData
-    .filter(item => item.type === 'Revenue' || 
-                   (item.original_type && item.original_type.toLowerCase().includes('income')))
-    .reduce((sum, item) => {
-      // Don't use Math.abs() - preserve the sign for resolutions
-      console.log(`📊 Revenue item: ${item.name} = ${item.total}`);
-      return sum + item.total;
-    }, 0);
-
-  // COGS calculation (should be positive)
-  const cogs = currentData
-    .filter(item => item.original_type === 'Cost of Goods Sold')
-    .reduce((sum, item) => sum + Math.abs(item.total), 0);
-
-  // Operating Expenses (should be positive)
-  const operatingExpenses = currentData
-    .filter(item => item.type === 'Expenses' && 
-                   item.original_type !== 'Interest Expense' &&
-                   item.original_type !== 'Cost of Goods Sold')
-    .reduce((sum, item) => sum + Math.abs(item.total), 0);
-
-  // Interest Expense (should be positive)
-  const interestExpense = currentData
-    .filter(item => item.original_type === 'Interest Expense' ||
-                   item.name.toLowerCase().includes('mortgage interest'))
-    .reduce((sum, item) => sum + Math.abs(item.total), 0);
-
-  // Other Income (preserve sign for adjustments)
-  const otherIncome = currentData
-    .filter(item => item.original_type === 'Other Income')
-    .reduce((sum, item) => sum + item.total, 0);
-
-  // Other Expenses (should be positive)
-  const otherExpenses = currentData
-    .filter(item => item.name.toLowerCase().includes('other expense') &&
-                   !item.name.toLowerCase().includes('interest'))
-    .reduce((sum, item) => sum + Math.abs(item.total), 0);
-
-  const grossProfit = revenue - cogs;
-  const operatingIncome = grossProfit - operatingExpenses;
-  const netOperatingIncome = operatingIncome - interestExpense;
-  const netIncome = netOperatingIncome + otherIncome - otherExpenses;
-
-  console.log('🧮 KPI CALCULATIONS FIXED:', {
-    revenue: `$${revenue.toLocaleString()} (preserves negative resolutions)`,
-    cogs: `$${cogs.toLocaleString()}`,
-    operatingExpenses: `$${operatingExpenses.toLocaleString()}`,
-    netIncome: `$${netIncome.toLocaleString()}`
-  });
-
-  return {
-    revenue,
-    cogs,
-    grossProfit,
-    operatingExpenses,
-    operatingIncome,
-    interestExpense,
-    netOperatingIncome: netOperatingIncome,
-    otherIncome,
-    otherExpenses,
-    netIncome,
-    grossMargin: revenue ? (grossProfit / revenue) * 100 : 0,
-    operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
-    netMargin: revenue ? (netIncome / revenue) * 100 : 0
   };
-};
 
   const generateTrendData = () => {
     const months = ['Jan 2023', 'Feb 2023', 'Mar 2023', 'Apr 2023', 'May 2023', 'Jun 2023'];
