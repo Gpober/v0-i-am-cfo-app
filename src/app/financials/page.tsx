@@ -1346,21 +1346,21 @@ export default function FinancialsPage() {
                             .map((item) => (
                               <tr key={`income-${item.name}`} className="hover:bg-gray-50">
                                 <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                  {item.name}
+                                  {item.entries && item.entries.length > 0 && (
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      ({item.entries.length} transactions)
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2 text-right text-sm text-gray-700">
                                   <span 
-                                    className="cursor-help"
+                                    className="cursor-help hover:bg-blue-50 px-2 py-1 rounded transition-colors"
                                     onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
                                     onMouseLeave={handleAccountMouseLeave}
                                   >
-                                    {item.name}
-                                    {item.entries && item.entries.length > 0 && (
-                                      <span className="ml-2 text-xs text-gray-500">
-                                        ({item.entries.length} transactions)
-                                      </span>
-                                    )}
+                                    {formatCurrency(item.total)}
                                   </span>
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-700">
-                                  {formatCurrency(item.total)}
                                 </td>
                                 <td className="px-4 py-2 text-right text-sm text-gray-500">
                                   {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
@@ -1387,10 +1387,10 @@ export default function FinancialsPage() {
                               💸 EXPENSES
                             </td>
                             <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                              ({formatCurrency(kpis.operatingExpenses)})
+                              ({formatCurrency(Math.abs(kpis.operatingExpenses))})
                             </td>
                             <td className="px-4 py-4 text-right text-sm text-red-600">
-                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
+                              {kpis.revenue ? calculatePercentage(Math.abs(kpis.operatingExpenses), Math.abs(kpis.revenue)) : '0%'}
                             </td>
                           </tr>
                           
@@ -1400,21 +1400,21 @@ export default function FinancialsPage() {
                             .map((item) => (
                               <tr key={`expense-${item.name}`} className="hover:bg-gray-50">
                                 <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                                  {item.name}
+                                  {item.entries && item.entries.length > 0 && (
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      ({item.entries.length} transactions)
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2 text-right text-sm text-gray-700">
                                   <span 
-                                    className="cursor-help"
+                                    className="cursor-help hover:bg-red-50 px-2 py-1 rounded transition-colors"
                                     onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
                                     onMouseLeave={handleAccountMouseLeave}
                                   >
-                                    {item.name}
-                                    {item.entries && item.entries.length > 0 && (
-                                      <span className="ml-2 text-xs text-gray-500">
-                                        ({item.entries.length} transactions)
-                                      </span>
-                                    )}
+                                    {formatCurrency(item.total)}
                                   </span>
-                                </td>
-                                <td className="px-4 py-2 text-right text-sm text-gray-700">
-                                  {formatCurrency(item.total)}
                                 </td>
                                 <td className="px-4 py-2 text-right text-sm text-gray-500">
                                   {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
@@ -1428,10 +1428,10 @@ export default function FinancialsPage() {
                               📊 TOTAL EXPENSES
                             </td>
                             <td className="px-4 py-4 text-right text-lg font-bold text-red-800">
-                              ({formatCurrency(kpis.operatingExpenses)})
+                              ({formatCurrency(Math.abs(kpis.operatingExpenses))})
                             </td>
                             <td className="px-4 py-4 text-right text-sm font-bold text-red-800">
-                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
+                              {kpis.revenue ? calculatePercentage(Math.abs(kpis.operatingExpenses), Math.abs(kpis.revenue)) : '0%'}
                             </td>
                           </tr>
 
