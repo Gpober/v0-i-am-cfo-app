@@ -120,8 +120,8 @@ const fetchProperties = async (): Promise<string[]> => {
   try {
     console.log('🏠 Fetching unique class values from financial_transactions...');
     
-    // Get unique class values from your financial_transactions table
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/financial_transactions?select=class&order=class`, {
+    // Get ALL unique class values from your financial_transactions table (no date filtering)
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/financial_transactions?select=class`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
@@ -459,7 +459,7 @@ const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
-  const [selectedMonth, setSelectedMonth] = useState<MonthString>('May 2025');
+  const [selectedMonth, setSelectedMonth] = useState<MonthString>('January 2023');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [timeView, setTimeView] = useState<TimeView>('Monthly');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
