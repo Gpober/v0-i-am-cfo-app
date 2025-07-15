@@ -1,17 +1,99 @@
-name: Claude Max Code Base Action
+name: Claude Max Code Review
 on:
   workflow_dispatch:
     inputs:
       prompt:
-        description: 'What would you like Claude to help with?'
+        description: 'What would you like Claude to analyze?'
         required: true
-        default: 'Analyze this repository and suggest improvements for file size optimization'
+        default: 'Review my financial dashboard for performance improvements and help debug the resolution account sign issue'
+      files:
+        description: 'Specific files to analyze (optional)'
+        required: false
+        default: 'src/app/financials/page.tsx'
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
 jobs:
-  claude-code:
+  claude-review:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Run Claude Code
-        uses: grll/claude-code-action@beta
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          prompt: ${{ github.event.inputs.prompt }}
+          fetch-depth: 0
+
+      - name: Authenticate with Claude Max Plan
+        id: auth
+        run: |
+          echo "Using Claude Max Plan authentication"
+          echo "CLAUDE_AUTH=max-plan" >> $GITHUB_ENV
+
+      - name: Claude Code Analysis
+        uses: anthropics/claude-github-action@v1
+        with:
+          # Your Max plan credentials will be used automatically
+          model: "claude-3-5-sonnet-20241022"
+          prompt: ${{ github.event.inputs.prompt || 'Analyze this code for improvements, focusing on React performance, TypeScript best practices, and financial calculation accuracy. Pay special attention to the accounting logic in the switch statement around line 320.' }}
+          files: ${{ github.event.inputs.files || '.' }}
+          max_tokens: 4000
+          temperature: 0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Analysis Issue
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `Claude Analysis: ${new Date().toISOString().split('T')[0]}`;
+            const body = `## 🤖 Claude Max Plan Analysis
+            
+            **Prompt:** ${{ github.event.inputs.prompt }}
+            **Files:** ${{ github.event.inputs.files || 'All files' }}
+            **Model:** claude-3-5-sonnet-20241022
+            
+            Analysis results will appear below this comment.
+            
+            ---
+            *Generated using Claude Max Plan ($200/month subscription)*`;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['claude-analysis', 'code-review', 'max-plan']
+            });
+
+      - name: Financial Dashboard Specific Analysis
+        if: github.event_name == 'workflow_dispatch'
+        uses: anthropics/claude-github-action@v1
+        with:
+          model: "claude-3-5-sonnet-20241022"
+          prompt: |
+            Focus specifically on this financial dashboard:
+            
+            1. **Resolution Account Issue**: Around line 320 in the switch statement, resolution accounts with debit amounts should show as negative income, but they're showing positive. Trace the data flow and identify where the sign is getting flipped.
+            
+            2. **Performance**: This is a 2000+ line React component. Suggest specific refactoring strategies for better performance.
+            
+            3. **Accounting Logic**: Review the debit/credit calculations in the switch statement. Ensure they follow proper accounting principles.
+            
+            4. **Code Organization**: Suggest how to break down this large component.
+            
+            5. **TypeScript**: Identify any type safety improvements.
+            
+            Provide specific, actionable recommendations with code examples.
+          files: "src/app/financials/page.tsx"
+          max_tokens: 8000
+          temperature: 0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
