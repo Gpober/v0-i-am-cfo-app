@@ -115,12 +115,31 @@ const createSupabaseClient = () => {
 
 const supabase = createSupabaseClient();
 
-// Fetch properties from your financial_transactions table
+// Hardcoded properties based on your actual database data
+const HARDCODED_PROPERTIES = [
+  'All Properties',
+  'Cleveland',
+  'Columbus IN', 
+  'Detroit',
+  'General',
+  'Hastings MN',
+  'Lisbon',
+  'McHenry IL',
+  'Mokena IL',
+  'Pine Terrace',
+  'Rockford',
+  'Terra2',
+  'Terra3',
+  'Terraview',
+  'Wesley'
+];
+
+// Fetch properties - now uses hardcoded list as fallback
 const fetchProperties = async (): Promise<string[]> => {
   try {
-    console.log('🏠 Fetching unique class values from financial_transactions...');
+    console.log('🏠 Using hardcoded property list...');
     
-    // Get ALL unique class values from your financial_transactions table (no date filtering)
+    // Optional: Still try to fetch from database for future properties
     const response = await fetch(`${SUPABASE_URL}/rest/v1/financial_transactions?select=class`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -131,30 +150,27 @@ const fetchProperties = async (): Promise<string[]> => {
 
     if (response.ok) {
       const data = await response.json();
-      console.log('📅 Found transaction entries:', data.length);
-      
-      // Extract unique class values
       const classValues = data
         .map((item: any) => item.class)
-        .filter((cls: any) => cls && cls.trim() !== '')
-        .filter((cls: any, index: number, array: any[]) => array.indexOf(cls) === index); // unique values
+        .filter((cls: any) => cls && cls.trim() !== '');
       
-      console.log('🏠 Unique classes found:', classValues);
+      const uniqueClasses = [...new Set(classValues)].sort();
       
-      if (classValues.length === 0) {
-        return ['All Properties', 'General'];
-      }
+      // Combine hardcoded with any new properties found in database
+      const allProperties = [...new Set([...HARDCODED_PROPERTIES.slice(1), ...uniqueClasses])].sort();
+      const result = ['All Properties', ...allProperties];
       
-      const result = ['All Properties', ...classValues.sort()];
-      console.log('✅ Final property list:', result);
+      console.log('✅ Properties loaded (hardcoded + database):', result.length);
       return result;
     }
     
-    return ['All Properties', 'General'];
+    // Fallback to hardcoded list if database fetch fails
+    console.log('✅ Using hardcoded properties as fallback');
+    return HARDCODED_PROPERTIES;
     
   } catch (error) {
-    console.error('❌ Property fetch error:', error);
-    return ['All Properties', 'General'];
+    console.error('❌ Property fetch error, using hardcoded list:', error);
+    return HARDCODED_PROPERTIES;
   }
 };
 
@@ -451,7 +467,7 @@ export default function FinancialsPage() {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [realData, setRealData] = useState<any>(null);
   const [dataError, setDataError] = useState<string | null>(null);
-  const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
+  const [availableProperties, setAvailableProperties] = useState<string[]>(HARDCODED_PROPERTIES);
 
   // Generate months list
   const generateMonthsList = () => {
