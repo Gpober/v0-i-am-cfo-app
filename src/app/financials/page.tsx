@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
 
-// IAM CFO Brand Colors
+// === CONSTANTS & CONFIGURATION ===
 const BRAND_COLORS = {
   primary: '#56B6E9',
   secondary: '#3A9BD1',
@@ -25,13 +25,16 @@ const BRAND_COLORS = {
     800: '#1E293B',
     900: '#0F172A'
   }
-};
+} as const;
 
-// Supabase Configuration
-const SUPABASE_URL = 'https://ijeuusvwqcnljctkvjdi.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZXV1c3Z3cWNubGpjdGt2amRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMjE4MDUsImV4cCI6MjA2NzY5NzgwNX0.O9Mb_X47wbXEMXbPQ8Cr3dzDn_E5DYG9b222FPy4LEU';
+const SUPABASE_CONFIG = {
+  url: 'https://ijeuusvwqcnljctkvjdi.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZXV1c3Z3cWNubGpjdGt2amRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMjE4MDUsImV4cCI6MjA2NzY5NzgwNX0.O9Mb_X47wbXEMXbPQ8Cr3dzDn_E5DYG9b222FPy4LEU'
+} as const;
 
-// Type definitions
+const CHART_COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning, BRAND_COLORS.danger, BRAND_COLORS.secondary, BRAND_COLORS.tertiary];
+
+// === TYPES ===
 type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
 type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
 type ViewMode = 'total' | 'detailed';
@@ -45,8 +48,10 @@ interface FinancialDataItem {
   type?: string;
   original_type?: string;
   detail_type?: string;
-  entries?: any[];
+  entries?: FinancialEntry[];
   mapping_method?: string;
+  hasSubAccounts?: boolean;
+  subAccounts?: Record<string, any>;
 }
 
 interface FinancialEntry {
@@ -84,59 +89,118 @@ interface TooltipState {
   y: number;
 }
 
-// Real Supabase client
-const createSupabaseClient = () => {
-  return {
+interface KPIData {
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  operatingExpenses: number;
+  operatingIncome: number;
+  otherIncome: number;
+  otherExpenses: number;
+  interestExpense: number;
+  netIncome: number;
+  grossMargin: number;
+  operatingMargin: number;
+  netMargin: number;
+}
+
+// === CUSTOM HOOKS ===
+const useSupabaseClient = () => {
+  return useMemo(() => ({
     from: (table: string) => ({
       select: (columns: string = '*') => ({
         eq: (column: string, value: string) => ({
           order: (orderBy: string) => 
-            fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&${column}=eq.${encodeURIComponent(value)}&order=${orderBy}`, {
+            fetch(`${SUPABASE_CONFIG.url}/rest/v1/${table}?select=${columns}&${column}=eq.${encodeURIComponent(value)}&order=${orderBy}`, {
               headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'apikey': SUPABASE_CONFIG.anonKey,
+                'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
                 'Content-Type': 'application/json'
               }
             }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
         }),
         order: (orderBy: string) => 
-          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}&order=${orderBy}`, {
+          fetch(`${SUPABASE_CONFIG.url}/rest/v1/${table}?select=${columns}&order=${orderBy}`, {
             headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'apikey': SUPABASE_CONFIG.anonKey,
+              'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
               'Content-Type': 'application/json'
             }
           }).then(res => res.json()).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
         then: (callback: Function) => 
-          fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${columns}`, {
+          fetch(`${SUPABASE_CONFIG.url}/rest/v1/${table}?select=${columns}`, {
             headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'apikey': SUPABASE_CONFIG.anonKey,
+              'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
               'Content-Type': 'application/json'
             }
           }).then(res => res.json()).then(data => callback({ data, error: null })).catch(error => callback({ data: null, error }))
       })
     })
-  };
+  }), []);
 };
 
-const supabase = createSupabaseClient();
+const useNotification = () => {
+  const [notification, setNotification] = useState<NotificationState>({ 
+    show: false, 
+    message: '', 
+    type: 'info' 
+  });
 
-// Fetch properties from Supabase
+  const showNotification = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: 'info' });
+    }, 3000);
+  }, []);
+
+  return { notification, showNotification };
+};
+
+// === UTILITY FUNCTIONS ===
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(value);
+};
+
+const calculatePercentage = (value: number, total: number): string => {
+  return total !== 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+};
+
+const generateMonthsList = (): MonthString[] => {
+  const months: MonthString[] = [];
+  const currentYear = new Date().getFullYear();
+  
+  for (let year = 2020; year <= currentYear + 2; year++) {
+    for (let month = 1; month <= 12; month++) {
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      months.push(`${monthNames[month - 1]} ${year}` as MonthString);
+    }
+  }
+  return months;
+};
+
+// === DATA FETCHING FUNCTIONS ===
 const fetchProperties = async (): Promise<string[]> => {
   try {
     console.log("🏠 Fetching property_class values from Supabase...");
 
     const headers = {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_CONFIG.anonKey,
+      Authorization: `Bearer ${SUPABASE_CONFIG.anonKey}`,
       "Content-Type": "application/json",
     };
 
     let uniqueProperties: string[] = [];
 
-    // === Step 1: Try 2025 entries ===
-    const url2025 = new URL(`${SUPABASE_URL}/rest/v1/journal_entries`);
+    // Try 2025 entries first
+    const url2025 = new URL(`${SUPABASE_CONFIG.url}/rest/v1/journal_entries`);
     url2025.searchParams.append("select", "property_class");
     url2025.searchParams.append("transaction_date", "gte.2025-01-01");
     url2025.searchParams.append("transaction_date", "lte.2025-12-31");
@@ -147,8 +211,8 @@ const fetchProperties = async (): Promise<string[]> => {
       const data = await res2025.json();
       const cleaned = data
         .map((item: any) => item.property_class)
-        .filter((pc) => pc && pc.trim() !== "")
-        .map((pc) => pc.replace(/,/g, "").trim()); // remove commas and trim
+        .filter((pc: string) => pc && pc.trim() !== "")
+        .map((pc: string) => pc.replace(/,/g, "").trim());
 
       uniqueProperties = [...new Set(cleaned)];
       console.log("📅 Cleaned 2025 properties:", uniqueProperties);
@@ -156,7 +220,7 @@ const fetchProperties = async (): Promise<string[]> => {
       console.warn("⚠️ 2025 fetch failed, falling back to all entries...");
 
       const fallbackRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/journal_entries?select=property_class`,
+        `${SUPABASE_CONFIG.url}/rest/v1/journal_entries?select=property_class`,
         { headers }
       );
 
@@ -164,15 +228,15 @@ const fetchProperties = async (): Promise<string[]> => {
         const data = await fallbackRes.json();
         const cleaned = data
           .map((item: any) => item.property_class)
-          .filter((pc) => pc && pc.trim() !== "")
-          .map((pc) => pc.replace(/,/g, "").trim());
+          .filter((pc: string) => pc && pc.trim() !== "")
+          .map((pc: string) => pc.replace(/,/g, "").trim());
 
         uniqueProperties = [...new Set(cleaned)];
         console.log("📦 Cleaned fallback properties:", uniqueProperties);
       }
     }
 
-    // === Step 2: Add known static values ===
+    // Add known static values
     const knownStatic = [
       "Cleveland", "Columbus IN", "Detroit", "General", "Hastings MN",
       "Lisbon", "McHenry IL", "Mokena IL", "Pine Terrace",
@@ -198,9 +262,161 @@ const fetchProperties = async (): Promise<string[]> => {
   }
 };
 
+const fetchFinancialData = async (
+  property: string | string[] = 'All Properties',
+  monthYear: string
+) => {
+  try {
+    console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, monthYear });
+    
+    const [month, year] = monthYear.split(' ');
+    const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
+    
+    // STRICT date filtering
+    const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
+    const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+    
+    console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
+    
+    let url = `${SUPABASE_CONFIG.url}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
+    
+    if (Array.isArray(property) && !property.includes('All Properties')) {
+      const encodedProps = property.map((p) => `"${p}"`).join(',');
+      url += `&property_class=in.(${encodedProps})`;
+      console.log('🏠 Filtering by multiple property_class:', property);
+    } else if (typeof property === 'string' && property !== 'All Properties') {
+      url += `&property_class=eq.${encodeURIComponent(property)}`;
+      console.log('🏠 Filtering by single property_class:', property);
+    }
 
+    console.log('📡 Final URL with STRICT date filtering:', url);
 
-// Enhanced data transformation functions
+    const [journalResponse, accountsResponse] = await Promise.all([
+      fetch(url, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      fetch(`${SUPABASE_CONFIG.url}/rest/v1/accounts?select=*&order=account_name`, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+          'Content-Type': 'application/json'
+        }
+      })
+    ]);
+
+    if (!journalResponse.ok || !accountsResponse.ok) {
+      throw new Error('Failed to fetch financial data');
+    }
+    
+    const journalData = await journalResponse.json();
+    const accountsData = await accountsResponse.json();
+    
+    console.log('📊 Journal entries loaded for STRICT date range:', journalData.length);
+    
+    // Client-side date validation
+    const filteredJournalData = journalData.filter((entry: any) => {
+      const entryDate = new Date(entry.transaction_date);
+      const entryYear = entryDate.getFullYear();
+      const entryMonth = entryDate.getMonth() + 1;
+      const entryDay = entryDate.getDate();
+      
+      const targetYear = parseInt(year);
+      const targetMonth = monthNum;
+      
+      const isCorrectYear = entryYear === targetYear;
+      const isCorrectMonth = entryMonth === targetMonth;
+      const isValidDay = entryDay >= 1 && entryDay <= lastDay;
+      
+      if (!isCorrectYear || !isCorrectMonth || !isValidDay) {
+        console.warn(`⚠️ FILTERED OUT: Entry ${entry.je_number} dated ${entry.transaction_date} (not in ${month} ${year})`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log(`✅ STRICT FILTERING RESULT: ${filteredJournalData.length} entries`);
+    
+    // Create account lookup map
+    const accountLookupMap = new Map();
+    
+    accountsData.forEach((account: any) => {
+      accountLookupMap.set(account.account_name, {
+        type: account.account_type,
+        standardName: account.account_name,
+        classification: account.account_type === 'Income' ? 'Revenue' : 
+                      account.account_type === 'Expenses' ? 'Expenses' :
+                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                      account.account_type === 'Other Income' ? 'Revenue' :
+                      account.account_type === 'Other Expenses' ? 'Expenses' :
+                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
+                      account.account_type
+      });
+    });
+
+    // Enhanced classification
+    const enhancedData = filteredJournalData.map((entry: any) => {
+      let accountInfo = accountLookupMap.get(entry.account_name);
+      
+      if (!accountInfo) {
+        accountInfo = {
+          type: entry.account_type,
+          classification: entry.account_type === 'Income' ? 'Revenue' : 
+                         entry.account_type === 'Expenses' ? 'Expenses' :
+                         entry.account_type === 'Cost of Goods Sold' ? 'Expenses' :
+                         entry.account_type === 'Other Income' ? 'Revenue' :
+                         entry.account_type === 'Other Expenses' ? 'Expenses' :
+                         entry.account_type === 'Interest Expense' ? 'Other Expenses' :
+                         entry.account_type,
+          standardName: entry.account_name
+        };
+      }
+      
+      return {
+        ...entry,
+        account_type: accountInfo?.type || entry.account_type || 'Other',
+        classification: accountInfo?.classification || accountInfo?.type || 'Other',
+        standard_account_name: accountInfo?.standardName || entry.account_name,
+        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Journal Entry Type'
+      };
+    });
+
+    return {
+      success: true,
+      data: enhancedData || [],
+      accountsData: accountsData,
+      summary: {
+        filteredEntries: enhancedData?.length || 0,
+        originalEntries: journalData.length,
+        dateFiltered: journalData.length - filteredJournalData.length,
+        dataSource: `Supabase + STRICT ${month} ${year} Filtering`,
+        dateRange: `${startDate} to ${endDate}`,
+        filters: { property, monthYear },
+        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
+        propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
+        mappingStats: {
+          totalEntries: enhancedData?.length || 0,
+          accountsTableMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Accounts Table').length || 0,
+          fallbackMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Fallback Classification').length || 0
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching financial data:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+      data: []
+    };
+  }
+};
+
+// === DATA TRANSFORMATION FUNCTIONS ===
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
   const getCleanAccountName = (entry: any) => {
     let accountName = entry.account_name?.trim() || '';
@@ -379,333 +595,7 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
   };
 };
 
-// Fetch financial data from Supabase
-const fetchFinancialData = async (
-  property: string = 'All Properties',
-  monthYear: string
-) => {
-  try {
-    console.log('🔍 FETCHING FINANCIAL DATA with filters:', { property, monthYear });
-    
-    const [month, year] = monthYear.split(' ');
-    const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
-    
-    // STRICT date filtering - exactly the month requested
-    const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-    const lastDay = new Date(parseInt(year), monthNum, 0).getDate(); // Get last day of the month
-    const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
-    
-    console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
-    
-    let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
-    
-    if (Array.isArray(property) && !property.includes('All Properties')) {
-  const encodedProps = property.map((p) => `"${p}"`).join(',');
-  url += `&property_class=in.(${encodedProps})`;
-  console.log('🏠 Filtering by multiple property_class:', property);
-} else if (typeof property === 'string' && property !== 'All Properties') {
-  url += `&property_class=eq.${encodeURIComponent(property)}`;
-  console.log('🏠 Filtering by single property_class:', property);
-}
-
-
-    console.log('📡 Final URL with STRICT date filtering:', url);
-
-    const [journalResponse, accountsResponse] = await Promise.all([
-      fetch(url, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }),
-      fetch(`${SUPABASE_URL}/rest/v1/accounts?select=*&order=account_name`, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      })
-    ]);
-
-    if (!journalResponse.ok || !accountsResponse.ok) {
-      throw new Error('Failed to fetch financial data');
-    }
-    
-    const journalData = await journalResponse.json();
-    const accountsData = await accountsResponse.json();
-    
-    console.log('📊 Journal entries loaded for STRICT date range:', journalData.length);
-    
-    // ADDITIONAL CLIENT-SIDE DATE VALIDATION to ensure no date leakage
-    const filteredJournalData = journalData.filter((entry: any) => {
-      const entryDate = new Date(entry.transaction_date);
-      const entryYear = entryDate.getFullYear();
-      const entryMonth = entryDate.getMonth() + 1; // getMonth() is 0-based
-      const entryDay = entryDate.getDate();
-      
-      const targetYear = parseInt(year);
-      const targetMonth = monthNum;
-      
-      const isCorrectYear = entryYear === targetYear;
-      const isCorrectMonth = entryMonth === targetMonth;
-      const isValidDay = entryDay >= 1 && entryDay <= lastDay;
-      
-      if (!isCorrectYear || !isCorrectMonth || !isValidDay) {
-        console.warn(`⚠️ FILTERED OUT: Entry ${entry.je_number} dated ${entry.transaction_date} (not in ${month} ${year})`);
-        return false;
-      }
-      
-      return true;
-    });
-    
-    console.log(`✅ STRICT FILTERING RESULT: ${filteredJournalData.length} entries (filtered out ${journalData.length - filteredJournalData.length} entries)`);
-    
-    // Debug: Show date range of actual entries
-    if (filteredJournalData.length > 0) {
-      const dates = filteredJournalData.map((e: any) => e.transaction_date).sort();
-      console.log(`📅 ACTUAL DATE RANGE in filtered data: ${dates[0]} to ${dates[dates.length - 1]}`);
-    }
-    
-    // Create account lookup map
-    const accountLookupMap = new Map();
-    
-    accountsData.forEach((account: any) => {
-      accountLookupMap.set(account.account_name, {
-        type: account.account_type,
-        standardName: account.account_name,
-        classification: account.account_type === 'Income' ? 'Revenue' : 
-                      account.account_type === 'Expenses' ? 'Expenses' :
-                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
-                      account.account_type === 'Other Income' ? 'Revenue' :
-                      account.account_type === 'Other Expenses' ? 'Expenses' :
-                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
-                      account.account_type
-      });
-    });
-
-    // Enhanced classification for journal entries to match your Google Sheets structure
-    const classifyJournalAccount = (entry: any) => {
-      const accountName = entry.account_name || '';
-      const name = accountName.toLowerCase();
-      const description = (entry.description || '').toLowerCase();
-      
-      console.log('🔍 Classifying account:', accountName, 'Description:', entry.description, 'Line amount:', entry.line_amount, 'Credit:', entry.credit_amount, 'Debit:', entry.debit_amount);
-      
-      // Revenue/Income classification - matching your Google Sheets exactly
-      if (name.includes('rental revenue - airbnb') || 
-          name.includes('rental revenue - direct') ||
-          name.includes('rental revenue - guesty') ||
-          name.includes('rental revenue - reserve payout') ||
-          name.includes('rental revenue - vrbo') ||
-          name.includes('direct booking') ||
-          name.includes('direct revenue') ||
-          name.includes('bookings') ||
-          name.includes('income') || 
-          name.includes('revenue') ||
-          name.includes('rent') || 
-          name.includes('airbnb') ||
-          name.includes('guesty') ||
-          name.includes('vrbo') ||
-          name.includes('adjustment for occupancy taxes') ||
-          name.includes('miscellaneous income') ||
-          name.includes('resolution adjustments') ||
-          // Check description for reclassification entries
-          description.includes('reclassify') ||
-          description.includes('move income') ||
-          description.includes('transfer') ||
-          description.includes('direct booking') ||
-          description.includes('guesty to direct') ||
-          // Standard revenue patterns
-          entry.credit_amount > 0 && entry.debit_amount === 0) {
-        console.log('✅ Classified as REVENUE:', accountName, 'Method: Pattern matching or credit entry');
-        return { 
-          type: 'Income', 
-          classification: 'Revenue', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Expense classification - matching your actual expense categories
-      if (name.includes('advertising') || name.includes('marketing') ||
-          name.includes('facebook') || name.includes('google') ||
-          name.includes('arcade') || name.includes('bank fee') || 
-          name.includes('disposal') || name.includes('waste') ||
-          name.includes('insurance') || name.includes('internet') || 
-          name.includes('tv service') || name.includes('cleaning') ||
-          name.includes('labor') || name.includes('meal') || 
-          name.includes('membership') || name.includes('subscription') ||
-          name.includes('office') || name.includes('shipping') || 
-          name.includes('postage') || name.includes('pool') || 
-          name.includes('hot tub') || name.includes('maintenance') ||
-          name.includes('repair') || name.includes('upgrade') ||
-          name.includes('snow') || name.includes('lawn') || 
-          name.includes('supplies') || name.includes('travel') ||
-          name.includes('utilities') || name.includes('water') || 
-          name.includes('sewer') || name.includes('expense') || 
-          name.includes('cost') ||
-          entry.debit_amount > 0 && entry.credit_amount === 0) {
-        console.log('✅ Classified as EXPENSE:', accountName);
-        return { 
-          type: 'Expenses', 
-          classification: 'Expenses', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Interest expense (separate category)
-      if (name.includes('mortgage') || name.includes('interest')) {
-        return { 
-          type: 'Interest Expense', 
-          classification: 'Other Expenses', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Asset classification
-      if (name.includes('improvements') || name.includes('property') || 
-          name.includes('equipment') || name.includes('cash') ||
-          name.includes('bank') || name.includes('checking') ||
-          name.includes('savings') || name.includes('receivable') ||
-          entry.account_type === 'Fixed Assets') {
-        return { 
-          type: 'Fixed Assets', 
-          classification: 'Assets', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Liability classification
-      if (name.includes('loan') || name.includes('payable') || 
-          name.includes('credit card') || name.includes('debt') || 
-          name.includes('liability') || entry.account_type === 'Credit Card') {
-        return { 
-          type: 'Credit Card', 
-          classification: 'Liabilities', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // ENHANCED DEFAULT CLASSIFICATION for reclassification entries
-      // For reclassification entries, look at the net effect and description
-      if (description.includes('reclassify') || description.includes('transfer') || description.includes('move')) {
-        console.log('🔄 RECLASSIFICATION ENTRY detected:', accountName, 'Description:', entry.description);
-        
-        // For reclassification entries, classify based on the account name pattern and net effect
-        if (name.includes('revenue') || name.includes('income') || name.includes('rental') || name.includes('booking')) {
-          console.log('✅ Reclassification classified as REVENUE:', accountName);
-          return { 
-            type: 'Income', 
-            classification: 'Revenue', 
-            standardName: entry.account_name 
-          };
-        } else {
-          console.log('✅ Reclassification classified as EXPENSE:', accountName);
-          return { 
-            type: 'Expenses', 
-            classification: 'Expenses', 
-            standardName: entry.account_name 
-          };
-        }
-      }
-      
-      // DEFAULT CLASSIFICATION: Use credit/debit logic with enhanced logging
-      if (entry.credit_amount > entry.debit_amount || entry.line_amount < 0) {
-        console.log('🔄 Default classified as REVENUE (credit > debit or negative line_amount):', accountName);
-        return { 
-          type: 'Income', 
-          classification: 'Revenue', 
-          standardName: entry.account_name || 'Revenue Account'
-        };
-      } else if (entry.debit_amount > entry.credit_amount || entry.line_amount > 0) {
-        console.log('🔄 Default classified as EXPENSE (debit > credit or positive line_amount):', accountName);
-        return { 
-          type: 'Expenses', 
-          classification: 'Expenses', 
-          standardName: entry.account_name || 'Expense Account'
-        };
-      } else {
-        // Equal amounts - classify based on account name patterns
-        console.log('🔄 Equal amounts - using name patterns for:', accountName);
-        if (name.includes('revenue') || name.includes('income') || name.includes('rental')) {
-          return { 
-            type: 'Income', 
-            classification: 'Revenue', 
-            standardName: entry.account_name 
-          };
-        } else {
-          return { 
-            type: 'Other', 
-            classification: 'Other', 
-            standardName: entry.account_name || 'Other Account'
-          };
-        }
-      }
-    };
-
-    // Process journal entries using the STRICTLY FILTERED data
-    const enhancedData = filteredJournalData.map((entry: any) => {
-      // First: Try to find exact match in your accounts table
-      let accountInfo = accountLookupMap.get(entry.account_name);
-      
-      if (accountInfo) {
-        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
-      } else {
-        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using account_type from journal entry`);
-        // Use the account_type directly from the journal entry - no guessing!
-        accountInfo = {
-          type: entry.account_type,
-          classification: entry.account_type === 'Income' ? 'Revenue' : 
-                         entry.account_type === 'Expenses' ? 'Expenses' :
-                         entry.account_type === 'Cost of Goods Sold' ? 'Expenses' :
-                         entry.account_type === 'Other Income' ? 'Revenue' :
-                         entry.account_type === 'Other Expenses' ? 'Expenses' :
-                         entry.account_type === 'Interest Expense' ? 'Other Expenses' :
-                         entry.account_type, // Default to whatever the journal entry says
-          standardName: entry.account_name
-        };
-      }
-      
-      return {
-        ...entry,
-        account_type: accountInfo?.type || entry.account_type || 'Other',
-        classification: accountInfo?.classification || accountInfo?.type || 'Other',
-        standard_account_name: accountInfo?.standardName || entry.account_name,
-        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Journal Entry Type'
-      };
-    });
-
-    return {
-      success: true,
-      data: enhancedData || [],
-      accountsData: accountsData,
-      summary: {
-        filteredEntries: enhancedData?.length || 0,
-        originalEntries: journalData.length,
-        dateFiltered: journalData.length - filteredJournalData.length,
-        dataSource: `Supabase + STRICT ${month} ${year} Filtering`,
-        dateRange: `${startDate} to ${endDate}`,
-        filters: { property, monthYear },
-        accountTypes: [...new Set(accountsData.map((a: any) => a.account_type))],
-        propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
-        mappingStats: {
-          totalEntries: enhancedData?.length || 0,
-          accountsTableMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Accounts Table').length || 0,
-          fallbackMapped: enhancedData?.filter((e: any) => e.mapping_method === 'Fallback Classification').length || 0
-        }
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching financial data:', error);
-    return {
-      success: false,
-      error: (error as Error).message,
-      data: []
-    };
-  }
-};
-
-// IAM CFO Logo Component
+// === LOGO COMPONENT ===
 const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <div className={`${className} flex items-center justify-center relative`}>
     <svg viewBox="0 0 120 120" className="w-full h-full">
@@ -732,43 +622,13 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   </div>
 );
 
-const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning, BRAND_COLORS.danger, BRAND_COLORS.secondary, BRAND_COLORS.tertiary];
-
-// Expandable account data for detailed views
-const accountDetails: Record<string, FinancialDataItem[]> = {
-  'Revenue': [
-    { name: 'Product Sales', total: 850000, months: { 'June 2025': 850000 } },
-    { name: 'Service Revenue', total: 300000, months: { 'June 2025': 300000 } },
-    { name: 'Licensing Fees', total: 75000, months: { 'June 2025': 75000 } },
-    { name: 'Other Revenue', total: 25000, months: { 'June 2025': 25000 } },
-  ],
-  'Cost of Goods Sold': [
-    { name: 'Direct Materials', total: 450000, months: { 'June 2025': 450000 } },
-    { name: 'Direct Labor', total: 200000, months: { 'June 2025': 200000 } },
-    { name: 'Manufacturing Overhead', total: 100000, months: { 'June 2025': 100000 } },
-  ],
-};
-
-// Sub-detail breakdowns
-const subAccountDetails: Record<string, Array<{name: string, amount: number}>> = {
-  'Direct Materials': [
-    { name: 'Raw Steel', amount: 180000 },
-    { name: 'Electronic Components', amount: 120000 },
-    { name: 'Packaging Materials', amount: 85000 },
-  ],
-  'Direct Labor': [
-    { name: 'Production Workers', amount: 120000 },
-    { name: 'Assembly Technicians', amount: 45000 },
-    { name: 'Quality Inspectors', amount: 25000 },
-  ],
-};
-
+// === MAIN COMPONENT ===
 export default function FinancialsPage() {
+  // State management
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
   const [selectedMonth, setSelectedMonth] = useState<MonthString>('May 2025');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [timeView, setTimeView] = useState<TimeView>('Monthly');
-  const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
   const [timeViewDropdownOpen, setTimeViewDropdownOpen] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
@@ -781,193 +641,154 @@ export default function FinancialsPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [availableProperties, setAvailableProperties] = useState<string[]>(['All Properties']);
 
-  // Generate months list
-  const generateMonthsList = () => {
-    const months = [];
-    const currentYear = new Date().getFullYear();
-    
-    for (let year = 2020; year <= currentYear + 2; year++) {
-      for (let month = 1; month <= 12; month++) {
-        const monthNames = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'
-        ];
-        months.push(`${monthNames[month - 1]} ${year}` as MonthString);
-      }
+  // Custom hooks
+  const supabase = useSupabaseClient();
+  const { notification, showNotification } = useNotification();
+
+  // Memoized values
+  const monthsList = useMemo(() => generateMonthsList(), []);
+
+  // Data fetching functions
+  const loadInitialData = useCallback(async () => {
+    try {
+      console.log("🚀 loadInitialData started...");
+      setIsLoadingData(true);
+
+      const properties = await fetchProperties();
+      console.log('🏠 Available properties loaded:', properties);
+
+      setAvailableProperties(properties);
+      await loadRealFinancialData();
+    } catch (error) {
+      console.error('❌ Failed to load initial data:', error);
+      setDataError('Failed to load initial data');
+    } finally {
+      setIsLoadingData(false);
     }
-    return months;
-  };
+  }, []);
 
-  const monthsList = generateMonthsList();
-
-const loadInitialData = async () => {
-  try {
-    console.log("🚀 loadInitialData started...");
-    setIsLoadingData(true);
-
-    const properties = await fetchProperties();
-    console.log('🏠 Available properties loaded:', properties);
-
-    setAvailableProperties(properties);
-
-    await loadRealFinancialData();
-  } catch (error) {
-    console.error('❌ Failed to load initial data:', error);
-    setDataError('Failed to load initial data');
-  } finally {
-    setIsLoadingData(false);
-  }
-};
-
- const loadRealFinancialData = async () => {
-  try {
-    setIsLoadingData(true);
-    setDataError(null);
-
-    const selected = Array.from(selectedProperties || []);
-    const isAllSelected = selected.includes("All Properties");
-
-    // Build query parameters to send to fetchFinancialData
-    let propertyFilter: string | string[] = "All Properties";
-
-    if (!isAllSelected) {
-      if (selected.length === 1) {
-        propertyFilter = selected[0]; // single property
-      } else if (selected.length > 1) {
-        propertyFilter = selected; // multi-property
-      }
-    }
-
-    console.log("🔍 LOADING DATA WITH FILTERS:", {
-      selectedProperties: selected,
-      propertyFilter,
-      month: selectedMonth,
-    });
-
-    // Fetch using unified logic — supports string or array
-    const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
-
-    if (rawData.success) {
-      const entries = rawData.data as FinancialEntry[];
-
-      console.log("🔍 DEBUG - Raw Journal Entries Sample:", entries.slice(0, 5));
-      console.log("🔍 DEBUG - Total entries loaded:", entries.length);
-
-      const transformedPL = transformFinancialData(entries, selectedMonth);
-      const transformedCF = transformCashFlowData(entries);
-
-      const combinedData = {
-        success: true,
-        ...transformedPL,
-        ...transformedCF,
-        summary: {
-          ...rawData.summary,
-          propertiesInData: [...new Set(entries.map((e) => e.property_class))],
-          selectedFilters: {
-            properties: selected,
-            month: selectedMonth,
-          },
-        },
-        performance: {
-          executionTimeMs: Date.now() % 1000,
-        },
-        rawEntries: entries.slice(0, 5),
-      };
-
-      setRealData(combinedData);
+  const loadRealFinancialData = useCallback(async () => {
+    try {
+      setIsLoadingData(true);
       setDataError(null);
 
-      const propertyText = isAllSelected
-        ? "all properties"
-        : `${selected.length} selected properties`;
+      const selected = Array.from(selectedProperties || []);
+      const isAllSelected = selected.includes("All Properties");
 
-      showNotification(
-        `Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`,
-        "success"
-      );
-    } else {
-      setDataError(rawData.error || "Failed to load financial data");
+      let propertyFilter: string | string[] = "All Properties";
+
+      if (!isAllSelected) {
+        if (selected.length === 1) {
+          propertyFilter = selected[0];
+        } else if (selected.length > 1) {
+          propertyFilter = selected;
+        }
+      }
+
+      console.log("🔍 LOADING DATA WITH FILTERS:", {
+        selectedProperties: selected,
+        propertyFilter,
+        month: selectedMonth,
+      });
+
+      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
+
+      if (rawData.success) {
+        const entries = rawData.data as FinancialEntry[];
+
+        console.log("🔍 DEBUG - Raw Journal Entries Sample:", entries.slice(0, 5));
+        console.log("🔍 DEBUG - Total entries loaded:", entries.length);
+
+        const transformedPL = transformFinancialData(entries, selectedMonth);
+        const transformedCF = transformCashFlowData(entries);
+
+        const combinedData = {
+          success: true,
+          ...transformedPL,
+          ...transformedCF,
+          summary: {
+            ...rawData.summary,
+            propertiesInData: [...new Set(entries.map((e) => e.property_class))],
+            selectedFilters: {
+              properties: selected,
+              month: selectedMonth,
+            },
+          },
+          performance: {
+            executionTimeMs: Date.now() % 1000,
+          },
+          rawEntries: entries.slice(0, 5),
+        };
+
+        setRealData(combinedData);
+        setDataError(null);
+
+        const propertyText = isAllSelected
+          ? "all properties"
+          : `${selected.length} selected properties`;
+
+        showNotification(
+          `Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`,
+          "success"
+        );
+      } else {
+        setDataError(rawData.error || "Failed to load financial data");
+        showNotification("Failed to load financial data", "error");
+      }
+    } catch (error) {
+      console.error("❌ Failed to load financial data:", error);
+      setDataError("Failed to load financial data");
       showNotification("Failed to load financial data", "error");
+    } finally {
+      setIsLoadingData(false);
     }
-  } catch (error) {
-    console.error("❌ Failed to load financial data:", error);
-    setDataError("Failed to load financial data");
-    showNotification("Failed to load financial data", "error");
-  } finally {
-    setIsLoadingData(false);
-  }
-};
+  }, [selectedProperties, selectedMonth, showNotification]);
 
+  // Property handling
+  const handlePropertyToggle = useCallback((property: string) => {
+    const realProperties = availableProperties.filter(p => p !== "All Properties");
+    const newSelected = new Set(selectedProperties);
 
-const handlePropertyToggle = (property: string) => {
-  const realProperties = availableProperties.filter(p => p !== "All Properties");
-  const newSelected = new Set(selectedProperties);
+    if (property === "All Properties") {
+      const isSelectingAll = realProperties.some(p => !newSelected.has(p));
 
-  if (property === "All Properties") {
-    // User clicked "All Properties" — toggle all
-    const isSelectingAll = realProperties.some(p => !newSelected.has(p));
-
-    if (isSelectingAll) {
-      // Select all real properties
-      realProperties.forEach(p => newSelected.add(p));
+      if (isSelectingAll) {
+        realProperties.forEach(p => newSelected.add(p));
+      } else {
+        newSelected.clear();
+      }
     } else {
-      // Deselect all
-      newSelected.clear();
+      if (newSelected.has(property)) {
+        newSelected.delete(property);
+      } else {
+        newSelected.add(property);
+      }
     }
-  } else {
-    // Toggling an individual property
-    if (newSelected.has(property)) {
-      newSelected.delete(property);
-    } else {
-      newSelected.add(property);
+
+    setSelectedProperties(newSelected);
+    console.log("🏠 Property selection changed:", Array.from(newSelected));
+  }, [availableProperties, selectedProperties]);
+
+  const getSelectedPropertiesText = useCallback(() => {
+    const realProperties = availableProperties.filter(p => p !== "All Properties");
+
+    if (selectedProperties.size === 0) {
+      return "All Properties";
     }
-  }
 
-  setSelectedProperties(newSelected);
-  console.log("🏠 Property selection changed:", Array.from(newSelected));
-};
+    if (selectedProperties.size === realProperties.length) {
+      return "All Properties";
+    }
 
+    if (selectedProperties.size === 1) {
+      return Array.from(selectedProperties)[0];
+    }
 
- const getSelectedPropertiesText = () => {
-  const realProperties = availableProperties.filter(p => p !== "All Properties");
+    return `${selectedProperties.size} Properties Selected`;
+  }, [availableProperties, selectedProperties]);
 
-  if (selectedProperties.size === 0) {
-    return "All Properties"; // fallback
-  }
-
-  if (selectedProperties.size === realProperties.length) {
-    return "All Properties";
-  }
-
-  if (selectedProperties.size === 1) {
-    return Array.from(selectedProperties)[0];
-  }
-
-  return `${selectedProperties.size} Properties Selected`;
-};
-
-
-  // Helper functions
-  const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0
-    }).format(value);
-  };
-
-  const calculatePercentage = (value: number, total: number): string => {
-    return total !== 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
-  };
-
-  const showNotification = (message: string, type: 'info' | 'success' | 'error' = 'info'): void => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => {
-      setNotification({ show: false, message: '', type: 'info' });
-    }, 3000);
-  };
-
-  const toggleAccountExpansion = (accountName: string): void => {
+  // Account expansion handling
+  const toggleAccountExpansion = useCallback((accountName: string) => {
     const newExpanded = new Set(expandedAccounts);
     if (newExpanded.has(accountName)) {
       newExpanded.delete(accountName);
@@ -975,22 +796,14 @@ const handlePropertyToggle = (property: string) => {
       newExpanded.add(accountName);
     }
     setExpandedAccounts(newExpanded);
-  };
+  }, [expandedAccounts]);
 
-  const isExpandableAccount = (accountName: string): boolean => {
-    // Check if it's in the static expandable accounts OR if it has sub-accounts
-    const currentDataItem = currentData.find(item => item.name === accountName);
-    return accountDetails.hasOwnProperty(accountName) || 
-           (currentDataItem && currentDataItem.hasSubAccounts);
-  };
-
-  const handleAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, accountItem: FinancialDataItem): void => {
-    // Check if this account has real transaction entries
+  // Tooltip handling
+  const handleAccountMouseEnter = useCallback((event: React.MouseEvent<HTMLElement>, accountItem: FinancialDataItem) => {
     if (!accountItem.entries || accountItem.entries.length === 0) return;
 
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     
-    // Build tooltip content with actual transaction details
     let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
       ${accountItem.name} • ${formatCurrency(accountItem.total)}
     </div>`;
@@ -999,7 +812,6 @@ const handlePropertyToggle = (property: string) => {
       ${accountItem.entries.length} Journal Entries • Mapping: ${accountItem.mapping_method}
     </div>`;
 
-    // Show up to 5 most recent transactions
     const recentEntries = accountItem.entries.slice(0, 5);
     
     recentEntries.forEach((entry: any, index: number) => {
@@ -1032,7 +844,6 @@ const handlePropertyToggle = (property: string) => {
       `;
     });
 
-    // Add summary if there are more entries
     if (accountItem.entries.length > 5) {
       tooltipContent += `
         <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
@@ -1049,126 +860,23 @@ const handlePropertyToggle = (property: string) => {
       x: rect.left + rect.width / 2,
       y: rect.top - 10
     });
-  };
+  }, []);
 
-  const handleSubAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, subAccountItem: any): void => {
-    // Handle both new sub-account structure and old static structure
-    if (typeof subAccountItem === 'object' && subAccountItem.entries) {
-      // New sub-account with real transaction data
-      const rect = (event.target as HTMLElement).getBoundingClientRect();
-      
-      let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
-        ${subAccountItem.name} • ${formatCurrency(subAccountItem.total)}
-      </div>`;
-
-      tooltipContent += `<div style="font-size: 11px; color: #E5E7EB; margin-bottom: 8px;">
-        ${subAccountItem.entries.length} Journal Entries • Property: ${subAccountItem.name}
-      </div>`;
-
-      // Show up to 3 most recent transactions for sub-accounts
-      const recentEntries = subAccountItem.entries.slice(0, 3);
-      
-      recentEntries.forEach((entry: any, index: number) => {
-        const entryDate = new Date(entry.transaction_date).toLocaleDateString();
-        const isLast = index === recentEntries.length - 1;
-        
-        tooltipContent += `
-          <div style="margin-bottom: ${isLast ? '0' : '6px'}; padding: 4px; background: rgba(255,255,255,0.1); border-radius: 4px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div style="display: flex; align-items: center; gap: 4px;">
-                <div style="width: 4px; height: 4px; background: #10B981; border-radius: 50%;"></div>
-                <strong style="font-size: 11px; color: white;">JE: ${entry.je_number}</strong>
-              </div>
-              <span style="font-size: 10px; color: #D1D5DB;">${entryDate}</span>
-            </div>
-            <div style="margin-left: 8px; margin-top: 2px;">
-              <div style="font-size: 10px; color: #F3F4F6;">
-                ${entry.original_description || 'No description'}
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-top: 2px;">
-                <span style="font-size: 10px; color: #9CA3AF;">
-                  ${entry.property || 'No Property'}
-                </span>
-                <span style="font-size: 11px; font-weight: bold; color: #10B981;">
-                  ${formatCurrency(Math.abs(entry.amount_used))}
-                </span>
-              </div>
-            </div>
-          </div>
-        `;
-      });
-
-      if (subAccountItem.entries.length > 3) {
-        tooltipContent += `
-          <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
-            <span style="font-size: 10px; color: #D1D5DB; font-style: italic;">
-              + ${subAccountItem.entries.length - 3} more entries
-            </span>
-          </div>
-        `;
-      }
-
-      setAccountTooltip({
-        show: true,
-        content: tooltipContent,
-        x: rect.left + rect.width / 2,
-        y: rect.top - 10
-      });
-    } else {
-      // Fallback to old static sub-account handling
-      handleSubAccountMouseEnterStatic(event, subAccountItem, typeof subAccountItem === 'string' ? 0 : subAccountItem);
-    }
-  };
-
-  const handleSubAccountMouseEnterStatic = (event: React.MouseEvent<HTMLElement>, subAccountName: string, subAccountTotal: number): void => {
-    const details = subAccountDetails[subAccountName];
-    if (!details || details.length === 0) return;
-
-    let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
-      ${subAccountName} • ${formatCurrency(subAccountTotal)}
-    </div>`;
-
-    details.forEach((item, index) => {
-      const percentage = subAccountTotal ? ((item.amount / subAccountTotal) * 100).toFixed(1) : '0';
-      
-      tooltipContent += `
-        <div style="margin-bottom: ${index < details.length - 1 ? '8px' : '0'};">
-          <div style="display: flex; align-items: center; gap: 4px;">
-            <div style="width: 6px; height: 6px; background: ${BRAND_COLORS.success}; border-radius: 50%;"></div>
-            <strong style="font-size: 12px; color: white;">${item.name}</strong>
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-left: 10px;">
-            <span style="font-size: 11px;">${formatCurrency(item.amount)}</span>
-            <span style="font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 10px;">${percentage}%</span>
-          </div>
-        </div>
-      `;
-    });
-
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    setAccountTooltip({
-      show: true,
-      content: tooltipContent,
-      x: rect.left + rect.width / 2,
-      y: rect.top - 10
-    });
-  };
-
-  const handleAccountMouseLeave = (): void => {
+  const handleAccountMouseLeave = useCallback(() => {
     setAccountTooltip({ show: false, content: '', x: 0, y: 0 });
-  };
+  }, []);
 
-  // Get current financial data
-  const getCurrentFinancialData = () => {
+  // Data getters
+  const getCurrentFinancialData = useCallback(() => {
     if (realData && realData.propertyFinancialData) {
       const propertyKey = Object.keys(realData.propertyFinancialData)[0] || 'All Properties';
       const monthlyData = realData.propertyFinancialData[propertyKey]?.Monthly;
       return monthlyData?.[selectedMonth] || [];
     }
     return [];
-  };
+  }, [realData, selectedMonth]);
 
-  const getCurrentCashFlowData = () => {
+  const getCurrentCashFlowData = useCallback(() => {
     if (realData && realData.propertyCashFlowData) {
       const propertyKey = Object.keys(realData.propertyCashFlowData)[0] || 'All Properties';
       return realData.propertyCashFlowData[propertyKey] || {
@@ -1190,13 +898,12 @@ const handlePropertyToggle = (property: string) => {
       beginningCash: 0,
       endingCash: 0
     };
-  };
-
-  const currentData = getCurrentFinancialData();
-  const currentCashFlowData = getCurrentCashFlowData();
+  }, [realData]);
 
   // Calculate KPIs
-  const calculateKPIs = () => {
+  const calculateKPIs = useCallback((): KPIData => {
+    const currentData = getCurrentFinancialData();
+    
     if (!currentData || currentData.length === 0) {
       return {
         revenue: 0,
@@ -1262,9 +969,14 @@ const handlePropertyToggle = (property: string) => {
       operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
       netMargin: revenue ? (netIncome / revenue) * 100 : 0
     };
-  };
+  }, [getCurrentFinancialData]);
 
-  const generateTrendData = () => {
+  // Memoized calculations
+  const currentData = useMemo(() => getCurrentFinancialData(), [getCurrentFinancialData]);
+  const currentCashFlowData = useMemo(() => getCurrentCashFlowData(), [getCurrentCashFlowData]);
+  const kpis = useMemo(() => calculateKPIs(), [calculateKPIs]);
+
+  const generateTrendData = useMemo(() => {
     const months = ['Jan 2023', 'Feb 2023', 'Mar 2023', 'Apr 2023', 'May 2023', 'Jun 2023'];
     const revenue = kpis.revenue;
     
@@ -1275,9 +987,9 @@ const handlePropertyToggle = (property: string) => {
       operatingIncome: (revenue * (0.8 + (index * 0.04))) * 0.2,
       netIncome: (revenue * (0.8 + (index * 0.04))) * 0.15,
     }));
-  };
+  }, [kpis.revenue]);
 
-  const generateExpenseBreakdown = () => {
+  const generateExpenseBreakdown = useMemo(() => {
     return currentData
       .filter(item => item.type === 'Expenses' && item.total > 0)
       .map(item => ({
@@ -1285,19 +997,25 @@ const handlePropertyToggle = (property: string) => {
         value: item.total
       }))
       .filter(item => item.value > 0);
-  };
+  }, [currentData]);
 
-  const kpis = calculateKPIs();
-  const trendData = generateTrendData();
-  const expenseData = generateExpenseBreakdown();
+  // Effects
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
 
-  const renderColumnHeaders = () => {
-    return (
-      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-        {selectedMonth}
-      </th>
-    );
-  };
+  useEffect(() => {
+    if (availableProperties.length > 1) {
+      loadRealFinancialData();
+    }
+  }, [selectedProperties, selectedMonth, availableProperties.length, loadRealFinancialData]);
+
+  // Render functions
+  const renderColumnHeaders = () => (
+    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+      {selectedMonth}
+    </th>
+  );
 
   const renderDataCells = (item: FinancialDataItem) => {
     const value = item.total || 0;
@@ -1382,16 +1100,7 @@ const handlePropertyToggle = (property: string) => {
                   className="flex items-center justify-between w-56 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
                   style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
                 >
-                  <span className="truncate">
-                    {selectedProperties.has('All Properties') 
-                      ? 'All Property Classes' 
-                      : selectedProperties.size === 0 
-                        ? 'Select Property Classes'
-                        : selectedProperties.size === 1
-                          ? Array.from(selectedProperties)[0]
-                          : `${selectedProperties.size} Properties Selected`
-                    }
-                  </span>
+                  <span className="truncate">{getSelectedPropertiesText()}</span>
                   <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
@@ -1630,578 +1339,3 @@ const handlePropertyToggle = (property: string) => {
                             ? 'text-white' 
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                         }`}
-                        style={{ backgroundColor: activeTab === 'cash-flow' ? BRAND_COLORS.primary : undefined }}
-                      >
-                        Cash Flow
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('balance-sheet')}
-                        className={`px-3 py-1 text-xs rounded transition-colors ${
-                          activeTab === 'balance-sheet' 
-                            ? 'text-white' 
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                        style={{ backgroundColor: activeTab === 'balance-sheet' ? BRAND_COLORS.primary : undefined }}
-                      >
-                        Balance Sheet
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* P&L Content */}
-                {activeTab === 'p&l' && (
-                  <div className="overflow-x-auto">
-                    {isLoadingData ? (
-                      <div className="flex items-center justify-center py-8">
-                        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                        <span>Loading financial data from Supabase...</span>
-                      </div>
-                    ) : currentData.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        No financial data available for the selected filters
-                      </div>
-                    ) : (
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Account
-                            </th>
-                            {renderColumnHeaders()}
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              % of Revenue
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {/* INCOME SECTION - Matching Your Google Sheets */}
-                          <tr className="bg-blue-50 border-t-2 border-blue-200">
-                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
-                              💰 INCOME
-                            </td>
-                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
-                              {formatCurrency(kpis.revenue)}
-                            </td>
-                            <td className="px-4 py-4 text-right text-sm text-blue-700">
-                              100.0%
-                            </td>
-                          </tr>
-                          
-                          {/* Individual Income Line Items */}
-                          {currentData
-                            .filter(item => item.type === 'Revenue' || 
-                                           (item.original_type && item.original_type.toLowerCase().includes('income')))
-                            .map((item) => {
-                              const isExpandable = isExpandableAccount(item.name);
-                              const isExpanded = expandedAccounts.has(item.name);
-                              
-                              return (
-                                <React.Fragment key={`income-${item.name}`}>
-                                  {/* Parent Account Row */}
-                                  <tr className="hover:bg-gray-50">
-                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                                      <div className="flex items-center">
-                                        {isExpandable && (
-                                          <button
-                                            onClick={() => toggleAccountExpansion(item.name)}
-                                            className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
-                                          >
-                                            {isExpanded ? (
-                                              <ChevronDown className="w-4 h-4 text-gray-500" />
-                                            ) : (
-                                              <ChevronRight className="w-4 h-4 text-gray-500" />
-                                            )}
-                                          </button>
-                                        )}
-                                        <span 
-                                          className="cursor-help"
-                                          onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
-                                          onMouseLeave={handleAccountMouseLeave}
-                                        >
-                                          {item.name}
-                                          {item.entries && item.entries.length > 0 && (
-                                            <span className="ml-2 text-xs text-gray-500">
-                                              ({item.entries.reduce((props: Set<string>, entry: any) => props.add(entry.property || 'No Property'), new Set()).size} properties)
-                                            </span>
-                                          )}
-                                        </span>
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-sm text-green-600">
-                                      {formatCurrency(Math.abs(item.total))}
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                                    </td>
-                                  </tr>
-                                  
-                                  {/* Sub-Account Details (when expanded) */}
-                                  {isExpandable && isExpanded && item.hasSubAccounts && 
-                                    Object.values(item.subAccounts || {}).map((subAccount: any) => (
-                                      <tr key={`${item.name}-${subAccount.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
-                                        <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
-                                          <div className="flex items-center">
-                                            <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                                            <span 
-                                              className="cursor-help"
-                                              onMouseEnter={(e) => handleSubAccountMouseEnter(e, subAccount)}
-                                              onMouseLeave={handleAccountMouseLeave}
-                                            >
-                                              {subAccount.name}
-                                            </span>
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-2 text-right text-sm text-green-600">
-                                          {formatCurrency(Math.abs(subAccount.total))}
-                                        </td>
-                                        <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                          {item.total ? calculatePercentage(Math.abs(subAccount.total), Math.abs(item.total)) : '0%'}
-                                        </td>
-                                      </tr>
-                                    ))
-                                  }
-                                  
-                                  {/* Static Sub-Account Details (for demo accounts) */}
-                                  {isExpandable && isExpanded && accountDetails[item.name] && 
-                                    accountDetails[item.name].map((subItem) => {
-                                      const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
-                                      return (
-                                        <tr key={`${item.name}-${subItem.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
-                                          <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
-                                            <div className="flex items-center">
-                                              <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: BRAND_COLORS.primary }}></div>
-                                              {subItem.name}
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-2 text-right text-sm text-gray-600">
-                                            <span 
-                                              className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
-                                              onMouseEnter={hasSubDetails ? (e) => handleSubAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
-                                              onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
-                                            >
-                                              {formatCurrency(subItem.total)}
-                                            </span>
-                                          </td>
-                                          <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                            {kpis.revenue ? calculatePercentage(subItem.total, kpis.revenue) : '0%'}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })
-                                  }
-                                </React.Fragment>
-                              );
-                            })}
-
-                          {/* TOTAL INCOME - Bold Line Like Your Sheet */}
-                          <tr className="bg-blue-100 border-t-2 border-blue-300">
-                            <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
-                              📊 TOTAL INCOME
-                            </td>
-                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
-                              {formatCurrency(kpis.revenue)}
-                            </td>
-                            <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
-                              100.0%
-                            </td>
-                          </tr>
-
-                          {/* EXPENSES SECTION */}
-                          <tr className="bg-red-50 border-t-4 border-red-200 mt-4">
-                            <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
-                              💸 EXPENSES
-                            </td>
-                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                              ({formatCurrency(kpis.operatingExpenses)})
-                            </td>
-                            <td className="px-4 py-4 text-right text-sm text-red-600">
-                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
-                            </td>
-                          </tr>
-                          
-                          {/* Individual Expense Line Items */}
-                          {currentData
-                            .filter(item => item.type === 'Expenses' && 
-                                           item.original_type !== 'Cost of Goods Sold' &&
-                                           !item.name.toLowerCase().includes('interest'))
-                            .map((item) => {
-                              const isExpandable = isExpandableAccount(item.name);
-                              const isExpanded = expandedAccounts.has(item.name);
-                              
-                              return (
-                                <React.Fragment key={`expense-${item.name}`}>
-                                  <tr className="hover:bg-gray-50">
-                                    <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
-                                      <div className="flex items-center">
-                                        {isExpandable && (
-                                          <button
-                                            onClick={() => toggleAccountExpansion(item.name)}
-                                            className="mr-2 hover:bg-gray-200 p-1 rounded transition-colors"
-                                          >
-                                            {isExpanded ? (
-                                              <ChevronDown className="w-4 h-4 text-gray-500" />
-                                            ) : (
-                                              <ChevronRight className="w-4 h-4 text-gray-500" />
-                                            )}
-                                          </button>
-                                        )}
-                                        <span 
-                                          className="cursor-help"
-                                          onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
-                                          onMouseLeave={handleAccountMouseLeave}
-                                        >
-                                          {item.name}
-                                        </span>
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-sm text-red-600">
-                                      ({formatCurrency(Math.abs(item.total))})
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                      {kpis.revenue ? calculatePercentage(Math.abs(item.total), kpis.revenue) : '0%'}
-                                    </td>
-                                  </tr>
-                                  
-                                  {/* Expanded Detail Rows */}
-                                  {isExpandable && isExpanded && accountDetails[item.name] && 
-                                    accountDetails[item.name].map((subItem) => {
-                                      const hasSubDetails = subAccountDetails.hasOwnProperty(subItem.name);
-                                      return (
-                                        <tr key={`${item.name}-${subItem.name}`} className="bg-blue-50 hover:bg-blue-100 transition-colors">
-                                          <td className="px-6 py-2 text-left text-sm text-gray-600 pl-20">
-                                            <div className="flex items-center">
-                                              <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: BRAND_COLORS.primary }}></div>
-                                              {subItem.name}
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-2 text-right text-sm text-gray-600">
-                                            <span 
-                                              className={hasSubDetails ? "cursor-help border-b border-dotted border-gray-500" : ""}
-                                              onMouseEnter={hasSubDetails ? (e) => handleSubAccountMouseEnter(e, subItem.name, subItem.total) : undefined}
-                                              onMouseLeave={hasSubDetails ? handleAccountMouseLeave : undefined}
-                                            >
-                                              ({formatCurrency(subItem.total)})
-                                            </span>
-                                          </td>
-                                          <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                            {kpis.revenue ? calculatePercentage(subItem.total, kpis.revenue) : '0%'}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })
-                                  }
-                                </React.Fragment>
-                              );
-                            })}
-
-                          {/* TOTAL EXPENSES */}
-                          <tr className="bg-red-100 border-t-2 border-red-300">
-                            <td className="px-6 py-4 text-left text-lg font-bold text-red-800">
-                              📊 TOTAL EXPENSES
-                            </td>
-                            <td className="px-4 py-4 text-right text-lg font-bold text-red-800">
-                              ({formatCurrency(kpis.operatingExpenses)})
-                            </td>
-                            <td className="px-4 py-4 text-right text-sm font-bold text-red-800">
-                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, kpis.revenue) : '0%'}
-                            </td>
-                          </tr>
-
-                          {/* NET INCOME - Final Bottom Line Like Your Sheet */}
-                          <tr className="border-t-4" style={{ 
-                            backgroundColor: BRAND_COLORS.primary + '20', 
-                            borderTopColor: BRAND_COLORS.primary 
-                          }}>
-                            <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
-                              🏆 NET INCOME
-                            </td>
-                            <td className={`px-4 py-5 text-right text-xl font-bold ${
-                              kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
-                            }`}>
-                              {formatCurrency(kpis.netIncome)}
-                            </td>
-                            <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
-                              {kpis.netMargin.toFixed(1)}%
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-                {/* Cash Flow Content */}
-                {activeTab === 'cash-flow' && (
-                  <div className="overflow-x-auto">
-                    {isLoadingData ? (
-                      <div className="flex items-center justify-center py-8">
-                        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                        <span>Loading cash flow data...</span>
-                      </div>
-                    ) : (
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Account
-                            </th>
-                            {renderColumnHeaders()}
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              % of Total Cash
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {/* Cash In-Flow Section */}
-                          <tr className="bg-green-50">
-                            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-green-800">
-                              💰 CASH IN-FLOW
-                            </td>
-                          </tr>
-                          {currentCashFlowData.inFlow.map((item) => (
-                            <tr key={`inflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                <span className="ml-4">{item.name}</span>
-                              </td>
-                              {renderCashFlowDataCells(item)}
-                              <td className="px-4 py-3 text-right text-sm text-green-600">
-                                {currentCashFlowData.totalCashFlow ? calculatePercentage(item.total, Math.abs(currentCashFlowData.totalCashFlow)) : '0%'}
-                              </td>
-                            </tr>
-                          ))}
-                          
-                          {/* Total Cash In-Flow */}
-                          <tr className="bg-green-100 font-semibold">
-                            <td className="px-4 py-3 text-left text-sm text-green-800 font-bold">
-                              Total Cash In-Flow
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
-                              {formatCurrency(currentCashFlowData.totalInFlow)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-green-800 font-bold">
-                              100%
-                            </td>
-                          </tr>
-
-                          {/* Cash Out-Flow Section */}
-                          <tr className="bg-red-50">
-                            <td colSpan={100} className="px-4 py-3 text-left text-sm font-bold text-red-800">
-                              💸 CASH OUT-FLOW
-                            </td>
-                          </tr>
-                          {currentCashFlowData.outFlow.map((item) => (
-                            <tr key={`outflow-${item.name}`} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3 text-left text-sm text-gray-700">
-                                <span className="ml-4">{item.name}</span>
-                              </td>
-                              {renderCashFlowDataCells(item)}
-                              <td className="px-4 py-3 text-right text-sm text-red-600">
-                                {currentCashFlowData.totalOutFlow ? calculatePercentage(Math.abs(item.total), Math.abs(currentCashFlowData.totalOutFlow)) : '0%'}
-                              </td>
-                            </tr>
-                          ))}
-
-                          {/* Total Cash Out-Flow */}
-                          <tr className="bg-red-100 font-semibold">
-                            <td className="px-4 py-3 text-left text-sm text-red-800 font-bold">
-                              Total Cash Out-Flow
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                              ({formatCurrency(Math.abs(currentCashFlowData.totalOutFlow))})
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-red-800 font-bold">
-                              100%
-                            </td>
-                          </tr>
-
-                          {/* Net Cash Flow */}
-                          <tr className="border-t-2" style={{ backgroundColor: BRAND_COLORS.primary + '10', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                            <td className="px-4 py-4 text-left text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
-                              🏦 NET CASH FLOW
-                            </td>
-                            <td className={`px-4 py-4 text-right text-lg font-bold ${
-                              currentCashFlowData.totalCashFlow >= 0 ? 'text-green-700' : 'text-red-700'
-                            }`}>
-                              {formatCurrency(currentCashFlowData.totalCashFlow)}
-                            </td>
-                            <td className="px-4 py-4 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
-                              Net Change
-                            </td>
-                          </tr>
-
-                          {/* Beginning & Ending Cash Balance */}
-                          <tr className="bg-gray-50">
-                            <td className="px-4 py-3 text-left text-sm text-gray-700">
-                              Beginning Cash Balance
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-gray-700">
-                              {formatCurrency(currentCashFlowData.beginningCash)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm text-gray-500">
-                              Starting
-                            </td>
-                          </tr>
-                          <tr className="border-t" style={{ backgroundColor: BRAND_COLORS.primary + '20', borderTopColor: BRAND_COLORS.primary + '40' }}>
-                            <td className="px-4 py-3 text-left text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
-                              Ending Cash Balance
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm font-bold" style={{ color: BRAND_COLORS.primary }}>
-                              {formatCurrency(currentCashFlowData.endingCash)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm" style={{ color: BRAND_COLORS.primary }}>
-                              Final
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-                {/* Balance Sheet Content */}
-                {activeTab === 'balance-sheet' && (
-                  <div className="p-6">
-                    <div className="text-center py-8">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Balance Sheet</h3>
-                      <p className="text-gray-600">Balance sheet functionality coming soon...</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Column: Charts */}
-            <div className="space-y-8">
-              {/* Revenue Trend Chart */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Revenue Trend</h3>
-                </div>
-                <div className="p-6">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke={BRAND_COLORS.primary} 
-                        strokeWidth={3}
-                        dot={{ r: 6, fill: BRAND_COLORS.primary }}
-                        activeDot={{ r: 8, fill: BRAND_COLORS.primary }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Expense Breakdown */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Expense Breakdown</h3>
-                </div>
-                <div className="p-6">
-                  {expenseData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <RechartsPieChart>
-                        <Tooltip formatter={(value: any) => [`${formatCurrency(Number(value))}`, '']} />
-                        <Pie
-                          data={expenseData}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {expenseData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-48 text-gray-500">
-                      No expense data available
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Property Performance Summary */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Property Summary</h3>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Selected Properties:</span>
-                      <span className="text-sm font-medium">{getSelectedPropertiesText()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Data Period:</span>
-                      <span className="text-sm font-medium">{selectedMonth}</span>
-                    </div>
-                    {realData?.summary && (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Journal Entries:</span>
-                          <span className="text-sm font-medium">{realData.summary.filteredEntries}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Properties in Data:</span>
-                          <span className="text-sm font-medium">{realData.summary.propertiesInData?.length || 0}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Account Tooltip */}
-          {accountTooltip.show && (
-            <div
-              className="fixed z-50 bg-gray-900 text-white p-4 rounded-lg text-xs shadow-xl pointer-events-none transition-opacity border border-gray-700"
-              style={{
-                left: Math.max(10, Math.min(accountTooltip.x - 140, window.innerWidth - 290)),
-                top: accountTooltip.y - 10,
-                transform: 'translateY(-100%)',
-                maxWidth: '280px',
-                minWidth: '260px'
-              }}
-              dangerouslySetInnerHTML={{ __html: accountTooltip.content }}
-            />
-          )}
-
-          {/* Notification */}
-          {notification.show && (
-            <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg text-white font-medium shadow-lg transition-transform ${
-              notification.type === 'success' ? 'bg-green-500' :
-              notification.type === 'error' ? 'bg-red-500' :
-              'bg-blue-500'
-            } ${notification.show ? 'translate-x-0' : 'translate-x-full'}`}>
-              {notification.message}
-            </div>
-          )}
-
-          {/* Click outside to close dropdowns */}
-          {(timeViewDropdownOpen || propertyDropdownOpen) && (
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => {
-                setTimeViewDropdownOpen(false);
-                setPropertyDropdownOpen(false);
-              }}
-            />
-          )}
-        </div>
-      </main>
-    </div>
-  );
-}
