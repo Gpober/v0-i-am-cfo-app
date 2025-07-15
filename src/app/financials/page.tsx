@@ -345,7 +345,7 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
   };
 };
 
-// Fetch financial data from your new Supabase table
+// Fetch financial data - proper SUMIF with conditional property filtering
 const fetchFinancialData = async (
   property: string = 'All Properties',
   monthYear: string
@@ -356,21 +356,25 @@ const fetchFinancialData = async (
     const [month, year] = monthYear.split(' ');
     const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
     
-    // Regular date filtering for your date column
+    // Date filtering
     const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
     const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
     const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
     
     console.log(`📅 DATE RANGE: ${startDate} to ${endDate} (${month} ${year})`);
     
+    // Base query with date filtering
     let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${startDate}&date=lte.${endDate}&order=date,account`;
     
+    // Add property filtering ONLY if specific property is selected
     if (property !== 'All Properties') {
       url += `&class=eq.${encodeURIComponent(property)}`;
-      console.log('🏠 Filtering by class:', property);
+      console.log('🏠 Filtering by specific property:', property);
+    } else {
+      console.log('🏠 Including ALL properties in sum');
     }
 
-    console.log('📡 Final URL with date filtering:', url);
+    console.log('📡 Final URL:', url);
 
     const response = await fetch(url, {
       headers: {
@@ -403,7 +407,10 @@ const fetchFinancialData = async (
         dateFiltered: 0,
         dataSource: `Supabase financial_transactions + ${month} ${year} Filtering`,
         dateRange: `${startDate} to ${endDate}`,
-        filters: { property, monthYear },
+        filters: { 
+          property: property === 'All Properties' ? 'ALL PROPERTIES (SUMIF ALL)' : property, 
+          monthYear 
+        },
         accountTypes: [...new Set(data.map((a: any) => a.account_type))],
         classesInData: [...new Set(data.map((e: any) => e.class))],
         mappingStats: {
