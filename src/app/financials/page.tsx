@@ -492,7 +492,7 @@ const fetchFinancialData = async (
     
     console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
     
-    let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
+    let url = `${SUPABASE_URL}/rest/v1/journal_entries_with_coa_types?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
     
     // PERFECT: Property filtering logic
     if (Array.isArray(property) && property.length > 0 && !property.includes('All Properties')) {
@@ -792,12 +792,12 @@ const fetchFinancialData = async (
       }
       
       return {
-        ...entry,
-        account_type: accountInfo?.type || entry.account_type || 'Other',
-        classification: accountInfo?.classification || accountInfo?.type || 'Other',
-        standard_account_name: accountInfo?.standardName || entry.account_name,
-        mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Classification Logic'
-      };
+  ...entry,
+  account_type: entry.authoritative_account_type || entry.account_type || 'Other',  // ← NEW
+  classification: entry.authoritative_account_type || entry.account_type || 'Other', // ← NEW
+  standard_account_name: accountInfo?.standardName || entry.account_name,
+  mapping_method: entry.type_source === 'EXACT_MATCH' ? 'COA Match' : 'Fallback' // ← NEW
+};
     });
 
     return {
