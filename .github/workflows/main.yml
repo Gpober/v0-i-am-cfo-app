@@ -1,5 +1,4 @@
 name: Claude Max Code Base Action
-
 on:
   workflow_dispatch:
     inputs:
@@ -7,13 +6,12 @@ on:
         description: 'What would you like Claude to help with?'
         required: true
         default: 'Analyze this repository and suggest improvements for file size optimization'
-
 jobs:
   claude-code:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Run Claude Code
-        uses: grll/claude-code-base-action@beta
+        uses: grll/claude-code-action@beta
         with:
           prompt: ${{ github.event.inputs.prompt }}
