@@ -402,8 +402,8 @@ const fetchFinancialData = async (
     
     console.log(`📅 DATE RANGE: ${startDate} to ${endDate} (${month} ${year})`);
     
-    // Base query with date filtering
-    let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=account,account_type,amount,class,memo&date=gte.${startDate}&date=lte.${endDate}`;
+    // Base query with date filtering - use broader selection
+    let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${startDate}&date=lte.${endDate}`;
     
     // Add property filtering ONLY if specific property is selected
     if (property !== 'All Properties') {
