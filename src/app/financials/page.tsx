@@ -101,6 +101,9 @@ const fetchProperties = async (): Promise<string[]> => {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json'
       }
+    
+    // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
+    if (timePeriod === 'Trailing 12' && viewMode === 'total') {
     });
 
     if (response.ok) {
@@ -160,36 +163,45 @@ const fetchTimeSeriesData = async (
           const firstDay = new Date(parseInt(year), monthNum - 1, 1);
           const lastDay = new Date(parseInt(year), monthNum, 0);
           
-          // Find all Sundays in the month
-          const sundays = [];
+          // Find all weeks in the month
+          const weeks = [];
           let current = new Date(firstDay);
           
-          // Go to first Sunday
-          while (current.getDay() !== 0) {
-            current.setDate(current.getDate() + 1);
-          }
-          
+          // Start from the first day of the month
           while (current <= lastDay) {
-            sundays.push(new Date(current));
+            const weekStart = new Date(current);
+            const weekEnd = new Date(current);
+            weekEnd.setDate(weekEnd.getDate() + 6); // 7 days total
+            
+            // Don't go past the end of the month
+            if (weekEnd > lastDay) {
+              weekEnd.setTime(lastDay.getTime());
+            }
+            
+            weeks.push({
+              start: weekStart,
+              end: weekEnd
+            });
+            
+            // Move to next week
             current.setDate(current.getDate() + 7);
           }
           
           // Create date ranges for each week
-          dateRanges = sundays.map((sunday, index) => {
-            const weekStart = new Date(sunday);
-            weekStart.setDate(sunday.getDate() - 6); // Monday of that week
-            
-            const weekEnd = new Date(sunday);
-            
-            // Make sure we don't go outside the month
-            if (weekStart < firstDay) weekStart.setTime(firstDay.getTime());
-            if (weekEnd > lastDay) weekEnd.setTime(lastDay.getTime());
+          dateRanges = weeks.map((week, index) => {
+            const weekLabel = `Week ${index + 1} (${week.start.getDate()}-${week.end.getDate()})`;
             
             return {
-              start: weekStart.toISOString().split('T')[0],
-              end: weekEnd.toISOString().split('T')[0],
-              label: `Week ending ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+              start: week.start.toISOString().split('T')[0],
+              end: week.end.toISOString().split('T')[0],
+              label: weekLabel
             };
+          });
+          
+          console.log('🔍 MONTHLY DETAIL - Weekly breakdown:', {
+            selectedMonth: monthYear,
+            weeksGenerated: dateRanges.length,
+            weeks: dateRanges.map(r => r.label)
           });
         }
         break;
@@ -355,8 +367,55 @@ const fetchTimeSeriesData = async (
       }
     }
     
-    // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
-    if (timePeriod === 'Trailing 12' && viewMode === 'total') {
+    // FIXED: For Monthly Detail mode, aggregate all weekly data into one summary for Total column
+    if (timePeriod === 'Monthly' && viewMode === 'detailed') {
+      console.log('🔍 AGGREGATING MONTHLY DETAIL DATA...');
+      
+      const aggregatedData: any = {};
+      let totalRevenue = 0;
+      let totalExpenses = 0;
+      
+      // Go through each week and aggregate the account totals
+      dateRanges.forEach((range) => {
+        const weekData = allData[range.label] || {};
+        
+        Object.values(weekData).forEach((account: any) => {
+          const accountName = account.name;
+          
+          if (!aggregatedData[accountName]) {
+            aggregatedData[accountName] = {
+              name: accountName,
+              type: account.type,
+              total: 0,
+              entries: [],
+              account_type: account.account_type
+            };
+          }
+          
+          // Sum the totals across all weeks
+          aggregatedData[accountName].total += account.total;
+          aggregatedData[accountName].entries.push(...account.entries);
+          
+          // Track overall totals for logging
+          if (account.type === 'Revenue') {
+            totalRevenue += account.total;
+          } else if (account.type === 'Expenses') {
+            totalExpenses += Math.abs(account.total);
+          }
+        });
+      });
+      
+      // Add aggregated data as "Monthly Total" for the Total column
+      allData['Monthly Total'] = aggregatedData;
+      
+      console.log('🔍 MONTHLY DETAIL AGGREGATED TOTALS:', {
+        totalRevenue,
+        totalExpenses,
+        netIncome: totalRevenue - totalExpenses,
+        accountCount: Object.keys(aggregatedData).length,
+        weeksAggregated: dateRanges.length
+      });
+    }
       console.log('🔍 AGGREGATING TRAILING 12 TOTAL DATA...');
       
       const aggregatedData: any = {};
@@ -706,7 +765,7 @@ export default function FinancialsPage() {
           setDataError(rawData.error || 'Failed to load financial data');
         }
       } else {
-        // For all other views, use time series data
+        // For all other views (including Monthly Detail), use time series data
         const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode);
         
         if (timeSeriesResult.success) {
@@ -814,7 +873,13 @@ export default function FinancialsPage() {
       if (timePeriod === 'Trailing 12' && viewMode === 'total') {
         const trailingData = timeSeriesData.data['Trailing 12 Months'] || {};
         return Object.values(trailingData);
-      } else {
+      } 
+      // FIXED: For Monthly Detail, use the aggregated total for KPIs
+      else if (timePeriod === 'Monthly' && viewMode === 'detailed') {
+        const monthlyTotalData = timeSeriesData.data['Monthly Total'] || {};
+        return Object.values(monthlyTotalData);
+      } 
+      else {
         // For all other modes, aggregate all periods for KPI calculation
         const allAccounts: Record<string, any> = {};
         
@@ -948,6 +1013,11 @@ export default function FinancialsPage() {
       
       // Add Total column for detail view
       if (viewMode === 'detailed') {
+        // For Monthly Detail, use the aggregated "Monthly Total" data
+        const totalData = timePeriod === 'Monthly' && timeSeriesData.data['Monthly Total'] 
+          ? timeSeriesData.data['Monthly Total'] 
+          : null;
+        
         headers.push(
           <th key="total" className="px-4 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50 border-l-2 border-blue-200">
             Total
@@ -1003,20 +1073,32 @@ export default function FinancialsPage() {
       
       // Add Total column for detail view
       if (viewMode === 'detailed') {
-        // Calculate total across all periods for this item
-        const totalValue = timeSeriesData.periods.reduce((sum: number, period: string) => {
-          const periodData = timeSeriesData.data[period]?.[item.name];
-          return sum + (periodData?.total || 0);
-        }, 0);
+        // For Monthly Detail, use the pre-calculated aggregated data
+        let totalValue: number;
+        let totalEntries: any[];
+        
+        if (timePeriod === 'Monthly' && timeSeriesData.data['Monthly Total']) {
+          const monthlyTotalAccount = timeSeriesData.data['Monthly Total'][item.name];
+          totalValue = monthlyTotalAccount?.total || 0;
+          totalEntries = monthlyTotalAccount?.entries || [];
+        } else {
+          // Calculate total across all periods for other time periods
+          totalValue = timeSeriesData.periods.reduce((sum: number, period: string) => {
+            const periodData = timeSeriesData.data[period]?.[item.name];
+            return sum + (periodData?.total || 0);
+          }, 0);
+          
+          totalEntries = timeSeriesData.periods.reduce((allEntries: any[], period: string) => {
+            const periodData = timeSeriesData.data[period]?.[item.name];
+            return allEntries.concat(periodData?.entries || []);
+          }, []);
+        }
         
         // Create aggregated item for clicking
         const totalItem = {
           ...item,
           total: totalValue,
-          entries: timeSeriesData.periods.reduce((allEntries: any[], period: string) => {
-            const periodData = timeSeriesData.data[period]?.[item.name];
-            return allEntries.concat(periodData?.entries || []);
-          }, [])
+          entries: totalEntries
         };
         
         cells.push(
@@ -1197,33 +1279,31 @@ export default function FinancialsPage() {
                   )}
                 </div>
 
-                {/* View Mode Toggle - Hidden for Monthly */}
-                {timePeriod !== 'Monthly' && (
-                  <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                    <button
-                      onClick={() => setViewMode('total')}
-                      className={`px-3 py-2 text-xs transition-colors ${
-                        viewMode === 'total'
-                          ? 'text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                      style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
-                    >
-                      Total
-                    </button>
-                    <button
-                      onClick={() => setViewMode('detailed')}
-                      className={`px-3 py-2 text-xs transition-colors ${
-                        viewMode === 'detailed'
-                          ? 'text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                      style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
-                    >
-                      Detail
-                    </button>
-                  </div>
-                )}
+                {/* View Mode Toggle - Show for all time periods */}
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                  <button
+                    onClick={() => setViewMode('total')}
+                    className={`px-3 py-2 text-xs transition-colors ${
+                      viewMode === 'total'
+                        ? 'text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
+                  >
+                    Total
+                  </button>
+                  <button
+                    onClick={() => setViewMode('detailed')}
+                    className={`px-3 py-2 text-xs transition-colors ${
+                      viewMode === 'detailed'
+                        ? 'text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
+                  >
+                    Detail
+                  </button>
+                </div>
               </div>
               <button
                 onClick={() => showNotification('Financial data exported', 'success')}
@@ -1349,6 +1429,8 @@ export default function FinancialsPage() {
                       <div className="mt-2 text-sm text-gray-600">
                         {timePeriod === 'Trailing 12' && viewMode === 'total' 
                           ? 'Showing aggregated totals for the past 12 months'
+                          : timePeriod === 'Monthly' && viewMode === 'detailed'
+                          ? 'Showing weekly breakdown within the selected month'
                           : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
                         }
                       </div>
