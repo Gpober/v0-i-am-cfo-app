@@ -251,27 +251,31 @@ const fetchTimeSeriesData = async (
         
       case 'Trailing 12':
         if (viewMode === 'total') {
-          // FIXED: Past 12 months aggregated into ONE total
-          // Calculate the start date as 12 months before the selected month
-          const endDate = new Date(selectedDate);
-          endDate.setMonth(endDate.getMonth() + 1); // Go to end of selected month
-          endDate.setDate(0); // Last day of selected month
+          // FIXED: Generate all 12 months individually, then we'll aggregate them
+          dateRanges = [];
           
-          const startDate = new Date(selectedDate);
-          startDate.setMonth(startDate.getMonth() - 11); // 11 months back + current = 12 months
-          startDate.setDate(1); // First day of that month
+          for (let i = 11; i >= 0; i--) {
+            const monthDate = new Date(selectedDate);
+            monthDate.setMonth(monthDate.getMonth() - i);
+            
+            const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+            const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+            
+            const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
+            const monthYear = monthStart.getFullYear();
+            
+            dateRanges.push({
+              start: monthStart.toISOString().split('T')[0],
+              end: monthEnd.toISOString().split('T')[0],
+              label: `${monthName} ${monthYear}`
+            });
+          }
           
-          dateRanges = [{
-            start: startDate.toISOString().split('T')[0],
-            end: endDate.toISOString().split('T')[0],
-            label: 'Trailing 12 Months'
-          }];
-          
-          console.log('🔍 TRAILING 12 TOTAL:', {
+          console.log('🔍 TRAILING 12 TOTAL - Will fetch all months and aggregate:', {
             selectedMonth: monthYear,
-            startDate: startDate.toISOString().split('T')[0],
-            endDate: endDate.toISOString().split('T')[0],
-            months: `${startDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} to ${endDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
+            periods: dateRanges.map(r => r.label),
+            firstPeriod: dateRanges[0],
+            lastPeriod: dateRanges[dateRanges.length - 1]
           });
         } else {
           // FIXED: Past 12 months individually (detail view)
@@ -358,25 +362,76 @@ const fetchTimeSeriesData = async (
       }
     }
     
-    // For Trailing 12 Total mode, we need to aggregate all the data properly
+    // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
     if (timePeriod === 'Trailing 12' && viewMode === 'total') {
       console.log('🔍 AGGREGATING TRAILING 12 TOTAL DATA...');
       
-      // Since we fetched as one big range, the data should already be aggregated
-      // But let's double-check the totals
-      const periodData = allData['Trailing 12 Months'] || {};
-      const accountTotals = Object.values(periodData).reduce((acc: any, account: any) => {
-        const revenue = account.type === 'Revenue' ? account.total : 0;
-        const expenses = account.type === 'Expenses' ? Math.abs(account.total) : 0;
-        
-        return {
-          totalRevenue: acc.totalRevenue + revenue,
-          totalExpenses: acc.totalExpenses + expenses,
-          accountCount: acc.accountCount + 1
-        };
-      }, { totalRevenue: 0, totalExpenses: 0, accountCount: 0 });
+      const aggregatedData: any = {};
+      let totalRevenue = 0;
+      let totalExpenses = 0;
       
-      console.log('🔍 TRAILING 12 AGGREGATED TOTALS:', accountTotals);
+      // Go through each month and aggregate the account totals
+      dateRanges.forEach((range) => {
+        const monthData = allData[range.label] || {};
+        
+        Object.values(monthData).forEach((account: any) => {
+          const accountName = account.name;
+          
+          if (!aggregatedData[accountName]) {
+            aggregatedData[accountName] = {
+              name: accountName,
+              type: account.type,
+              total: 0,
+              entries: [],
+              account_type: account.account_type
+            };
+          }
+          
+          // Sum the totals across all months
+          aggregatedData[accountName].total += account.total;
+          aggregatedData[accountName].entries.push(...account.entries);
+          
+          // Track overall totals for logging
+          if (account.type === 'Revenue') {
+            totalRevenue += account.total;
+          } else if (account.type === 'Expenses') {
+            totalExpenses += Math.abs(account.total);
+          }
+        });
+      });
+      
+      // Replace all monthly data with one aggregated summary
+      allData = {
+        'Trailing 12 Months': aggregatedData
+      };
+      
+      console.log('🔍 TRAILING 12 AGGREGATED TOTALS:', {
+        totalRevenue,
+        totalExpenses,
+        netIncome: totalRevenue - totalExpenses,
+        accountCount: Object.keys(aggregatedData).length,
+        periodsAggregated: dateRanges.length
+      });
+      
+      // Update the periods array to reflect the single aggregated period
+      return {
+        success: true,
+        data: allData,
+        periods: ['Trailing 12 Months'],
+        summary: {
+          timePeriod,
+          viewMode,
+          property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
+          dateRanges: [{
+            start: dateRanges[0].start,
+            end: dateRanges[dateRanges.length - 1].end,
+            label: 'Trailing 12 Months'
+          }],
+          totalEntriesProcessed,
+          periodsGenerated: 1,
+          monthsAggregated: dateRanges.length
+        }
+      };
     }
     
     return {
@@ -960,11 +1015,22 @@ export default function FinancialsPage() {
         </th>
       );
     } else if (timeSeriesData) {
-      return timeSeriesData.periods.map((period: string, index: number) => (
+      const headers = timeSeriesData.periods.map((period: string, index: number) => (
         <th key={period} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
           {period}
         </th>
       ));
+      
+      // Add Total column for detail view
+      if (viewMode === 'detailed') {
+        headers.push(
+          <th key="total" className="px-4 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50 border-l-2 border-blue-200">
+            Total
+          </th>
+        );
+      }
+      
+      return headers;
     }
     return null;
   };
@@ -987,7 +1053,7 @@ export default function FinancialsPage() {
         </td>
       );
     } else if (timeSeriesData) {
-      return timeSeriesData.periods.map((period: string) => {
+      const cells = timeSeriesData.periods.map((period: string) => {
         const periodData = timeSeriesData.data[period]?.[item.name];
         const value = periodData?.total || 0;
         
@@ -1013,6 +1079,42 @@ export default function FinancialsPage() {
           </td>
         );
       });
+      
+      // Add Total column for detail view
+      if (viewMode === 'detailed') {
+        // Calculate total across all periods for this item
+        const totalValue = timeSeriesData.periods.reduce((sum: number, period: string) => {
+          const periodData = timeSeriesData.data[period]?.[item.name];
+          return sum + (periodData?.total || 0);
+        }, 0);
+        
+        // Create aggregated item for clicking
+        const totalItem = {
+          ...item,
+          total: totalValue,
+          entries: timeSeriesData.periods.reduce((allEntries: any[], period: string) => {
+            const periodData = timeSeriesData.data[period]?.[item.name];
+            return allEntries.concat(periodData?.entries || []);
+          }, [])
+        };
+        
+        cells.push(
+          <td key="total" className={`px-4 py-3 text-right text-sm font-bold bg-blue-50 border-l-2 border-blue-200 ${
+            totalValue >= 0 ? 'text-green-700' : 'text-red-700'
+          }`}>
+            <span 
+              className={`cursor-pointer hover:bg-${item.type === 'Revenue' ? 'blue' : 'red'}-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-${item.type === 'Revenue' ? 'blue' : 'red'}-300`}
+              onMouseEnter={(e) => handleAccountMouseEnter(e, totalItem)}
+              onMouseLeave={handleAccountMouseLeave}
+              onClick={() => handleAccountClick(totalItem)}
+            >
+              {formatCurrency(totalValue)}
+            </span>
+          </td>
+        );
+      }
+      
+      return cells;
     }
     return null;
   };
@@ -1230,14 +1332,16 @@ export default function FinancialsPage() {
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> {realData ? 
                   `Loaded ${realData.summary.filteredEntries} entries from financial_transactions table • Date Filtering Active` :
-                  `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} periods • Time Series Mode`
+                  timePeriod === 'Trailing 12' && viewMode === 'total' ? 
+                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.monthsAggregated} months • Aggregated into Trailing 12 Total` :
+                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} periods • Time Series Mode`
                 }
                 <div className="mt-1 text-xs">
                   <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {selectedMonth} • {timePeriod} {viewMode}
                 </div>
                 {timePeriod === 'Trailing 12' && viewMode === 'total' && timeSeriesData && (
                   <div className="mt-1 text-xs">
-                    <strong>Trailing 12 Period:</strong> {timeSeriesData.summary.dateRanges[0]?.start} to {timeSeriesData.summary.dateRanges[0]?.end}
+                    <strong>Trailing 12 Period:</strong> {timeSeriesData.summary.dateRanges[0]?.start} to {timeSeriesData.summary.dateRanges[0]?.end} ({timeSeriesData.summary.monthsAggregated} months aggregated)
                   </div>
                 )}
               </div>
@@ -1372,15 +1476,22 @@ export default function FinancialsPage() {
                               {formatCurrency(kpis.revenue)}
                             </td>
                           ) : timeSeriesData ? (
-                            timeSeriesData.periods.map((period: string) => (
-                              <td key={period} className="px-4 py-4 text-right text-lg font-bold text-blue-900">
-                                {formatCurrency(
-                                  Object.values(timeSeriesData.data[period] || {})
-                                    .filter((account: any) => account.type === 'Revenue')
-                                    .reduce((sum: number, account: any) => sum + account.total, 0)
-                                )}
-                              </td>
-                            ))
+                            <>
+                              {timeSeriesData.periods.map((period: string) => (
+                                <td key={period} className="px-4 py-4 text-right text-lg font-bold text-blue-900">
+                                  {formatCurrency(
+                                    Object.values(timeSeriesData.data[period] || {})
+                                      .filter((account: any) => account.type === 'Revenue')
+                                      .reduce((sum: number, account: any) => sum + account.total, 0)
+                                  )}
+                                </td>
+                              ))}
+                              {viewMode === 'detailed' && (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-blue-900 bg-blue-50 border-l-2 border-blue-200">
+                                  {formatCurrency(kpis.revenue)}
+                                </td>
+                              )}
+                            </>
                           ) : null}
                           <td className="px-4 py-4 text-right text-sm text-blue-700">
                             100.0%
@@ -1421,15 +1532,22 @@ export default function FinancialsPage() {
                               {formatCurrency(kpis.revenue)}
                             </td>
                           ) : timeSeriesData ? (
-                            timeSeriesData.periods.map((period: string) => (
-                              <td key={period} className="px-4 py-4 text-right text-lg font-bold text-blue-800">
-                                {formatCurrency(
-                                  Object.values(timeSeriesData.data[period] || {})
-                                    .filter((account: any) => account.type === 'Revenue')
-                                    .reduce((sum: number, account: any) => sum + account.total, 0)
-                                )}
-                              </td>
-                            ))
+                            <>
+                              {timeSeriesData.periods.map((period: string) => (
+                                <td key={period} className="px-4 py-4 text-right text-lg font-bold text-blue-800">
+                                  {formatCurrency(
+                                    Object.values(timeSeriesData.data[period] || {})
+                                      .filter((account: any) => account.type === 'Revenue')
+                                      .reduce((sum: number, account: any) => sum + account.total, 0)
+                                  )}
+                                </td>
+                              ))}
+                              {viewMode === 'detailed' && (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-blue-800 bg-blue-50 border-l-2 border-blue-200">
+                                  {formatCurrency(kpis.revenue)}
+                                </td>
+                              )}
+                            </>
                           ) : null}
                           <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
                             100.0%
@@ -1450,15 +1568,22 @@ export default function FinancialsPage() {
                               ({formatCurrency(Math.abs(kpis.operatingExpenses))})
                             </td>
                           ) : timeSeriesData ? (
-                            timeSeriesData.periods.map((period: string) => (
-                              <td key={period} className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                                ({formatCurrency(Math.abs(
-                                  Object.values(timeSeriesData.data[period] || {})
-                                    .filter((account: any) => account.type === 'Expenses')
-                                    .reduce((sum: number, account: any) => sum + account.total, 0)
-                                ))})
-                              </td>
-                            ))
+                            <>
+                              {timeSeriesData.periods.map((period: string) => (
+                                <td key={period} className="px-4 py-4 text-right text-lg font-bold text-red-600">
+                                  ({formatCurrency(Math.abs(
+                                    Object.values(timeSeriesData.data[period] || {})
+                                      .filter((account: any) => account.type === 'Expenses')
+                                      .reduce((sum: number, account: any) => sum + account.total, 0)
+                                  ))})
+                                </td>
+                              ))}
+                              {viewMode === 'detailed' && (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-red-600 bg-blue-50 border-l-2 border-blue-200">
+                                  ({formatCurrency(Math.abs(kpis.operatingExpenses))})
+                                </td>
+                              )}
+                            </>
                           ) : null}
                           <td className="px-4 py-4 text-right text-sm text-red-600">
                             {kpis.revenue ? calculatePercentage(Math.abs(kpis.operatingExpenses), Math.abs(kpis.revenue)) : '0%'}
@@ -1499,15 +1624,22 @@ export default function FinancialsPage() {
                               ({formatCurrency(Math.abs(kpis.operatingExpenses))})
                             </td>
                           ) : timeSeriesData ? (
-                            timeSeriesData.periods.map((period: string) => (
-                              <td key={period} className="px-4 py-4 text-right text-lg font-bold text-red-800">
-                                ({formatCurrency(Math.abs(
-                                  Object.values(timeSeriesData.data[period] || {})
-                                    .filter((account: any) => account.type === 'Expenses')
-                                    .reduce((sum: number, account: any) => sum + account.total, 0)
-                                ))})
-                              </td>
-                            ))
+                            <>
+                              {timeSeriesData.periods.map((period: string) => (
+                                <td key={period} className="px-4 py-4 text-right text-lg font-bold text-red-800">
+                                  ({formatCurrency(Math.abs(
+                                    Object.values(timeSeriesData.data[period] || {})
+                                      .filter((account: any) => account.type === 'Expenses')
+                                      .reduce((sum: number, account: any) => sum + account.total, 0)
+                                  ))})
+                                </td>
+                              ))}
+                              {viewMode === 'detailed' && (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-red-800 bg-blue-50 border-l-2 border-blue-200">
+                                  ({formatCurrency(Math.abs(kpis.operatingExpenses))})
+                                </td>
+                              )}
+                            </>
                           ) : null}
                           <td className="px-4 py-4 text-right text-sm font-bold text-red-800">
                             {kpis.revenue ? calculatePercentage(Math.abs(kpis.operatingExpenses), Math.abs(kpis.revenue)) : '0%'}
@@ -1535,23 +1667,32 @@ export default function FinancialsPage() {
                               {formatCurrency(kpis.netIncome)}
                             </td>
                           ) : timeSeriesData ? (
-                            timeSeriesData.periods.map((period: string) => {
-                              const periodRevenue = Object.values(timeSeriesData.data[period] || {})
-                                .filter((account: any) => account.type === 'Revenue')
-                                .reduce((sum: number, account: any) => sum + account.total, 0);
-                              const periodExpenses = Object.values(timeSeriesData.data[period] || {})
-                                .filter((account: any) => account.type === 'Expenses')
-                                .reduce((sum: number, account: any) => sum + account.total, 0);
-                              const periodNetIncome = periodRevenue - periodExpenses;
-                              
-                              return (
-                                <td key={period} className={`px-4 py-5 text-right text-xl font-bold ${
-                                  periodNetIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                            <>
+                              {timeSeriesData.periods.map((period: string) => {
+                                const periodRevenue = Object.values(timeSeriesData.data[period] || {})
+                                  .filter((account: any) => account.type === 'Revenue')
+                                  .reduce((sum: number, account: any) => sum + account.total, 0);
+                                const periodExpenses = Object.values(timeSeriesData.data[period] || {})
+                                  .filter((account: any) => account.type === 'Expenses')
+                                  .reduce((sum: number, account: any) => sum + account.total, 0);
+                                const periodNetIncome = periodRevenue - periodExpenses;
+                                
+                                return (
+                                  <td key={period} className={`px-4 py-5 text-right text-xl font-bold ${
+                                    periodNetIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                                  }`}>
+                                    {formatCurrency(periodNetIncome)}
+                                  </td>
+                                );
+                              })}
+                              {viewMode === 'detailed' && (
+                                <td className={`px-4 py-5 text-right text-xl font-bold bg-blue-50 border-l-2 border-blue-200 ${
+                                  kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
                                 }`}>
-                                  {formatCurrency(periodNetIncome)}
+                                  {formatCurrency(kpis.netIncome)}
                                 </td>
-                              );
-                            })
+                              )}
+                            </>
                           ) : null}
                           <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
                             {kpis.netMargin.toFixed(1)}%
