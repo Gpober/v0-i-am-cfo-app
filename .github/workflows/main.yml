@@ -163,11 +163,14 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
+
       - name: Deploy to Netlify
         id: deploy
         run: |
           echo "🚀 Deploying to Netlify..."
-          npx netlify-cli deploy --prod --dir=out
+          netlify deploy --prod --dir=out --auth=$NETLIFY_AUTH_TOKEN --site=$NETLIFY_SITE_ID
           echo "status=success" >> $GITHUB_OUTPUT
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
