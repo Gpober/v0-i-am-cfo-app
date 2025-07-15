@@ -1054,7 +1054,7 @@ export default function FinancialsPage() {
   const renderSectionHeader = (title: string, emoji: string, category: PLCategory, bgClass: string, textClass: string) => (
     <tr className={`${bgClass} border-t-2 border-opacity-50`}>
       <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} ${
-        viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+        timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
       } ${bgClass}`}>
         {emoji} {title}
       </td>
@@ -1437,21 +1437,22 @@ export default function FinancialsPage() {
                       No financial data available for the selected filters
                     </div>
                   ) : (
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
-                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
-                          }`}>
-                            Account
-                          </th>
-                          {renderColumnHeaders()}
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            % of Revenue
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                    <div className="relative">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+                              timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                            }`}>
+                              Account
+                            </th>
+                            {renderColumnHeaders()}
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              % of Revenue
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
                         {/* 💰 REVENUE SECTION */}
                         {renderSectionHeader('REVENUE', '💰', 'Revenue', 'bg-blue-50', 'text-blue-900')}
                         
@@ -1461,7 +1462,7 @@ export default function FinancialsPage() {
                           .map((item: any) => (
                             <tr key={`revenue-${item.name}`} className="hover:bg-gray-50">
                               <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
-                                viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                                timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
                               }`}>
                                 {item.name}
                                 {item.entries && item.entries.length > 0 && (
@@ -1479,9 +1480,9 @@ export default function FinancialsPage() {
 
                         {/* TOTAL REVENUE */}
                         <tr className="bg-blue-100 border-t-2 border-blue-300">
-                          <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-blue-100 ${
-                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
-                          }`}>
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 ${
+                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                          } bg-blue-100`}>
                             📊 TOTAL REVENUE
                           </td>
                           {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
@@ -1575,7 +1576,7 @@ export default function FinancialsPage() {
                           borderTopColor: BRAND_COLORS.success 
                         }}>
                           <td className={`px-6 py-5 text-left text-xl font-bold ${
-                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
                           }`} style={{ 
                             color: BRAND_COLORS.success,
                             backgroundColor: BRAND_COLORS.success + '20'
@@ -1675,7 +1676,7 @@ export default function FinancialsPage() {
                           borderTopColor: BRAND_COLORS.primary 
                         }}>
                           <td className={`px-6 py-5 text-left text-xl font-bold ${
-                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
                           }`} style={{ 
                             color: BRAND_COLORS.primary,
                             backgroundColor: BRAND_COLORS.primary + '20'
@@ -1782,7 +1783,7 @@ export default function FinancialsPage() {
                           borderTopColor: BRAND_COLORS.secondary 
                         }}>
                           <td className={`px-6 py-6 text-left text-2xl font-bold ${
-                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
                           }`} style={{ 
                             color: BRAND_COLORS.secondary,
                             backgroundColor: BRAND_COLORS.secondary + '30'
@@ -1826,8 +1827,9 @@ export default function FinancialsPage() {
                             {kpis.netMargin.toFixed(1)}%
                           </td>
                         </tr>
-                      </tbody>
-                    </table>
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
               </div>
