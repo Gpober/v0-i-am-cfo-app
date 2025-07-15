@@ -92,6 +92,16 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Fix Package Lock Sync
+        run: |
+          echo "🔧 Checking package.json and lock file sync..."
+          # If lock file is out of sync, regenerate it
+          if ! npm ci --dry-run; then
+            echo "⚠️ Lock file out of sync, regenerating..."
+            rm -f package-lock.json
+            npm install
+          fi
+
       - name: Install dependencies
         run: |
           echo "📦 Installing dependencies..."
