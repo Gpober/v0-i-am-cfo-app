@@ -150,9 +150,10 @@ jobs:
 
       - name: Deploy to Netlify
         id: deploy
-        uses: netlify/actions/cli@master
-        with:
-          args: deploy --prod --dir=out
+        run: |
+          echo "🚀 Deploying to Netlify..."
+          npx netlify-cli deploy --prod --dir=out
+          echo "status=success" >> $GITHUB_OUTPUT
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
@@ -178,8 +179,7 @@ jobs:
             4. Recommend next steps for optimization
             5. Create a deployment summary report
             
-            Build Status: ${{ needs.build.outputs.build-status }}
-            Build Size: ${{ needs.build.outputs.build-size }}
+            Deployment Status: ${{ needs.deploy-netlify.outputs.deploy-status }}
             
             Generate a comprehensive deployment report in markdown format.
           system_prompt: "You are a DevOps engineer providing post-deployment analysis and monitoring recommendations."
@@ -221,7 +221,7 @@ jobs:
   # Alternative Deploy Options
   deploy-vercel:
     if: github.event.inputs.deploy_target == 'vercel'
-    needs: [build, claude-analysis]
+    needs: [claude-analysis, claude-build-optimization]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -237,17 +237,25 @@ jobs:
 
   deploy-github-pages:
     if: github.event.inputs.deploy_target == 'github-pages'
-    needs: [build, claude-analysis]
+    needs: [claude-analysis, claude-build-optimization]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: build-output-${{ github.run_number }}
-          path: dist/
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install and Build
+        run: |
+          npm ci
+          npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -255,7 +263,7 @@ jobs:
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/
+          path: out/
 
       - name: Deploy to GitHub Pages
         id: deployment
