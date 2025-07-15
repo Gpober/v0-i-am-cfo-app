@@ -968,7 +968,21 @@ export default function FinancialsPage() {
   };
 
   const generateTrendData = () => {
-    const months = ['Jan 2023', 'Feb 2023', 'Mar 2023', 'Apr 2023', 'May 2023', 'Jun 2023'];
+    // Get the current selected month/year
+    const [currentMonth, currentYear] = selectedMonth.split(' ');
+    const currentDate = new Date(`${currentMonth} 1, ${currentYear}`);
+    
+    // Generate 6 months of data ending with the current selected month
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(currentDate);
+      date.setMonth(date.getMonth() - i);
+      
+      const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+      const year = date.getFullYear();
+      months.push(`${monthName} ${year}`);
+    }
+    
     const revenue = kpis.revenue;
     
     return months.map((month, index) => ({
@@ -1668,9 +1682,7 @@ export default function FinancialsPage() {
               {/* Transaction Detail Panel */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    {selectedAccountDetails ? 'Transaction Details' : 'Property Summary'}
-                  </h3>
+                  <h3 className="text-xl font-semibold text-gray-900">Transaction Details</h3>
                   {selectedAccountDetails && (
                     <div className="mt-2 flex items-center justify-between">
                       <div>
