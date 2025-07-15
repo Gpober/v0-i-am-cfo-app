@@ -1114,15 +1114,12 @@ export default function FinancialsPage() {
                 )}
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                P&L ACCOUNTS ONLY: Revenue → COGS → Gross Profit → Operating Expenses → Net Operating Income → Other Income/Expenses → Net Income
+                Real-time P&L by Property Class • From financial_transactions table
                 {timeSeriesData?.summary && (
                   <span className="ml-2 text-green-600">
                     • {timeSeriesData.summary.totalEntriesProcessed} entries loaded • {timeSeriesData.summary.periodsGenerated} periods
                   </span>
                 )}
-                <div className="mt-1 text-xs text-red-600">
-                  🚫 Balance Sheet accounts (Assets, Liabilities, Equity) are EXCLUDED from this P&L view
-                </div>
               </p>
             </div>
           </div>
