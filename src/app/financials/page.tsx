@@ -176,6 +176,26 @@ const fetchProperties = async (): Promise<string[]> => {
 
 // Enhanced data transformation functions - SUMIF approach with proper aggregation
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
+  console.log('🔍 TRANSFORM DEBUG - Total entries received:', entries.length);
+  console.log('🔍 TRANSFORM DEBUG - Sample entries:', entries.slice(0, 3).map(e => ({
+    account: e.account,
+    account_type: e.account_type,
+    amount: e.amount,
+    class: e.class
+  })));
+  
+  // Check for Direct revenue specifically
+  const directEntries = entries.filter(e => e.account && e.account.includes('Direct'));
+  console.log('🔍 TRANSFORM DEBUG - Direct entries found:', directEntries.length);
+  if (directEntries.length > 0) {
+    console.log('🔍 TRANSFORM DEBUG - Direct entries sample:', directEntries.slice(0, 3).map(e => ({
+      account: e.account,
+      account_type: e.account_type,
+      amount: e.amount,
+      class: e.class
+    })));
+  }
+
   const getCleanAccountName = (entry: any) => {
     let accountName = entry.account?.trim() || '';
     
@@ -364,7 +384,7 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
   };
 };
 
-// Fetch financial data - proper SUMIF with conditional property filtering
+// Simplified data fetching - just group and sum directly from Supabase
 const fetchFinancialData = async (
   property: string = 'All Properties',
   monthYear: string
@@ -383,7 +403,7 @@ const fetchFinancialData = async (
     console.log(`📅 DATE RANGE: ${startDate} to ${endDate} (${month} ${year})`);
     
     // Base query with date filtering
-    let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${startDate}&date=lte.${endDate}&order=date,account`;
+    let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=account,account_type,amount,class,memo&date=gte.${startDate}&date=lte.${endDate}`;
     
     // Add property filtering ONLY if specific property is selected
     if (property !== 'All Properties') {
@@ -407,35 +427,75 @@ const fetchFinancialData = async (
       throw new Error('Failed to fetch financial data');
     }
     
-    const data = await response.json();
+    const rawData = await response.json();
     
-    console.log('📊 Financial transactions loaded:', data.length);
+    console.log('📊 Raw financial transactions loaded:', rawData.length);
     
-    // Debug: Show date range of actual entries
-    if (data.length > 0) {
-      const dates = data.map((e: any) => e.date).sort();
-      console.log(`📅 ACTUAL DATE RANGE in data: ${dates[0]} to ${dates[dates.length - 1]}`);
-    }
+    // Simple grouping by account name and sum amounts
+    const grouped = rawData.reduce((acc: any, row: any) => {
+      const accountName = row.account?.trim() || 'Unknown Account';
+      
+      if (!acc[accountName]) {
+        acc[accountName] = {
+          name: accountName,
+          type: row.account_type === 'Income' ? 'Revenue' : 
+                row.account_type === 'Expenses' ? 'Expenses' : 'Other',
+          total: 0,
+          entries: [],
+          account_type: row.account_type
+        };
+      }
+      
+      acc[accountName].total += (row.amount || 0);
+      acc[accountName].entries.push(row);
+      
+      return acc;
+    }, {});
+
+    console.log('📊 Grouped accounts:', Object.keys(grouped));
+    console.log('📊 Direct revenue check:', grouped['Rental Revenue - Direct'] ? 
+      `Found with total: ${grouped['Rental Revenue - Direct'].total}` : 'NOT FOUND');
+
+    // Convert to array and filter
+    const accountsArray = Object.values(grouped)
+      .filter((item: any) => Math.abs(item.total) > 0.01)
+      .sort((a: any, b: any) => {
+        if (a.type !== b.type) {
+          return a.type === 'Revenue' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+    const plData = accountsArray.filter((item: any) => 
+      item.type === 'Revenue' || item.type === 'Expenses'
+    );
 
     return {
       success: true,
-      data: data || [],
+      data: plData,
       summary: {
-        filteredEntries: data?.length || 0,
-        originalEntries: data.length,
+        filteredEntries: rawData.length,
+        originalEntries: rawData.length,
         dateFiltered: 0,
-        dataSource: `Supabase financial_transactions + ${month} ${year} Filtering`,
+        dataSource: `Supabase financial_transactions + ${month} ${year} Direct Query`,
         dateRange: `${startDate} to ${endDate}`,
         filters: { 
           property: property === 'All Properties' ? 'ALL PROPERTIES (SUMIF ALL)' : property, 
           monthYear 
         },
-        accountTypes: [...new Set(data.map((a: any) => a.account_type))],
-        classesInData: [...new Set(data.map((e: any) => e.class))],
+        accountTypes: [...new Set(rawData.map((a: any) => a.account_type))],
+        classesInData: [...new Set(rawData.map((e: any) => e.class))],
         mappingStats: {
-          totalEntries: data?.length || 0,
-          directMapped: data?.length || 0,
+          totalEntries: rawData.length,
+          directMapped: rawData.length,
           fallbackMapped: 0
+        }
+      },
+      propertyFinancialData: {
+        'All Properties': {
+          Monthly: {
+            [monthYear]: plData
+          }
         }
       }
     };
@@ -562,30 +622,14 @@ export default function FinancialsPage() {
       const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
       
       if (rawData.success) {
-        const entries = rawData.data as FinancialEntry[];
-        
-        console.log('🔍 DEBUG - Raw Financial Transactions Sample:', entries.slice(0, 5));
-        console.log('🔍 DEBUG - Total entries loaded:', entries.length);
-        
-        const transformedPL = transformFinancialData(entries, selectedMonth);
-        const transformedCF = transformCashFlowData(entries);
-
+        // Use the data directly - no transformation needed
         const combinedData = {
           success: true,
-          ...transformedPL,
-          ...transformedCF,
-          summary: {
-            ...rawData.summary,
-            classesInData: [...new Set(entries.map(e => e.class))],
-            selectedFilters: {
-              properties: Array.from(selectedProperties),
-              month: selectedMonth
-            }
-          },
+          propertyFinancialData: rawData.propertyFinancialData,
+          summary: rawData.summary,
           performance: {
             executionTimeMs: Date.now() % 1000
-          },
-          rawEntries: entries.slice(0, 5)
+          }
         };
 
         setRealData(combinedData);
@@ -595,7 +639,7 @@ export default function FinancialsPage() {
           ? 'all property classes' 
           : `${selectedProperties.size} selected property classes`;
           
-        showNotification(`Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`, 'success');
+        showNotification(`Loaded ${rawData.summary.filteredEntries} entries for ${propertyText} in ${selectedMonth}`, 'success');
       } else {
         setDataError(rawData.error || 'Failed to load financial data');
         showNotification('Failed to load financial data', 'error');
