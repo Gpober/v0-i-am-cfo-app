@@ -1343,7 +1343,7 @@ export default function FinancialsPage() {
                 </div>
 
                 {/* P&L Content */}
-                <div className="overflow-x-auto">
+                <div className={`overflow-x-auto ${viewMode === 'detailed' ? 'relative' : ''}`}>
                   {isLoadingData ? (
                     <div className="flex items-center justify-center py-8">
                       <RefreshCw className="w-6 h-6 animate-spin mr-2" />
@@ -1357,7 +1357,9 @@ export default function FinancialsPage() {
                     <table className="w-full">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
                             Account
                           </th>
                           {renderColumnHeaders()}
@@ -1369,7 +1371,9 @@ export default function FinancialsPage() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {/* INCOME SECTION */}
                         <tr className="bg-blue-50 border-t-2 border-blue-200">
-                          <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-blue-900 bg-blue-50 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
                             💰 INCOME
                           </td>
                           {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
@@ -1404,7 +1408,9 @@ export default function FinancialsPage() {
                           .filter(item => item.type === 'Revenue')
                           .map((item) => (
                             <tr key={`income-${item.name}`} className="hover:bg-gray-50">
-                              <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                              <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
+                                viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                              }`}>
                                 {item.name}
                                 {item.entries && item.entries.length > 0 && (
                                   <span className="ml-2 text-xs text-gray-500">
@@ -1421,7 +1427,9 @@ export default function FinancialsPage() {
 
                         {/* TOTAL INCOME */}
                         <tr className="bg-blue-100 border-t-2 border-blue-300">
-                          <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-blue-100 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
                             📊 TOTAL INCOME
                           </td>
                           {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
@@ -1453,7 +1461,9 @@ export default function FinancialsPage() {
 
                         {/* EXPENSES SECTION */}
                         <tr className="bg-red-50 border-t-4 border-red-200 mt-4">
-                          <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-red-900 bg-red-50 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
                             💸 EXPENSES
                           </td>
                           {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
@@ -1488,7 +1498,9 @@ export default function FinancialsPage() {
                           .filter(item => item.type === 'Expenses')
                           .map((item) => (
                             <tr key={`expense-${item.name}`} className="hover:bg-gray-50">
-                              <td className="px-6 py-2 text-left text-sm text-gray-700 pl-12">
+                              <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
+                                viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                              }`}>
                                 {item.name}
                                 {item.entries && item.entries.length > 0 && (
                                   <span className="ml-2 text-xs text-gray-500">
@@ -1505,7 +1517,9 @@ export default function FinancialsPage() {
 
                         {/* TOTAL EXPENSES */}
                         <tr className="bg-red-100 border-t-2 border-red-300">
-                          <td className="px-6 py-4 text-left text-lg font-bold text-red-800">
+                          <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-red-100 ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`}>
                             📊 TOTAL EXPENSES
                           </td>
                           {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
@@ -1540,7 +1554,12 @@ export default function FinancialsPage() {
                           backgroundColor: BRAND_COLORS.primary + '20', 
                           borderTopColor: BRAND_COLORS.primary 
                         }}>
-                          <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                          <td className={`px-6 py-5 text-left text-xl font-bold ${
+                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                          }`} style={{ 
+                            color: BRAND_COLORS.primary,
+                            backgroundColor: BRAND_COLORS.primary + '20'
+                          }}>
                             🏆 NET INCOME
                           </td>
                           {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
