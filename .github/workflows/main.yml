@@ -18,6 +18,11 @@ on:
         description: 'Run Claude analysis?'
         type: boolean
         default: true
+      custom_instructions:
+        description: 'Custom instructions for Claude (optional)'
+        type: string
+        required: false
+        default: 'Focus on Airbnb financial tracking and reporting features'
 
 permissions:
   contents: read
@@ -44,7 +49,16 @@ jobs:
         uses: grll/claude-code-base-action@beta
         with:
           prompt: |
-            Analyze this Next.js financial dashboard project with Supabase backend for deployment readiness:
+            Analyze this Airbnb CFO financial dashboard project with Supabase backend for deployment readiness:
+            
+            CUSTOM INSTRUCTIONS: ${{ github.event.inputs.custom_instructions || 'Focus on Airbnb financial tracking and reporting features' }}
+            
+            MY PROJECT GOALS:
+            - Track Airbnb property financial performance
+            - Monitor revenue, expenses, and profit margins
+            - Automated expense categorization and reporting
+            - Multi-property portfolio management
+            - Real-time financial KPIs and alerts
             
             Please review:
             1. Code quality and TypeScript usage
@@ -65,6 +79,7 @@ jobs:
             - Security review (especially Supabase RLS)
             - Build configuration suggestions
             - Backend/database recommendations
+            - Specific suggestions for Airbnb financial tracking features
             
             Generate a comprehensive markdown report with your findings and recommendations.
           system_prompt: "You are a senior full-stack engineer with expertise in Next.js, React, Supabase, and deployment optimization. Focus on production readiness, performance, security, and best practices for financial applications."
