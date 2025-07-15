@@ -76,18 +76,35 @@ interface NotificationState {
   type: 'info' | 'success' | 'error';
 }
 
-// ENHANCED: Account Classification Function based on Supabase account_type and account_detail_type
-const classifyAccount = (accountType: string, accountDetailType: string, accountName: string): PLCategory => {
+// ENHANCED: P&L ONLY Account Classification - EXCLUDES Balance Sheet accounts
+const classifyAccount = (accountType: string, accountDetailType: string, accountName: string): PLCategory | null => {
   const type = (accountType || '').toLowerCase().trim();
   const detailType = (accountDetailType || '').toLowerCase().trim();
   const name = (accountName || '').toLowerCase().trim();
   
-  // Revenue Classification
-  if (type === 'income' || type === 'revenue') {
+  // ❌ EXCLUDE BALANCE SHEET ACCOUNTS - Return null for non-P&L accounts
+  const balanceSheetTypes = [
+    'asset', 'assets', 'current asset', 'fixed asset', 'other asset',
+    'liability', 'liabilities', 'current liability', 'long term liability',
+    'equity', 'owner equity', 'retained earnings', 'capital', 'stockholder equity',
+    'accounts receivable', 'accounts payable', 'cash', 'bank', 'inventory',
+    'equipment', 'property', 'building', 'loan', 'credit card', 'payroll liability'
+  ];
+  
+  // Check if this is a balance sheet account
+  if (balanceSheetTypes.some(bsType => type.includes(bsType) || detailType.includes(bsType))) {
+    console.log(`🚫 EXCLUDING Balance Sheet Account: ${accountName} (Type: ${accountType})`);
+    return null;
+  }
+  
+  // ✅ P&L ACCOUNTS ONLY
+  
+  // Revenue Classification - INCOME STATEMENT ONLY
+  if (type === 'income' || type === 'revenue' || type === 'sales') {
     return 'Revenue';
   }
   
-  // COGS Classification (Cost of Goods Sold)
+  // COGS Classification (Cost of Goods Sold) - P&L EXPENSE
   if (type === 'cost of goods sold' || type === 'cogs' || 
       detailType.includes('cost of goods sold') || 
       detailType.includes('cogs') ||
@@ -99,7 +116,7 @@ const classifyAccount = (accountType: string, accountDetailType: string, account
     return 'COGS';
   }
   
-  // Other Income Classification
+  // Other Income Classification - NON-OPERATING INCOME
   if (type === 'other income' || 
       detailType.includes('other income') ||
       detailType.includes('interest income') ||
@@ -112,7 +129,7 @@ const classifyAccount = (accountType: string, accountDetailType: string, account
     return 'Other Income';
   }
   
-  // Other Expenses Classification
+  // Other Expenses Classification - NON-OPERATING EXPENSES
   if (type === 'other expense' || 
       detailType.includes('other expense') ||
       detailType.includes('interest expense') ||
@@ -126,31 +143,21 @@ const classifyAccount = (accountType: string, accountDetailType: string, account
     return 'Other Expenses';
   }
   
-  // Operating Expenses Classification (default for most expenses)
-  if (type === 'expense' || type === 'expenses' ||
-      detailType.includes('operating') ||
-      detailType.includes('administrative') ||
-      detailType.includes('selling') ||
-      detailType.includes('general') ||
-      detailType.includes('rent') ||
-      detailType.includes('utilities') ||
-      detailType.includes('insurance') ||
-      detailType.includes('marketing') ||
-      detailType.includes('salary') ||
-      detailType.includes('wage')) {
+  // Operating Expenses Classification - OPERATING EXPENSES ONLY
+  if (type === 'expense' || type === 'expenses') {
     return 'Operating Expenses';
   }
   
-  // Default fallback based on account type
-  if (type.includes('income')) {
+  // Default fallback - Only include if it's clearly P&L related
+  if (type.includes('income') || type.includes('revenue')) {
     return 'Revenue';
-  } else if (type.includes('expense')) {
+  } else if (type.includes('expense') || type.includes('cost')) {
     return 'Operating Expenses';
   }
   
-  // Final fallback
-  console.warn(`⚠️ Unknown account classification for: ${accountName} (Type: ${accountType}, Detail: ${accountDetailType})`);
-  return 'Operating Expenses';
+  // ❌ If we can't determine it's a P&L account, EXCLUDE IT
+  console.warn(`⚠️ EXCLUDING - Not a P&L account: ${accountName} (Type: ${accountType}, Detail: ${accountDetailType})`);
+  return null;
 };
 
 // Hardcoded properties based on your actual database data
@@ -431,14 +438,19 @@ const fetchTimeSeriesData = async (
         console.log(`🔍 Period ${range.label}: ${rawData.length} transactions`);
         totalEntriesProcessed += rawData.length;
         
-        // ENHANCED: Group and aggregate data with proper classification
+        // ENHANCED: Group and aggregate P&L data ONLY - EXCLUDE Balance Sheet accounts
         const grouped = rawData.reduce((acc: any, row: any) => {
           const accountName = row.account || 'Unknown Account';
           
+          // ENHANCED: Use new P&L-only classification system
+          const category = classifyAccount(row.account_type, row.account_detail_type, accountName);
+          
+          // ❌ SKIP if this is not a P&L account (Balance Sheet accounts return null)
+          if (category === null) {
+            return acc; // Skip this account
+          }
+          
           if (!acc[accountName]) {
-            // ENHANCED: Use new classification system
-            const category = classifyAccount(row.account_type, row.account_detail_type, accountName);
-            
             acc[accountName] = {
               name: accountName,
               category: category,
@@ -1102,12 +1114,15 @@ export default function FinancialsPage() {
                 )}
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Enhanced P&L Structure: Revenue → COGS → Gross Profit → Operating Expenses → Net Operating Income → Other Income/Expenses → Net Income
+                P&L ACCOUNTS ONLY: Revenue → COGS → Gross Profit → Operating Expenses → Net Operating Income → Other Income/Expenses → Net Income
                 {timeSeriesData?.summary && (
                   <span className="ml-2 text-green-600">
                     • {timeSeriesData.summary.totalEntriesProcessed} entries loaded • {timeSeriesData.summary.periodsGenerated} periods
                   </span>
                 )}
+                <div className="mt-1 text-xs text-red-600">
+                  🚫 Balance Sheet accounts (Assets, Liabilities, Equity) are EXCLUDED from this P&L view
+                </div>
               </p>
             </div>
           </div>
@@ -1399,7 +1414,7 @@ export default function FinancialsPage() {
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900">
-                        Enhanced Profit & Loss Statement
+                        Profit & Loss Statement (P&L ACCOUNTS ONLY)
                       </h3>
                       <div className="mt-2 text-sm text-gray-600">
                         {timePeriod === 'Trailing 12' && viewMode === 'total' 
@@ -1414,7 +1429,10 @@ export default function FinancialsPage() {
                           </span>
                         )}
                         <div className="mt-1 text-xs text-green-600">
-                          ✅ Enhanced with automatic account classification based on Supabase account_type and account_detail_type
+                          ✅ P&L accounts automatically classified • Balance Sheet accounts excluded
+                        </div>
+                        <div className="mt-1 text-xs text-red-600">
+                          🚫 Assets, Liabilities, and Equity accounts are filtered out
                         </div>
                       </div>
                     </div>
