@@ -800,11 +800,12 @@ export default function FinancialsPage() {
     setSelectedAccountDetails(accountItem);
   };
 
-  // ENHANCED: Get current financial data - enhanced for Monthly Detail mode
+  // FIXED: Get current financial data - properly handles all modes including Yearly Total
   const getCurrentFinancialData = () => {
     if (timeSeriesData) {
-      // ENHANCED: For all detailed modes including Monthly Detail, aggregate all periods for KPI calculation
-      if (viewMode === 'detailed') {
+      // For detailed modes OR total modes that need aggregation, sum all periods
+      if (viewMode === 'detailed' || 
+          (viewMode === 'total' && (timePeriod === 'Quarterly' || timePeriod === 'Yearly'))) {
         const allAccounts: Record<string, any> = {};
         
         timeSeriesData.periods.forEach((period: string) => {
@@ -826,12 +827,12 @@ export default function FinancialsPage() {
         
         return Object.values(allAccounts);
       } else {
-        // For total modes (including Trailing 12 Total and Monthly Total)
+        // For single-period total modes (Monthly Total, Trailing 12 Total)
         if (timePeriod === 'Trailing 12' && viewMode === 'total') {
           const trailingData = timeSeriesData.data['Trailing 12 Months'] || {};
           return Object.values(trailingData);
         } else {
-          // For Monthly Total, Quarterly Total, Yearly Total
+          // For Monthly Total only - use first (and only) period
           const firstPeriodKey = timeSeriesData.periods[0];
           const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
           return Object.values(firstPeriodData);
