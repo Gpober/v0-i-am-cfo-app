@@ -786,18 +786,152 @@ export default function FinancialsPage() {
     }, 3000);
   };
 
-  const toggleAccountExpansion = (accountName: string): void => {
-    const newExpanded = new Set(expandedAccounts);
-    if (newExpanded.has(accountName)) {
-      newExpanded.delete(accountName);
-    } else {
-      newExpanded.add(accountName);
-    }
-    setExpandedAccounts(newExpanded);
-  };
-
   const handleAccountClick = (accountItem: FinancialDataItem): void => {
     setSelectedAccountDetails(accountItem);
+  };
+
+  // ENHANCED: Render grouped accounts with expandable parents
+  const renderGroupedAccounts = (accounts: any[]) => {
+    const groupedAccounts = groupAccountsByParent(accounts);
+    
+    return groupedAccounts.map((account: any) => {
+      if (account.isParent) {
+        // This is a parent account with sub-accounts
+        const isExpanded = expandedAccounts.has(account.name);
+        
+        return (
+          <React.Fragment key={`parent-${account.name}`}>
+            {/* Parent Account Row */}
+            <tr className="hover:bg-gray-50 bg-gray-25">
+              <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
+                timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+              }`}>
+                <div className="flex items-center">
+                  <button
+                    onClick={() => toggleParentAccount(account.name)}
+                    className="mr-2 p-1 hover:bg-gray-200 rounded transition-colors"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-gray-600" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-600" />
+                    )}
+                  </button>
+                  <div>
+                    <span className="font-medium">{account.name}</span>
+                    {account.subAccounts && account.subAccounts.length > 0 && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        ({account.subAccounts.length} sub-accounts, {account.entries.length} transactions)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </td>
+              {renderDataCells(account)}
+              <td className="px-4 py-2 text-right text-sm text-gray-500">
+                {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
+              </td>
+            </tr>
+            
+            {/* Sub-Account Rows (if expanded) */}
+            {isExpanded && account.subAccounts && account.subAccounts.map((subAccount: any) => (
+              <tr key={`sub-${account.name}-${subAccount.name}`} className="hover:bg-gray-50 bg-blue-25">
+                <td className={`px-6 py-2 text-left text-sm text-gray-600 pl-20 bg-white ${
+                  timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                }`}>
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 mr-2 flex items-center justify-center">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                    </div>
+                    <div>
+                      <span className="text-gray-700">{subAccount.name}</span>
+                      {subAccount.entries && subAccount.entries.length > 0 && (
+                        <span className="ml-2 text-xs text-gray-500">
+                          ({subAccount.entries.length} transactions)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </td>
+                {renderDataCells(subAccount)}
+                <td className="px-4 py-2 text-right text-sm text-gray-500">
+                  {kpis.revenue ? calculatePercentage(Math.abs(subAccount.total), Math.abs(kpis.revenue)) : '0%'}
+                </td>
+              </tr>
+            ))}
+          </React.Fragment>
+        );
+      } else {
+        // This is a standalone account
+        return (
+          <tr key={`standalone-${account.name}`} className="hover:bg-gray-50">
+            <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
+              timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+            }`}>
+              {account.name}
+              {account.entries && account.entries.length > 0 && (
+                <span className="ml-2 text-xs text-gray-500">
+                  ({account.entries.length} transactions)
+                </span>
+              )}
+            </td>
+            {renderDataCells(account)}
+            <td className="px-4 py-2 text-right text-sm text-gray-500">
+              {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
+            </td>
+          </tr>
+        );
+      }
+    });
+  };
+
+  // ENHANCED: Group accounts by main account (before colon) and sub-accounts (after colon)
+  const groupAccountsByParent = (accounts: any[]) => {
+    const grouped: any = {};
+    const standalone: any[] = [];
+    
+    accounts.forEach(account => {
+      if (account.name.includes(':')) {
+        // This is a sub-account
+        const [parentName, subName] = account.name.split(':', 2);
+        
+        if (!grouped[parentName]) {
+          grouped[parentName] = {
+            name: parentName,
+            category: account.category,
+            type: account.category,
+            total: 0,
+            entries: [],
+            account_type: account.account_type,
+            account_detail_type: account.account_detail_type,
+            subAccounts: [],
+            isParent: true
+          };
+        }
+        
+        // Add to parent total
+        grouped[parentName].total += account.total;
+        grouped[parentName].entries.push(...account.entries);
+        
+        // Add as sub-account
+        grouped[parentName].subAccounts.push({
+          ...account,
+          name: subName.trim(),
+          parentName: parentName,
+          isSubAccount: true
+        });
+      } else {
+        // This is a standalone account
+        standalone.push({
+          ...account,
+          isStandalone: true
+        });
+      }
+    });
+    
+    // Convert grouped object to array and combine with standalone
+    const parentAccounts = Object.values(grouped);
+    return [...standalone, ...parentAccounts].sort((a: any, b: any) => a.name.localeCompare(b.name));
   };
 
   // ENHANCED: Get current financial data - properly handles all modes and categories
@@ -1457,26 +1591,7 @@ export default function FinancialsPage() {
                         {renderSectionHeader('REVENUE', '💰', 'Revenue', 'bg-blue-50', 'text-blue-900')}
                         
                         {/* Individual Revenue Line Items */}
-                        {currentData
-                          .filter((item: any) => item.category === 'Revenue')
-                          .map((item: any) => (
-                            <tr key={`revenue-${item.name}`} className="hover:bg-gray-50">
-                              <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
-                                timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
-                              }`}>
-                                {item.name}
-                                {item.entries && item.entries.length > 0 && (
-                                  <span className="ml-2 text-xs text-gray-500">
-                                    ({item.entries.length} transactions)
-                                  </span>
-                                )}
-                              </td>
-                              {renderDataCells(item)}
-                              <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
-                              </td>
-                            </tr>
-                          ))}
+                        {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Revenue'))}
 
                         {/* TOTAL REVENUE */}
                         <tr className="bg-blue-100 border-t-2 border-blue-300">
@@ -1571,15 +1686,13 @@ export default function FinancialsPage() {
                         )}
 
                         {/* 📈 GROSS PROFIT */}
-                        <tr className="border-t-4" style={{ 
-                          backgroundColor: BRAND_COLORS.success + '20', 
+                        <tr className="border-t-4 bg-green-100" style={{ 
                           borderTopColor: BRAND_COLORS.success 
                         }}>
                           <td className={`px-6 py-5 text-left text-xl font-bold ${
                             timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
-                          }`} style={{ 
-                            color: BRAND_COLORS.success,
-                            backgroundColor: BRAND_COLORS.success + '20'
+                          } bg-green-100`} style={{ 
+                            color: BRAND_COLORS.success
                           }}>
                             📈 GROSS PROFIT
                           </td>
@@ -1671,15 +1784,13 @@ export default function FinancialsPage() {
                         </tr>
 
                         {/* 🏆 NET OPERATING INCOME */}
-                        <tr className="border-t-4" style={{ 
-                          backgroundColor: BRAND_COLORS.primary + '20', 
+                        <tr className="border-t-4 bg-green-100" style={{ 
                           borderTopColor: BRAND_COLORS.primary 
                         }}>
                           <td className={`px-6 py-5 text-left text-xl font-bold ${
                             timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
-                          }`} style={{ 
-                            color: BRAND_COLORS.primary,
-                            backgroundColor: BRAND_COLORS.primary + '20'
+                          } bg-green-100`} style={{ 
+                            color: BRAND_COLORS.primary
                           }}>
                             🏆 NET OPERATING INCOME
                           </td>
@@ -1778,15 +1889,13 @@ export default function FinancialsPage() {
                         )}
 
                         {/* 🎯 FINAL NET INCOME */}
-                        <tr className="border-t-4" style={{ 
-                          backgroundColor: BRAND_COLORS.secondary + '30', 
+                        <tr className="border-t-4 bg-green-100" style={{ 
                           borderTopColor: BRAND_COLORS.secondary 
                         }}>
                           <td className={`px-6 py-6 text-left text-2xl font-bold ${
                             timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
-                          }`} style={{ 
-                            color: BRAND_COLORS.secondary,
-                            backgroundColor: BRAND_COLORS.secondary + '30'
+                          } bg-green-100`} style={{ 
+                            color: BRAND_COLORS.secondary
                           }}>
                             🎯 NET INCOME
                           </td>
