@@ -174,7 +174,7 @@ const fetchProperties = async (): Promise<string[]> => {
   }
 };
 
-// Enhanced data transformation functions - SUMIF approach
+// Enhanced data transformation functions - SUMIF approach with proper aggregation
 const transformFinancialData = (entries: FinancialEntry[], monthYear: string) => {
   const getCleanAccountName = (entry: any) => {
     let accountName = entry.account?.trim() || '';
@@ -186,6 +186,7 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     return accountName;
   };
 
+  // Group by account name and sum across ALL properties and entries
   const groupedData = entries.reduce((acc, entry) => {
     const accountName = getCleanAccountName(entry);
     const key = accountName;
@@ -216,7 +217,7 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       };
     }
     
-    // SUMIF: Just sum the raw amount - no conversions or absolute values
+    // SUMIF: Sum the raw amount across ALL properties
     const amount = entry.amount || 0;
     
     acc[key].total += amount;
@@ -235,6 +236,12 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     
     return acc;
   }, {} as Record<string, any>);
+
+  console.log('🔢 Aggregated data:', Object.entries(groupedData).map(([name, data]: [string, any]) => ({
+    name,
+    total: data.total,
+    entries: data.entries.length
+  })));
 
   const typeOrder: Record<string, number> = {
     'Revenue': 1,
