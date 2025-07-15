@@ -33,7 +33,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // Type definitions
 type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
-type TimeView = 'Monthly' | 'YTD' | 'TTM' | 'MoM' | 'YoY';
+type TimePeriod = 'Monthly' | 'Quarterly' | 'Yearly' | 'Trailing 12';
 type ViewMode = 'total' | 'detailed';
 type MonthString = `${'January' | 'February' | 'March' | 'April' | 'May' | 'June' | 
                    'July' | 'August' | 'September' | 'October' | 'November' | 'December'} ${number}`;
@@ -384,7 +384,222 @@ const transformCashFlowData = (entries: FinancialEntry[]) => {
   };
 };
 
-// Simplified data fetching - just group and sum directly from Supabase
+// Enhanced time series data fetching for different time periods
+const fetchTimeSeriesData = async (
+  property: string = 'All Properties',
+  monthYear: string,
+  timePeriod: TimePeriod,
+  viewMode: ViewMode
+) => {
+  try {
+    console.log('🔍 FETCHING TIME SERIES DATA:', { property, monthYear, timePeriod, viewMode });
+    
+    const [month, year] = monthYear.split(' ');
+    const selectedDate = new Date(`${month} 1, ${year}`);
+    
+    let dateRanges: Array<{start: string, end: string, label: string}> = [];
+    
+    // Generate date ranges based on time period and view mode
+    switch (timePeriod) {
+      case 'Monthly':
+        if (viewMode === 'total') {
+          // Single month
+          const monthNum = selectedDate.getMonth() + 1;
+          const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+          const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
+          const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+          dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
+        } else {
+          // Weekly breakdown within the month
+          const monthNum = selectedDate.getMonth() + 1;
+          const firstDay = new Date(parseInt(year), monthNum - 1, 1);
+          const lastDay = new Date(parseInt(year), monthNum, 0);
+          
+          // Find all Sundays in the month
+          const sundays = [];
+          let current = new Date(firstDay);
+          
+          // Go to first Sunday
+          while (current.getDay() !== 0) {
+            current.setDate(current.getDate() + 1);
+          }
+          
+          while (current <= lastDay) {
+            sundays.push(new Date(current));
+            current.setDate(current.getDate() + 7);
+          }
+          
+          // Create date ranges for each week
+          dateRanges = sundays.map((sunday, index) => {
+            const weekStart = new Date(sunday);
+            weekStart.setDate(sunday.getDate() - 6); // Monday of that week
+            
+            const weekEnd = new Date(sunday);
+            
+            // Make sure we don't go outside the month
+            if (weekStart < firstDay) weekStart.setTime(firstDay.getTime());
+            if (weekEnd > lastDay) weekEnd.setTime(lastDay.getTime());
+            
+            return {
+              start: weekStart.toISOString().split('T')[0],
+              end: weekEnd.toISOString().split('T')[0],
+              label: `Week ending ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+            };
+          });
+        }
+        break;
+        
+      case 'Quarterly':
+        const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
+        if (viewMode === 'total') {
+          // Single quarter
+          const qStart = new Date(parseInt(year), (quarter - 1) * 3, 1);
+          const qEnd = new Date(parseInt(year), quarter * 3, 0);
+          dateRanges = [{
+            start: qStart.toISOString().split('T')[0],
+            end: qEnd.toISOString().split('T')[0],
+            label: `Q${quarter} ${year}`
+          }];
+        } else {
+          // YTD quarters
+          for (let q = 1; q <= quarter; q++) {
+            const qStart = new Date(parseInt(year), (q - 1) * 3, 1);
+            const qEnd = new Date(parseInt(year), q * 3, 0);
+            dateRanges.push({
+              start: qStart.toISOString().split('T')[0],
+              end: qEnd.toISOString().split('T')[0],
+              label: `Q${q} ${year}`
+            });
+          }
+        }
+        break;
+        
+      case 'Yearly':
+        if (viewMode === 'total') {
+          // Single year
+          const yearStart = `${year}-01-01`;
+          const yearEnd = `${year}-12-31`;
+          dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
+        } else {
+          // YTD months
+          const currentMonth = selectedDate.getMonth() + 1;
+          for (let m = 1; m <= currentMonth; m++) {
+            const monthStart = `${year}-${m.toString().padStart(2, '0')}-01`;
+            const monthEnd = new Date(parseInt(year), m, 0);
+            const monthEndStr = monthEnd.toISOString().split('T')[0];
+            const monthName = new Date(parseInt(year), m - 1, 1).toLocaleDateString('en-US', { month: 'short' });
+            dateRanges.push({
+              start: monthStart,
+              end: monthEndStr,
+              label: `${monthName} ${year}`
+            });
+          }
+        }
+        break;
+        
+      case 'Trailing 12':
+        if (viewMode === 'total') {
+          // Past 12 months aggregated
+          const endDate = new Date(selectedDate);
+          const startDate = new Date(selectedDate);
+          startDate.setMonth(startDate.getMonth() - 11);
+          startDate.setDate(1);
+          
+          const lastDay = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0);
+          dateRanges = [{
+            start: startDate.toISOString().split('T')[0],
+            end: lastDay.toISOString().split('T')[0],
+            label: 'Trailing 12 Months'
+          }];
+        } else {
+          // Past 12 months individually
+          for (let i = 11; i >= 0; i--) {
+            const monthDate = new Date(selectedDate);
+            monthDate.setMonth(monthDate.getMonth() - i);
+            
+            const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+            const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+            
+            const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
+            const monthYear = monthStart.getFullYear();
+            
+            dateRanges.push({
+              start: monthStart.toISOString().split('T')[0],
+              end: monthEnd.toISOString().split('T')[0],
+              label: `${monthName} ${monthYear}`
+            });
+          }
+        }
+        break;
+    }
+    
+    // Fetch data for all date ranges
+    const allData: any = {};
+    
+    for (const range of dateRanges) {
+      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end}`;
+      
+      if (property !== 'All Properties') {
+        url += `&class=eq.${encodeURIComponent(property)}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const rawData = await response.json();
+        
+        // Group and aggregate data for this period
+        const grouped = rawData.reduce((acc: any, row: any) => {
+          const accountName = row.account || 'Unknown Account';
+          
+          if (!acc[accountName]) {
+            acc[accountName] = {
+              name: accountName,
+              type: row.account_type === 'Income' ? 'Revenue' : 
+                    row.account_type === 'Expenses' ? 'Expenses' : 'Other',
+              total: 0,
+              entries: [],
+              account_type: row.account_type
+            };
+          }
+          
+          acc[accountName].total += (row.amount || 0);
+          acc[accountName].entries.push(row);
+          
+          return acc;
+        }, {});
+        
+        allData[range.label] = grouped;
+      }
+    }
+    
+    return {
+      success: true,
+      data: allData,
+      periods: dateRanges.map(r => r.label),
+      summary: {
+        timePeriod,
+        viewMode,
+        property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
+        dateRanges: dateRanges
+      }
+    };
+    
+  } catch (error) {
+    console.error('Error fetching time series data:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+      data: {}
+    };
+  }
+};
 const fetchFinancialData = async (
   property: string = 'All Properties',
   monthYear: string
@@ -631,10 +846,10 @@ const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
   const [selectedMonth, setSelectedMonth] = useState<MonthString>('January 2023');
-  const [viewMode, setViewMode] = useState<ViewMode>('detailed');
-  const [timeView, setTimeView] = useState<TimeView>('Monthly');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('Monthly');
+  const [viewMode, setViewMode] = useState<ViewMode>('total');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  const [timeViewDropdownOpen, setTimeViewDropdownOpen] = useState(false);
+  const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
@@ -646,6 +861,7 @@ export default function FinancialsPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [availableProperties, setAvailableProperties] = useState<string[]>(HARDCODED_PROPERTIES);
   const [selectedAccountDetails, setSelectedAccountDetails] = useState<FinancialDataItem | null>(null);
+  const [timeSeriesData, setTimeSeriesData] = useState<any>(null);
 
   // Generate months list
   const generateMonthsList = () => {
@@ -674,7 +890,7 @@ export default function FinancialsPage() {
   // Load data when filters change
   useEffect(() => {
     loadRealFinancialData();
-  }, [selectedProperties, selectedMonth]);
+  }, [selectedProperties, selectedMonth, timePeriod, viewMode]);
 
   const loadInitialData = async () => {
     try {
@@ -707,34 +923,49 @@ export default function FinancialsPage() {
       console.log('🔍 LOADING DATA WITH FILTERS:', {
         selectedProperties: Array.from(selectedProperties),
         propertyFilter,
-        month: selectedMonth
+        month: selectedMonth,
+        timePeriod,
+        viewMode
       });
       
-      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
-      
-      if (rawData.success) {
-        // Use the data directly - no transformation needed
-        const combinedData = {
-          success: true,
-          propertyFinancialData: rawData.propertyFinancialData,
-          summary: rawData.summary,
-          performance: {
-            executionTimeMs: Date.now() % 1000
-          }
-        };
-
-        setRealData(combinedData);
-        setDataError(null);
+      // For Monthly Total view, use the original single-month fetch
+      if (timePeriod === 'Monthly' && viewMode === 'total') {
+        const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
         
-        const propertyText = selectedProperties.has('All Properties') 
-          ? 'all property classes' 
-          : `${selectedProperties.size} selected property classes`;
-          
-        showNotification(`Loaded ${rawData.summary.filteredEntries} entries for ${propertyText} in ${selectedMonth}`, 'success');
+        if (rawData.success) {
+          const combinedData = {
+            success: true,
+            propertyFinancialData: rawData.propertyFinancialData,
+            summary: rawData.summary,
+            performance: {
+              executionTimeMs: Date.now() % 1000
+            }
+          };
+
+          setRealData(combinedData);
+          setTimeSeriesData(null); // Clear time series data
+          setDataError(null);
+        } else {
+          setDataError(rawData.error || 'Failed to load financial data');
+        }
       } else {
-        setDataError(rawData.error || 'Failed to load financial data');
-        showNotification('Failed to load financial data', 'error');
+        // For all other views, use time series data
+        const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode);
+        
+        if (timeSeriesResult.success) {
+          setTimeSeriesData(timeSeriesResult);
+          setRealData(null); // Clear single-month data
+          setDataError(null);
+        } else {
+          setDataError(timeSeriesResult.error || 'Failed to load time series data');
+        }
       }
+      
+      const propertyText = selectedProperties.has('All Properties') 
+        ? 'all property classes' 
+        : `${selectedProperties.size} selected property classes`;
+        
+      showNotification(`Loaded data for ${propertyText} - ${timePeriod} ${viewMode} view`, 'success');
       
     } catch (error) {
       console.error('Failed to load financial data:', error);
@@ -882,12 +1113,34 @@ export default function FinancialsPage() {
     setSelectedAccountDetails(accountItem);
   };
 
-  // Get current financial data
+  // Get current financial data - works with both single month and time series
   const getCurrentFinancialData = () => {
-    if (realData && realData.propertyFinancialData) {
+    if (timePeriod === 'Monthly' && viewMode === 'total' && realData?.propertyFinancialData) {
       const propertyKey = Object.keys(realData.propertyFinancialData)[0] || 'All Properties';
       const monthlyData = realData.propertyFinancialData[propertyKey]?.Monthly;
       return monthlyData?.[selectedMonth] || [];
+    } else if (timeSeriesData) {
+      // For time series data, aggregate all periods for KPI calculation
+      const allAccounts: Record<string, any> = {};
+      
+      timeSeriesData.periods.forEach((period: string) => {
+        const periodData = timeSeriesData.data[period] || {};
+        
+        Object.values(periodData).forEach((account: any) => {
+          if (!allAccounts[account.name]) {
+            allAccounts[account.name] = {
+              name: account.name,
+              type: account.type,
+              total: 0,
+              entries: []
+            };
+          }
+          allAccounts[account.name].total += account.total;
+          allAccounts[account.name].entries.push(...account.entries);
+        });
+      });
+      
+      return Object.values(allAccounts);
     }
     return [];
   };
@@ -1009,23 +1262,68 @@ export default function FinancialsPage() {
   const expenseData = generateExpenseBreakdown();
 
   const renderColumnHeaders = () => {
-    return (
-      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-        {selectedMonth}
-      </th>
-    );
+    if (timePeriod === 'Monthly' && viewMode === 'total') {
+      return (
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+          {selectedMonth}
+        </th>
+      );
+    } else if (timeSeriesData) {
+      return timeSeriesData.periods.map((period: string, index: number) => (
+        <th key={period} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+          {period}
+        </th>
+      ));
+    }
+    return null;
   };
 
   const renderDataCells = (item: FinancialDataItem) => {
-    const value = item.total || 0;
-    
-    return (
-      <td className={`px-4 py-3 text-right text-sm font-medium ${
-        value >= 0 ? 'text-green-600' : 'text-red-600'
-      }`}>
-        {formatCurrency(value)}
-      </td>
-    );
+    if (timePeriod === 'Monthly' && viewMode === 'total') {
+      const value = item.total || 0;
+      return (
+        <td className={`px-4 py-3 text-right text-sm font-medium ${
+          value >= 0 ? 'text-green-600' : 'text-red-600'
+        }`}>
+          <span 
+            className={`cursor-pointer hover:bg-${item.type === 'Revenue' ? 'blue' : 'red'}-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-${item.type === 'Revenue' ? 'blue' : 'red'}-200`}
+            onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
+            onMouseLeave={handleAccountMouseLeave}
+            onClick={() => handleAccountClick(item)}
+          >
+            {formatCurrency(value)}
+          </span>
+        </td>
+      );
+    } else if (timeSeriesData) {
+      return timeSeriesData.periods.map((period: string) => {
+        const periodData = timeSeriesData.data[period]?.[item.name];
+        const value = periodData?.total || 0;
+        
+        // Create a period-specific item for clicking
+        const periodItem = {
+          ...item,
+          total: value,
+          entries: periodData?.entries || []
+        };
+        
+        return (
+          <td key={period} className={`px-4 py-3 text-right text-sm font-medium ${
+            value >= 0 ? 'text-green-600' : 'text-red-600'
+          }`}>
+            <span 
+              className={`cursor-pointer hover:bg-${item.type === 'Revenue' ? 'blue' : 'red'}-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-${item.type === 'Revenue' ? 'blue' : 'red'}-200`}
+              onMouseEnter={(e) => handleAccountMouseEnter(e, periodItem)}
+              onMouseLeave={handleAccountMouseLeave}
+              onClick={() => handleAccountClick(periodItem)}
+            >
+              {value !== 0 ? formatCurrency(value) : '-'}
+            </span>
+          </td>
+        );
+      });
+    }
+    return null;
   };
 
   const renderCashFlowDataCells = (item: FinancialDataItem) => {
@@ -1162,7 +1460,65 @@ export default function FinancialsPage() {
                 )}
               </div>
 
-              {/* Action Buttons */}
+              {/* Time Period and View Mode Controls */}
+              <div className="flex items-center gap-2">
+                {/* Time Period Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setTimePeriodDropdownOpen(!timePeriodDropdownOpen)}
+                    className="flex items-center justify-between w-32 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                    style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+                  >
+                    <span className="truncate">{timePeriod}</span>
+                    <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${timePeriodDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {timePeriodDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                      {(['Monthly', 'Quarterly', 'Yearly', 'Trailing 12'] as TimePeriod[]).map((period) => (
+                        <div
+                          key={period}
+                          className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                          onClick={() => {
+                            setTimePeriod(period);
+                            setTimePeriodDropdownOpen(false);
+                          }}
+                        >
+                          {period}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* View Mode Toggle - Hidden for Monthly */}
+                {timePeriod !== 'Monthly' && (
+                  <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                    <button
+                      onClick={() => setViewMode('total')}
+                      className={`px-3 py-2 text-xs transition-colors ${
+                        viewMode === 'total'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
+                    >
+                      Total
+                    </button>
+                    <button
+                      onClick={() => setViewMode('detailed')}
+                      className={`px-3 py-2 text-xs transition-colors ${
+                        viewMode === 'detailed'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
+                    >
+                      Detail
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => showNotification('Financial data exported', 'success')}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
@@ -1277,11 +1633,76 @@ export default function FinancialsPage() {
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      {activeTab === 'p&l' ? 'Profit & Loss Statement (By Property Class)' : 
-                       activeTab === 'cash-flow' ? 'Cash Flow Statement' : 
-                       'Balance Sheet'}
-                    </h3>
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        {activeTab === 'p&l' ? 'Profit & Loss Statement (By Property Class)' : 
+                         activeTab === 'cash-flow' ? 'Cash Flow Statement' : 
+                         'Balance Sheet'}
+                      </h3>
+                      {activeTab === 'p&l' && (
+                        <div className="mt-3 flex items-center gap-4">
+                          {/* Time Period and View Mode Controls */}
+                          <div className="flex items-center gap-2">
+                            {/* Time Period Dropdown */}
+                            <div className="relative">
+                              <button
+                                onClick={() => setTimePeriodDropdownOpen(!timePeriodDropdownOpen)}
+                                className="flex items-center justify-between w-32 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+                              >
+                                <span className="truncate">{timePeriod}</span>
+                                <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${timePeriodDropdownOpen ? 'rotate-180' : ''}`} />
+                              </button>
+                              
+                              {timePeriodDropdownOpen && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                                  {(['Monthly', 'Quarterly', 'Yearly', 'Trailing 12'] as TimePeriod[]).map((period) => (
+                                    <div
+                                      key={period}
+                                      className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                                      onClick={() => {
+                                        setTimePeriod(period);
+                                        setTimePeriodDropdownOpen(false);
+                                      }}
+                                    >
+                                      {period}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* View Mode Toggle - Hidden for Monthly */}
+                            {timePeriod !== 'Monthly' && (
+                              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                                <button
+                                  onClick={() => setViewMode('total')}
+                                  className={`px-3 py-2 text-xs transition-colors ${
+                                    viewMode === 'total'
+                                      ? 'text-white'
+                                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                  style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
+                                >
+                                  Total
+                                </button>
+                                <button
+                                  onClick={() => setViewMode('detailed')}
+                                  className={`px-3 py-2 text-xs transition-colors ${
+                                    viewMode === 'detailed'
+                                      ? 'text-white'
+                                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                  style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
+                                >
+                                  Detail
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setActiveTab('p&l')}
@@ -1833,11 +2254,11 @@ export default function FinancialsPage() {
           )}
 
           {/* Click outside to close dropdowns */}
-          {(timeViewDropdownOpen || propertyDropdownOpen) && (
+          {(timePeriodDropdownOpen || propertyDropdownOpen) && (
             <div
               className="fixed inset-0 z-10"
               onClick={() => {
-                setTimeViewDropdownOpen(false);
+                setTimePeriodDropdownOpen(false);
                 setPropertyDropdownOpen(false);
               }}
             />
