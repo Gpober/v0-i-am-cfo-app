@@ -129,7 +129,7 @@ const fetchProperties = async (): Promise<string[]> => {
   }
 };
 
-// FIXED: Enhanced time series data fetching with correct Trailing 12 logic
+// ENHANCED: Enhanced time series data fetching with Monthly Detail support
 const fetchTimeSeriesData = async (
   property: string = 'All Properties',
   monthYear: string,
@@ -155,42 +155,63 @@ const fetchTimeSeriesData = async (
           const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
           dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
         } else {
-          // Weekly breakdown within the month
+          // ENHANCED: Weekly breakdown within the month for Monthly Detail
           const monthNum = selectedDate.getMonth() + 1;
           const firstDay = new Date(parseInt(year), monthNum - 1, 1);
           const lastDay = new Date(parseInt(year), monthNum, 0);
           
-          // Find all Sundays in the month
-          const sundays = [];
-          let current = new Date(firstDay);
-          
-          // Go to first Sunday
-          while (current.getDay() !== 0) {
-            current.setDate(current.getDate() + 1);
-          }
-          
-          while (current <= lastDay) {
-            sundays.push(new Date(current));
-            current.setDate(current.getDate() + 7);
-          }
-          
-          // Create date ranges for each week
-          dateRanges = sundays.map((sunday, index) => {
-            const weekStart = new Date(sunday);
-            weekStart.setDate(sunday.getDate() - 6); // Monday of that week
-            
-            const weekEnd = new Date(sunday);
-            
-            // Make sure we don't go outside the month
-            if (weekStart < firstDay) weekStart.setTime(firstDay.getTime());
-            if (weekEnd > lastDay) weekEnd.setTime(lastDay.getTime());
-            
-            return {
-              start: weekStart.toISOString().split('T')[0],
-              end: weekEnd.toISOString().split('T')[0],
-              label: `Week ending ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-            };
+          console.log('🗓️ MONTHLY DETAIL - Generating weekly breakdown:', {
+            month: monthYear,
+            firstDay: firstDay.toISOString().split('T')[0],
+            lastDay: lastDay.toISOString().split('T')[0]
           });
+          
+          // Generate weeks within the month (starting from Monday)
+          const weeks = [];
+          let weekStart = new Date(firstDay);
+          
+          // Move to first Monday of the month (or stay at first day if it's Monday)
+          while (weekStart.getDay() !== 1 && weekStart <= lastDay) {
+            weekStart.setDate(weekStart.getDate() + 1);
+          }
+          
+          // If we went past the first day trying to find Monday, start from first day
+          if (weekStart > firstDay) {
+            weekStart = new Date(firstDay);
+          }
+          
+          let weekNumber = 1;
+          
+          while (weekStart <= lastDay) {
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6); // Add 6 days for full week
+            
+            // Don't go past the end of the month
+            if (weekEnd > lastDay) {
+              weekEnd.setTime(lastDay.getTime());
+            }
+            
+            const weekStartStr = weekStart.toISOString().split('T')[0];
+            const weekEndStr = weekEnd.toISOString().split('T')[0];
+            
+            const startDay = weekStart.getDate();
+            const endDay = weekEnd.getDate();
+            
+            weeks.push({
+              start: weekStartStr,
+              end: weekEndStr,
+              label: `Week ${weekNumber} (${startDay}-${endDay})`
+            });
+            
+            console.log(`📅 Week ${weekNumber}: ${weekStartStr} to ${weekEndStr} (${startDay}-${endDay})`);
+            
+            // Move to next week
+            weekStart.setDate(weekStart.getDate() + 7);
+            weekNumber++;
+          }
+          
+          dateRanges = weeks;
+          console.log('✅ MONTHLY DETAIL - Generated', weeks.length, 'weeks');
         }
         break;
         
@@ -685,37 +706,15 @@ export default function FinancialsPage() {
         viewMode
       });
       
-      // For Monthly Total view, use the original single-month fetch
-      if (timePeriod === 'Monthly' && viewMode === 'total') {
-        const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
-        
-        if (rawData.success) {
-          const combinedData = {
-            success: true,
-            propertyFinancialData: rawData.propertyFinancialData,
-            summary: rawData.summary,
-            performance: {
-              executionTimeMs: Date.now() % 1000
-            }
-          };
-
-          setRealData(combinedData);
-          setTimeSeriesData(null); // Clear time series data
-          setDataError(null);
-        } else {
-          setDataError(rawData.error || 'Failed to load financial data');
-        }
+      // ENHANCED: Use time series for ALL modes including Monthly Detail
+      const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode);
+      
+      if (timeSeriesResult.success) {
+        setTimeSeriesData(timeSeriesResult);
+        setRealData(null); // Clear single-month data
+        setDataError(null);
       } else {
-        // For all other views, use time series data
-        const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode);
-        
-        if (timeSeriesResult.success) {
-          setTimeSeriesData(timeSeriesResult);
-          setRealData(null); // Clear single-month data
-          setDataError(null);
-        } else {
-          setDataError(timeSeriesResult.error || 'Failed to load time series data');
-        }
+        setDataError(timeSeriesResult.error || 'Failed to load time series data');
       }
       
       const propertyText = selectedProperties.has('All Properties') 
@@ -797,25 +796,15 @@ export default function FinancialsPage() {
     setExpandedAccounts(newExpanded);
   };
 
-
-
   const handleAccountClick = (accountItem: FinancialDataItem): void => {
     setSelectedAccountDetails(accountItem);
   };
 
-  // FIXED: Get current financial data - works with both single month and time series
+  // ENHANCED: Get current financial data - enhanced for Monthly Detail mode
   const getCurrentFinancialData = () => {
-    if (timePeriod === 'Monthly' && viewMode === 'total' && realData?.propertyFinancialData) {
-      const propertyKey = Object.keys(realData.propertyFinancialData)[0] || 'All Properties';
-      const monthlyData = realData.propertyFinancialData[propertyKey]?.Monthly;
-      return monthlyData?.[selectedMonth] || [];
-    } else if (timeSeriesData) {
-      // FIXED: For Trailing 12 Total, use the single aggregated period
-      if (timePeriod === 'Trailing 12' && viewMode === 'total') {
-        const trailingData = timeSeriesData.data['Trailing 12 Months'] || {};
-        return Object.values(trailingData);
-      } else {
-        // For all other modes, aggregate all periods for KPI calculation
+    if (timeSeriesData) {
+      // ENHANCED: For all detailed modes including Monthly Detail, aggregate all periods for KPI calculation
+      if (viewMode === 'detailed') {
         const allAccounts: Record<string, any> = {};
         
         timeSeriesData.periods.forEach((period: string) => {
@@ -836,6 +825,17 @@ export default function FinancialsPage() {
         });
         
         return Object.values(allAccounts);
+      } else {
+        // For total modes (including Trailing 12 Total and Monthly Total)
+        if (timePeriod === 'Trailing 12' && viewMode === 'total') {
+          const trailingData = timeSeriesData.data['Trailing 12 Months'] || {};
+          return Object.values(trailingData);
+        } else {
+          // For Monthly Total, Quarterly Total, Yearly Total
+          const firstPeriodKey = timeSeriesData.periods[0];
+          const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
+          return Object.values(firstPeriodData);
+        }
       }
     }
     return [];
@@ -933,20 +933,14 @@ export default function FinancialsPage() {
   const expenseData = generateExpenseBreakdown();
 
   const renderColumnHeaders = () => {
-    if (timePeriod === 'Monthly' && viewMode === 'total') {
-      return (
-        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-          {selectedMonth}
-        </th>
-      );
-    } else if (timeSeriesData) {
+    if (timeSeriesData) {
       const headers = timeSeriesData.periods.map((period: string, index: number) => (
         <th key={period} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
           {period}
         </th>
       ));
       
-      // Add Total column for detail view
+      // ENHANCED: Add Total column for ALL detailed views including Monthly Detail
       if (viewMode === 'detailed') {
         headers.push(
           <th key="total" className="px-4 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50 border-l-2 border-blue-200">
@@ -961,21 +955,7 @@ export default function FinancialsPage() {
   };
 
   const renderDataCells = (item: FinancialDataItem) => {
-    if (timePeriod === 'Monthly' && viewMode === 'total') {
-      const value = item.total || 0;
-      return (
-        <td className={`px-4 py-3 text-right text-sm font-medium ${
-          value >= 0 ? 'text-green-600' : 'text-red-600'
-        }`}>
-          <span 
-            className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-200"
-            onClick={() => handleAccountClick(item)}
-          >
-            {formatCurrency(value)}
-          </span>
-        </td>
-      );
-    } else if (timeSeriesData) {
+    if (timeSeriesData) {
       const cells = timeSeriesData.periods.map((period: string) => {
         const periodData = timeSeriesData.data[period]?.[item.name];
         const value = periodData?.total || 0;
@@ -1001,7 +981,7 @@ export default function FinancialsPage() {
         );
       });
       
-      // Add Total column for detail view
+      // ENHANCED: Add Total column for ALL detailed views including Monthly Detail
       if (viewMode === 'detailed') {
         // Calculate total across all periods for this item
         const totalValue = timeSeriesData.periods.reduce((sum: number, period: string) => {
@@ -1051,7 +1031,7 @@ export default function FinancialsPage() {
                 <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
                   Financial Management
                 </span>
-                {(realData || timeSeriesData) && (
+                {timeSeriesData && (
                   <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
                     Connected to financial_transactions
                   </span>
@@ -1059,11 +1039,6 @@ export default function FinancialsPage() {
               </div>
               <p className="text-sm text-gray-600 mt-1">
                 Real-time P&L by Property Class • From financial_transactions table
-                {realData?.summary && (
-                  <span className="ml-2 text-green-600">
-                    • {realData.summary.filteredEntries} entries loaded
-                  </span>
-                )}
                 {timeSeriesData?.summary && (
                   <span className="ml-2 text-green-600">
                     • {timeSeriesData.summary.totalEntriesProcessed} entries loaded • {timeSeriesData.summary.periodsGenerated} periods
@@ -1197,33 +1172,31 @@ export default function FinancialsPage() {
                   )}
                 </div>
 
-                {/* View Mode Toggle - Hidden for Monthly */}
-                {timePeriod !== 'Monthly' && (
-                  <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                    <button
-                      onClick={() => setViewMode('total')}
-                      className={`px-3 py-2 text-xs transition-colors ${
-                        viewMode === 'total'
-                          ? 'text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                      style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
-                    >
-                      Total
-                    </button>
-                    <button
-                      onClick={() => setViewMode('detailed')}
-                      className={`px-3 py-2 text-xs transition-colors ${
-                        viewMode === 'detailed'
-                          ? 'text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                      style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
-                    >
-                      Detail
-                    </button>
-                  </div>
-                )}
+                {/* ENHANCED: View Mode Toggle - Now available for ALL time periods */}
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                  <button
+                    onClick={() => setViewMode('total')}
+                    className={`px-3 py-2 text-xs transition-colors ${
+                      viewMode === 'total'
+                        ? 'text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
+                  >
+                    Total
+                  </button>
+                  <button
+                    onClick={() => setViewMode('detailed')}
+                    className={`px-3 py-2 text-xs transition-colors ${
+                      viewMode === 'detailed'
+                        ? 'text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
+                  >
+                    Detail
+                  </button>
+                </div>
               </div>
               <button
                 onClick={() => showNotification('Financial data exported', 'success')}
@@ -1246,17 +1219,21 @@ export default function FinancialsPage() {
           </div>
 
           {/* Data Status */}
-          {(realData || timeSeriesData) && (
+          {timeSeriesData && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
-                <strong>Data Status:</strong> {realData ? 
-                  `Loaded ${realData.summary.filteredEntries} entries from financial_transactions table • Date Filtering Active` :
+                <strong>Data Status:</strong> {
                   timePeriod === 'Trailing 12' && viewMode === 'total' ? 
                     `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.monthsAggregated} months • Aggregated into Trailing 12 Total` :
+                    timePeriod === 'Monthly' && viewMode === 'detailed' ?
+                      `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} weeks • Monthly Detail with Weekly Breakdown` :
                     `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} periods • Time Series Mode`
                 }
                 <div className="mt-1 text-xs">
                   <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {selectedMonth} • {timePeriod} {viewMode}
+                  {timePeriod === 'Monthly' && viewMode === 'detailed' && (
+                    <span className="ml-2 font-medium text-green-700">📅 Weekly Breakdown</span>
+                  )}
                 </div>
                 {timePeriod === 'Trailing 12' && viewMode === 'total' && timeSeriesData && (
                   <div className="mt-1 text-xs">
@@ -1275,7 +1252,8 @@ export default function FinancialsPage() {
                   <div className="text-gray-600 text-sm font-medium mb-2">Revenue</div>
                   <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
-                    {timePeriod === 'Trailing 12' && viewMode === 'total' ? 'Past 12 Months' : 'Top Line'}
+                    {timePeriod === 'Trailing 12' && viewMode === 'total' ? 'Past 12 Months' : 
+                     timePeriod === 'Monthly' && viewMode === 'detailed' ? 'Monthly Total' : 'Top Line'}
                   </div>
                 </div>
                 <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
@@ -1349,8 +1327,15 @@ export default function FinancialsPage() {
                       <div className="mt-2 text-sm text-gray-600">
                         {timePeriod === 'Trailing 12' && viewMode === 'total' 
                           ? 'Showing aggregated totals for the past 12 months'
+                          : timePeriod === 'Monthly' && viewMode === 'detailed'
+                          ? 'Showing weekly breakdown for the selected month'
                           : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
                         }
+                        {timePeriod === 'Monthly' && viewMode === 'detailed' && (
+                          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                            📅 Weekly Detail
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1386,11 +1371,7 @@ export default function FinancialsPage() {
                           <td className="px-6 py-4 text-left text-lg font-bold text-blue-900">
                             💰 INCOME
                           </td>
-                          {timePeriod === 'Monthly' && viewMode === 'total' ? (
-                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
-                              {formatCurrency(kpis.revenue)}
-                            </td>
-                          ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
                             <td className="px-4 py-4 text-right text-lg font-bold text-blue-900">
                               {formatCurrency(kpis.revenue)}
                             </td>
@@ -1442,11 +1423,7 @@ export default function FinancialsPage() {
                           <td className="px-6 py-4 text-left text-lg font-bold text-blue-800">
                             📊 TOTAL INCOME
                           </td>
-                          {timePeriod === 'Monthly' && viewMode === 'total' ? (
-                            <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
-                              {formatCurrency(kpis.revenue)}
-                            </td>
-                          ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
                             <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
                               {formatCurrency(kpis.revenue)}
                             </td>
@@ -1478,11 +1455,7 @@ export default function FinancialsPage() {
                           <td className="px-6 py-4 text-left text-lg font-bold text-red-900">
                             💸 EXPENSES
                           </td>
-                          {timePeriod === 'Monthly' && viewMode === 'total' ? (
-                            <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
-                              ({formatCurrency(Math.abs(kpis.operatingExpenses))})
-                            </td>
-                          ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
                             <td className="px-4 py-4 text-right text-lg font-bold text-red-600">
                               ({formatCurrency(Math.abs(kpis.operatingExpenses))})
                             </td>
@@ -1534,11 +1507,7 @@ export default function FinancialsPage() {
                           <td className="px-6 py-4 text-left text-lg font-bold text-red-800">
                             📊 TOTAL EXPENSES
                           </td>
-                          {timePeriod === 'Monthly' && viewMode === 'total' ? (
-                            <td className="px-4 py-4 text-right text-lg font-bold text-red-800">
-                              ({formatCurrency(Math.abs(kpis.operatingExpenses))})
-                            </td>
-                          ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
                             <td className="px-4 py-4 text-right text-lg font-bold text-red-800">
                               ({formatCurrency(Math.abs(kpis.operatingExpenses))})
                             </td>
@@ -1573,13 +1542,7 @@ export default function FinancialsPage() {
                           <td className="px-6 py-5 text-left text-xl font-bold" style={{ color: BRAND_COLORS.primary }}>
                             🏆 NET INCOME
                           </td>
-                          {timePeriod === 'Monthly' && viewMode === 'total' ? (
-                            <td className={`px-4 py-5 text-right text-xl font-bold ${
-                              kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
-                            }`}>
-                              {formatCurrency(kpis.netIncome)}
-                            </td>
-                          ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
                             <td className={`px-4 py-5 text-right text-xl font-bold ${
                               kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
                             }`}>
@@ -1787,22 +1750,6 @@ export default function FinancialsPage() {
                         <span className="text-sm text-gray-600">View Mode:</span>
                         <span className="text-sm font-medium">{timePeriod} {viewMode}</span>
                       </div>
-                      {realData?.summary && (
-                        <>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Financial Transactions:</span>
-                            <span className="text-sm font-medium">{realData.summary.filteredEntries}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Property Classes in Data:</span>
-                            <span className="text-sm font-medium">{realData.summary.classesInData?.length || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Account Types:</span>
-                            <span className="text-sm font-medium">{realData.summary.accountTypes?.length || 0}</span>
-                          </div>
-                        </>
-                      )}
                       {timeSeriesData?.summary && (
                         <>
                           <div className="flex justify-between items-center">
@@ -1829,12 +1776,30 @@ export default function FinancialsPage() {
                               </div>
                             </div>
                           )}
+                          {timePeriod === 'Monthly' && viewMode === 'detailed' && (
+                            <div className="p-3 bg-green-50 rounded-lg">
+                              <div className="text-sm text-green-700">
+                                <strong>📅 Monthly Weekly Breakdown:</strong>
+                                <div className="mt-1 text-xs">
+                                  Showing {timeSeriesData.summary.periodsGenerated} weeks within {selectedMonth}
+                                </div>
+                                <div className="mt-2 text-xs">
+                                  Each week column shows financial activity for that specific week range. The Total column aggregates all weeks for the month.
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </>
                       )}
                       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                         <p className="text-sm text-blue-700">
                           💡 <strong>Tip:</strong> Click on any dollar amount in the P&L table to view detailed transaction breakdowns here.
                         </p>
+                        {timePeriod === 'Monthly' && viewMode === 'detailed' && (
+                          <p className="text-sm text-blue-700 mt-2">
+                            📅 <strong>Monthly Detail:</strong> Use the weekly columns to analyze financial performance by week within {selectedMonth}.
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1842,9 +1807,6 @@ export default function FinancialsPage() {
               </div>
             </div>
           </div>
-
-          {/* Account Tooltip */}
-          {/* Removed hover tooltips - using transaction detail panel instead */}
 
           {/* Notification */}
           {notification.show && (
