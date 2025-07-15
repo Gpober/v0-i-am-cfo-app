@@ -44,29 +44,36 @@ jobs:
         uses: grll/claude-code-base-action@beta
         with:
           prompt: |
-            Analyze this Next.js financial dashboard project for deployment readiness:
+            Analyze this Next.js financial dashboard project with Supabase backend for deployment readiness:
             
             Please review:
             1. Code quality and TypeScript usage
-            2. Performance optimizations needed
-            3. Bundle size concerns
-            4. Security considerations
-            5. Build configuration recommendations
-            6. Component architecture assessment
+            2. Supabase integration and database patterns
+            3. Authentication and security implementation
+            4. Performance optimizations needed
+            5. Bundle size concerns
+            6. Build configuration recommendations
+            7. Database schema and query optimization
+            8. RLS (Row Level Security) policies if present
             
-            Focus on the main financial component at src/app/financials/page.tsx if it exists.
+            Focus on the main financial component at src/app/financials/page.tsx and any Supabase-related code.
             
             Provide:
             - Overall quality score (1-10)
             - Critical issues that must be fixed before deployment
             - Performance optimization recommendations
+            - Security review (especially Supabase RLS)
             - Build configuration suggestions
-            - Security review
+            - Backend/database recommendations
             
-            Generate a markdown report with your findings and recommendations.
-          system_prompt: "You are a senior full-stack engineer with expertise in Next.js, React, and deployment optimization. Focus on production readiness, performance, and best practices."
+            Generate a comprehensive markdown report with your findings and recommendations.
+          system_prompt: "You are a senior full-stack engineer with expertise in Next.js, React, Supabase, and deployment optimization. Focus on production readiness, performance, security, and best practices for financial applications."
           allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
           max_turns: "10"
+          claude_env: |
+            NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           anthropic_api_key: ${{ secrets.CLAUDE_API_KEY }}
 
       - name: Extract Claude Analysis Results
@@ -131,6 +138,9 @@ jobs:
           echo "🔨 Building with Claude Max optimizations..."
           npm run build
           echo "status=success" >> $GITHUB_OUTPUT
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Analyze Bundle Size
         id: analyze-bundle
@@ -150,12 +160,21 @@ jobs:
           path: out/
           retention-days: 30
 
+      - name: Verify Build Output
+        run: |
+          echo "📁 Checking build output..."
+          ls -la out/ || echo "No out/ directory found"
+          find out/ -type f | head -10 || echo "Build output verification failed"
+
   # Phase 3: Deploy to Netlify
   deploy-netlify:
     if: github.event.inputs.deploy_target == 'netlify' || github.event.inputs.deploy_target == ''
     needs: [build, claude-analysis]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
