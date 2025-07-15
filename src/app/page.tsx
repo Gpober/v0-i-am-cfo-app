@@ -1133,7 +1133,7 @@ export default function FinancialsPage() {
         <div className="space-y-8">
           {/* Header Controls */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Enhanced Financial Management</h2>
+            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Financial Management</h2>
             <div className="flex flex-wrap gap-4 items-center">
               {/* Month Selector */}
               <select
@@ -1406,7 +1406,7 @@ export default function FinancialsPage() {
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900">
-                        Profit & Loss Statement (P&L ACCOUNTS ONLY)
+                        Profit & Loss Statement (By Property Class)
                       </h3>
                       <div className="mt-2 text-sm text-gray-600">
                         {timePeriod === 'Trailing 12' && viewMode === 'total' 
