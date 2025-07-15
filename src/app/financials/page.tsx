@@ -70,13 +70,6 @@ interface NotificationState {
   type: 'info' | 'success' | 'error';
 }
 
-interface TooltipState {
-  show: boolean;
-  content: string;
-  x: number;
-  y: number;
-}
-
 // Hardcoded properties based on your actual database data
 const HARDCODED_PROPERTIES = [
   'All Properties',
@@ -618,7 +611,6 @@ export default function FinancialsPage() {
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
-  const [accountTooltip, setAccountTooltip] = useState<TooltipState>({ show: false, content: '', x: 0, y: 0 });
 
   // Real data state
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -805,74 +797,7 @@ export default function FinancialsPage() {
     setExpandedAccounts(newExpanded);
   };
 
-  const handleAccountMouseEnter = (event: React.MouseEvent<HTMLElement>, accountItem: FinancialDataItem): void => {
-    if (!accountItem.entries || accountItem.entries.length === 0) return;
 
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    
-    let tooltipContent = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
-      ${accountItem.name} • ${formatCurrency(accountItem.total)}
-    </div>`;
-
-    tooltipContent += `<div style="font-size: 11px; color: #E5E7EB; margin-bottom: 8px;">
-      ${accountItem.entries.length} Financial Transactions • Mapping: ${accountItem.mapping_method || 'Direct'}
-    </div>`;
-
-    const recentEntries = accountItem.entries.slice(0, 5);
-    
-    recentEntries.forEach((entry: any, index: number) => {
-      const entryDate = new Date(entry.date).toLocaleDateString();
-      const isLast = index === recentEntries.length - 1;
-      
-      tooltipContent += `
-        <div style="margin-bottom: ${isLast ? '0' : '6px'}; padding: 4px; background: rgba(255,255,255,0.1); border-radius: 4px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <div style="width: 4px; height: 4px; background: ${entry.amount >= 0 ? '#10B981' : '#EF4444'}; border-radius: 50%;"></div>
-              <strong style="font-size: 11px; color: white;">ID: ${entry.id}</strong>
-            </div>
-            <span style="font-size: 10px; color: #D1D5DB;">${entryDate}</span>
-          </div>
-          <div style="margin-left: 8px; margin-top: 2px;">
-            ${entry.memo ? `
-              <div style="font-size: 10px; color: #F3F4F6; margin-bottom: 2px; padding: 2px 4px; background: rgba(255,255,255,0.1); border-radius: 2px;">
-                💬 ${entry.memo}
-              </div>
-            ` : ''}
-            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
-              <span style="font-size: 10px; color: #9CA3AF;">
-                ${entry.class || 'No Class'} • ${entry.account_type}
-              </span>
-              <span style="font-size: 11px; font-weight: bold; color: ${entry.amount >= 0 ? '#10B981' : '#EF4444'};">
-                ${formatCurrency(Math.abs(entry.amount))}
-              </span>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-
-    if (accountItem.entries.length > 5) {
-      tooltipContent += `
-        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
-          <span style="font-size: 10px; color: #D1D5DB; font-style: italic;">
-            + ${accountItem.entries.length - 5} more transactions
-          </span>
-        </div>
-      `;
-    }
-
-    setAccountTooltip({
-      show: true,
-      content: tooltipContent,
-      x: rect.left + rect.width / 2,
-      y: rect.top - 10
-    });
-  };
-
-  const handleAccountMouseLeave = (): void => {
-    setAccountTooltip({ show: false, content: '', x: 0, y: 0 });
-  };
 
   const handleAccountClick = (accountItem: FinancialDataItem): void => {
     setSelectedAccountDetails(accountItem);
@@ -1043,9 +968,7 @@ export default function FinancialsPage() {
           value >= 0 ? 'text-green-600' : 'text-red-600'
         }`}>
           <span 
-            className={`cursor-pointer hover:bg-${item.type === 'Revenue' ? 'blue' : 'red'}-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-${item.type === 'Revenue' ? 'blue' : 'red'}-200`}
-            onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
-            onMouseLeave={handleAccountMouseLeave}
+            className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-200"
             onClick={() => handleAccountClick(item)}
           >
             {formatCurrency(value)}
@@ -1069,9 +992,7 @@ export default function FinancialsPage() {
             value >= 0 ? 'text-green-600' : 'text-red-600'
           }`}>
             <span 
-              className={`cursor-pointer hover:bg-${item.type === 'Revenue' ? 'blue' : 'red'}-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-${item.type === 'Revenue' ? 'blue' : 'red'}-200`}
-              onMouseEnter={(e) => handleAccountMouseEnter(e, periodItem)}
-              onMouseLeave={handleAccountMouseLeave}
+              className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-200"
               onClick={() => handleAccountClick(periodItem)}
             >
               {value !== 0 ? formatCurrency(value) : '-'}
@@ -1103,9 +1024,7 @@ export default function FinancialsPage() {
             totalValue >= 0 ? 'text-green-700' : 'text-red-700'
           }`}>
             <span 
-              className={`cursor-pointer hover:bg-${item.type === 'Revenue' ? 'blue' : 'red'}-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-${item.type === 'Revenue' ? 'blue' : 'red'}-300`}
-              onMouseEnter={(e) => handleAccountMouseEnter(e, totalItem)}
-              onMouseLeave={handleAccountMouseLeave}
+              className="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-300"
               onClick={() => handleAccountClick(totalItem)}
             >
               {formatCurrency(totalValue)}
@@ -1925,19 +1844,7 @@ export default function FinancialsPage() {
           </div>
 
           {/* Account Tooltip */}
-          {accountTooltip.show && (
-            <div
-              className="fixed z-50 bg-gray-900 text-white p-4 rounded-lg text-xs shadow-xl pointer-events-none transition-opacity border border-gray-700"
-              style={{
-                left: Math.max(10, Math.min(accountTooltip.x - 140, window.innerWidth - 290)),
-                top: accountTooltip.y - 10,
-                transform: 'translateY(-100%)',
-                maxWidth: '280px',
-                minWidth: '260px'
-              }}
-              dangerouslySetInnerHTML={{ __html: accountTooltip.content }}
-            />
-          )}
+          {/* Removed hover tooltips - using transaction detail panel instead */}
 
           {/* Notification */}
           {notification.show && (
