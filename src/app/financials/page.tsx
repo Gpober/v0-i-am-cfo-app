@@ -255,71 +255,51 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     const creditAmount = entry.credit_amount || 0;
     
     switch (acc[key].type) {
-      case 'Revenue':
-      case 'Income':
-        // BULLETPROOF RESOLUTION DETECTION
-        const isResolutionAccount = 
-          // Exact match for the specific account
-          originalAccountName === 'Resolution Adjustments, Returned Payments, Etc.' ||
-          cleanAccountName === 'Resolution Adjustments, Returned Payments, Etc.' ||
-          // Handle potential sub-accounts like "Resolution Adjustments, Returned Payments, Etc.:Refund"
-          originalAccountName.startsWith('Resolution Adjustments, Returned Payments, Etc.:') ||
-          // Keyword detection in account names
-          originalAccountName.toLowerCase().includes('resolution adjustments') ||
-          originalAccountName.toLowerCase().includes('returned payments') ||
-          cleanAccountName.toLowerCase().includes('resolution adjustments') ||
-          cleanAccountName.toLowerCase().includes('returned payments') ||
-          // Description-based detection for reclassification entries
-          description.includes('resolution') ||
-          description.includes('refund') ||
-          description.includes('chargeback') ||
-          description.includes('dispute');
-        
-        if (isResolutionAccount) {
-          // FORCE NEGATIVE - resolutions always reduce revenue
-          let rawAmount = Math.max(
-            Math.abs(debitAmount),
-            Math.abs(creditAmount),
-            Math.abs(entry.line_amount || 0)
-          );
-          amount = -rawAmount; // ALWAYS NEGATIVE
-          
-          console.log(`🔴 RESOLUTION DETECTED (FORCED NEGATIVE): "${originalAccountName}" → ${amount}`);
-          console.log(`   Cleaned name: "${cleanAccountName}"`);
-          console.log(`   Description: "${entry.description}"`);
-          console.log(`   Amounts: Debit=${debitAmount}, Credit=${creditAmount}`);
-        } else {
-          // PERFECT: Income/Revenue = Credit - Debit (normal balance is CREDIT)
-          amount = creditAmount - debitAmount;
-          console.log(`💰 NORMAL REVENUE: ${accountName} = ${amount} (Credit: ${creditAmount}, Debit: ${debitAmount})`);
-        }
-        break;
-        
-      case 'Expenses':
-        // PERFECT: Expenses = Debit - Credit (normal balance is DEBIT)
-        amount = debitAmount - creditAmount;
-        console.log(`💸 EXPENSE: ${accountName} = ${amount} (Debit: ${debitAmount}, Credit: ${creditAmount})`);
-        break;
-        
-      case 'Assets':
-      case 'Fixed Assets':
-        // PERFECT: Assets = Debit - Credit (normal balance is DEBIT)
-        amount = debitAmount - creditAmount;
-        console.log(`🏢 ASSET: ${accountName} = ${amount} (Debit: ${debitAmount}, Credit: ${creditAmount})`);
-        break;
-        
-      case 'Liabilities':
-      case 'Credit Card':
-        // PERFECT: Liabilities = Credit - Debit (normal balance is CREDIT)
-        amount = creditAmount - debitAmount;
-        console.log(`💳 LIABILITY: ${accountName} = ${amount} (Credit: ${creditAmount}, Debit: ${debitAmount})`);
-        break;
-        
-      case 'Equity':
-        // PERFECT: Equity = Credit - Debit (normal balance is CREDIT)
-        amount = creditAmount - debitAmount;
-        console.log(`⚖️ EQUITY: ${accountName} = ${amount} (Credit: ${creditAmount}, Debit: ${debitAmount})`);
-        break;
+  // ASSETS: Normal balance is DEBIT
+  case 'Fixed Assets':
+  case 'Other Current Assets':
+  case 'Assets':
+    amount = debitAmount - creditAmount;
+    console.log(`🏢 ASSET: ${accountName} = ${amount} (Debit: ${debitAmount}, Credit: ${creditAmount})`);
+    break;
+    
+  // EXPENSES: Normal balance is DEBIT
+  case 'Expenses':
+  case 'Other Expenses':
+  case 'Cost of Goods Sold':
+  case 'Interest Expense':
+    amount = debitAmount - creditAmount;
+    console.log(`💸 EXPENSE: ${accountName} = ${amount} (Debit: ${debitAmount}, Credit: ${creditAmount})`);
+    break;
+    
+  // INCOME: Normal balance is CREDIT
+  case 'Revenue':
+  case 'Income':
+  case 'Other Income':
+    amount = creditAmount - debitAmount;
+    console.log(`💰 INCOME: ${accountName} = ${amount} (Credit: ${creditAmount}, Debit: ${debitAmount})`);
+    break;
+    
+  // LIABILITIES: Normal balance is CREDIT
+  case 'Other Current Liabilities':
+  case 'Liabilities':
+  case 'Credit Card':
+  case 'Bank':
+    amount = creditAmount - debitAmount;
+    console.log(`💳 LIABILITY: ${accountName} = ${amount} (Credit: ${creditAmount}, Debit: ${debitAmount})`);
+    break;
+    
+  // EQUITY: Normal balance is CREDIT
+  case 'Equity':
+  case 'Long Term Liabilities':
+    amount = creditAmount - debitAmount;
+    console.log(`⚖️ EQUITY: ${accountName} = ${amount} (Credit: ${creditAmount}, Debit: ${debitAmount})`);
+    break;
+    
+  default:
+    amount = entry.line_amount || (debitAmount - creditAmount);
+    console.log(`⚠️ UNKNOWN TYPE: ${accountName} | Type: ${acc[key].type} | Amount: ${amount}`);
+}
         
       case 'Other Income':
         // Other Income follows revenue rules: Credit - Debit
