@@ -339,12 +339,12 @@ const fetchFinancialData = async (
     const [month, year] = monthYear.split(' ');
     const monthNum = new Date(`${month} 1, ${year}`).getMonth() + 1;
     
-    // STRICT date filtering for your date column
+    // Regular date filtering for your date column
     const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
     const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
     const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
     
-    console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
+    console.log(`📅 DATE RANGE: ${startDate} to ${endDate} (${month} ${year})`);
     
     let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${startDate}&date=lte.${endDate}&order=date,account`;
     
@@ -353,7 +353,7 @@ const fetchFinancialData = async (
       console.log('🏠 Filtering by class:', property);
     }
 
-    console.log('📡 Final URL with STRICT date filtering:', url);
+    console.log('📡 Final URL with date filtering:', url);
 
     const response = await fetch(url, {
       headers: {
@@ -369,51 +369,29 @@ const fetchFinancialData = async (
     
     const data = await response.json();
     
-    console.log('📊 Financial transactions loaded for STRICT date range:', data.length);
-    
-    // ADDITIONAL CLIENT-SIDE DATE VALIDATION
-    const filteredData = data.filter((entry: any) => {
-      const entryDate = new Date(entry.date);
-      const entryYear = entryDate.getFullYear();
-      const entryMonth = entryDate.getMonth() + 1;
-      
-      const targetYear = parseInt(year);
-      const targetMonth = monthNum;
-      
-      const isCorrectYear = entryYear === targetYear;
-      const isCorrectMonth = entryMonth === targetMonth;
-      
-      if (!isCorrectYear || !isCorrectMonth) {
-        console.warn(`⚠️ FILTERED OUT: Entry ${entry.id} dated ${entry.date} (not in ${month} ${year})`);
-        return false;
-      }
-      
-      return true;
-    });
-    
-    console.log(`✅ STRICT FILTERING RESULT: ${filteredData.length} entries (filtered out ${data.length - filteredData.length} entries)`);
+    console.log('📊 Financial transactions loaded:', data.length);
     
     // Debug: Show date range of actual entries
-    if (filteredData.length > 0) {
-      const dates = filteredData.map((e: any) => e.date).sort();
-      console.log(`📅 ACTUAL DATE RANGE in filtered data: ${dates[0]} to ${dates[dates.length - 1]}`);
+    if (data.length > 0) {
+      const dates = data.map((e: any) => e.date).sort();
+      console.log(`📅 ACTUAL DATE RANGE in data: ${dates[0]} to ${dates[dates.length - 1]}`);
     }
 
     return {
       success: true,
-      data: filteredData || [],
+      data: data || [],
       summary: {
-        filteredEntries: filteredData?.length || 0,
+        filteredEntries: data?.length || 0,
         originalEntries: data.length,
-        dateFiltered: data.length - filteredData.length,
-        dataSource: `Supabase financial_transactions + STRICT ${month} ${year} Filtering`,
+        dateFiltered: 0,
+        dataSource: `Supabase financial_transactions + ${month} ${year} Filtering`,
         dateRange: `${startDate} to ${endDate}`,
         filters: { property, monthYear },
-        accountTypes: [...new Set(filteredData.map((a: any) => a.account_type))],
-        classesInData: [...new Set(filteredData.map((e: any) => e.class))],
+        accountTypes: [...new Set(data.map((a: any) => a.account_type))],
+        classesInData: [...new Set(data.map((e: any) => e.class))],
         mappingStats: {
-          totalEntries: filteredData?.length || 0,
-          directMapped: filteredData?.length || 0,
+          totalEntries: data?.length || 0,
+          directMapped: data?.length || 0,
           fallbackMapped: 0
         }
       }
@@ -1015,20 +993,15 @@ export default function FinancialsPage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> Loaded {realData.summary.filteredEntries} entries 
-                from financial_transactions table • STRICT Date Filtering Active
+                from financial_transactions table • Date Filtering Active
                 <div className="mt-1 text-xs">
-                  <strong>Date Range:</strong> {realData.summary.dateRange} (STRICT {selectedMonth} ONLY)
+                  <strong>Date Range:</strong> {realData.summary.dateRange} ({selectedMonth})
                 </div>
                 <div className="mt-1 text-xs">
                   <strong>Current Filters:</strong> {getSelectedPropertiesText()} • {selectedMonth}
                 </div>
                 <div className="mt-1 text-xs">
                   <strong>Data Source:</strong> {realData.summary.dataSource}
-                </div>
-                <div className="mt-1 text-xs">
-                  <strong>Date Filtering:</strong> {realData.summary.originalEntries || 0} original entries → 
-                  {realData.summary.filteredEntries} after STRICT filtering 
-                  {realData.summary.dateFiltered ? `(${realData.summary.dateFiltered} entries filtered out)` : ''}
                 </div>
               </div>
             </div>
