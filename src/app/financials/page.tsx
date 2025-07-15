@@ -645,6 +645,7 @@ export default function FinancialsPage() {
   const [realData, setRealData] = useState<any>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const [availableProperties, setAvailableProperties] = useState<string[]>(HARDCODED_PROPERTIES);
+  const [selectedAccountDetails, setSelectedAccountDetails] = useState<FinancialDataItem | null>(null);
 
   // Generate months list
   const generateMonthsList = () => {
@@ -875,6 +876,10 @@ export default function FinancialsPage() {
 
   const handleAccountMouseLeave = (): void => {
     setAccountTooltip({ show: false, content: '', x: 0, y: 0 });
+  };
+
+  const handleAccountClick = (accountItem: FinancialDataItem): void => {
+    setSelectedAccountDetails(accountItem);
   };
 
   // Get current financial data
@@ -1355,9 +1360,10 @@ export default function FinancialsPage() {
                                 </td>
                                 <td className="px-4 py-2 text-right text-sm text-gray-700">
                                   <span 
-                                    className="cursor-help hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                                    className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-200"
                                     onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
                                     onMouseLeave={handleAccountMouseLeave}
+                                    onClick={() => handleAccountClick(item)}
                                   >
                                     {formatCurrency(item.total)}
                                   </span>
@@ -1409,9 +1415,10 @@ export default function FinancialsPage() {
                                 </td>
                                 <td className="px-4 py-2 text-right text-sm text-gray-700">
                                   <span 
-                                    className="cursor-help hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                    className="cursor-pointer hover:bg-red-50 px-2 py-1 rounded transition-colors border border-transparent hover:border-red-200"
                                     onMouseEnter={(e) => handleAccountMouseEnter(e, item)}
                                     onMouseLeave={handleAccountMouseLeave}
+                                    onClick={() => handleAccountClick(item)}
                                   >
                                     {formatCurrency(item.total)}
                                   </span>
@@ -1658,38 +1665,130 @@ export default function FinancialsPage() {
                 </div>
               </div>
 
-              {/* Property Performance Summary */}
+              {/* Transaction Detail Panel */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Property Summary</h3>
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {selectedAccountDetails ? 'Transaction Details' : 'Property Summary'}
+                  </h3>
+                  {selectedAccountDetails && (
+                    <div className="mt-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{selectedAccountDetails.name}</p>
+                        <p className="text-lg font-semibold" style={{ color: BRAND_COLORS.primary }}>
+                          {formatCurrency(selectedAccountDetails.total)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedAccountDetails(null)}
+                        className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Selected Properties:</span>
-                      <span className="text-sm font-medium">{getSelectedPropertiesText()}</span>
+                  {selectedAccountDetails ? (
+                    <div className="space-y-4">
+                      {/* Summary Stats */}
+                      <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div>
+                          <span className="text-xs text-gray-500">Total Transactions</span>
+                          <div className="text-lg font-semibold">{selectedAccountDetails.entries?.length || 0}</div>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500">Account Type</span>
+                          <div className="text-lg font-semibold">{selectedAccountDetails.type}</div>
+                        </div>
+                      </div>
+
+                      {/* Transaction List */}
+                      <div className="max-h-96 overflow-y-auto">
+                        <div className="space-y-2">
+                          {selectedAccountDetails.entries && selectedAccountDetails.entries.length > 0 ? (
+                            selectedAccountDetails.entries
+                              .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                              .map((entry: any, index: number) => (
+                                <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                                  <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        className={`w-2 h-2 rounded-full ${
+                                          entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
+                                        }`}
+                                      />
+                                      <span className="text-xs text-gray-500">ID: {entry.id}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={`text-sm font-semibold ${
+                                        entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                                      }`}>
+                                        {formatCurrency(entry.amount)}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(entry.date).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {entry.memo && (
+                                    <div className="mb-2 p-2 bg-blue-50 rounded text-xs">
+                                      <span className="text-blue-700">💬 {entry.memo}</span>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="flex justify-between text-xs text-gray-600">
+                                    <span>
+                                      <strong>Class:</strong> {entry.class || 'No Class'}
+                                    </span>
+                                    <span>
+                                      <strong>Type:</strong> {entry.account_type}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))
+                          ) : (
+                            <div className="text-center py-8 text-gray-500">
+                              No transaction details available
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Data Period:</span>
-                      <span className="text-sm font-medium">{selectedMonth}</span>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Selected Properties:</span>
+                        <span className="text-sm font-medium">{getSelectedPropertiesText()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Data Period:</span>
+                        <span className="text-sm font-medium">{selectedMonth}</span>
+                      </div>
+                      {realData?.summary && (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Financial Transactions:</span>
+                            <span className="text-sm font-medium">{realData.summary.filteredEntries}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Property Classes in Data:</span>
+                            <span className="text-sm font-medium">{realData.summary.classesInData?.length || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Account Types:</span>
+                            <span className="text-sm font-medium">{realData.summary.accountTypes?.length || 0}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-700">
+                          💡 <strong>Tip:</strong> Click on any dollar amount in the P&L table to view detailed transaction breakdowns here.
+                        </p>
+                      </div>
                     </div>
-                    {realData?.summary && (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Financial Transactions:</span>
-                          <span className="text-sm font-medium">{realData.summary.filteredEntries}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Property Classes in Data:</span>
-                          <span className="text-sm font-medium">{realData.summary.classesInData?.length || 0}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Account Types:</span>
-                          <span className="text-sm font-medium">{realData.summary.accountTypes?.length || 0}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
