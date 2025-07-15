@@ -431,9 +431,39 @@ const fetchFinancialData = async (
     
     console.log('📊 Raw financial transactions loaded:', rawData.length);
     
+    // Debug: Check all unique account names in raw data
+    const uniqueAccounts = [...new Set(rawData.map((row: any) => row.account))];
+    console.log('📊 All unique account names in raw data:', uniqueAccounts);
+    
+    // Debug: Check for any revenue account variations
+    const revenueAccounts = rawData.filter((row: any) => 
+      row.account && row.account.toLowerCase().includes('revenue')
+    ).map((row: any) => row.account);
+    const uniqueRevenueAccounts = [...new Set(revenueAccounts)];
+    console.log('📊 All unique REVENUE account names:', uniqueRevenueAccounts);
+    
+    // Debug: Sum by exact account name
+    const accountSums = rawData.reduce((acc: any, row: any) => {
+      const exactName = row.account;
+      if (!acc[exactName]) acc[exactName] = 0;
+      acc[exactName] += (row.amount || 0);
+      return acc;
+    }, {});
+    console.log('📊 Raw account sums:', accountSums);
+    
     // Simple grouping by account name and sum amounts
     const grouped = rawData.reduce((acc: any, row: any) => {
       const accountName = row.account?.trim() || 'Unknown Account';
+      
+      // Debug every row for Direct revenue
+      if (accountName.toLowerCase().includes('direct')) {
+        console.log('🔍 Found Direct row:', {
+          accountName,
+          account_type: row.account_type,
+          amount: row.amount,
+          class: row.class
+        });
+      }
       
       if (!acc[accountName]) {
         acc[accountName] = {
@@ -444,6 +474,11 @@ const fetchFinancialData = async (
           entries: [],
           account_type: row.account_type
         };
+        
+        // Debug when creating Direct account
+        if (accountName.toLowerCase().includes('direct')) {
+          console.log('🔍 Created Direct account:', accountName);
+        }
       }
       
       acc[accountName].total += (row.amount || 0);
@@ -452,6 +487,7 @@ const fetchFinancialData = async (
       return acc;
     }, {});
 
+    console.log('📊 All account names found:', Object.keys(grouped));
     console.log('📊 Grouped accounts:', Object.keys(grouped));
     console.log('📊 Direct revenue check:', grouped['Rental Revenue - Direct'] ? 
       `Found with total: ${grouped['Rental Revenue - Direct'].total}` : 'NOT FOUND');
