@@ -300,26 +300,6 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
     amount = entry.line_amount || (debitAmount - creditAmount);
     console.log(`⚠️ UNKNOWN TYPE: ${accountName} | Type: ${acc[key].type} | Amount: ${amount}`);
 }
-        
-      case 'Other Income':
-        // Other Income follows revenue rules: Credit - Debit
-        amount = creditAmount - debitAmount;
-        console.log(`📈 OTHER INCOME: ${accountName} = ${amount} (Credit: ${creditAmount}, Debit: ${debitAmount})`);
-        break;
-        
-      case 'Other Expenses':
-      case 'Interest Expense':
-      case 'Cost of Goods Sold':
-        // Other Expenses follow expense rules: Debit - Credit
-        amount = debitAmount - creditAmount;
-        console.log(`📉 OTHER EXPENSE: ${accountName} = ${amount} (Debit: ${debitAmount}, Credit: ${creditAmount})`);
-        break;
-        
-      default:
-        // Default: Use line_amount if available, otherwise use debit-credit
-        amount = entry.line_amount || (debitAmount - creditAmount);
-        console.log(`⚠️ UNKNOWN TYPE: ${accountName} | Type: ${acc[key].type} | Amount: ${amount}`);
-    }
     
     acc[key].total += amount;
     acc[key].months[monthYear as MonthString] = (acc[key].months[monthYear as MonthString] || 0) + amount;
