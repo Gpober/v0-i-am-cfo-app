@@ -230,56 +230,49 @@ const transformFinancialData = (entries: FinancialEntry[], monthYear: string) =>
       };
     }
     
-    // FIXED: Proper amount calculation respecting natural account balances
+    // FIXED: Proper amount calculation with correct revenue handling
     let amount = 0;
+    const description = (entry.description || '').toLowerCase();
     
     switch (acc[key].type) {
       case 'Revenue':
-        // Revenue accounts have natural CREDIT balances
-        // Credits INCREASE revenue (positive)
-        // Debits DECREASE revenue (negative) - like resolutions/adjustments
-        amount = entry.credit_amount - entry.debit_amount;
-        
-        // If using line_amount, respect its sign
-        if (entry.line_amount !== 0 && entry.line_amount !== null) {
-          amount = entry.line_amount;
+        // FIXED: Handle resolutions separately from normal revenue
+        if (description.includes('resolution') || 
+            description.includes('adjustment') || 
+            description.includes('refund') || 
+            description.includes('chargeback')) {
+          // Resolutions reduce revenue (should be negative)
+          amount = -(Math.abs(entry.debit_amount - entry.credit_amount));
+          console.log(`🔄 RESOLUTION: ${accountName} = -${Math.abs(entry.debit_amount - entry.credit_amount)}`);
+        } else {
+          // Normal revenue (should be positive)
+          // Revenue accounts have natural CREDIT balances
+          amount = entry.credit_amount - entry.debit_amount;
+          
+          // If the calculation gives negative for normal revenue, flip it
+          if (amount < 0 && !description.includes('resolution')) {
+            amount = Math.abs(amount);
+          }
+          
+          console.log(`💰 NORMAL REVENUE: ${accountName} = ${amount} (Credit: ${entry.credit_amount}, Debit: ${entry.debit_amount})`);
         }
-        
-        console.log(`🔍 REVENUE: ${accountName} | Credit: ${entry.credit_amount} | Debit: ${entry.debit_amount} | Line: ${entry.line_amount} | Final: ${amount}`);
         break;
         
       case 'Expenses':
         // Expense accounts have natural DEBIT balances
-        // Debits INCREASE expenses (positive)
-        // Credits DECREASE expenses (negative) - like refunds/reversals
-        amount = entry.debit_amount - entry.credit_amount;
-        
-        // If using line_amount, respect its sign for expenses
-        if (entry.line_amount !== 0 && entry.line_amount !== null) {
-          amount = Math.abs(entry.line_amount); // Expenses should show as positive amounts
-        }
-        
-        console.log(`🔍 EXPENSE: ${accountName} | Debit: ${entry.debit_amount} | Credit: ${entry.credit_amount} | Line: ${entry.line_amount} | Final: ${amount}`);
+        amount = Math.abs(entry.debit_amount - entry.credit_amount);
+        console.log(`💸 EXPENSE: ${accountName} = ${amount}`);
         break;
         
       case 'Assets':
-        // Asset accounts have natural DEBIT balances
         amount = entry.debit_amount - entry.credit_amount;
-        if (entry.line_amount !== 0 && entry.line_amount !== null) {
-          amount = entry.line_amount;
-        }
         break;
         
       case 'Liabilities':
-        // Liability accounts have natural CREDIT balances
         amount = entry.credit_amount - entry.debit_amount;
-        if (entry.line_amount !== 0 && entry.line_amount !== null) {
-          amount = entry.line_amount;
-        }
         break;
         
       default:
-        // For unknown types, use line_amount if available, otherwise debit - credit
         amount = entry.line_amount || (entry.debit_amount - entry.credit_amount);
         console.log(`⚠️ UNKNOWN TYPE: ${accountName} | Type: ${acc[key].type} | Amount: ${amount}`);
     }
@@ -418,23 +411,29 @@ const fetchFinancialData = async (
     
     // STRICT date filtering - exactly the month requested
     const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-    const lastDay = new Date(parseInt(year), monthNum, 0).getDate(); // Get last day of the month
+    const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
     const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
     
     console.log(`📅 STRICT DATE RANGE: ${startDate} to ${endDate} (${month} ${year} ONLY)`);
     
     let url = `${SUPABASE_URL}/rest/v1/journal_entries?select=*&transaction_date=gte.${startDate}&transaction_date=lte.${endDate}&order=transaction_date,account_name`;
     
-    if (Array.isArray(property) && !property.includes('All Properties')) {
+    // FIXED: Property filtering logic
+    if (Array.isArray(property) && property.length > 0 && !property.includes('All Properties')) {
+      // Multiple specific properties selected
       const encodedProps = property.map((p) => `"${p}"`).join(',');
       url += `&property_class=in.(${encodedProps})`;
-      console.log('🏠 Filtering by multiple property_class:', property);
+      console.log('🏠 FILTERING BY MULTIPLE PROPERTIES:', property);
     } else if (typeof property === 'string' && property !== 'All Properties') {
+      // Single specific property selected
       url += `&property_class=eq.${encodeURIComponent(property)}`;
-      console.log('🏠 Filtering by single property_class:', property);
+      console.log('🏠 FILTERING BY SINGLE PROPERTY:', property);
+    } else {
+      // All Properties selected - no property filter
+      console.log('🏠 NO PROPERTY FILTER - SHOWING ALL PROPERTIES');
     }
 
-    console.log('📡 Final URL with STRICT date filtering:', url);
+    console.log('📡 Final URL with STRICT filtering:', url);
 
     const [journalResponse, accountsResponse] = await Promise.all([
       fetch(url, {
@@ -462,21 +461,19 @@ const fetchFinancialData = async (
     
     console.log('📊 Journal entries loaded for STRICT date range:', journalData.length);
     
-    // ADDITIONAL CLIENT-SIDE DATE VALIDATION to ensure no date leakage
+    // ADDITIONAL CLIENT-SIDE DATE VALIDATION
     const filteredJournalData = journalData.filter((entry: any) => {
       const entryDate = new Date(entry.transaction_date);
       const entryYear = entryDate.getFullYear();
-      const entryMonth = entryDate.getMonth() + 1; // getMonth() is 0-based
-      const entryDay = entryDate.getDate();
+      const entryMonth = entryDate.getMonth() + 1;
       
       const targetYear = parseInt(year);
       const targetMonth = monthNum;
       
       const isCorrectYear = entryYear === targetYear;
       const isCorrectMonth = entryMonth === targetMonth;
-      const isValidDay = entryDay >= 1 && entryDay <= lastDay;
       
-      if (!isCorrectYear || !isCorrectMonth || !isValidDay) {
+      if (!isCorrectYear || !isCorrectMonth) {
         console.warn(`⚠️ FILTERED OUT: Entry ${entry.je_number} dated ${entry.transaction_date} (not in ${month} ${year})`);
         return false;
       }
@@ -486,84 +483,39 @@ const fetchFinancialData = async (
     
     console.log(`✅ STRICT FILTERING RESULT: ${filteredJournalData.length} entries (filtered out ${journalData.length - filteredJournalData.length} entries)`);
     
-    // Debug: Show date range of actual entries
-    if (filteredJournalData.length > 0) {
-      const dates = filteredJournalData.map((e: any) => e.transaction_date).sort();
-      console.log(`📅 ACTUAL DATE RANGE in filtered data: ${dates[0]} to ${dates[dates.length - 1]}`);
+    // ADDITIONAL PROPERTY FILTERING VALIDATION
+    let propertyFilteredData = filteredJournalData;
+    
+    if (Array.isArray(property) && property.length > 0 && !property.includes('All Properties')) {
+      propertyFilteredData = filteredJournalData.filter((entry: any) => 
+        property.includes(entry.property_class)
+      );
+      console.log(`🏠 PROPERTY FILTER APPLIED: ${propertyFilteredData.length} entries match properties:`, property);
+    } else if (typeof property === 'string' && property !== 'All Properties') {
+      propertyFilteredData = filteredJournalData.filter((entry: any) => 
+        entry.property_class === property
+      );
+      console.log(`🏠 SINGLE PROPERTY FILTER APPLIED: ${propertyFilteredData.length} entries match property: ${property}`);
     }
     
-    // Create account lookup map
-    const accountLookupMap = new Map();
-    
-    accountsData.forEach((account: any) => {
-      accountLookupMap.set(account.account_name, {
-        type: account.account_type,
-        standardName: account.account_name,
-        classification: account.account_type === 'Income' ? 'Revenue' : 
-                      account.account_type === 'Expenses' ? 'Expenses' :
-                      account.account_type === 'Cost of Goods Sold' ? 'Expenses' :
-                      account.account_type === 'Other Income' ? 'Revenue' :
-                      account.account_type === 'Other Expenses' ? 'Expenses' :
-                      account.account_type === 'Interest Expense' ? 'Other Expenses' :
-                      account.account_type
-      });
-    });
-
-    // Enhanced classification for journal entries with resolution handling
+    // Enhanced classification logic (keep your existing classifyJournalAccount function)
     const classifyJournalAccount = (entry: any) => {
       const accountName = entry.account_name || '';
       const name = accountName.toLowerCase();
       const description = (entry.description || '').toLowerCase();
       
-      console.log('🔍 Classifying account:', accountName, 'Description:', entry.description, 'Line amount:', entry.line_amount, 'Credit:', entry.credit_amount, 'Debit:', entry.debit_amount);
-      
-      // SPECIAL HANDLING: Resolution adjustments that reduce income
-      if (description.includes('resolution') || 
-          description.includes('adjustment') || 
-          description.includes('refund') || 
-          description.includes('chargeback') ||
-          description.includes('dispute')) {
-        
-        console.log('🔄 RESOLUTION/ADJUSTMENT detected:', accountName);
-        
-        // If it's hitting a revenue account with a debit (reducing income)
-        if (name.includes('revenue') || name.includes('income') || name.includes('rental')) {
-          console.log('✅ Resolution classified as REVENUE (will be negative):', accountName);
-          return { 
-            type: 'Income', 
-            classification: 'Revenue', 
-            standardName: entry.account_name 
-          };
-        }
-      }
-      
-      // Revenue/Income classification - matching your Google Sheets exactly
-      if (name.includes('rental revenue - airbnb') || 
-          name.includes('rental revenue - direct') ||
-          name.includes('rental revenue - guesty') ||
-          name.includes('rental revenue - reserve payout') ||
-          name.includes('rental revenue - vrbo') ||
+      // Revenue/Income classification
+      if (name.includes('rental revenue') || 
           name.includes('direct booking') ||
-          name.includes('direct revenue') ||
-          name.includes('bookings') ||
           name.includes('income') || 
           name.includes('revenue') ||
           name.includes('rent') || 
           name.includes('airbnb') ||
           name.includes('guesty') ||
           name.includes('vrbo') ||
-          name.includes('adjustment for occupancy taxes') ||
-          name.includes('miscellaneous income') ||
           name.includes('resolution adjustments') ||
-          // Check description for reclassification entries
           description.includes('reclassify') ||
-          description.includes('move income') ||
-          description.includes('transfer') ||
-          description.includes('direct booking') ||
-          description.includes('guesty to direct') ||
-          // Standard revenue patterns
-          entry.credit_amount > 0 && entry.debit_amount === 0) {
-        console.log('✅ Classified as REVENUE:', accountName, 'Method: Pattern matching or credit entry');
+          description.includes('direct booking')) {
         return { 
           type: 'Income', 
           classification: 'Revenue', 
@@ -571,26 +523,11 @@ const fetchFinancialData = async (
         };
       }
       
-      // Expense classification - matching your actual expense categories
-      if (name.includes('advertising') || name.includes('marketing') ||
-          name.includes('facebook') || name.includes('google') ||
-          name.includes('arcade') || name.includes('bank fee') || 
-          name.includes('disposal') || name.includes('waste') ||
-          name.includes('insurance') || name.includes('internet') || 
-          name.includes('tv service') || name.includes('cleaning') ||
-          name.includes('labor') || name.includes('meal') || 
-          name.includes('membership') || name.includes('subscription') ||
-          name.includes('office') || name.includes('shipping') || 
-          name.includes('postage') || name.includes('pool') || 
-          name.includes('hot tub') || name.includes('maintenance') ||
-          name.includes('repair') || name.includes('upgrade') ||
-          name.includes('snow') || name.includes('lawn') || 
-          name.includes('supplies') || name.includes('travel') ||
-          name.includes('utilities') || name.includes('water') || 
-          name.includes('sewer') || name.includes('expense') || 
-          name.includes('cost') ||
-          entry.debit_amount > 0 && entry.credit_amount === 0) {
-        console.log('✅ Classified as EXPENSE:', accountName);
+      // Expense classification
+      if (name.includes('advertising') || name.includes('cleaning') ||
+          name.includes('insurance') || name.includes('utilities') || 
+          name.includes('maintenance') || name.includes('supplies') ||
+          name.includes('expense') || name.includes('cost')) {
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
@@ -598,106 +535,39 @@ const fetchFinancialData = async (
         };
       }
       
-      // Interest expense (separate category)
-      if (name.includes('mortgage') || name.includes('interest')) {
-        return { 
-          type: 'Interest Expense', 
-          classification: 'Other Expenses', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Asset classification
-      if (name.includes('improvements') || name.includes('property') || 
-          name.includes('equipment') || name.includes('cash') ||
-          name.includes('bank') || name.includes('checking') ||
-          name.includes('savings') || name.includes('receivable') ||
-          entry.account_type === 'Fixed Assets') {
-        return { 
-          type: 'Fixed Assets', 
-          classification: 'Assets', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // Liability classification
-      if (name.includes('loan') || name.includes('payable') || 
-          name.includes('credit card') || name.includes('debt') || 
-          name.includes('liability') || entry.account_type === 'Credit Card') {
-        return { 
-          type: 'Credit Card', 
-          classification: 'Liabilities', 
-          standardName: entry.account_name 
-        };
-      }
-      
-      // ENHANCED DEFAULT CLASSIFICATION for reclassification entries
-      // For reclassification entries, look at the net effect and description
-      if (description.includes('reclassify') || description.includes('transfer') || description.includes('move')) {
-        console.log('🔄 RECLASSIFICATION ENTRY detected:', accountName, 'Description:', entry.description);
-        
-        // For reclassification entries, classify based on the account name pattern and net effect
-        if (name.includes('revenue') || name.includes('income') || name.includes('rental') || name.includes('booking')) {
-          console.log('✅ Reclassification classified as REVENUE:', accountName);
-          return { 
-            type: 'Income', 
-            classification: 'Revenue', 
-            standardName: entry.account_name 
-          };
-        } else {
-          console.log('✅ Reclassification classified as EXPENSE:', accountName);
-          return { 
-            type: 'Expenses', 
-            classification: 'Expenses', 
-            standardName: entry.account_name 
-          };
-        }
-      }
-      
-      // DEFAULT CLASSIFICATION: Use credit/debit logic with enhanced logging
-      if (entry.credit_amount > entry.debit_amount || entry.line_amount < 0) {
-        console.log('🔄 Default classified as REVENUE (credit > debit or negative line_amount):', accountName);
+      // Default classification based on amounts
+      if (entry.credit_amount > entry.debit_amount) {
         return { 
           type: 'Income', 
           classification: 'Revenue', 
           standardName: entry.account_name || 'Revenue Account'
         };
-      } else if (entry.debit_amount > entry.credit_amount || entry.line_amount > 0) {
-        console.log('🔄 Default classified as EXPENSE (debit > credit or positive line_amount):', accountName);
+      } else {
         return { 
           type: 'Expenses', 
           classification: 'Expenses', 
           standardName: entry.account_name || 'Expense Account'
         };
-      } else {
-        // Equal amounts - classify based on account name patterns
-        console.log('🔄 Equal amounts - using name patterns for:', accountName);
-        if (name.includes('revenue') || name.includes('income') || name.includes('rental')) {
-          return { 
-            type: 'Income', 
-            classification: 'Revenue', 
-            standardName: entry.account_name 
-          };
-        } else {
-          return { 
-            type: 'Other', 
-            classification: 'Other', 
-            standardName: entry.account_name || 'Other Account'
-          };
-        }
       }
     };
 
-    // Process journal entries using the STRICTLY FILTERED data
-    const enhancedData = filteredJournalData.map((entry: any) => {
-      // First: Try to find exact match in your accounts table
+    // Create account lookup map
+    const accountLookupMap = new Map();
+    accountsData.forEach((account: any) => {
+      accountLookupMap.set(account.account_name, {
+        type: account.account_type,
+        standardName: account.account_name,
+        classification: account.account_type === 'Income' ? 'Revenue' : 
+                      account.account_type === 'Expenses' ? 'Expenses' :
+                      account.account_type
+      });
+    });
+
+    // Process journal entries
+    const enhancedData = propertyFilteredData.map((entry: any) => {
       let accountInfo = accountLookupMap.get(entry.account_name);
       
-      if (accountInfo) {
-        console.log(`✅ FOUND in accounts table: ${entry.account_name} → ${accountInfo.classification}`);
-      } else {
-        console.log(`❌ NOT FOUND in accounts table: ${entry.account_name}, using classification logic`);
-        // Use the classification function
+      if (!accountInfo) {
         accountInfo = classifyJournalAccount(entry);
       }
       
@@ -709,6 +579,31 @@ const fetchFinancialData = async (
         mapping_method: accountLookupMap.has(entry.account_name) ? 'Accounts Table' : 'Classification Logic'
       };
     });
+
+    return {
+      success: true,
+      data: enhancedData || [],
+      accountsData: accountsData,
+      summary: {
+        filteredEntries: enhancedData?.length || 0,
+        originalEntries: journalData.length,
+        dateFiltered: journalData.length - filteredJournalData.length,
+        propertyFiltered: filteredJournalData.length - propertyFilteredData.length,
+        dataSource: `Supabase + STRICT ${month} ${year} Filtering`,
+        dateRange: `${startDate} to ${endDate}`,
+        filters: { property, monthYear },
+        propertiesInData: [...new Set(enhancedData.map((e: any) => e.property_class))],
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching financial data:', error);
+    return {
+      success: false,
+      error: (error as Error).message,
+      data: []
+    };
+  }
+};
 
     return {
       success: true,
@@ -855,111 +750,131 @@ export default function FinancialsPage() {
   };
 
   const loadRealFinancialData = async () => {
-    try {
-      setIsLoadingData(true);
+  try {
+    setIsLoadingData(true);
+    setDataError(null);
+
+    const selected = Array.from(selectedProperties || []);
+    console.log("🔍 LOADING DATA WITH FILTERS:", {
+      selectedProperties: selected,
+      month: selectedMonth,
+    });
+
+    // FIXED: Build proper property filter
+    let propertyFilter: string | string[] = "All Properties";
+    
+    if (selected.length === 0) {
+      // No properties selected - show all
+      propertyFilter = "All Properties";
+    } else if (selected.length === availableProperties.filter(p => p !== "All Properties").length) {
+      // All real properties selected - show all
+      propertyFilter = "All Properties";
+    } else if (selected.length === 1) {
+      // Single property
+      propertyFilter = selected[0];
+    } else {
+      // Multiple specific properties
+      propertyFilter = selected;
+    }
+
+    console.log("🎯 FINAL PROPERTY FILTER:", propertyFilter);
+
+    // Fetch with the corrected property filter
+    const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
+
+    if (rawData.success) {
+      const entries = rawData.data as FinancialEntry[];
+
+      console.log("🔍 LOADED ENTRIES:", entries.length);
+      console.log("🏠 PROPERTIES IN DATA:", [...new Set(entries.map(e => e.property_class))]);
+
+      const transformedPL = transformFinancialData(entries, selectedMonth);
+      const transformedCF = transformCashFlowData(entries);
+
+      const combinedData = {
+        success: true,
+        ...transformedPL,
+        ...transformedCF,
+        summary: {
+          ...rawData.summary,
+          propertiesInData: [...new Set(entries.map((e) => e.property_class))],
+          selectedFilters: {
+            properties: selected,
+            month: selectedMonth,
+          },
+        },
+        rawEntries: entries.slice(0, 5),
+      };
+
+      setRealData(combinedData);
       setDataError(null);
 
-      const selected = Array.from(selectedProperties || []);
-      const isAllSelected = selected.includes("All Properties");
+      const propertyText = propertyFilter === "All Properties" 
+        ? "all properties" 
+        : Array.isArray(propertyFilter)
+          ? `${propertyFilter.length} selected properties (${propertyFilter.join(', ')})`
+          : `${propertyFilter}`;
 
-      // Build query parameters to send to fetchFinancialData
-      let propertyFilter: string | string[] = "All Properties";
-
-      if (!isAllSelected) {
-        if (selected.length === 1) {
-          propertyFilter = selected[0]; // single property
-        } else if (selected.length > 1) {
-          propertyFilter = selected; // multi-property
-        }
-      }
-
-      console.log("🔍 LOADING DATA WITH FILTERS:", {
-        selectedProperties: selected,
-        propertyFilter,
-        month: selectedMonth,
-      });
-
-      // Fetch using unified logic — supports string or array
-      const rawData = await fetchFinancialData(propertyFilter, selectedMonth);
-
-      if (rawData.success) {
-        const entries = rawData.data as FinancialEntry[];
-
-        console.log("🔍 DEBUG - Raw Journal Entries Sample:", entries.slice(0, 5));
-        console.log("🔍 DEBUG - Total entries loaded:", entries.length);
-
-        const transformedPL = transformFinancialData(entries, selectedMonth);
-        const transformedCF = transformCashFlowData(entries);
-
-        const combinedData = {
-          success: true,
-          ...transformedPL,
-          ...transformedCF,
-          summary: {
-            ...rawData.summary,
-            propertiesInData: [...new Set(entries.map((e) => e.property_class))],
-            selectedFilters: {
-              properties: selected,
-              month: selectedMonth,
-            },
-          },
-          performance: {
-            executionTimeMs: Date.now() % 1000,
-          },
-          rawEntries: entries.slice(0, 5),
-        };
-
-        setRealData(combinedData);
-        setDataError(null);
-
-        const propertyText = isAllSelected
-          ? "all properties"
-          : `${selected.length} selected properties`;
-
-        showNotification(
-          `Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`,
-          "success"
-        );
-      } else {
-        setDataError(rawData.error || "Failed to load financial data");
-        showNotification("Failed to load financial data", "error");
-      }
-    } catch (error) {
-      console.error("❌ Failed to load financial data:", error);
-      setDataError("Failed to load financial data");
-      showNotification("Failed to load financial data", "error");
-    } finally {
-      setIsLoadingData(false);
+      showNotification(
+        `✅ Loaded ${entries.length} entries for ${propertyText} in ${selectedMonth}`,
+        "success"
+      );
+    } else {
+      setDataError(rawData.error || "Failed to load financial data");
+      showNotification("❌ Failed to load financial data", "error");
     }
-  };
+  } catch (error) {
+    console.error("❌ Failed to load financial data:", error);
+    setDataError("Failed to load financial data");
+    showNotification("❌ Failed to load financial data", "error");
+  } finally {
+    setIsLoadingData(false);
+  }
+};
 
   const handlePropertyToggle = (property: string) => {
-    const realProperties = availableProperties.filter(p => p !== "All Properties");
-    const newSelected = new Set(selectedProperties);
+  const realProperties = availableProperties.filter(p => p !== "All Properties");
+  const newSelected = new Set(selectedProperties);
 
-    if (property === "All Properties") {
-      // User clicked "All Properties" — toggle all
-      const isSelectingAll = realProperties.some(p => !newSelected.has(p));
+  console.log('🏠 BEFORE TOGGLE:', Array.from(selectedProperties), 'Toggling:', property);
 
-      if (isSelectingAll) {
-        // Select all real properties
-        realProperties.forEach(p => newSelected.add(p));
-      } else {
-        // Deselect all
-        newSelected.clear();
-      }
+  if (property === "All Properties") {
+    // If All Properties is clicked, check current state
+    const allRealSelected = realProperties.every(p => newSelected.has(p));
+    
+    if (allRealSelected) {
+      // All are selected, so deselect all
+      newSelected.clear();
     } else {
-      // Toggling an individual property
-      if (newSelected.has(property)) {
-        newSelected.delete(property);
-      } else {
-        newSelected.add(property);
-      }
+      // Not all selected, so select all
+      newSelected.clear();
+      realProperties.forEach(p => newSelected.add(p));
     }
+  } else {
+    // Individual property toggle
+    if (newSelected.has(property)) {
+      newSelected.delete(property);
+    } else {
+      newSelected.add(property);
+    }
+    
+    // If all properties are now selected, no need to change (keep individual selections)
+    // If no properties selected, add "All Properties" behavior by selecting all
+    if (newSelected.size === 0) {
+      realProperties.forEach(p => newSelected.add(p));
+    }
+  }
 
-    setSelectedProperties(newSelected);
-    console.log("🏠 Property selection changed:", Array.from(newSelected));
-  };
+  console.log('🏠 AFTER TOGGLE:', Array.from(newSelected));
+  
+  setSelectedProperties(newSelected);
+  
+  // IMPORTANT: Trigger data reload after state update
+  setTimeout(() => {
+    console.log('🔄 TRIGGERING DATA RELOAD...');
+    loadRealFinancialData();
+  }, 100);
+};
 
   const getSelectedPropertiesText = () => {
     const realProperties = availableProperties.filter(p => p !== "All Properties");
@@ -1229,89 +1144,90 @@ export default function FinancialsPage() {
 
   // FIXED: Calculate KPIs with proper positive/negative handling
   const calculateKPIs = () => {
-    if (!currentData || currentData.length === 0) {
-      return {
-        revenue: 0,
-        cogs: 0,
-        grossProfit: 0,
-        operatingExpenses: 0,
-        operatingIncome: 0,
-        otherIncome: 0,
-        otherExpenses: 0,
-        interestExpense: 0,
-        netIncome: 0,
-        grossMargin: 0,
-        operatingMargin: 0,
-        netMargin: 0
-      };
-    }
-
-    // FIXED: Revenue calculation - respects negative amounts (like resolutions)
-    const revenue = currentData
-      .filter(item => item.type === 'Revenue' || 
-                     (item.original_type && item.original_type.toLowerCase().includes('income')))
-      .reduce((sum, item) => {
-        // Don't use Math.abs() - let resolutions be negative
-        return sum + item.total; // This preserves the proper sign
-      }, 0);
-
-    // FIXED: COGS calculation
-    const cogs = currentData
-      .filter(item => item.original_type === 'Cost of Goods Sold')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0); // COGS should be positive
-
-    // FIXED: Operating Expenses calculation
-    const operatingExpenses = currentData
-      .filter(item => item.type === 'Expenses' && 
-                     item.original_type !== 'Interest Expense' &&
-                     item.original_type !== 'Cost of Goods Sold')
-      .reduce((sum, item) => sum + Math.abs(item.total), 0); // Expenses should be positive
-
-    // FIXED: Interest Expense calculation
-    const interestExpense = currentData
-      .filter(item => item.original_type === 'Interest Expense' ||
-                     item.name.toLowerCase().includes('mortgage interest'))
-      .reduce((sum, item) => sum + Math.abs(item.total), 0); // Should be positive
-
-    // FIXED: Other Income calculation (can be negative for adjustments)
-    const otherIncome = currentData
-      .filter(item => item.original_type === 'Other Income')
-      .reduce((sum, item) => sum + item.total, 0); // Preserve sign
-
-    // FIXED: Other Expenses calculation
-    const otherExpenses = currentData
-      .filter(item => item.name.toLowerCase().includes('other expense') &&
-                     !item.name.toLowerCase().includes('interest'))
-      .reduce((sum, item) => sum + Math.abs(item.total), 0); // Should be positive
-
-    const grossProfit = revenue - cogs;
-    const operatingIncome = grossProfit - operatingExpenses;
-    const netOperatingIncome = operatingIncome - interestExpense;
-    const netIncome = netOperatingIncome + otherIncome - otherExpenses;
-
-    console.log('🧮 KPI CALCULATIONS:', {
-      revenue: `$${revenue.toLocaleString()} (includes negative resolutions)`,
-      cogs: `$${cogs.toLocaleString()}`,
-      operatingExpenses: `$${operatingExpenses.toLocaleString()}`,
-      netIncome: `$${netIncome.toLocaleString()}`
-    });
-
+  if (!currentData || currentData.length === 0) {
     return {
-      revenue,
-      cogs,
-      grossProfit,
-      operatingExpenses,
-      operatingIncome,
-      interestExpense,
-      netOperatingIncome: netOperatingIncome,
-      otherIncome,
-      otherExpenses,
-      netIncome,
-      grossMargin: revenue ? (grossProfit / revenue) * 100 : 0,
-      operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
-      netMargin: revenue ? (netIncome / revenue) * 100 : 0
+      revenue: 0,
+      cogs: 0,
+      grossProfit: 0,
+      operatingExpenses: 0,
+      operatingIncome: 0,
+      otherIncome: 0,
+      otherExpenses: 0,
+      interestExpense: 0,
+      netIncome: 0,
+      grossMargin: 0,
+      operatingMargin: 0,
+      netMargin: 0
     };
+  }
+
+  // FIXED: Revenue calculation - preserves negative resolutions
+  const revenue = currentData
+    .filter(item => item.type === 'Revenue' || 
+                   (item.original_type && item.original_type.toLowerCase().includes('income')))
+    .reduce((sum, item) => {
+      // Don't use Math.abs() - preserve the sign for resolutions
+      console.log(`📊 Revenue item: ${item.name} = ${item.total}`);
+      return sum + item.total;
+    }, 0);
+
+  // COGS calculation (should be positive)
+  const cogs = currentData
+    .filter(item => item.original_type === 'Cost of Goods Sold')
+    .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+  // Operating Expenses (should be positive)
+  const operatingExpenses = currentData
+    .filter(item => item.type === 'Expenses' && 
+                   item.original_type !== 'Interest Expense' &&
+                   item.original_type !== 'Cost of Goods Sold')
+    .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+  // Interest Expense (should be positive)
+  const interestExpense = currentData
+    .filter(item => item.original_type === 'Interest Expense' ||
+                   item.name.toLowerCase().includes('mortgage interest'))
+    .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+  // Other Income (preserve sign for adjustments)
+  const otherIncome = currentData
+    .filter(item => item.original_type === 'Other Income')
+    .reduce((sum, item) => sum + item.total, 0);
+
+  // Other Expenses (should be positive)
+  const otherExpenses = currentData
+    .filter(item => item.name.toLowerCase().includes('other expense') &&
+                   !item.name.toLowerCase().includes('interest'))
+    .reduce((sum, item) => sum + Math.abs(item.total), 0);
+
+  const grossProfit = revenue - cogs;
+  const operatingIncome = grossProfit - operatingExpenses;
+  const netOperatingIncome = operatingIncome - interestExpense;
+  const netIncome = netOperatingIncome + otherIncome - otherExpenses;
+
+  console.log('🧮 KPI CALCULATIONS FIXED:', {
+    revenue: `$${revenue.toLocaleString()} (preserves negative resolutions)`,
+    cogs: `$${cogs.toLocaleString()}`,
+    operatingExpenses: `$${operatingExpenses.toLocaleString()}`,
+    netIncome: `$${netIncome.toLocaleString()}`
+  });
+
+  return {
+    revenue,
+    cogs,
+    grossProfit,
+    operatingExpenses,
+    operatingIncome,
+    interestExpense,
+    netOperatingIncome: netOperatingIncome,
+    otherIncome,
+    otherExpenses,
+    netIncome,
+    grossMargin: revenue ? (grossProfit / revenue) * 100 : 0,
+    operatingMargin: revenue ? (operatingIncome / revenue) * 100 : 0,
+    netMargin: revenue ? (netIncome / revenue) * 100 : 0
   };
+};
 
   const generateTrendData = () => {
     const months = ['Jan 2023', 'Feb 2023', 'Mar 2023', 'Apr 2023', 'May 2023', 'Jun 2023'];
