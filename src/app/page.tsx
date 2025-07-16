@@ -430,6 +430,12 @@ const fetchTimeSeriesData = async (
             availableProperties = propertiesInData;
           }
           
+          console.log(`🏢 BY-PROPERTY DATA PROCESSING for ${range.label}:`, {
+            totalTransactions: rawData.length,
+            propertiesFound: propertiesInData.length,
+            properties: propertiesInData
+          });
+          
           // Group by account first, then by property within each account
           const groupedByAccount = rawData.reduce((acc: any, row: any) => {
             const accountName = row.account || 'Unknown Account';
@@ -467,6 +473,12 @@ const fetchTimeSeriesData = async (
             
             return acc;
           }, {});
+          
+          console.log(`🏢 BY-PROPERTY GROUPED for ${range.label}:`, {
+            accountsGrouped: Object.keys(groupedByAccount).length,
+            sampleAccount: Object.keys(groupedByAccount)[0],
+            sampleData: groupedByAccount[Object.keys(groupedByAccount)[0]]
+          });
           
           allData[range.label] = groupedByAccount;
         } else {
@@ -1773,7 +1785,7 @@ export default function FinancialsPage() {
                           timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
                           `past 12 months ending ${selectedMonth}`
                         }</p>
-                        <p><strong>📱 Usage:</strong> Click amounts for transaction details • Compare property performance</p>
+                        <p><strong>📱 Usage:</strong> Click amounts for transaction details • Compare property performance across {timePeriod.toLowerCase()} period</p>
                         <p><strong>🏗️ Grouping:</strong> Account grouping still active for better organization</p>
                       </div>
                     </div>
@@ -1821,7 +1833,12 @@ export default function FinancialsPage() {
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> {
                   viewMode === 'by-property' ?
-                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData?.availableProperties?.length || 0} properties • Property Dimension View (${timePeriod})` :
+                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData?.availableProperties?.length || 0} properties • Property Dimension View (${timePeriod} - ${
+                      timePeriod === 'Monthly' ? selectedMonth :
+                      timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
+                      timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
+                      `Trailing 12 ending ${selectedMonth}`
+                    })` :
                   timePeriod === 'Trailing 12' && viewMode === 'total' ? 
                     `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.monthsAggregated || timeSeriesData.summary.periodsGenerated} months • Aggregated into Trailing 12 Total` :
                     timePeriod === 'Monthly' && viewMode === 'detailed' ?
@@ -1857,7 +1874,8 @@ export default function FinancialsPage() {
                   <div className="text-gray-600 text-sm font-medium mb-2">Revenue</div>
                   <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
                   <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
-                    {viewMode === 'by-property' ? 'All Properties' :
+                    {viewMode === 'by-property' ? 
+                      `All Properties (${timePeriod}${timePeriod === 'Trailing 12' ? ' Months' : ''})` :
                      timePeriod === 'Trailing 12' && viewMode === 'total' ? 'Past 12 Months' : 
                      timePeriod === 'Monthly' && viewMode === 'detailed' ? 'Monthly Total' : 'Past 12 Months'}
                   </div>
