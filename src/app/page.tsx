@@ -245,7 +245,7 @@ const fetchTimeSeriesData = async (
     
     let dateRanges: Array<{start: string, end: string, label: string}> = [];
     
-    // For by-property view, get a single period regardless of time period setting
+    // ENHANCED: For by-property view, respect time period dropdown settings
     if (viewMode === 'by-property') {
       if (timePeriod === 'Monthly') {
         const monthNum = selectedDate.getMonth() + 1;
@@ -253,6 +253,7 @@ const fetchTimeSeriesData = async (
         const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
         const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
         dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
+        console.log('🏢 BY-PROPERTY + MONTHLY:', monthYear);
       } else if (timePeriod === 'Quarterly') {
         const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
         const qStart = new Date(parseInt(year), (quarter - 1) * 3, 1);
@@ -262,24 +263,25 @@ const fetchTimeSeriesData = async (
           end: qEnd.toISOString().split('T')[0],
           label: `Q${quarter} ${year}`
         }];
+        console.log('🏢 BY-PROPERTY + QUARTERLY:', `Q${quarter} ${year}`);
       } else if (timePeriod === 'Yearly') {
         const yearStart = `${year}-01-01`;
         const yearEnd = `${year}-12-31`;
         dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
+        console.log('🏢 BY-PROPERTY + YEARLY:', year);
       } else { // Trailing 12
-        // For by-property + trailing 12, get the full 12 month period
-        const endDate = new Date(selectedDate);
-        const startDate = new Date(endDate);
+        // For by-property + trailing 12, get the full 12 month period ending with selected month
+        const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0); // Last day of selected month
+        const startDate = new Date(selectedDate);
         startDate.setMonth(startDate.getMonth() - 11);
-        startDate.setDate(1);
-        
-        const lastDay = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0);
+        startDate.setDate(1); // First day of 12 months ago
         
         dateRanges = [{
           start: startDate.toISOString().split('T')[0],
-          end: lastDay.toISOString().split('T')[0],
-          label: 'Trailing 12 Months'
+          end: endDate.toISOString().split('T')[0],
+          label: `Trailing 12 Months (ending ${monthYear})`
         }];
+        console.log('🏢 BY-PROPERTY + TRAILING 12:', `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
       }
     } else {
       // Original logic for non-property views
@@ -1661,13 +1663,18 @@ export default function FinancialsPage() {
                         <p><strong>🎯 Total Column:</strong> Aggregated totals across all properties (subtle styling)</p>
                       </div>
                       <div>
-                        <p><strong>🔢 Period:</strong> Data for {timePeriod === 'Trailing 12' ? 'past 12 months' : selectedMonth}</p>
+                        <p><strong>🔢 Period:</strong> {timePeriod} view for {
+                          timePeriod === 'Monthly' ? selectedMonth :
+                          timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
+                          timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
+                          `past 12 months ending ${selectedMonth}`
+                        }</p>
                         <p><strong>📱 Usage:</strong> Click amounts for transaction details • Compare property performance</p>
                         <p><strong>🏗️ Grouping:</strong> Account grouping still active for better organization</p>
                       </div>
                     </div>
                     <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded text-xs">
-                      <strong>💡 Example:</strong> See how "Cleveland" property revenue compares to "Detroit" property revenue in the same time period
+                      <strong>💡 Example:</strong> See how "Cleveland" property revenue compares to "Detroit" property revenue for the selected {timePeriod.toLowerCase()} period
                     </div>
                   </div>
                 </div>
@@ -1710,7 +1717,7 @@ export default function FinancialsPage() {
               <div className="text-green-800 text-sm">
                 <strong>Data Status:</strong> {
                   viewMode === 'by-property' ?
-                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData?.availableProperties?.length || 0} properties • Property Dimension View` :
+                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData?.availableProperties?.length || 0} properties • Property Dimension View (${timePeriod})` :
                   timePeriod === 'Trailing 12' && viewMode === 'total' ? 
                     `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.monthsAggregated || timeSeriesData.summary.periodsGenerated} months • Aggregated into Trailing 12 Total` :
                     timePeriod === 'Monthly' && viewMode === 'detailed' ?
@@ -1718,9 +1725,14 @@ export default function FinancialsPage() {
                     `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} periods • Time Series Mode`
                 }
                 <div className="mt-1 text-xs">
-                  <strong>Current Filters:</strong> {viewMode === 'by-property' ? 'All Properties (Property View)' : getSelectedPropertiesText()} • {selectedMonth} • {timePeriod} {viewMode}
+                  <strong>Current Filters:</strong> {viewMode === 'by-property' ? `All Properties (${timePeriod} Property View)` : getSelectedPropertiesText()} • {selectedMonth} • {timePeriod} {viewMode}
                   {viewMode === 'by-property' && (
-                    <span className="ml-2 font-medium text-purple-700">🏢 Property Comparison</span>
+                    <span className="ml-2 font-medium text-purple-700">🏢 {
+                      timePeriod === 'Monthly' ? 'Monthly Comparison' :
+                      timePeriod === 'Quarterly' ? 'Quarterly Comparison' :
+                      timePeriod === 'Yearly' ? 'Yearly Comparison' :
+                      'Trailing 12 Comparison'
+                    }</span>
                   )}
                 </div>
                 {viewMode === 'by-property' && timeSeriesData?.availableProperties && (
@@ -1813,11 +1825,16 @@ export default function FinancialsPage() {
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900">
-                    Profit & Loss Statement {viewMode === 'by-property' ? '(By Property)' : '(By Property Class)'}
+                    Profit & Loss Statement {viewMode === 'by-property' ? `(By Property - ${timePeriod})` : '(By Property Class)'}
                   </h3>
                   <div className="mt-2 text-sm text-gray-600">
                     {viewMode === 'by-property'
-                      ? `Showing property comparison for ${timePeriod === 'Trailing 12' ? 'the past 12 months' : selectedMonth} • ${timeSeriesData?.availableProperties?.length || 0} properties`
+                      ? `Showing ${timePeriod.toLowerCase()} property comparison for ${
+                          timePeriod === 'Monthly' ? selectedMonth :
+                          timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
+                          timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
+                          `past 12 months ending ${selectedMonth}`
+                        } • ${timeSeriesData?.availableProperties?.length || 0} properties`
                       : timePeriod === 'Trailing 12' && viewMode === 'total' 
                       ? 'Showing aggregated totals for the past 12 months'
                       : timePeriod === 'Monthly' && viewMode === 'detailed'
