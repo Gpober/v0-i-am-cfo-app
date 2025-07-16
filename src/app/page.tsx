@@ -56,7 +56,10 @@ interface FinancialDataItem {
   // NEW: Grouping properties
   isParent?: boolean;
   isSubAccount?: boolean;
+  isStandalone?: boolean;
+  isParentAsSubAccount?: boolean; // When parent account becomes its own sub-account
   parentName?: string;
+  originalName?: string; // Keep original full name for data lookup
   subAccounts?: FinancialDataItem[];
 }
 
@@ -809,12 +812,24 @@ export default function FinancialsPage() {
     setExpandedAccounts(newExpanded);
   };
 
-  // NEW: 🏗️ ENHANCED Account Grouping with Colon Detection
+  // NEW: 🏗️ ENHANCED Account Grouping with Colon Detection and Parent-as-Sub handling
   const groupAccountsByParent = (accounts: FinancialDataItem[]): FinancialDataItem[] => {
     console.log('🏗️ GROUPING ACCOUNTS - Starting with', accounts.length, 'accounts');
     
     const grouped: Record<string, FinancialDataItem> = {};
     const standalone: FinancialDataItem[] = [];
+    const parentNames = new Set<string>();
+    
+    // First pass: identify all parent names from colon-separated accounts
+    accounts.forEach(account => {
+      if (account.name.includes(':')) {
+        const colonIndex = account.name.indexOf(':');
+        const parentName = account.name.substring(0, colonIndex).trim();
+        parentNames.add(parentName);
+      }
+    });
+    
+    console.log('🔍 Identified parent names:', Array.from(parentNames));
     
     accounts.forEach(account => {
       if (account.name.includes(':')) {
@@ -851,13 +866,50 @@ export default function FinancialsPage() {
         grouped[parentName].subAccounts.push({
           ...account,
           name: subName,
+          originalName: account.name, // Keep original name for data lookup
           parentName: parentName,
           isSubAccount: true
         });
         
-        console.log(`➕ Added sub-account "${subName}" to parent "${parentName}" (Parent total now: ${formatCurrency(grouped[parentName].total)})`);
+        console.log(`➕ Added sub-account "${subName}" to parent "${parentName}"`);
+        
+      } else if (parentNames.has(account.name)) {
+        // This is a standalone account that ALSO has sub-accounts with colons
+        // Convert it to a parent and add itself as a sub-account
+        console.log(`🔄 Converting standalone "${account.name}" to parent (has sub-accounts)`);
+        
+        if (!grouped[account.name]) {
+          grouped[account.name] = {
+            name: account.name,
+            category: account.category,
+            type: account.category,
+            total: 0,
+            months: {},
+            entries: [],
+            account_type: account.account_type,
+            account_detail_type: account.account_detail_type,
+            subAccounts: [],
+            isParent: true
+          };
+        }
+        
+        // Add the standalone account as a sub-account of itself
+        grouped[account.name].total += account.total;
+        grouped[account.name].entries.push(...(account.entries || []));
+        grouped[account.name].subAccounts = grouped[account.name].subAccounts || [];
+        grouped[account.name].subAccounts.push({
+          ...account,
+          name: account.name, // Keep same name for display
+          originalName: account.name, // Original name for data lookup
+          parentName: account.name,
+          isSubAccount: true,
+          isParentAsSubAccount: true // Special flag to identify this case
+        });
+        
+        console.log(`🔗 Added "${account.name}" as sub-account of itself`);
+        
       } else {
-        // This is a standalone account
+        // This is a truly standalone account with no related sub-accounts
         standalone.push({
           ...account,
           isStandalone: true
@@ -873,10 +925,15 @@ export default function FinancialsPage() {
     // Sort everything alphabetically
     result.sort((a, b) => a.name.localeCompare(b.name));
     
-    // Sort sub-accounts within each parent
+    // Sort sub-accounts within each parent, but put parent-as-sub first
     result.forEach(account => {
       if (account.subAccounts) {
-        account.subAccounts.sort((a, b) => a.name.localeCompare(b.name));
+        account.subAccounts.sort((a, b) => {
+          // Put parent-as-sub-account first
+          if (a.isParentAsSubAccount && !b.isParentAsSubAccount) return -1;
+          if (!a.isParentAsSubAccount && b.isParentAsSubAccount) return 1;
+          return a.name.localeCompare(b.name);
+        });
       }
     });
     
@@ -884,7 +941,8 @@ export default function FinancialsPage() {
       totalAccounts: accounts.length,
       standaloneAccounts: standalone.length,
       parentAccounts: parentAccounts.length,
-      totalSubAccounts: parentAccounts.reduce((sum, parent) => sum + (parent.subAccounts?.length || 0), 0)
+      totalSubAccounts: parentAccounts.reduce((sum, parent) => sum + (parent.subAccounts?.length || 0), 0),
+      parentsWithSelfAsSubAccount: parentAccounts.filter(p => p.subAccounts?.some(s => s.isParentAsSubAccount)).length
     });
     
     return result;
@@ -943,33 +1001,50 @@ export default function FinancialsPage() {
             
             {/* 📋 SUB-ACCOUNT ROWS (if expanded) */}
             {isExpanded && account.subAccounts && account.subAccounts.map((subAccount: FinancialDataItem) => (
-              <tr key={`sub-${account.name}-${subAccount.name}`} className="hover:bg-gray-50 bg-blue-25 border-l-4 border-blue-200">
-                <td className={`px-6 py-2 text-left text-sm bg-blue-25 ${
+              <tr key={`sub-${account.name}-${subAccount.name}`} className={`hover:bg-gray-50 ${
+                subAccount.isParentAsSubAccount ? 'bg-yellow-25 border-l-4 border-yellow-300' : 'bg-blue-25 border-l-4 border-blue-200'
+              }`}>
+                <td className={`px-6 py-2 text-left text-sm ${
+                  subAccount.isParentAsSubAccount ? 'bg-yellow-25' : 'bg-blue-25'
+                } ${
                   timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
                 }`}>
                   <div className="flex items-center pl-8">
                     <div className="w-4 h-4 mr-3 flex items-center justify-center">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      <div className={`w-2 h-2 rounded-full ${
+                        subAccount.isParentAsSubAccount ? 'bg-yellow-500' : 'bg-blue-400'
+                      }`}></div>
                     </div>
                     <div>
                       <div className="flex items-center">
                         <span className="text-gray-700 font-medium">
-                          💧 {subAccount.name}
+                          {subAccount.isParentAsSubAccount ? '📁' : '💧'} {subAccount.name}
                         </span>
-                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
-                          Sub
+                        <span className={`ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                          subAccount.isParentAsSubAccount 
+                            ? 'bg-yellow-100 text-yellow-800' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {subAccount.isParentAsSubAccount ? 'Parent' : 'Sub'}
                         </span>
                       </div>
                       {subAccount.entries && subAccount.entries.length > 0 && (
                         <div className="text-xs text-gray-500 mt-1">
                           🔍 {subAccount.entries.length} transactions
+                          {subAccount.isParentAsSubAccount && (
+                            <span className="ml-2 text-yellow-600 font-medium">
+                              (Direct to {account.name})
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 </td>
                 {renderDataCells(subAccount)}
-                <td className="px-4 py-2 text-right text-sm text-gray-500 bg-blue-25">
+                <td className={`px-4 py-2 text-right text-sm text-gray-500 ${
+                  subAccount.isParentAsSubAccount ? 'bg-yellow-25' : 'bg-blue-25'
+                }`}>
                   {kpis.revenue ? calculatePercentage(Math.abs(subAccount.total), Math.abs(kpis.revenue)) : '0%'}
                 </td>
               </tr>
@@ -1175,14 +1250,38 @@ export default function FinancialsPage() {
   const renderDataCells = (item: FinancialDataItem) => {
     if (timeSeriesData) {
       const cells = timeSeriesData.periods.map((period: string) => {
-        const periodData = timeSeriesData.data[period]?.[item.name];
-        const value = periodData?.total || 0;
+        let value = 0;
+        let periodEntries: any[] = [];
+        
+        if (item.isParent) {
+          // For parent accounts, calculate value from sub-accounts using their original names
+          value = item.subAccounts?.reduce((sum, subAccount) => {
+            const originalSubName = subAccount.originalName || `${item.name}:${subAccount.name}`;
+            const subPeriodData = timeSeriesData.data[period]?.[originalSubName];
+            if (subPeriodData) {
+              periodEntries.push(...(subPeriodData.entries || []));
+              return sum + (subPeriodData.total || 0);
+            }
+            return sum;
+          }, 0) || 0;
+        } else if (item.isSubAccount) {
+          // For sub-accounts, use original name for lookup
+          const lookupName = item.originalName || item.name;
+          const periodData = timeSeriesData.data[period]?.[lookupName];
+          value = periodData?.total || 0;
+          periodEntries = periodData?.entries || [];
+        } else {
+          // For regular accounts, get data normally
+          const periodData = timeSeriesData.data[period]?.[item.name];
+          value = periodData?.total || 0;
+          periodEntries = periodData?.entries || [];
+        }
         
         // Create a period-specific item for clicking
         const periodItem = {
           ...item,
           total: value,
-          entries: periodData?.entries || []
+          entries: periodEntries
         };
         
         return (
@@ -1202,19 +1301,50 @@ export default function FinancialsPage() {
       // ENHANCED: Add Total column for ALL detailed views including Monthly Detail
       if (viewMode === 'detailed') {
         // Calculate total across all periods for this item
-        const totalValue = timeSeriesData.periods.reduce((sum: number, period: string) => {
-          const periodData = timeSeriesData.data[period]?.[item.name];
-          return sum + (periodData?.total || 0);
-        }, 0);
+        let totalValue = 0;
+        let allEntries: any[] = [];
+        
+        if (item.isParent) {
+          // For parent accounts, sum across all periods and sub-accounts using original names
+          totalValue = timeSeriesData.periods.reduce((sum: number, period: string) => {
+            return sum + (item.subAccounts?.reduce((subSum, subAccount) => {
+              const originalSubName = subAccount.originalName || `${item.name}:${subAccount.name}`;
+              const subPeriodData = timeSeriesData.data[period]?.[originalSubName];
+              if (subPeriodData) {
+                allEntries.push(...(subPeriodData.entries || []));
+                return subSum + (subPeriodData.total || 0);
+              }
+              return subSum;
+            }, 0) || 0);
+          }, 0);
+        } else if (item.isSubAccount) {
+          // For sub-accounts, use original name for lookup
+          const lookupName = item.originalName || item.name;
+          totalValue = timeSeriesData.periods.reduce((sum: number, period: string) => {
+            const periodData = timeSeriesData.data[period]?.[lookupName];
+            if (periodData) {
+              allEntries.push(...(periodData.entries || []));
+              return sum + (periodData.total || 0);
+            }
+            return sum;
+          }, 0);
+        } else {
+          // For regular accounts, sum normally
+          totalValue = timeSeriesData.periods.reduce((sum: number, period: string) => {
+            const periodData = timeSeriesData.data[period]?.[item.name];
+            if (periodData) {
+              allEntries.push(...(periodData.entries || []));
+              return sum + (periodData.total || 0);
+            }
+            return sum;
+          }, 0);
+        }
         
         // Create aggregated item for clicking
         const totalItem = {
           ...item,
           total: totalValue,
-          entries: timeSeriesData.periods.reduce((allEntries: any[], period: string) => {
-            const periodData = timeSeriesData.data[period]?.[item.name];
-            return allEntries.concat(periodData?.entries || []);
-          }, [])
+          entries: allEntries
         };
         
         cells.push(
@@ -1515,11 +1645,17 @@ export default function FinancialsPage() {
                     <div>
                       <p><strong>📁 Parent Accounts:</strong> Show aggregated totals with expand/collapse arrows</p>
                       <p><strong>📋 Sub-Accounts:</strong> Hidden by default, show when parent is expanded</p>
+                      <p><strong>🔄 Smart Handling:</strong> If "Utilities" exists standalone AND has sub-accounts, the standalone becomes a sub-account of itself</p>
                     </div>
                     <div>
                       <p><strong>🎯 Features:</strong> ▶️ Expand arrows • 🔢 Transaction counts • 📊 Aggregated totals</p>
                       <p><strong>📱 Usage:</strong> Click arrows to expand, click amounts for transaction details</p>
+                      <p><strong>🎨 Visual:</strong> Yellow highlight for parent-as-sub accounts, blue for regular sub-accounts</p>
                     </div>
+                  </div>
+                  <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                    <strong>💡 Example:</strong> If you have both "Utilities" ($500) and "Utilities:Electric" ($200), they group as:
+                    <br/>📁 Utilities ($700 total) → 📁 Utilities ($500) + ⚡ Electric ($200)
                   </div>
                 </div>
               </div>
