@@ -1891,21 +1891,192 @@ export default function FinancialsPage() {
                       {renderSectionHeader('REVENUE', '💰', 'Revenue', 'bg-blue-50', 'text-blue-900')}
                       {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Revenue'))}
 
+                      {/* TOTAL REVENUE */}
+                      <tr className="bg-blue-100 border-t-2 border-blue-300">
+                        <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 ${
+                          (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+                          (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                            ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                        } bg-blue-100`}>
+                          📊 TOTAL REVENUE
+                        </td>
+                        {viewMode === 'by-property' && timeSeriesData ? (
+                          <>
+                            {/* Property columns for by-property view */}
+                            {timeSeriesData.availableProperties?.map((property: string) => (
+                              <td key={property} className="px-3 py-4 text-right text-lg font-bold text-blue-800 border-r border-gray-200 last:border-r-0">
+                                {formatCurrency(getCategoryTotal('Revenue', undefined, property))}
+                              </td>
+                            ))}
+                            {/* Total column for by-property view */}
+                            <td className="px-3 py-4 text-right text-lg font-bold text-blue-800 bg-gray-50 border-l border-gray-300">
+                              {formatCurrency(kpis.revenue)}
+                            </td>
+                          </>
+                        ) : (
+                          <td className="px-4 py-4 text-right text-lg font-bold text-blue-800">
+                            {formatCurrency(kpis.revenue)}
+                          </td>
+                        )}
+                        <td className="px-4 py-4 text-right text-sm font-bold text-blue-800">
+                          100.0%
+                        </td>
+                      </tr>
+
                       {/* COGS Section */}
                       {currentData.some((item: any) => item.category === 'COGS') && (
                         <>
                           {renderSectionHeader('COST OF GOODS SOLD', '🏭', 'COGS', 'bg-red-50', 'text-red-900')}
                           {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'COGS'))}
+
+                          {/* TOTAL COGS */}
+                          <tr className="bg-red-100 border-t-2 border-red-300">
+                            <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-red-100 ${
+                              (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+                              (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-200 shadow-lg' : ''
+                            }`}>
+                              📊 TOTAL COGS
+                            </td>
+                            {viewMode === 'by-property' && timeSeriesData ? (
+                              <>
+                                {timeSeriesData.availableProperties?.map((property: string) => (
+                                  <td key={property} className="px-3 py-4 text-right text-lg font-bold text-red-800 border-r border-gray-200 last:border-r-0">
+                                    ({formatCurrency(Math.abs(getCategoryTotal('COGS', undefined, property)))})
+                                  </td>
+                                ))}
+                                <td className="px-3 py-4 text-right text-lg font-bold text-red-800 bg-gray-50 border-l border-gray-300">
+                                  ({formatCurrency(kpis.cogs)})
+                                </td>
+                              </>
+                            ) : (
+                              <td className="px-4 py-4 text-right text-lg font-bold text-red-800">
+                                ({formatCurrency(kpis.cogs)})
+                              </td>
+                            )}
+                            <td className="px-4 py-4 text-right text-sm font-bold text-red-800">
+                              {kpis.revenue ? calculatePercentage(kpis.cogs, Math.abs(kpis.revenue)) : '0%'}
+                            </td>
+                          </tr>
                         </>
                       )}
+
+                      {/* 📈 GROSS PROFIT */}
+                      <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.success }}>
+                        <td className={`px-6 py-5 text-left text-xl font-bold bg-green-100 ${
+                          (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+                          (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                            ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                        }`} style={{ color: BRAND_COLORS.success }}>
+                          📈 GROSS PROFIT
+                        </td>
+                        {viewMode === 'by-property' && timeSeriesData ? (
+                          <>
+                            {timeSeriesData.availableProperties?.map((property: string) => {
+                              const revenue = getCategoryTotal('Revenue', undefined, property);
+                              const cogs = getCategoryTotal('COGS', undefined, property);
+                              const grossProfit = revenue - Math.abs(cogs);
+                              
+                              return (
+                                <td key={property} className={`px-3 py-5 text-right text-xl font-bold border-r border-gray-200 last:border-r-0`} style={{ color: BRAND_COLORS.success }}>
+                                  {formatCurrency(grossProfit)}
+                                </td>
+                              );
+                            })}
+                            <td className={`px-3 py-5 text-right text-xl font-bold bg-gray-50 border-l border-gray-300`} style={{ color: BRAND_COLORS.success }}>
+                              {formatCurrency(kpis.grossProfit)}
+                            </td>
+                          </>
+                        ) : (
+                          <td className={`px-4 py-5 text-right text-xl font-bold`} style={{ color: BRAND_COLORS.success }}>
+                            {formatCurrency(kpis.grossProfit)}
+                          </td>
+                        )}
+                        <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.success }}>
+                          {kpis.grossMargin.toFixed(1)}%
+                        </td>
+                      </tr>
 
                       {/* Operating Expenses Section */}
                       {currentData.some((item: any) => item.category === 'Operating Expenses') && (
                         <>
                           {renderSectionHeader('OPERATING EXPENSES', '💸', 'Operating Expenses', 'bg-orange-50', 'text-orange-900')}
                           {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Operating Expenses'))}
+
+                          {/* TOTAL OPERATING EXPENSES */}
+                          <tr className="bg-orange-100 border-t-2 border-orange-300">
+                            <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-orange-100 ${
+                              (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+                              (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-200 shadow-lg' : ''
+                            }`}>
+                              📊 TOTAL OPERATING EXPENSES
+                            </td>
+                            {viewMode === 'by-property' && timeSeriesData ? (
+                              <>
+                                {timeSeriesData.availableProperties?.map((property: string) => (
+                                  <td key={property} className="px-3 py-4 text-right text-lg font-bold text-orange-800 border-r border-gray-200 last:border-r-0">
+                                    ({formatCurrency(Math.abs(getCategoryTotal('Operating Expenses', undefined, property)))})
+                                  </td>
+                                ))}
+                                <td className="px-3 py-4 text-right text-lg font-bold text-orange-800 bg-gray-50 border-l border-gray-300">
+                                  ({formatCurrency(kpis.operatingExpenses)})
+                                </td>
+                              </>
+                            ) : (
+                              <td className="px-4 py-4 text-right text-lg font-bold text-orange-800">
+                                ({formatCurrency(kpis.operatingExpenses)})
+                              </td>
+                            )}
+                            <td className="px-4 py-4 text-right text-sm font-bold text-orange-800">
+                              {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, Math.abs(kpis.revenue)) : '0%'}
+                            </td>
+                          </tr>
                         </>
                       )}
+
+                      {/* 🏆 NET OPERATING INCOME */}
+                      <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.primary }}>
+                        <td className={`px-6 py-5 text-left text-xl font-bold bg-green-100 ${
+                          (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+                          (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                            ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                        }`} style={{ color: BRAND_COLORS.primary }}>
+                          🏆 NET OPERATING INCOME
+                        </td>
+                        {viewMode === 'by-property' && timeSeriesData ? (
+                          <>
+                            {timeSeriesData.availableProperties?.map((property: string) => {
+                              const revenue = getCategoryTotal('Revenue', undefined, property);
+                              const cogs = getCategoryTotal('COGS', undefined, property);
+                              const opex = getCategoryTotal('Operating Expenses', undefined, property);
+                              const netOpIncome = revenue - Math.abs(cogs) - Math.abs(opex);
+                              
+                              return (
+                                <td key={property} className={`px-3 py-5 text-right text-xl font-bold border-r border-gray-200 last:border-r-0 ${
+                                  netOpIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                                }`}>
+                                  {formatCurrency(netOpIncome)}
+                                </td>
+                              );
+                            })}
+                            <td className={`px-3 py-5 text-right text-xl font-bold bg-gray-50 border-l border-gray-300 ${
+                              kpis.netOperatingIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {formatCurrency(kpis.netOperatingIncome)}
+                            </td>
+                          </>
+                        ) : (
+                          <td className={`px-4 py-5 text-right text-xl font-bold ${
+                            kpis.netOperatingIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                          }`}>
+                            {formatCurrency(kpis.netOperatingIncome)}
+                          </td>
+                        )}
+                        <td className="px-4 py-5 text-right text-lg font-bold" style={{ color: BRAND_COLORS.primary }}>
+                          {kpis.operatingMargin.toFixed(1)}%
+                        </td>
+                      </tr>
 
                       {/* Other Income Section */}
                       {currentData.some((item: any) => item.category === 'Other Income') && (
@@ -1922,6 +2093,51 @@ export default function FinancialsPage() {
                           {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Other Expenses'))}
                         </>
                       )}
+
+                      {/* 🎯 FINAL NET INCOME */}
+                      <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.secondary }}>
+                        <td className={`px-6 py-6 text-left text-2xl font-bold bg-green-100 ${
+                          (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+                          (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                            ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                        }`} style={{ color: BRAND_COLORS.secondary }}>
+                          🎯 NET INCOME
+                        </td>
+                        {viewMode === 'by-property' && timeSeriesData ? (
+                          <>
+                            {timeSeriesData.availableProperties?.map((property: string) => {
+                              const revenue = getCategoryTotal('Revenue', undefined, property);
+                              const cogs = getCategoryTotal('COGS', undefined, property);
+                              const opex = getCategoryTotal('Operating Expenses', undefined, property);
+                              const otherIncome = getCategoryTotal('Other Income', undefined, property);
+                              const otherExpenses = getCategoryTotal('Other Expenses', undefined, property);
+                              const finalNetIncome = revenue - Math.abs(cogs) - Math.abs(opex) + otherIncome - Math.abs(otherExpenses);
+                              
+                              return (
+                                <td key={property} className={`px-3 py-6 text-right text-2xl font-bold border-r border-gray-200 last:border-r-0 ${
+                                  finalNetIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                                }`}>
+                                  {formatCurrency(finalNetIncome)}
+                                </td>
+                              );
+                            })}
+                            <td className={`px-3 py-6 text-right text-2xl font-bold bg-gray-50 border-l border-gray-300 ${
+                              kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {formatCurrency(kpis.netIncome)}
+                            </td>
+                          </>
+                        ) : (
+                          <td className={`px-4 py-6 text-right text-2xl font-bold ${
+                            kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                          }`}>
+                            {formatCurrency(kpis.netIncome)}
+                          </td>
+                        )}
+                        <td className="px-4 py-6 text-right text-xl font-bold" style={{ color: BRAND_COLORS.secondary }}>
+                          {kpis.netMargin.toFixed(1)}%
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
