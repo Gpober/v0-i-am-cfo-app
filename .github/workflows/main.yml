@@ -1,288 +1,50 @@
-name: Claude Max Build & Deploy with Official Action
+name: Claude Code Helper (API Key)
+
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
-      deploy_target:
-        description: 'Where to deploy?'
+      task:
+        description: 'What should Claude help with?'
+        required: true
         type: choice
         options:
-        - netlify
-        - vercel
-        - github-pages
-        default: 'netlify'
-      claude_analysis:
-        description: 'Run Claude analysis?'
-        type: boolean
-        default: true
-      custom_instructions:
-        description: 'Custom instructions for Claude (optional)'
-        type: string
+          - 'Review and fix bugs'
+          - 'Improve code quality'
+          - 'Add documentation'
+          - 'Optimize performance'
+          - 'Custom task'
+      
+      custom_prompt:
+        description: 'Custom instructions (if Custom task selected)'
         required: false
-        default: 'Focus on Airbnb financial tracking and reporting features'
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-  issues: write
-  pull-requests: write
-
-env:
-  NODE_VERSION: '18'
+        default: 'Review this codebase and provide helpful suggestions'
 
 jobs:
-  # Phase 1: Official Claude Max Analysis
   claude-analysis:
-    if: github.event.inputs.claude_analysis != 'false'
     runs-on: ubuntu-latest
-    outputs:
-      analysis-result: ${{ steps.claude-output.outputs.result }}
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Claude Max Code Analysis
-        uses: grll/claude-code-base-action@beta
-        with:
-          prompt: |
-            Analyze this Airbnb CFO financial dashboard project with Supabase backend for deployment readiness:
-            
-            CUSTOM INSTRUCTIONS: ${{ github.event.inputs.custom_instructions || 'Focus on Airbnb financial tracking and reporting features' }}
-            
-            MY PROJECT GOALS:
-            - Track Airbnb property financial performance
-            - Monitor revenue, expenses, and profit margins
-            - Automated expense categorization and reporting
-            - Multi-property portfolio management
-            - Real-time financial KPIs and alerts
-            
-            Please review:
-            1. Code quality and TypeScript usage
-            2. Supabase integration and database patterns
-            3. Authentication and security implementation
-            4. Performance optimizations needed
-            5. Bundle size concerns
-            6. Build configuration recommendations
-            7. Database schema and query optimization
-            8. RLS (Row Level Security) policies if present
-            
-            Focus on the main financial component at src/app/financials/page.tsx and any Supabase-related code.
-            
-            Provide:
-            - Overall quality score (1-10)
-            - Critical issues that must be fixed before deployment
-            - Performance optimization recommendations
-            - Security review (especially Supabase RLS)
-            - Build configuration suggestions
-            - Backend/database recommendations
-            - Specific suggestions for Airbnb financial tracking features
-            
-            Generate a comprehensive markdown report with your findings and recommendations.
-          system_prompt: "You are a senior full-stack engineer with expertise in Next.js, React, Supabase, and deployment optimization. Focus on production readiness, performance, security, and best practices for financial applications."
-          allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
-          max_turns: "10"
-          claude_env: |
-            NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-            SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          anthropic_api_key: ${{ secrets.CLAUDE_API_KEY }}
-
-      - name: Extract Claude Analysis Results
-        id: claude-output
-        run: |
-          echo "result=completed" >> $GITHUB_OUTPUT
-          echo "✅ Claude Max analysis completed successfully"
-
-  # Phase 2: Claude Build Optimization
-  claude-build-optimization:
-    needs: [claude-analysis]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Claude Max Build Optimization
-        uses: grll/claude-code-base-action@beta
-        with:
-          prompt: |
-            Based on your previous analysis, help optimize this Next.js project for production build:
-            
-            1. Review the current next.config.js (if it exists)
-            2. Create or update build configuration for optimal performance
-            3. Suggest any package.json optimizations
-            4. Identify any build-time optimizations needed
-            5. Ensure proper static export configuration for Netlify deployment
-            
-            Apply the optimizations directly to the files.
-          append_system_prompt: "Focus on creating production-ready build configurations. Ensure static export compatibility."
-          allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
-          max_turns: "5"
-          anthropic_api_key: ${{ secrets.CLAUDE_API_KEY }}
-
-  # Phase 3: Deploy to Netlify (Simplified)
-  deploy-netlify:
-    if: github.event.inputs.deploy_target == 'netlify' || github.event.inputs.deploy_target == ''
-    needs: [claude-analysis, claude-build-optimization]
-    runs-on: ubuntu-latest
-    outputs:
-      deploy-status: ${{ steps.deploy.outputs.status }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Fix Package Lock Sync
-        run: |
-          echo "🔧 Checking package.json and lock file sync..."
-          # If lock file is out of sync, regenerate it
-          if ! npm ci --dry-run; then
-            echo "⚠️ Lock file out of sync, regenerating..."
-            rm -f package-lock.json
-            npm install
-          fi
-
-      - name: Install dependencies
-        run: |
-          echo "📦 Installing dependencies..."
-          npm ci
-
-      - name: Build Application
-        run: |
-          echo "🔨 Building for deployment..."
-          npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-
-      - name: Install Netlify CLI
-        run: npm install -g netlify-cli
-
-      - name: Deploy to Netlify
-        id: deploy
-        run: |
-          echo "🚀 Deploying to Netlify..."
-          netlify deploy --prod --dir=out --auth=$NETLIFY_AUTH_TOKEN --site=$NETLIFY_SITE_ID
-          echo "status=success" >> $GITHUB_OUTPUT
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-
-  # Phase 4: Post-Deploy Claude Review
-  post-deploy-review:
-    needs: [claude-analysis, deploy-netlify]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Claude Max Post-Deploy Analysis
-        uses: grll/claude-code-base-action@beta
-        with:
-          prompt: |
-            The deployment is complete! Please provide a post-deployment analysis:
-            
-            1. Review the deployment success
-            2. Identify any potential runtime issues to monitor
-            3. Suggest performance monitoring strategies
-            4. Recommend next steps for optimization
-            5. Create a deployment summary report
-            
-            Deployment Status: ${{ needs.deploy-netlify.outputs.deploy-status }}
-            
-            Generate a comprehensive deployment report in markdown format.
-          system_prompt: "You are a DevOps engineer providing post-deployment analysis and monitoring recommendations."
-          allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool"
-          max_turns: "5"
-          claude_env: |
-            DEPLOYMENT_STATUS: ${{ needs.deploy-netlify.outputs.deploy-status }}
-            DEPLOYMENT_TARGET: netlify
-          anthropic_api_key: ${{ secrets.CLAUDE_API_KEY }}
-
-      - name: Create Deployment Issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `🤖 Claude Max Deployment #${{ github.run_number }} - Official Action`,
-              body: `
-              # 🚀 Claude Max Deployment Complete
-              
-              **Status:** ${{ needs.deploy-netlify.outputs.deploy-status }}
-              **Claude Analysis:** ${{ needs.claude-analysis.outputs.analysis-result }}
-              
-              ## 🤖 Official Claude Max Integration
-              - ✅ Pre-build analysis by Claude Max
-              - ✅ Build optimization by Claude Max  
-              - ✅ Post-deploy review by Claude Max
-              - ✅ Successfully deployed to Netlify
-              
-              Your financial dashboard is live with full Claude Max AI optimization!
-              
-              ---
-              *Powered by official Claude Max Code Base Action*
-              `,
-              labels: ['claude-max', 'deployment', 'official-action']
-            });
-
-  # Alternative Deploy Options
-  deploy-vercel:
-    if: github.event.inputs.deploy_target == 'vercel'
-    needs: [claude-analysis, claude-build-optimization]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Claude Code Analysis
+      uses: grill/claude-code-base-action@beta
+      with:
+        prompt: |
+          ${{ 
+            github.event.inputs.task == 'Review and fix bugs' && 'Analyze this codebase for bugs and provide specific fixes. Show exact code changes needed.' ||
+            github.event.inputs.task == 'Improve code quality' && 'Review this code for quality improvements. Suggest refactoring and better patterns with examples.' ||
+            github.event.inputs.task == 'Add documentation' && 'Add comprehensive documentation to this codebase including comments and README updates.' ||
+            github.event.inputs.task == 'Optimize performance' && 'Analyze this code for performance improvements and provide optimized versions.' ||
+            github.event.inputs.custom_prompt
+          }}
         
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.ORG_ID }}
-          vercel-project-id: ${{ secrets.PROJECT_ID }}
-          vercel-args: '--prod'
-
-  deploy-github-pages:
-    if: github.event.inputs.deploy_target == 'github-pages'
-    needs: [claude-analysis, claude-build-optimization]
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install and Build
-        run: |
-          npm ci
-          npm run build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload to GitHub Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: out/
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,EditTool,BatchTool"
+        # Try API key authentication first
+        api_key: ${{ secrets.CLAUDE_API_KEY }}
+        # If that doesn't work, we can try OAuth
+        # use_oauth: "false"
