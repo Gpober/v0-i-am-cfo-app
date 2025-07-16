@@ -223,10 +223,13 @@ const fetchTimeSeriesData = async (
     
     const [month, year] = monthYear.split(' ');
     const selectedDate = new Date(`${month} 1, ${year}`);
+    console.log('🔍 Selected date object:', selectedDate);
+    console.log('🔍 Month:', month, 'Year:', year);
     
     let dateRanges: Array<{start: string, end: string, label: string}> = [];
     
-    // ENHANCED: For by-property view, respect time period dropdown settings
+    // ENHANCED: For by-property view, use the SAME logic as other views
+    // Fetch month by month to avoid hitting row limits, then aggregate
     if (viewMode === 'by-property') {
       if (timePeriod === 'Monthly') {
         const monthNum = selectedDate.getMonth() + 1;
@@ -248,16 +251,23 @@ const fetchTimeSeriesData = async (
         const yearEnd = `${year}-12-31`;
         dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
       } else { // Trailing 12
-        const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-        const startDate = new Date(selectedDate);
-        startDate.setMonth(startDate.getMonth() - 11);
-        startDate.setDate(1);
-        
-        dateRanges = [{
-          start: startDate.toISOString().split('T')[0],
-          end: endDate.toISOString().split('T')[0],
-          label: `Trailing 12 Months (ending ${monthYear})`
-        }];
+        // FIXED: Use month-by-month fetching like other views to avoid row limits
+        for (let i = 11; i >= 0; i--) {
+          const monthDate = new Date(selectedDate);
+          monthDate.setMonth(monthDate.getMonth() - i);
+          
+          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+          
+          const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
+          const monthYear = monthStart.getFullYear();
+          
+          dateRanges.push({
+            start: monthStart.toISOString().split('T')[0],
+            end: monthEnd.toISOString().split('T')[0],
+            label: `${monthName} ${monthYear}`
+          });
+        }
       }
     } else {
       // Original logic for non-property views
@@ -395,6 +405,9 @@ const fetchTimeSeriesData = async (
       }
     }
     
+    console.log('🔍 CALCULATED DATE RANGES:', dateRanges);
+    console.log('🔍 Total date ranges for', viewMode, 'view:', dateRanges.length);
+    
     // Fetch data for all date ranges
     const allData: any = {};
     let totalEntriesProcessed = 0;
@@ -403,12 +416,17 @@ const fetchTimeSeriesData = async (
     for (const range of dateRanges) {
       console.log(`🔍 Fetching data for period: ${range.label} (${range.start} to ${range.end})`);
       
-      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end}`;
+      // CRITICAL FIX: Fetch ALL data without row limits
+      // Supabase might have a default limit, so we'll use a very high limit
+      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end}&limit=100000`;
       
-      // For by-property view, get all properties; otherwise use selected property filter
+      // FIXED: For by-property view, NEVER filter by property - we need ALL property data
+      // Only filter by property for non-by-property views
       if (viewMode !== 'by-property' && property !== 'All Properties') {
         url += `&class=eq.${encodeURIComponent(property)}`;
       }
+      
+      console.log(`🔍 FETCHING URL for ${viewMode} view:`, url);
       
       const response = await fetch(url, {
         headers: {
@@ -421,6 +439,9 @@ const fetchTimeSeriesData = async (
       if (response.ok) {
         const rawData = await response.json();
         console.log(`🔍 Period ${range.label}: ${rawData.length} transactions`);
+        console.log(`🔍 Sample transactions for ${range.label}:`, rawData.slice(0, 3));
+        console.log(`🔍 Date range: ${range.start} to ${range.end}`);
+        console.log(`🔍 View mode: ${viewMode}, Property filter: ${property}`);
         totalEntriesProcessed += rawData.length;
         
         if (viewMode === 'by-property') {
@@ -460,10 +481,13 @@ const fetchTimeSeriesData = async (
               };
             }
             
-            if (!acc[accountName].propertyTotals[propertyName]) {
-              acc[accountName].propertyTotals[propertyName] = 0;
-              acc[accountName].propertyEntries[propertyName] = [];
-            }
+            // Initialize ALL properties for this account, not just the current one
+            propertiesInData.forEach(prop => {
+              if (!acc[accountName].propertyTotals[prop]) {
+                acc[accountName].propertyTotals[prop] = 0;
+                acc[accountName].propertyEntries[prop] = [];
+              }
+            });
             
             acc[accountName].total += (row.amount || 0);
             acc[accountName].propertyTotals[propertyName] += (row.amount || 0);
@@ -477,7 +501,8 @@ const fetchTimeSeriesData = async (
           console.log(`🏢 BY-PROPERTY GROUPED for ${range.label}:`, {
             accountsGrouped: Object.keys(groupedByAccount).length,
             sampleAccount: Object.keys(groupedByAccount)[0],
-            sampleData: groupedByAccount[Object.keys(groupedByAccount)[0]]
+            sampleData: groupedByAccount[Object.keys(groupedByAccount)[0]],
+            availableProperties: propertiesInData
           });
           
           allData[range.label] = groupedByAccount;
@@ -515,6 +540,99 @@ const fetchTimeSeriesData = async (
         console.error(`Failed to fetch data for period ${range.label}:`, response.status);
         allData[range.label] = {};
       }
+    }
+    
+    // FIXED: For by-property Trailing 12, aggregate all monthly data 
+    if (viewMode === 'by-property' && timePeriod === 'Trailing 12') {
+      console.log('🔍 AGGREGATING BY-PROPERTY TRAILING 12 DATA...');
+      
+      const aggregatedData: any = {};
+      let allAvailableProperties: string[] = [];
+      
+      // First, collect all properties from all months
+      dateRanges.forEach((range) => {
+        const monthData = allData[range.label] || {};
+        Object.values(monthData).forEach((account: any) => {
+          if (account.propertyTotals) {
+            Object.keys(account.propertyTotals).forEach(prop => {
+              if (!allAvailableProperties.includes(prop)) {
+                allAvailableProperties.push(prop);
+              }
+            });
+          }
+        });
+      });
+      
+      // Then aggregate all months
+      dateRanges.forEach((range) => {
+        const monthData = allData[range.label] || {};
+        
+        Object.values(monthData).forEach((account: any) => {
+          const accountName = account.name;
+          
+          if (!aggregatedData[accountName]) {
+            aggregatedData[accountName] = {
+              name: accountName,
+              category: account.category,
+              type: account.category,
+              total: 0,
+              entries: [],
+              account_type: account.account_type,
+              account_detail_type: account.account_detail_type,
+              propertyTotals: {},
+              propertyEntries: {}
+            };
+            
+            // Initialize all properties for this account
+            allAvailableProperties.forEach(prop => {
+              aggregatedData[accountName].propertyTotals[prop] = 0;
+              aggregatedData[accountName].propertyEntries[prop] = [];
+            });
+          }
+          
+          aggregatedData[accountName].total += account.total;
+          aggregatedData[accountName].entries.push(...account.entries);
+          
+          // Aggregate property data
+          if (account.propertyTotals) {
+            Object.entries(account.propertyTotals).forEach(([prop, amount]: [string, any]) => {
+              aggregatedData[accountName].propertyTotals[prop] += amount;
+            });
+          }
+          
+          if (account.propertyEntries) {
+            Object.entries(account.propertyEntries).forEach(([prop, entries]: [string, any]) => {
+              aggregatedData[accountName].propertyEntries[prop].push(...entries);
+            });
+          }
+        });
+      });
+      
+      allData = {
+        'Trailing 12 Months': aggregatedData
+      };
+      
+      availableProperties = allAvailableProperties.sort();
+      
+      return {
+        success: true,
+        data: allData,
+        periods: ['Trailing 12 Months'],
+        availableProperties: availableProperties,
+        summary: {
+          timePeriod,
+          viewMode,
+          property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
+          dateRanges: [{
+            start: dateRanges[0].start,
+            end: dateRanges[dateRanges.length - 1].end,
+            label: 'Trailing 12 Months'
+          }],
+          totalEntriesProcessed,
+          periodsGenerated: 1,
+          monthsAggregated: dateRanges.length
+        }
+      };
     }
     
     // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
@@ -699,8 +817,9 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
+      // FIXED: For by-property view, always use 'All Properties' to get all data
       let propertyFilter = 'All Properties';
-      if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
+      if (viewMode !== 'by-property' && selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
         propertyFilter = Array.from(selectedProperties)[0];
       }
       
@@ -709,7 +828,8 @@ export default function FinancialsPage() {
         propertyFilter,
         month: selectedMonth,
         timePeriod,
-        viewMode
+        viewMode,
+        note: viewMode === 'by-property' ? 'FORCING All Properties for by-property view' : 'Using selected property filter'
       });
       
       const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode);
@@ -962,7 +1082,16 @@ export default function FinancialsPage() {
         // For by-property view, get data from the first period
         const firstPeriodKey = timeSeriesData.periods[0];
         const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
-        return Object.values(firstPeriodData);
+        const result = Object.values(firstPeriodData);
+        
+        console.log('🏢 BY-PROPERTY getCurrentFinancialData:', {
+          periodKey: firstPeriodKey,
+          accountCount: result.length,
+          sampleAccount: result[0],
+          availableProperties: timeSeriesData.availableProperties
+        });
+        
+        return result;
       } else if (viewMode === 'detailed' || 
           (viewMode === 'total' && (timePeriod === 'Quarterly' || timePeriod === 'Yearly'))) {
         // Aggregate across multiple periods
