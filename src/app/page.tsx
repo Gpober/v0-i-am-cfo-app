@@ -226,7 +226,7 @@ const fetchTimeSeriesData = async (
     
     let dateRanges: Array<{start: string, end: string, label: string}> = [];
     
-    // ENHANCED: For by-property view, respect time period dropdown settings
+   // ENHANCED: For by-property view, respect time period dropdown settings
     if (viewMode === 'by-property') {
       if (timePeriod === 'Monthly') {
         const monthNum = selectedDate.getMonth() + 1;
