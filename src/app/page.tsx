@@ -417,6 +417,10 @@ const fetchTimeSeriesData = async (
         url += `&class=eq.${encodeURIComponent(property)}`;
       }
       
+      // CRITICAL FIX: Remove any row limits that might be applied by default
+      // Supabase might be limiting to 1000 rows by default
+      url += `&limit=50000`; // Increase limit to get all data
+      
       console.log(`🔍 FETCHING URL for ${viewMode} view:`, url);
       
       const response = await fetch(url, {
