@@ -31,6 +31,111 @@ const BRAND_COLORS = {
 const SUPABASE_URL = 'https://pjaieumtjszcwussmwel.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqYWlldW10anN6Y3d1c3Ntd2VsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIwNDQyMTgsImV4cCI6MjA2NzYyMDIxOH0.E1y-qx4EW7dbdN_2sijZaiQVO7ZcqnwC9hTSIccChP0';
 
+// CSS Styles for P&L Table Scrolling
+const tableStyles = `
+  .table-container {
+    /* Desktop smooth scrolling */
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    
+    /* Custom scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+  
+  .table-container::-webkit-scrollbar {
+    height: 8px;
+  }
+  
+  .table-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+  
+  .table-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  
+  .table-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  
+  .account-column {
+    position: relative;
+    background-color: inherit;
+  }
+  
+  /* Enhanced sticky positioning for account columns */
+  .account-column.sticky {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: inherit;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Mobile responsive styles */
+  @media (max-width: 768px) {
+    .table-container {
+      font-size: 0.75rem;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .account-column {
+      min-width: 120px !important;
+      font-size: 0.75rem;
+      padding: 0.5rem !important;
+    }
+    
+    .account-column .truncate {
+      max-width: 100px;
+    }
+    
+    /* Touch-friendly scrolling */
+    .table-container::-webkit-scrollbar {
+      height: 12px;
+    }
+    
+    .table-container::-webkit-scrollbar-thumb {
+      background: #3b82f6;
+      border-radius: 6px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .account-column {
+      min-width: 100px !important;
+      font-size: 0.7rem;
+      padding: 0.25rem !important;
+    }
+    
+    .account-column .truncate {
+      max-width: 80px;
+    }
+  }
+  
+  @media (max-width: 320px) {
+    .account-column {
+      min-width: 80px !important;
+      font-size: 0.65rem;
+      padding: 0.25rem !important;
+    }
+    
+    .account-column .truncate {
+      max-width: 60px;
+    }
+  }
+`;
+
+// Inject styles into the document
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = tableStyles;
+  document.head.appendChild(styleElement);
+}
+
 // Type definitions
 type FinancialTab = 'p&l' | 'cash-flow' | 'balance-sheet';
 type TimePeriod = 'Monthly' | 'Quarterly' | 'Yearly' | 'Trailing 12';
@@ -1352,7 +1457,7 @@ export default function FinancialsPage() {
       if (viewMode === 'by-property') {
         const properties = timeSeriesData.availableProperties || [];
         const headers = properties.map((property: string) => (
-          <th key={property} className="px-3 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+          <th key={property} className="px-3 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0 min-w-24">
             <div className="truncate max-w-20" title={property}>
               {property}
             </div>
@@ -1368,8 +1473,10 @@ export default function FinancialsPage() {
         return headers;
       } else {
         const headers = timeSeriesData.periods.map((period: string) => (
-          <th key={period} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-            {period}
+          <th key={period} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-24">
+            <div className="truncate" title={period}>
+              {period}
+            </div>
           </th>
         ));
         
@@ -1416,7 +1523,7 @@ export default function FinancialsPage() {
           };
           
           return (
-            <td key={property} className={`px-3 py-3 text-right text-sm font-medium border-r border-gray-200 last:border-r-0 ${
+            <td key={property} className={`px-3 py-3 text-right text-sm font-medium border-r border-gray-200 last:border-r-0 min-w-24 ${
               value >= 0 ? 'text-green-600' : 'text-red-600'
             }`}>
               <span 
@@ -1484,7 +1591,7 @@ export default function FinancialsPage() {
           };
           
           return (
-            <td key={period} className={`px-4 py-3 text-right text-sm font-medium ${
+            <td key={period} className={`px-4 py-3 text-right text-sm font-medium min-w-24 ${
               value >= 0 ? 'text-green-600' : 'text-red-600'
             }`}>
               <span 
@@ -1598,10 +1705,10 @@ export default function FinancialsPage() {
           <React.Fragment key={`parent-${account.name}`}>
             {/* PARENT ACCOUNT ROW */}
             <tr className="hover:bg-blue-50 bg-blue-25 border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
-              <td className={`px-6 py-3 text-left text-sm bg-blue-25 ${
+              <td className={`account-column px-6 py-3 text-left text-sm bg-blue-25 min-w-48 ${
                 (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                 (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                  ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
+                  ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg' : ''
               }`}>
                 <div className="flex items-center">
                   <button
@@ -1631,7 +1738,7 @@ export default function FinancialsPage() {
                 </div>
               </td>
               {renderDataCells(account)}
-              <td className="px-4 py-3 text-right text-sm text-gray-500 bg-blue-25">
+              <td className="px-4 py-3 text-right text-sm text-gray-500 bg-blue-25 min-w-20">
                 {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
               </td>
             </tr>
@@ -1641,12 +1748,12 @@ export default function FinancialsPage() {
               <tr key={`sub-${account.name}-${subAccount.name}`} className={`hover:bg-gray-50 ${
                 subAccount.isParentAsSubAccount ? 'bg-yellow-25 border-l-4 border-yellow-300' : 'bg-blue-25 border-l-4 border-blue-200'
               }`}>
-                <td className={`px-6 py-2 text-left text-sm ${
+                <td className={`account-column px-6 py-2 text-left text-sm min-w-48 ${
                   subAccount.isParentAsSubAccount ? 'bg-yellow-25' : 'bg-blue-25'
                 } ${
                   (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                   (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                    ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
+                    ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg' : ''
                 }`}>
                   <div className="flex items-center pl-8">
                     <div className="w-4 h-4 mr-3 flex items-center justify-center">
@@ -1681,7 +1788,7 @@ export default function FinancialsPage() {
                   </div>
                 </td>
                 {renderDataCells(subAccount)}
-                <td className={`px-4 py-2 text-right text-sm text-gray-500 ${
+                <td className={`px-4 py-2 text-right text-sm text-gray-500 min-w-20 ${
                   subAccount.isParentAsSubAccount ? 'bg-yellow-25' : 'bg-blue-25'
                 }`}>
                   {kpis.revenue ? calculatePercentage(Math.abs(subAccount.total), Math.abs(kpis.revenue)) : '0%'}
@@ -1694,10 +1801,10 @@ export default function FinancialsPage() {
         // Standalone account
         return (
           <tr key={`standalone-${account.name}`} className="hover:bg-gray-50">
-            <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
+            <td className={`account-column px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white min-w-48 ${
               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
+                ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg' : ''
             }`}>
               <div className="flex items-center">
                 <span className="text-gray-700">📄 {account.name}</span>
@@ -1712,7 +1819,7 @@ export default function FinancialsPage() {
               )}
             </td>
             {renderDataCells(account)}
-            <td className="px-4 py-2 text-right text-sm text-gray-500">
+            <td className="px-4 py-2 text-right text-sm text-gray-500 min-w-20">
               {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
             </td>
           </tr>
@@ -1724,7 +1831,7 @@ export default function FinancialsPage() {
   // Render section headers and totals with property support
   const renderSectionHeader = (title: string, emoji: string, category: PLCategory, bgClass: string, textClass: string) => (
     <tr className={`${bgClass} border-t-2 border-opacity-50`}>
-      <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} ${
+      <td className={`account-column px-6 py-4 text-left text-lg font-bold ${textClass} min-w-48 ${
         (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
         (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
           ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
@@ -2227,7 +2334,7 @@ export default function FinancialsPage() {
                 </div>
 
                 {/* P&L Table Content */}
-<div className={`overflow-x-auto ${(viewMode === 'detailed' || viewMode === 'by-property') ? 'relative' : ''}`}>
+<div className="table-container overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 relative">
   {isLoadingData ? (
     <div className="flex items-center justify-center py-8">
       <RefreshCw className="w-6 h-6 animate-spin mr-2" />
@@ -2239,19 +2346,21 @@ export default function FinancialsPage() {
     </div>
   ) : (
     <div className="relative">
-      <table className="w-full">
+      <table className="w-full min-w-max">
         <thead className="bg-gray-50">
           <tr>
-            <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+            <th className={`account-column px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 min-w-48 ${
               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
             }`}>
               Account
             </th>
             {renderColumnHeaders()}
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              % of Revenue
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-24">
+              <div className="truncate" title="% of Revenue">
+                % of Revenue
+              </div>
             </th>
           </tr>
         </thead>
@@ -2262,10 +2371,10 @@ export default function FinancialsPage() {
 
                           {/* TOTAL REVENUE */}
                           <tr className="bg-blue-100 border-t-2 border-blue-300">
-                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 ${
+                            <td className={`account-column px-6 py-4 text-left text-lg font-bold text-blue-800 min-w-48 ${
                               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
                             } bg-blue-100`}>
                               📊 TOTAL REVENUE
                             </td>
@@ -2313,8 +2422,8 @@ export default function FinancialsPage() {
 
                               {/* TOTAL COGS */}
                               <tr className="bg-red-100 border-t-2 border-red-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-red-100 ${
-                                  (viewMode === 'detailed' || viewMode === 'by-property') ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
+                                <td className={`account-column px-6 py-4 text-left text-lg font-bold text-red-800 bg-red-100 min-w-48 ${
+                                  (viewMode === 'detailed' || viewMode === 'by-property') ? 'sticky left-0 z-30 border-r-2 border-gray-200 shadow-lg' : ''
                                 }`}>
                                   📊 TOTAL COGS
                                 </td>
@@ -2359,10 +2468,10 @@ export default function FinancialsPage() {
 
                           {/* 📈 GROSS PROFIT */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.success }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-green-100 ${
+                            <td className={`account-column px-6 py-5 text-left text-xl font-bold bg-green-100 min-w-48 ${
                               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
                             }`} style={{ color: BRAND_COLORS.success }}>
                               📈 GROSS PROFIT
                             </td>
@@ -2420,7 +2529,7 @@ export default function FinancialsPage() {
 
                               {/* TOTAL OPERATING EXPENSES */}
                               <tr className="bg-orange-100 border-t-2 border-orange-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-orange-100 ${
+                                <td className={`account-column px-6 py-4 text-left text-lg font-bold text-orange-800 bg-orange-100 min-w-48 ${
                                   (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                                   (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
                                     ? 'sticky left-0 z-30 border-r-2 border-gray-200 shadow-lg' : ''
@@ -2468,10 +2577,10 @@ export default function FinancialsPage() {
 
                           {/* 🏆 NET OPERATING INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.primary }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-green-100 ${
+                            <td className={`account-column px-6 py-5 text-left text-xl font-bold bg-green-100 min-w-48 ${
                               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
                             }`} style={{ color: BRAND_COLORS.primary }}>
                               🏆 NET OPERATING INCOME
                             </td>
@@ -2551,10 +2660,10 @@ export default function FinancialsPage() {
 
                           {/* 🎯 FINAL NET INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.secondary }}>
-                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-green-100 ${
+                            <td className={`account-column px-6 py-6 text-left text-2xl font-bold bg-green-100 min-w-48 ${
                               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
                             }`} style={{ color: BRAND_COLORS.secondary }}>
                               🎯 NET INCOME
                             </td>
