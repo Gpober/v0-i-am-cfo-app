@@ -1104,8 +1104,8 @@ export default function FinancialsPage() {
         ));
         
         headers.push(
-          <th key="total" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-l border-gray-300">
-            <div className="text-gray-500">Total</div>
+          <th key="total" className="px-3 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50 border-l border-blue-300">
+            <div className="text-blue-600 font-semibold">Total</div>
           </th>
         );
         
@@ -1181,11 +1181,11 @@ export default function FinancialsPage() {
         };
         
         cells.push(
-          <td key="total" className={`px-3 py-3 text-right text-sm font-medium bg-gray-50 border-l border-gray-300 ${
-            totalValue >= 0 ? 'text-gray-700' : 'text-gray-700'
+          <td key="total" className={`px-3 py-3 text-right text-sm font-medium bg-blue-50 border-l border-blue-300 ${
+            totalValue >= 0 ? 'text-blue-700' : 'text-blue-700'
           }`}>
             <span 
-              className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-gray-300"
+              className="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-400"
               onClick={() => handleAccountClick(totalItem)}
             >
               {formatCurrency(totalValue)}
@@ -1285,11 +1285,11 @@ export default function FinancialsPage() {
           };
           
           cells.push(
-            <td key="total" className={`px-4 py-3 text-right text-sm font-medium bg-gray-50 border-l border-gray-300 ${
-              totalValue >= 0 ? 'text-gray-700' : 'text-gray-700'
+            <td key="total" className={`px-4 py-3 text-right text-sm font-medium bg-blue-50 border-l border-blue-300 ${
+              totalValue >= 0 ? 'text-blue-700' : 'text-blue-700'
             }`}>
               <span 
-                className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-gray-300"
+                className="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-400"
                 onClick={() => handleAccountClick(totalItem)}
               >
                 {formatCurrency(totalValue)}
@@ -1490,7 +1490,7 @@ export default function FinancialsPage() {
             );
           })}
           {/* Total column for section headers */}
-          <td className={`px-3 py-4 text-right text-sm font-bold text-gray-600 bg-gray-50 border-l border-gray-300`}>
+          <td className={`px-3 py-4 text-right text-sm font-bold text-blue-800 bg-blue-100 border-l border-blue-400`}>
             {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
               ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
               : formatCurrency(getCategoryTotal(category))
@@ -1518,7 +1518,7 @@ export default function FinancialsPage() {
             );
           })}
           {viewMode === 'detailed' && (
-            <td className={`px-4 py-4 text-right text-lg font-bold text-gray-600 bg-gray-50 border-l border-gray-300`}>
+            <td className={`px-4 py-4 text-right text-lg font-bold text-blue-800 bg-blue-100 border-l border-blue-400`}>
               {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
                 ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
                 : formatCurrency(getCategoryTotal(category))
@@ -2016,7 +2016,7 @@ export default function FinancialsPage() {
                                   </td>
                                 ))}
                                 {/* Total column for by-property view */}
-                                <td className="px-3 py-4 text-right text-lg font-bold text-blue-800 bg-gray-50 border-l border-gray-300">
+                                <td className="px-3 py-4 text-right text-lg font-bold text-blue-900 bg-blue-200 border-l border-blue-500 shadow-sm">
                                   {formatCurrency(kpis.revenue)}
                                 </td>
                               </>
@@ -2063,7 +2063,7 @@ export default function FinancialsPage() {
                                         ({formatCurrency(Math.abs(getCategoryTotal('COGS', undefined, property)))})
                                       </td>
                                     ))}
-                                    <td className="px-3 py-4 text-right text-lg font-bold text-red-800 bg-gray-50 border-l border-gray-300">
+                                    <td className="px-3 py-4 text-right text-lg font-bold text-red-900 bg-red-200 border-l border-red-500 shadow-sm">
                                       ({formatCurrency(kpis.cogs)})
                                     </td>
                                   </>
@@ -2117,7 +2117,7 @@ export default function FinancialsPage() {
                                     </td>
                                   );
                                 })}
-                                <td className={`px-3 py-5 text-right text-xl font-bold bg-gray-50 border-l border-gray-300`} style={{ color: BRAND_COLORS.success }}>
+                                <td className={`px-3 py-5 text-right text-xl font-bold bg-green-200 border-l border-green-500 shadow-sm`} style={{ color: BRAND_COLORS.success }}>
                                   {formatCurrency(kpis.grossProfit)}
                                 </td>
                               </>
@@ -2172,7 +2172,7 @@ export default function FinancialsPage() {
                                         ({formatCurrency(Math.abs(getCategoryTotal('Operating Expenses', undefined, property)))})
                                       </td>
                                     ))}
-                                    <td className="px-3 py-4 text-right text-lg font-bold text-orange-800 bg-gray-50 border-l border-gray-300">
+                                    <td className="px-3 py-4 text-right text-lg font-bold text-orange-900 bg-orange-200 border-l border-orange-500 shadow-sm">
                                       ({formatCurrency(kpis.operatingExpenses)})
                                     </td>
                                   </>
@@ -2229,9 +2229,9 @@ export default function FinancialsPage() {
                                     </td>
                                   );
                                 })}
-                                <td className={`px-3 py-5 text-right text-xl font-bold bg-gray-50 border-l border-gray-300 ${
-                                  kpis.netOperatingIncome >= 0 ? 'text-green-700' : 'text-red-700'
-                                }`}>
+                                <td className={`px-3 py-5 text-right text-xl font-bold ${
+                                  kpis.netOperatingIncome >= 0 ? 'text-green-800 bg-green-200' : 'text-red-800 bg-red-200'
+                                } border-l border-blue-500 shadow-sm`}>
                                   {formatCurrency(kpis.netOperatingIncome)}
                                 </td>
                               </>
@@ -2314,9 +2314,9 @@ export default function FinancialsPage() {
                                     </td>
                                   );
                                 })}
-                                <td className={`px-3 py-6 text-right text-2xl font-bold bg-gray-50 border-l border-gray-300 ${
-                                  kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
-                                }`}>
+                                <td className={`px-3 py-6 text-right text-2xl font-bold ${
+                                  kpis.netIncome >= 0 ? 'text-green-800 bg-green-200' : 'text-red-800 bg-red-200'
+                                } border-l border-blue-500 shadow-sm`}>
                                   {formatCurrency(kpis.netIncome)}
                                 </td>
                               </>
