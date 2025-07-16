@@ -964,7 +964,7 @@ export default function FinancialsPage() {
             {/* 🏢 PARENT ACCOUNT ROW */}
             <tr className="hover:bg-blue-50 bg-blue-25 border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
               <td className={`px-6 py-3 text-left text-sm bg-blue-25 ${
-                timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
               }`}>
                 <div className="flex items-center">
                   <button
@@ -1007,7 +1007,7 @@ export default function FinancialsPage() {
                 <td className={`px-6 py-2 text-left text-sm ${
                   subAccount.isParentAsSubAccount ? 'bg-yellow-25' : 'bg-blue-25'
                 } ${
-                  timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                  timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
                 }`}>
                   <div className="flex items-center pl-8">
                     <div className="w-4 h-4 mr-3 flex items-center justify-center">
@@ -1056,7 +1056,7 @@ export default function FinancialsPage() {
         return (
           <tr key={`standalone-${account.name}`} className="hover:bg-gray-50">
             <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
-              timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+              timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
             }`}>
               <div className="flex items-center">
                 <span className="text-gray-700">📄 {account.name}</span>
@@ -1810,7 +1810,7 @@ export default function FinancialsPage() {
                         <thead className="bg-gray-50">
                           <tr>
                             <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
-                              timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                              timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
                             }`}>
                               Account
                             </th>
@@ -1830,7 +1830,7 @@ export default function FinancialsPage() {
                         {/* TOTAL REVENUE */}
                         <tr className="bg-blue-100 border-t-2 border-blue-300">
                           <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 ${
-                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
                           } bg-blue-100`}>
                             📊 TOTAL REVENUE
                           </td>
@@ -1905,7 +1905,7 @@ export default function FinancialsPage() {
                           borderTopColor: BRAND_COLORS.success 
                         }}>
                           <td className={`px-6 py-5 text-left text-xl font-bold ${
-                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
                           } bg-green-100`} style={{ 
                             color: BRAND_COLORS.success
                           }}>
@@ -1941,50 +1941,54 @@ export default function FinancialsPage() {
                         </tr>
 
                         {/* 💸 OPERATING EXPENSES SECTION */}
-                        {renderSectionHeader('OPERATING EXPENSES', '💸', 'Operating Expenses', 'bg-orange-50', 'text-orange-900')}
-                        
-                        {/* Individual Operating Expense Line Items with Grouping */}
-                        {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Operating Expenses'))}
+                        {currentData.some((item: any) => item.category === 'Operating Expenses') && (
+                          <>
+                            {renderSectionHeader('OPERATING EXPENSES', '💸', 'Operating Expenses', 'bg-orange-50', 'text-orange-900')}
+                            
+                            {/* Individual Operating Expense Line Items with Grouping */}
+                            {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Operating Expenses'))}
 
-                        {/* TOTAL OPERATING EXPENSES */}
-                        <tr className="bg-orange-100 border-t-2 border-orange-300">
-                          <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-orange-100 ${
-                            viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
-                          }`}>
-                            📊 TOTAL OPERATING EXPENSES
-                          </td>
-                          {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
-                            <td className="px-4 py-4 text-right text-lg font-bold text-orange-800">
-                              ({formatCurrency(kpis.operatingExpenses)})
-                            </td>
-                          ) : timeSeriesData ? (
-                            <>
-                              {timeSeriesData.periods.map((period: string) => {
-                                const total = Math.abs(getCategoryTotal('Operating Expenses', period));
-                                return (
-                                  <td key={period} className="px-4 py-4 text-right text-lg font-bold text-orange-800">
-                                    ({formatCurrency(total)})
-                                  </td>
-                                );
-                              })}
-                              {viewMode === 'detailed' && (
-                                <td className="px-4 py-4 text-right text-lg font-bold text-orange-800 bg-blue-50 border-l-2 border-blue-200">
+                            {/* TOTAL OPERATING EXPENSES - Always show this summary row */}
+                            <tr className="bg-orange-100 border-t-2 border-orange-300">
+                              <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-orange-100 ${
+                                timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-30 border-r-2 border-gray-200 shadow-lg' : ''
+                              }`}>
+                                📊 TOTAL OPERATING EXPENSES
+                              </td>
+                              {timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
+                                <td className="px-4 py-4 text-right text-lg font-bold text-orange-800">
                                   ({formatCurrency(kpis.operatingExpenses)})
                                 </td>
-                              )}
-                            </>
-                          ) : null}
-                          <td className="px-4 py-4 text-right text-sm font-bold text-orange-800">
-                            {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, Math.abs(kpis.revenue)) : '0%'}
-                          </td>
-                        </tr>
+                              ) : timeSeriesData ? (
+                                <>
+                                  {timeSeriesData.periods.map((period: string) => {
+                                    const total = Math.abs(getCategoryTotal('Operating Expenses', period));
+                                    return (
+                                      <td key={period} className="px-4 py-4 text-right text-lg font-bold text-orange-800">
+                                        ({formatCurrency(total)})
+                                      </td>
+                                    );
+                                  })}
+                                  {viewMode === 'detailed' && (
+                                    <td className="px-4 py-4 text-right text-lg font-bold text-orange-800 bg-blue-50 border-l-2 border-blue-200">
+                                      ({formatCurrency(kpis.operatingExpenses)})
+                                    </td>
+                                  )}
+                                </>
+                              ) : null}
+                              <td className="px-4 py-4 text-right text-sm font-bold text-orange-800">
+                                {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, Math.abs(kpis.revenue)) : '0%'}
+                              </td>
+                            </tr>
+                          </>
+                        )}
 
                         {/* 🏆 NET OPERATING INCOME */}
                         <tr className="border-t-4 bg-green-100" style={{ 
                           borderTopColor: BRAND_COLORS.primary 
                         }}>
                           <td className={`px-6 py-5 text-left text-xl font-bold ${
-                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
                           } bg-green-100`} style={{ 
                             color: BRAND_COLORS.primary
                           }}>
@@ -2051,7 +2055,7 @@ export default function FinancialsPage() {
                           borderTopColor: BRAND_COLORS.secondary 
                         }}>
                           <td className={`px-6 py-6 text-left text-2xl font-bold ${
-                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
+                            timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
                           } bg-green-100`} style={{ 
                             color: BRAND_COLORS.secondary
                           }}>
