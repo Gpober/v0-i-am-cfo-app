@@ -1,4 +1,4 @@
-name: Claude Code Helper (API Key)
+name: Claude Code Helper
 
 on:
   workflow_dispatch:
@@ -44,5 +44,4 @@ jobs:
           }}
         
         allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,EditTool,BatchTool"
-        # Use your existing API key
         anthropic_api_key: ${{ secrets.CLAUDE_API_KEY }}
