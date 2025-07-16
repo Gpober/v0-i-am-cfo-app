@@ -228,30 +228,10 @@ const fetchTimeSeriesData = async (
     
     let dateRanges: Array<{start: string, end: string, label: string}> = [];
     
-    // ENHANCED: For by-property view, use the SAME logic as other views
-    // Fetch month by month to avoid hitting row limits, then aggregate
+    // ENHANCED: For by-property view, use month-by-month fetching like other views
     if (viewMode === 'by-property') {
-      if (timePeriod === 'Monthly') {
-        const monthNum = selectedDate.getMonth() + 1;
-        const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-        const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
-        const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
-        dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
-      } else if (timePeriod === 'Quarterly') {
-        const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
-        const qStart = new Date(parseInt(year), (quarter - 1) * 3, 1);
-        const qEnd = new Date(parseInt(year), quarter * 3, 0);
-        dateRanges = [{
-          start: qStart.toISOString().split('T')[0],
-          end: qEnd.toISOString().split('T')[0],
-          label: `Q${quarter} ${year}`
-        }];
-      } else if (timePeriod === 'Yearly') {
-        const yearStart = `${year}-01-01`;
-        const yearEnd = `${year}-12-31`;
-        dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
-      } else { // Trailing 12
-        // FIXED: Use month-by-month fetching like other views to avoid row limits
+      // Use the SAME date range logic as detailed view to avoid row limits
+      if (timePeriod === 'Trailing 12') {
         for (let i = 11; i >= 0; i--) {
           const monthDate = new Date(selectedDate);
           monthDate.setMonth(monthDate.getMonth() - i);
@@ -268,6 +248,13 @@ const fetchTimeSeriesData = async (
             label: `${monthName} ${monthYear}`
           });
         }
+      } else {
+        // For other time periods, use single range
+        const monthNum = selectedDate.getMonth() + 1;
+        const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+        const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
+        const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+        dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
       }
     } else {
       // Original logic for non-property views
@@ -540,99 +527,6 @@ const fetchTimeSeriesData = async (
         console.error(`Failed to fetch data for period ${range.label}:`, response.status);
         allData[range.label] = {};
       }
-    }
-    
-    // FIXED: For by-property Trailing 12, aggregate all monthly data 
-    if (viewMode === 'by-property' && timePeriod === 'Trailing 12') {
-      console.log('🔍 AGGREGATING BY-PROPERTY TRAILING 12 DATA...');
-      
-      const aggregatedData: any = {};
-      let allAvailableProperties: string[] = [];
-      
-      // First, collect all properties from all months
-      dateRanges.forEach((range) => {
-        const monthData = allData[range.label] || {};
-        Object.values(monthData).forEach((account: any) => {
-          if (account.propertyTotals) {
-            Object.keys(account.propertyTotals).forEach(prop => {
-              if (!allAvailableProperties.includes(prop)) {
-                allAvailableProperties.push(prop);
-              }
-            });
-          }
-        });
-      });
-      
-      // Then aggregate all months
-      dateRanges.forEach((range) => {
-        const monthData = allData[range.label] || {};
-        
-        Object.values(monthData).forEach((account: any) => {
-          const accountName = account.name;
-          
-          if (!aggregatedData[accountName]) {
-            aggregatedData[accountName] = {
-              name: accountName,
-              category: account.category,
-              type: account.category,
-              total: 0,
-              entries: [],
-              account_type: account.account_type,
-              account_detail_type: account.account_detail_type,
-              propertyTotals: {},
-              propertyEntries: {}
-            };
-            
-            // Initialize all properties for this account
-            allAvailableProperties.forEach(prop => {
-              aggregatedData[accountName].propertyTotals[prop] = 0;
-              aggregatedData[accountName].propertyEntries[prop] = [];
-            });
-          }
-          
-          aggregatedData[accountName].total += account.total;
-          aggregatedData[accountName].entries.push(...account.entries);
-          
-          // Aggregate property data
-          if (account.propertyTotals) {
-            Object.entries(account.propertyTotals).forEach(([prop, amount]: [string, any]) => {
-              aggregatedData[accountName].propertyTotals[prop] += amount;
-            });
-          }
-          
-          if (account.propertyEntries) {
-            Object.entries(account.propertyEntries).forEach(([prop, entries]: [string, any]) => {
-              aggregatedData[accountName].propertyEntries[prop].push(...entries);
-            });
-          }
-        });
-      });
-      
-      allData = {
-        'Trailing 12 Months': aggregatedData
-      };
-      
-      availableProperties = allAvailableProperties.sort();
-      
-      return {
-        success: true,
-        data: allData,
-        periods: ['Trailing 12 Months'],
-        availableProperties: availableProperties,
-        summary: {
-          timePeriod,
-          viewMode,
-          property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
-          dateRanges: [{
-            start: dateRanges[0].start,
-            end: dateRanges[dateRanges.length - 1].end,
-            label: 'Trailing 12 Months'
-          }],
-          totalEntriesProcessed,
-          periodsGenerated: 1,
-          monthsAggregated: dateRanges.length
-        }
-      };
     }
     
     // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
