@@ -13,155 +13,142 @@ on:
           - 'Add documentation'
           - 'Optimize performance'
           - 'Custom task'
-      
       custom_prompt:
-        description: 'Type your custom request here (works for any task type)'
+        description: 'Custom instructions (if Custom task selected)'
         required: false
-        default: 'Fix the horizontal scrolling issues in the P&L table section'
-      
+        default: 'Review this codebase and provide helpful suggestions'
       create_pr:
-        description: 'Create Pull Request instead of direct commit?'
+        description: 'Create Pull Request (recommended) or push directly to main'
         required: true
-        type: boolean
-        default: true
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        default: 'true'
+
+# CRITICAL: These permissions are required for auto-editing
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: write
 
 jobs:
   claude-analysis:
     runs-on: ubuntu-latest
     
-    permissions:
-      contents: write
-      pull-requests: write
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
+        # This is crucial for EditTool to work
         token: ${{ secrets.GITHUB_TOKEN }}
-    
+        fetch-depth: 0
+
     - name: Create branch for changes
-      if: ${{ github.event.inputs.create_pr == 'true' }}
+      if: github.event.inputs.create_pr == 'true'
       run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
         BRANCH_NAME="claude-fixes-$(date +%s)"
-        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
         git checkout -b $BRANCH_NAME
-    
+        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
     - name: Run Claude Code Analysis and Auto-Fix
       uses: anthropics/claude-code-base-action@beta
       with:
         prompt: |
           ${{ 
-            github.event.inputs.custom_prompt != 'Fix the horizontal scrolling issues in the P&L table section' && github.event.inputs.custom_prompt ||
-            github.event.inputs.task == 'Review and fix bugs' && 'Find and fix bugs in this codebase. Use EditTool to directly modify files with corrections. Focus on security issues, error handling, and type safety. Make actual changes to the files.' ||
-            github.event.inputs.task == 'Improve code quality' && 'Improve code quality throughout this codebase. Use EditTool to refactor, clean up, and optimize. Make direct changes to files with better patterns.' ||
-            github.event.inputs.task == 'Add documentation' && 'Add comprehensive documentation to this codebase. Use EditTool to modify files and add comments, docstrings, and update README files.' ||
-            github.event.inputs.task == 'Optimize performance' && 'Optimize performance in this codebase. Use EditTool to directly modify files with performance improvements. Focus on React optimizations, async operations, and data handling.' ||
-            'Fix the horizontal scrolling issues in the P&L table section. Use EditTool to modify the files. The main problems: 1) P&L table doesn''t scroll properly with many columns (by-property view), 2) Account column should stay sticky while other columns scroll, 3) Table breaks on mobile, 4) Sticky positioning CSS not working. Fix the overflow-x behavior, make Account column properly sticky with correct z-index, ensure responsive design.'
+            github.event.inputs.custom_prompt != 'Review this codebase and provide helpful suggestions' && github.event.inputs.custom_prompt ||
+            github.event.inputs.task == 'Review and fix bugs' && 'Analyze this codebase for bugs and provide specific fixes. Use EditTool to actually fix the issues you find. Focus on: null checks, error handling, type safety, async/await issues, and performance problems.' ||
+            github.event.inputs.task == 'Improve code quality' && 'Review this code for quality improvements. Use EditTool to refactor and implement better patterns. Focus on: code organization, performance optimization, and best practices.' ||
+            github.event.inputs.task == 'Add documentation' && 'Add comprehensive documentation to this codebase. Use EditTool to add comments, update README, and improve code clarity.' ||
+            github.event.inputs.task == 'Optimize performance' && 'Analyze this code for performance improvements. Use EditTool to implement optimizations for: data loading, rendering, calculations, and user interactions.'
           }}
-          
-          CRITICAL INSTRUCTIONS:
-          1. Use EditTool to directly modify files - make actual changes
-          2. Fix the issues by editing the actual code files
-          3. Save all modifications using EditTool
-          4. Focus on making working improvements, not just suggestions
-          5. Be thorough but don't over-engineer
         
-        allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,EditTool,BatchTool,Write"
+        # CRITICAL: Grant EditTool permission explicitly
+        allowed_tools: "Task,Bash(git:*),View,GlobTool,GrepTool,LS,Read,Edit,MultiEdit,Write,BatchTool"
         anthropic_api_key: ${{ secrets.CLAUDE_API_KEY }}
-    
+        
+        # Additional permissions for file operations
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Check for changes
       id: changes
       run: |
-        if [ -n "$(git status --porcelain)" ]; then
-          echo "changes=true" >> $GITHUB_OUTPUT
-          echo "Changes detected:"
-          git status --porcelain
-          echo "Files modified:"
-          git diff --name-only
+        if git diff --quiet; then
+          echo "changed=false" >> $GITHUB_OUTPUT
+          echo "No changes made by Claude"
         else
-          echo "changes=false" >> $GITHUB_OUTPUT
-          echo "No changes detected"
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "Changes detected:"
+          git diff --name-only
         fi
-    
+
     - name: Commit changes
-      if: steps.changes.outputs.changes == 'true'
+      if: steps.changes.outputs.changed == 'true'
       run: |
-        git config --local user.email "claude-bot@github-actions.com"
-        git config --local user.name "Claude Auto-Fix Bot"
+        git config --local user.email "action@github.com"
+        git config --local user.name "Claude Auto-Fix"
         git add .
         
         # Create detailed commit message
-        echo "🤖 Claude Auto-Fix: ${{ github.event.inputs.task }}" > commit_msg.txt
-        echo "" >> commit_msg.txt
-        echo "Automated code improvements by Claude:" >> commit_msg.txt
-        echo "- Task: ${{ github.event.inputs.task }}" >> commit_msg.txt
-        echo "- Timestamp: $(date)" >> commit_msg.txt
-        echo "" >> commit_msg.txt
-        echo "Files modified:" >> commit_msg.txt
-        git diff --cached --name-only | sed 's/^/- /' >> commit_msg.txt
-        echo "" >> commit_msg.txt
-        echo "⚠️ Please review all changes before merging!" >> commit_msg.txt
+        TASK="${{ github.event.inputs.task }}"
+        if [ "${{ github.event.inputs.custom_prompt }}" != "Review this codebase and provide helpful suggestions" ]; then
+          TASK="Custom task"
+        fi
         
-        git commit -F commit_msg.txt
-    
+        git commit -m "🤖 Claude Auto-Fix: $TASK
+
+        Files modified:
+        $(git diff --cached --name-only | sed 's/^/- /')
+        
+        Changes made by Claude Code AI assistant
+        Review carefully before merging!"
+
     - name: Push changes and create PR
-      if: steps.changes.outputs.changes == 'true' && github.event.inputs.create_pr == 'true'
+      if: steps.changes.outputs.changed == 'true' && github.event.inputs.create_pr == 'true'
       run: |
         git push origin $BRANCH_NAME
         
-        # Create PR body
-        echo "## 🤖 Claude Auto-Fix Results" > pr_body.txt
-        echo "" >> pr_body.txt
-        echo "**Task:** ${{ github.event.inputs.task }}" >> pr_body.txt
-        echo "**Custom Instructions:** ${{ github.event.inputs.custom_prompt }}" >> pr_body.txt
-        echo "" >> pr_body.txt
-        echo "### 📝 Changes Made:" >> pr_body.txt
-        git diff HEAD~1 --name-only | sed 's/^/- /' >> pr_body.txt
-        echo "" >> pr_body.txt
-        echo "### ⚠️ Review Required" >> pr_body.txt
-        echo "Claude has analyzed and modified the code according to the specified task." >> pr_body.txt
-        echo "Please carefully review each change before merging to ensure they meet your requirements." >> pr_body.txt
-        echo "" >> pr_body.txt
-        echo "**Generated at:** $(date)" >> pr_body.txt
-        
+        # Create PR using GitHub CLI
         gh pr create \
           --title "🤖 Claude Auto-Fix: ${{ github.event.inputs.task }}" \
-          --body-file pr_body.txt \
-          --head $BRANCH_NAME \
-          --base ${{ github.ref_name }} \
+          --body "## 🤖 Automated fixes by Claude
+
+        **Task:** ${{ github.event.inputs.task }}
+        **Custom Prompt:** ${{ github.event.inputs.custom_prompt }}
+        
+        ### Files Modified:
+        $(git diff HEAD~1 --name-only | sed 's/^/- /')
+        
+        ### ⚠️ Review Required
+        Please review all changes carefully before merging:
+        - Test the functionality 
+        - Check for any breaking changes
+        - Verify the fixes work as expected
+        
+        Generated by Claude Code Base Action" \
           --label "claude-auto-fix" \
           --label "needs-review"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Push direct to main
-      if: steps.changes.outputs.changes == 'true' && github.event.inputs.create_pr == 'false'
+
+    - name: Push directly to main
+      if: steps.changes.outputs.changed == 'true' && github.event.inputs.create_pr == 'false'
       run: |
-        git push origin ${{ github.ref_name }}
-        echo "⚠️ Changes pushed directly to ${{ github.ref_name }}!"
-        echo "Direct push completed. Changes are now live."
-    
-    - name: No changes summary
-      if: steps.changes.outputs.changes == 'false'
-      run: |
-        echo "✅ Claude analyzed the code but found no changes were needed."
-        echo "The codebase may already be in good shape for the requested task!"
-        echo "Task: ${{ github.event.inputs.task }}"
-    
+        git push origin main
+
     - name: Summary
       if: always()
       run: |
-        echo "## Claude Auto-Fix Summary"
-        echo "Task: ${{ github.event.inputs.task }}"
-        echo "Create PR: ${{ github.event.inputs.create_pr }}"
-        echo "Changes Made: ${{ steps.changes.outputs.changes }}"
-        if [ "${{ steps.changes.outputs.changes }}" == "true" ]; then
-          echo "✅ Claude successfully made code improvements"
+        if [ "${{ steps.changes.outputs.changed }}" == "true" ]; then
+          echo "✅ Claude successfully made changes to your codebase!"
           if [ "${{ github.event.inputs.create_pr }}" == "true" ]; then
-            echo "📝 Pull request created for review"
+            echo "📋 Check the new Pull Request for review"
           else
             echo "🚀 Changes pushed directly to main branch"
           fi
         else
-          echo "ℹ️ No changes needed"
+          echo "ℹ️ No changes were needed - your code looks good!"
         fi
