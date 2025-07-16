@@ -1074,47 +1074,53 @@ export default function FinancialsPage() {
       viewMode,
       periods: timeSeriesData.periods,
       dataKeys: Object.keys(timeSeriesData.data),
-      sampleData: timeSeriesData.data[timeSeriesData.periods[0]]
+      availableProperties: timeSeriesData.availableProperties
     });
 
-    // For by-property view, use the first period's data
-    if (viewMode === 'by-property') {
+    // For by-property view with multiple properties, show property breakdown
+    if (viewMode === 'by-property' && timeSeriesData.availableProperties && timeSeriesData.availableProperties.length > 0) {
       const firstPeriodKey = timeSeriesData.periods[0];
       const periodData = timeSeriesData.data[firstPeriodKey] || {};
       
-      // Calculate totals for this period
-      const revenue = Object.values(periodData)
-        .filter((item: any) => item.category === 'Revenue')
-        .reduce((sum: number, item: any) => sum + item.total, 0);
-      
-      const cogs = Object.values(periodData)
-        .filter((item: any) => item.category === 'COGS')
-        .reduce((sum: number, item: any) => sum + Math.abs(item.total), 0);
-      
-      const operatingExpenses = Object.values(periodData)
-        .filter((item: any) => item.category === 'Operating Expenses')
-        .reduce((sum: number, item: any) => sum + Math.abs(item.total), 0);
-      
-      const otherIncome = Object.values(periodData)
-        .filter((item: any) => item.category === 'Other Income')
-        .reduce((sum: number, item: any) => sum + item.total, 0);
-      
-      const otherExpenses = Object.values(periodData)
-        .filter((item: any) => item.category === 'Other Expenses')
-        .reduce((sum: number, item: any) => sum + Math.abs(item.total), 0);
+      // Create trend data by property
+      const propertyTrendData = timeSeriesData.availableProperties.map((property: string) => {
+        const revenue = Object.values(periodData)
+          .filter((item: any) => item.category === 'Revenue')
+          .reduce((sum: number, item: any) => sum + (item.propertyTotals?.[property] || 0), 0);
+        
+        const cogs = Object.values(periodData)
+          .filter((item: any) => item.category === 'COGS')
+          .reduce((sum: number, item: any) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
+        
+        const operatingExpenses = Object.values(periodData)
+          .filter((item: any) => item.category === 'Operating Expenses')
+          .reduce((sum: number, item: any) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
+        
+        const otherIncome = Object.values(periodData)
+          .filter((item: any) => item.category === 'Other Income')
+          .reduce((sum: number, item: any) => sum + (item.propertyTotals?.[property] || 0), 0);
+        
+        const otherExpenses = Object.values(periodData)
+          .filter((item: any) => item.category === 'Other Expenses')
+          .reduce((sum: number, item: any) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
 
-      const netIncome = revenue - cogs - operatingExpenses + otherIncome - otherExpenses;
+        const netIncome = revenue - cogs - operatingExpenses + otherIncome - otherExpenses;
 
-      return [{
-        period: firstPeriodKey,
-        revenue,
-        netIncome,
-        grossProfit: revenue - cogs,
-        operatingIncome: revenue - cogs - operatingExpenses
-      }];
+        return {
+          period: property.length > 8 ? property.substring(0, 8) + '...' : property,
+          fullPropertyName: property,
+          revenue,
+          netIncome,
+          grossProfit: revenue - cogs,
+          operatingIncome: revenue - cogs - operatingExpenses
+        };
+      }).filter(item => item.revenue > 0 || item.netIncome !== 0); // Only show properties with activity
+      
+      console.log('🏢 BY-PROPERTY TREND DATA:', propertyTrendData);
+      return propertyTrendData;
     }
 
-    // For detailed view or multiple periods
+    // For detailed view or multiple periods (time-based trend)
     if (viewMode === 'detailed' || (timePeriod !== 'Monthly' || viewMode !== 'total')) {
       const trendResult = timeSeriesData.periods.map((period: string) => {
         const periodData = timeSeriesData.data[period] || {};
@@ -1143,6 +1149,7 @@ export default function FinancialsPage() {
 
         const result = {
           period: period.length > 12 ? period.substring(0, 12) : period,
+          fullPeriodName: period,
           revenue,
           netIncome,
           grossProfit: revenue - cogs,
@@ -1151,13 +1158,13 @@ export default function FinancialsPage() {
         
         console.log(`📊 Period ${period}:`, result);
         return result;
-      });
+      }).filter(item => item.revenue > 0 || item.netIncome !== 0); // Only show periods with activity
       
       console.log('📊 FINAL TREND DATA:', trendResult);
       return trendResult;
     }
 
-    // For single period (like Trailing 12 Total)
+    // For single period (like Trailing 12 Total) - show overall totals as single point
     const singlePeriodKey = timeSeriesData.periods[0];
     const periodData = timeSeriesData.data[singlePeriodKey] || {};
     
@@ -1183,13 +1190,17 @@ export default function FinancialsPage() {
 
     const netIncome = revenue - cogs - operatingExpenses + otherIncome - otherExpenses;
 
-    return [{
-      period: singlePeriodKey,
+    const result = [{
+      period: singlePeriodKey.length > 15 ? 'Total' : singlePeriodKey,
+      fullPeriodName: singlePeriodKey,
       revenue,
       netIncome,
       grossProfit: revenue - cogs,
       operatingIncome: revenue - cogs - operatingExpenses
     }];
+    
+    console.log('📊 SINGLE PERIOD DATA:', result);
+    return result;
   };
 
   const generateExpenseBreakdown = () => {
@@ -2495,12 +2506,12 @@ export default function FinancialsPage() {
                   <h3 className="text-xl font-semibold text-gray-900">Revenue & Net Income Trend</h3>
                   <div className="text-sm text-gray-600 mt-1">
                     {viewMode === 'by-property' ? 
-                      `${timePeriod} comparison across properties` :
+                      `${timePeriod} comparison across properties • ${trendData.length} properties shown` :
                       timePeriod === 'Trailing 12' && viewMode === 'total' ? 
                         'Past 12 months aggregated' :
                         `${timePeriod} ${viewMode} breakdown`
                     }
-                    {trendData.length > 1 && (
+                    {trendData.length > 1 && viewMode !== 'by-property' && (
                       <span className="ml-2 text-green-600">• {trendData.length} periods</span>
                     )}
                   </div>
