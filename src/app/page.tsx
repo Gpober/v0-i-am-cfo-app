@@ -248,24 +248,17 @@ const fetchTimeSeriesData = async (
         const yearEnd = `${year}-12-31`;
         dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
       } else { // Trailing 12
-        // FIX: For by-property trailing 12, we need to aggregate ALL 12 months like other views
-        // Not just create a single period, but process all 12 months and sum them up
-        for (let i = 11; i >= 0; i--) {
-          const monthDate = new Date(selectedDate);
-          monthDate.setMonth(monthDate.getMonth() - i);
-          
-          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-          
-          const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
-          const monthYear = monthStart.getFullYear();
-          
-          dateRanges.push({
-            start: monthStart.toISOString().split('T')[0],
-            end: monthEnd.toISOString().split('T')[0],
-            label: `${monthName} ${monthYear}`
-          });
-        }
+        // FIX: For by-property, use single date range covering all 12 months
+        const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        const startDate = new Date(selectedDate);
+        startDate.setMonth(startDate.getMonth() - 11);
+        startDate.setDate(1);
+        
+        dateRanges = [{
+          start: startDate.toISOString().split('T')[0],
+          end: endDate.toISOString().split('T')[0],
+          label: `Trailing 12 Months (ending ${monthYear})`
+        }];
       }
     } else {
       // Original logic for non-property views
@@ -527,95 +520,6 @@ const fetchTimeSeriesData = async (
         console.error(`Failed to fetch data for period ${range.label}:`, response.status);
         allData[range.label] = {};
       }
-    }
-    
-    // FIXED: For by-property Trailing 12, aggregate all monthly data into one summary
-    if (viewMode === 'by-property' && timePeriod === 'Trailing 12') {
-      console.log('🔍 AGGREGATING BY-PROPERTY TRAILING 12 DATA...');
-      
-      const aggregatedData: any = {};
-      let allAvailableProperties: string[] = [];
-      
-      dateRanges.forEach((range) => {
-        const monthData = allData[range.label] || {};
-        
-        // Collect all properties from all months
-        Object.values(monthData).forEach((account: any) => {
-          if (account.propertyTotals) {
-            Object.keys(account.propertyTotals).forEach(prop => {
-              if (!allAvailableProperties.includes(prop)) {
-                allAvailableProperties.push(prop);
-              }
-            });
-          }
-        });
-        
-        Object.values(monthData).forEach((account: any) => {
-          const accountName = account.name;
-          
-          if (!aggregatedData[accountName]) {
-            aggregatedData[accountName] = {
-              name: accountName,
-              category: account.category,
-              type: account.category,
-              total: 0,
-              entries: [],
-              account_type: account.account_type,
-              account_detail_type: account.account_detail_type,
-              propertyTotals: {},
-              propertyEntries: {}
-            };
-            
-            // Initialize all properties for this account
-            allAvailableProperties.forEach(prop => {
-              aggregatedData[accountName].propertyTotals[prop] = 0;
-              aggregatedData[accountName].propertyEntries[prop] = [];
-            });
-          }
-          
-          aggregatedData[accountName].total += account.total;
-          aggregatedData[accountName].entries.push(...account.entries);
-          
-          // Aggregate property data
-          if (account.propertyTotals) {
-            Object.entries(account.propertyTotals).forEach(([prop, amount]: [string, any]) => {
-              aggregatedData[accountName].propertyTotals[prop] += amount;
-            });
-          }
-          
-          if (account.propertyEntries) {
-            Object.entries(account.propertyEntries).forEach(([prop, entries]: [string, any]) => {
-              aggregatedData[accountName].propertyEntries[prop].push(...entries);
-            });
-          }
-        });
-      });
-      
-      allData = {
-        'Trailing 12 Months': aggregatedData
-      };
-      
-      availableProperties = allAvailableProperties.sort();
-      
-      return {
-        success: true,
-        data: allData,
-        periods: ['Trailing 12 Months'],
-        availableProperties: availableProperties,
-        summary: {
-          timePeriod,
-          viewMode,
-          property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
-          dateRanges: [{
-            start: dateRanges[0].start,
-            end: dateRanges[dateRanges.length - 1].end,
-            label: 'Trailing 12 Months'
-          }],
-          totalEntriesProcessed,
-          periodsGenerated: 1,
-          monthsAggregated: dateRanges.length
-        }
-      };
     }
     
     // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
