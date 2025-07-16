@@ -226,42 +226,7 @@ const fetchTimeSeriesData = async (
     
     let dateRanges: Array<{start: string, end: string, label: string}> = [];
     
-   // ENHANCED: For by-property view, respect time period dropdown settings
-    if (viewMode === 'by-property') {
-      if (timePeriod === 'Monthly') {
-        const monthNum = selectedDate.getMonth() + 1;
-        const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-        const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
-        const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
-        dateRanges = [{ start: startDate, end: endDate, label: `${monthYear} (Monthly)` }];
-      } else if (timePeriod === 'Quarterly') {
-        const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
-        const qStart = new Date(parseInt(year), (quarter - 1) * 3, 1);
-        const qEnd = new Date(parseInt(year), quarter * 3, 0);
-        dateRanges = [{
-          start: qStart.toISOString().split('T')[0],
-          end: qEnd.toISOString().split('T')[0],
-          label: `Q${quarter} ${year} (Quarterly)`
-        }];
-      } else if (timePeriod === 'Yearly') {
-        const yearStart = `${year}-01-01`;
-        const yearEnd = `${year}-12-31`;
-        dateRanges = [{ start: yearStart, end: yearEnd, label: `${year} (Yearly)` }];
-      } else if (timePeriod === 'Trailing 12') {
-        // For Trailing 12 in by-property view, get the full 12 months ending with selected month
-        const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-        const startDate = new Date(selectedDate);
-        startDate.setMonth(startDate.getMonth() - 11);
-        startDate.setDate(1);
-        
-        dateRanges = [{
-          start: startDate.toISOString().split('T')[0],
-          end: endDate.toISOString().split('T')[0],
-          label: `Trailing 12 Months (ending ${monthYear})`
-        }];
-      }
-    } else {
-      // Original logic for non-property views
+         // Original logic for non-property views
       switch (timePeriod) {
         case 'Monthly':
           if (viewMode === 'total') {
