@@ -1073,7 +1073,8 @@ export default function FinancialsPage() {
       timePeriod,
       viewMode,
       periods: timeSeriesData.periods,
-      dataKeys: Object.keys(timeSeriesData.data)
+      dataKeys: Object.keys(timeSeriesData.data),
+      sampleData: timeSeriesData.data[timeSeriesData.periods[0]]
     });
 
     // For by-property view, use the first period's data
@@ -1115,7 +1116,7 @@ export default function FinancialsPage() {
 
     // For detailed view or multiple periods
     if (viewMode === 'detailed' || (timePeriod !== 'Monthly' || viewMode !== 'total')) {
-      return timeSeriesData.periods.map((period: string) => {
+      const trendResult = timeSeriesData.periods.map((period: string) => {
         const periodData = timeSeriesData.data[period] || {};
         
         const revenue = Object.values(periodData)
@@ -1140,14 +1141,20 @@ export default function FinancialsPage() {
 
         const netIncome = revenue - cogs - operatingExpenses + otherIncome - otherExpenses;
 
-        return {
-          period: period.length > 12 ? period.substring(0, 12) : period, // Truncate long period names
+        const result = {
+          period: period.length > 12 ? period.substring(0, 12) : period,
           revenue,
           netIncome,
           grossProfit: revenue - cogs,
           operatingIncome: revenue - cogs - operatingExpenses
         };
+        
+        console.log(`📊 Period ${period}:`, result);
+        return result;
       });
+      
+      console.log('📊 FINAL TREND DATA:', trendResult);
+      return trendResult;
     }
 
     // For single period (like Trailing 12 Total)
