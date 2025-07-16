@@ -781,6 +781,7 @@ export default function FinancialsPage() {
     }
     return months;
   };
+}
 
   const monthsList = generateMonthsList();
 
