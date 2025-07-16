@@ -409,17 +409,15 @@ const fetchTimeSeriesData = async (
     for (const range of dateRanges) {
       console.log(`🔍 Fetching data for period: ${range.label} (${range.start} to ${range.end})`);
       
-      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end}`;
+      // CRITICAL FIX: Fetch ALL data without row limits
+      // Supabase might have a default limit, so we'll use a very high limit
+      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end}&limit=100000`;
       
       // FIXED: For by-property view, NEVER filter by property - we need ALL property data
       // Only filter by property for non-by-property views
       if (viewMode !== 'by-property' && property !== 'All Properties') {
         url += `&class=eq.${encodeURIComponent(property)}`;
       }
-      
-      // CRITICAL FIX: Remove any row limits that might be applied by default
-      // Supabase might be limiting to 1000 rows by default
-      url += `&limit=50000`; // Increase limit to get all data
       
       console.log(`🔍 FETCHING URL for ${viewMode} view:`, url);
       
