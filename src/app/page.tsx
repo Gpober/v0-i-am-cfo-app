@@ -220,6 +220,8 @@ const fetchTimeSeriesData = async (
 ) => {
   try {
     console.log('🔍 FETCHING TIME SERIES DATA:', { property, monthYear, timePeriod, viewMode });
+    console.log('🔍 Selected date object:', selectedDate);
+    console.log('🔍 Month:', month, 'Year:', year);
     
     const [month, year] = monthYear.split(' ');
     const selectedDate = new Date(`${month} 1, ${year}`);
@@ -396,6 +398,9 @@ const fetchTimeSeriesData = async (
       }
     }
     
+    console.log('🔍 CALCULATED DATE RANGES:', dateRanges);
+    console.log('🔍 Total date ranges for', viewMode, 'view:', dateRanges.length);
+    
     // Fetch data for all date ranges
     const allData: any = {};
     let totalEntriesProcessed = 0;
@@ -406,10 +411,13 @@ const fetchTimeSeriesData = async (
       
       let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end}`;
       
-      // For by-property view, get all properties; otherwise use selected property filter
+      // FIXED: For by-property view, NEVER filter by property - we need ALL property data
+      // Only filter by property for non-by-property views
       if (viewMode !== 'by-property' && property !== 'All Properties') {
         url += `&class=eq.${encodeURIComponent(property)}`;
       }
+      
+      console.log(`🔍 FETCHING URL for ${viewMode} view:`, url);
       
       const response = await fetch(url, {
         headers: {
@@ -422,6 +430,9 @@ const fetchTimeSeriesData = async (
       if (response.ok) {
         const rawData = await response.json();
         console.log(`🔍 Period ${range.label}: ${rawData.length} transactions`);
+        console.log(`🔍 Sample transactions for ${range.label}:`, rawData.slice(0, 3));
+        console.log(`🔍 Date range: ${range.start} to ${range.end}`);
+        console.log(`🔍 View mode: ${viewMode}, Property filter: ${property}`);
         totalEntriesProcessed += rawData.length;
         
         if (viewMode === 'by-property') {
@@ -704,8 +715,9 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
+      // FIXED: For by-property view, always use 'All Properties' to get all data
       let propertyFilter = 'All Properties';
-      if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
+      if (viewMode !== 'by-property' && selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
         propertyFilter = Array.from(selectedProperties)[0];
       }
       
@@ -714,7 +726,8 @@ export default function FinancialsPage() {
         propertyFilter,
         month: selectedMonth,
         timePeriod,
-        viewMode
+        viewMode,
+        note: viewMode === 'by-property' ? 'FORCING All Properties for by-property view' : 'Using selected property filter'
       });
       
       const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode);
