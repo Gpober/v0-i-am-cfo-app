@@ -53,6 +53,11 @@ interface FinancialDataItem {
   mapping_method?: string;
   account_type?: string;
   account_detail_type?: string;
+  // NEW: Grouping properties
+  isParent?: boolean;
+  isSubAccount?: boolean;
+  parentName?: string;
+  subAccounts?: FinancialDataItem[];
 }
 
 interface FinancialEntry {
@@ -629,7 +634,10 @@ export default function FinancialsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('total');
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
   const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false);
+  
+  // NEW: Expandable accounts state
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
 
@@ -790,71 +798,178 @@ export default function FinancialsPage() {
     setSelectedAccountDetails(accountItem);
   };
 
-  // ENHANCED: Render grouped accounts with expandable parents
-  const renderGroupedAccounts = (accounts: any[]) => {
+  // NEW: Toggle parent account expansion
+  const toggleParentAccount = (parentName: string): void => {
+    const newExpanded = new Set(expandedAccounts);
+    if (newExpanded.has(parentName)) {
+      newExpanded.delete(parentName);
+    } else {
+      newExpanded.add(parentName);
+    }
+    setExpandedAccounts(newExpanded);
+  };
+
+  // NEW: 🏗️ ENHANCED Account Grouping with Colon Detection
+  const groupAccountsByParent = (accounts: FinancialDataItem[]): FinancialDataItem[] => {
+    console.log('🏗️ GROUPING ACCOUNTS - Starting with', accounts.length, 'accounts');
+    
+    const grouped: Record<string, FinancialDataItem> = {};
+    const standalone: FinancialDataItem[] = [];
+    
+    accounts.forEach(account => {
+      if (account.name.includes(':')) {
+        // This is a sub-account (e.g., "Utilities:Water & sewer")
+        const colonIndex = account.name.indexOf(':');
+        const parentName = account.name.substring(0, colonIndex).trim();
+        const subName = account.name.substring(colonIndex + 1).trim();
+        
+        console.log(`📊 Found sub-account: "${account.name}" → Parent: "${parentName}", Sub: "${subName}"`);
+        
+        if (!grouped[parentName]) {
+          grouped[parentName] = {
+            name: parentName,
+            category: account.category,
+            type: account.category,
+            total: 0,
+            months: {},
+            entries: [],
+            account_type: account.account_type,
+            account_detail_type: account.account_detail_type,
+            subAccounts: [],
+            isParent: true
+          };
+          console.log(`🔨 Created parent account: "${parentName}"`);
+        }
+        
+        // Add to parent total and entries
+        grouped[parentName].total += account.total;
+        grouped[parentName].entries = grouped[parentName].entries || [];
+        grouped[parentName].entries.push(...(account.entries || []));
+        
+        // Add as sub-account with enhanced properties
+        grouped[parentName].subAccounts = grouped[parentName].subAccounts || [];
+        grouped[parentName].subAccounts.push({
+          ...account,
+          name: subName,
+          parentName: parentName,
+          isSubAccount: true
+        });
+        
+        console.log(`➕ Added sub-account "${subName}" to parent "${parentName}" (Parent total now: ${formatCurrency(grouped[parentName].total)})`);
+      } else {
+        // This is a standalone account
+        standalone.push({
+          ...account,
+          isStandalone: true
+        });
+        console.log(`🔸 Standalone account: "${account.name}"`);
+      }
+    });
+    
+    // Convert grouped object to array and combine with standalone
+    const parentAccounts = Object.values(grouped);
+    const result = [...standalone, ...parentAccounts];
+    
+    // Sort everything alphabetically
+    result.sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Sort sub-accounts within each parent
+    result.forEach(account => {
+      if (account.subAccounts) {
+        account.subAccounts.sort((a, b) => a.name.localeCompare(b.name));
+      }
+    });
+    
+    console.log('🏗️ GROUPING COMPLETE:', {
+      totalAccounts: accounts.length,
+      standaloneAccounts: standalone.length,
+      parentAccounts: parentAccounts.length,
+      totalSubAccounts: parentAccounts.reduce((sum, parent) => sum + (parent.subAccounts?.length || 0), 0)
+    });
+    
+    return result;
+  };
+
+  // NEW: 🎨 ENHANCED Render function for grouped accounts with expand/collapse
+  const renderGroupedAccounts = (accounts: FinancialDataItem[]) => {
     const groupedAccounts = groupAccountsByParent(accounts);
     
-    return groupedAccounts.map((account: any) => {
+    return groupedAccounts.map((account: FinancialDataItem) => {
       if (account.isParent) {
         // This is a parent account with sub-accounts
         const isExpanded = expandedAccounts.has(account.name);
+        const subAccountCount = account.subAccounts?.length || 0;
+        const totalTransactions = account.entries?.length || 0;
         
         return (
           <React.Fragment key={`parent-${account.name}`}>
-            {/* Parent Account Row */}
-            <tr className="hover:bg-gray-50 bg-gray-25">
-              <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
+            {/* 🏢 PARENT ACCOUNT ROW */}
+            <tr className="hover:bg-blue-50 bg-blue-25 border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
+              <td className={`px-6 py-3 text-left text-sm bg-blue-25 ${
                 timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
               }`}>
                 <div className="flex items-center">
                   <button
                     onClick={() => toggleParentAccount(account.name)}
-                    className="mr-2 p-1 hover:bg-gray-200 rounded transition-colors"
+                    className="mr-3 p-1 hover:bg-blue-200 rounded transition-colors"
+                    title={isExpanded ? 'Collapse sub-accounts' : 'Expand sub-accounts'}
                   >
                     {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-gray-600" />
+                      <ChevronDown className="w-4 h-4 text-blue-600" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-600" />
+                      <ChevronRight className="w-4 h-4 text-blue-600" />
                     )}
                   </button>
                   <div>
-                    <span className="font-medium">{account.name}</span>
-                    {account.subAccounts && account.subAccounts.length > 0 && (
-                      <span className="ml-2 text-xs text-gray-500">
-                        ({account.subAccounts.length} sub-accounts, {account.entries.length} transactions)
+                    <div className="flex items-center">
+                      <span className="font-bold text-gray-800" style={{ color: BRAND_COLORS.primary }}>
+                        📁 {account.name}
                       </span>
-                    )}
+                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                        Parent
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      🔢 {subAccountCount} sub-accounts • {totalTransactions} total transactions
+                    </div>
                   </div>
                 </div>
               </td>
               {renderDataCells(account)}
-              <td className="px-4 py-2 text-right text-sm text-gray-500">
+              <td className="px-4 py-3 text-right text-sm text-gray-500 bg-blue-25">
                 {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
               </td>
             </tr>
             
-            {/* Sub-Account Rows (if expanded) */}
-            {isExpanded && account.subAccounts && account.subAccounts.map((subAccount: any) => (
-              <tr key={`sub-${account.name}-${subAccount.name}`} className="hover:bg-gray-50 bg-blue-25">
-                <td className={`px-6 py-2 text-left text-sm text-gray-600 pl-20 bg-white ${
+            {/* 📋 SUB-ACCOUNT ROWS (if expanded) */}
+            {isExpanded && account.subAccounts && account.subAccounts.map((subAccount: FinancialDataItem) => (
+              <tr key={`sub-${account.name}-${subAccount.name}`} className="hover:bg-gray-50 bg-blue-25 border-l-4 border-blue-200">
+                <td className={`px-6 py-2 text-left text-sm bg-blue-25 ${
                   timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
                 }`}>
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 mr-2 flex items-center justify-center">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                  <div className="flex items-center pl-8">
+                    <div className="w-4 h-4 mr-3 flex items-center justify-center">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                     </div>
                     <div>
-                      <span className="text-gray-700">{subAccount.name}</span>
-                      {subAccount.entries && subAccount.entries.length > 0 && (
-                        <span className="ml-2 text-xs text-gray-500">
-                          ({subAccount.entries.length} transactions)
+                      <div className="flex items-center">
+                        <span className="text-gray-700 font-medium">
+                          💧 {subAccount.name}
                         </span>
+                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+                          Sub
+                        </span>
+                      </div>
+                      {subAccount.entries && subAccount.entries.length > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          🔍 {subAccount.entries.length} transactions
+                        </div>
                       )}
                     </div>
                   </div>
                 </td>
                 {renderDataCells(subAccount)}
-                <td className="px-4 py-2 text-right text-sm text-gray-500">
+                <td className="px-4 py-2 text-right text-sm text-gray-500 bg-blue-25">
                   {kpis.revenue ? calculatePercentage(Math.abs(subAccount.total), Math.abs(kpis.revenue)) : '0%'}
                 </td>
               </tr>
@@ -868,11 +983,16 @@ export default function FinancialsPage() {
             <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
               timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1 ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
             }`}>
-              {account.name}
-              {account.entries && account.entries.length > 0 && (
-                <span className="ml-2 text-xs text-gray-500">
-                  ({account.entries.length} transactions)
+              <div className="flex items-center">
+                <span className="text-gray-700">📄 {account.name}</span>
+                <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+                  Individual
                 </span>
+              </div>
+              {account.entries && account.entries.length > 0 && (
+                <div className="text-xs text-gray-500 mt-1">
+                  🔍 {account.entries.length} transactions
+                </div>
               )}
             </td>
             {renderDataCells(account)}
@@ -883,55 +1003,6 @@ export default function FinancialsPage() {
         );
       }
     });
-  };
-
-  // ENHANCED: Group accounts by main account (before colon) and sub-accounts (after colon)
-  const groupAccountsByParent = (accounts: any[]) => {
-    const grouped: any = {};
-    const standalone: any[] = [];
-    
-    accounts.forEach(account => {
-      if (account.name.includes(':')) {
-        // This is a sub-account
-        const [parentName, subName] = account.name.split(':', 2);
-        
-        if (!grouped[parentName]) {
-          grouped[parentName] = {
-            name: parentName,
-            category: account.category,
-            type: account.category,
-            total: 0,
-            entries: [],
-            account_type: account.account_type,
-            account_detail_type: account.account_detail_type,
-            subAccounts: [],
-            isParent: true
-          };
-        }
-        
-        // Add to parent total
-        grouped[parentName].total += account.total;
-        grouped[parentName].entries.push(...account.entries);
-        
-        // Add as sub-account
-        grouped[parentName].subAccounts.push({
-          ...account,
-          name: subName.trim(),
-          parentName: parentName,
-          isSubAccount: true
-        });
-      } else {
-        // This is a standalone account
-        standalone.push({
-          ...account,
-          isStandalone: true
-        });
-      }
-    });
-    
-    // Convert grouped object to array and combine with standalone
-    const parentAccounts = Object.values(grouped);
-    return [...standalone, ...parentAccounts].sort((a: any, b: any) => a.name.localeCompare(b.name));
   };
 
   // ENHANCED: Get current financial data - properly handles all modes and categories
@@ -1428,6 +1499,33 @@ export default function FinancialsPage() {
             </div>
           </div>
 
+          {/* NEW: 🏗️ Account Grouping Info Banner */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold">🏗️</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-blue-900 mb-2">Enhanced Account Grouping Active</h3>
+                <div className="text-xs text-blue-800 space-y-1">
+                  <p><strong>🔍 How It Works:</strong> Accounts with ":" are automatically grouped (e.g., "Utilities:Water & sewer")</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                    <div>
+                      <p><strong>📁 Parent Accounts:</strong> Show aggregated totals with expand/collapse arrows</p>
+                      <p><strong>📋 Sub-Accounts:</strong> Hidden by default, show when parent is expanded</p>
+                    </div>
+                    <div>
+                      <p><strong>🎯 Features:</strong> ▶️ Expand arrows • 🔢 Transaction counts • 📊 Aggregated totals</p>
+                      <p><strong>📱 Usage:</strong> Click arrows to expand, click amounts for transaction details</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Data Status */}
           {timeSeriesData && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -1552,14 +1650,14 @@ export default function FinancialsPage() {
                           </span>
                         )}
                         <div className="mt-1 text-xs text-green-600">
-                          ✅ P&L accounts automatically classified • Balance Sheet accounts excluded
+                          ✅ P&L accounts automatically classified • Balance Sheet accounts excluded • 🏗️ Account grouping enabled
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* ENHANCED P&L Content with Proper Structure */}
+                {/* ENHANCED P&L Content with Account Grouping */}
                 <div className={`overflow-x-auto ${viewMode === 'detailed' ? 'relative' : ''}`}>
                   {isLoadingData ? (
                     <div className="flex items-center justify-center py-8">
@@ -1590,7 +1688,7 @@ export default function FinancialsPage() {
                         {/* 💰 REVENUE SECTION */}
                         {renderSectionHeader('REVENUE', '💰', 'Revenue', 'bg-blue-50', 'text-blue-900')}
                         
-                        {/* Individual Revenue Line Items */}
+                        {/* Individual Revenue Line Items with Grouping */}
                         {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Revenue'))}
 
                         {/* TOTAL REVENUE */}
@@ -1628,27 +1726,8 @@ export default function FinancialsPage() {
                           <>
                             {renderSectionHeader('COST OF GOODS SOLD', '🏭', 'COGS', 'bg-red-50', 'text-red-900')}
                             
-                            {/* Individual COGS Line Items */}
-                            {currentData
-                              .filter((item: any) => item.category === 'COGS')
-                              .map((item: any) => (
-                                <tr key={`cogs-${item.name}`} className="hover:bg-gray-50">
-                                  <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
-                                    viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
-                                  }`}>
-                                    {item.name}
-                                    {item.entries && item.entries.length > 0 && (
-                                      <span className="ml-2 text-xs text-gray-500">
-                                        ({item.entries.length} transactions)
-                                      </span>
-                                    )}
-                                  </td>
-                                  {renderDataCells(item)}
-                                  <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                    {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
-                                  </td>
-                                </tr>
-                              ))}
+                            {/* Individual COGS Line Items with Grouping */}
+                            {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'COGS'))}
 
                             {/* TOTAL COGS */}
                             <tr className="bg-red-100 border-t-2 border-red-300">
@@ -1728,27 +1807,8 @@ export default function FinancialsPage() {
                         {/* 💸 OPERATING EXPENSES SECTION */}
                         {renderSectionHeader('OPERATING EXPENSES', '💸', 'Operating Expenses', 'bg-orange-50', 'text-orange-900')}
                         
-                        {/* Individual Operating Expense Line Items */}
-                        {currentData
-                          .filter((item: any) => item.category === 'Operating Expenses')
-                          .map((item: any) => (
-                            <tr key={`opex-${item.name}`} className="hover:bg-gray-50">
-                              <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
-                                viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
-                              }`}>
-                                {item.name}
-                                {item.entries && item.entries.length > 0 && (
-                                  <span className="ml-2 text-xs text-gray-500">
-                                    ({item.entries.length} transactions)
-                                  </span>
-                                )}
-                              </td>
-                              {renderDataCells(item)}
-                              <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
-                              </td>
-                            </tr>
-                          ))}
+                        {/* Individual Operating Expense Line Items with Grouping */}
+                        {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Operating Expenses'))}
 
                         {/* TOTAL OPERATING EXPENSES */}
                         <tr className="bg-orange-100 border-t-2 border-orange-300">
@@ -1835,27 +1895,8 @@ export default function FinancialsPage() {
                           <>
                             {renderSectionHeader('OTHER INCOME', '➕', 'Other Income', 'bg-green-50', 'text-green-900')}
                             
-                            {/* Individual Other Income Line Items */}
-                            {currentData
-                              .filter((item: any) => item.category === 'Other Income')
-                              .map((item: any) => (
-                                <tr key={`other-income-${item.name}`} className="hover:bg-gray-50">
-                                  <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
-                                    viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
-                                  }`}>
-                                    {item.name}
-                                    {item.entries && item.entries.length > 0 && (
-                                      <span className="ml-2 text-xs text-gray-500">
-                                        ({item.entries.length} transactions)
-                                      </span>
-                                    )}
-                                  </td>
-                                  {renderDataCells(item)}
-                                  <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                    {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
-                                  </td>
-                                </tr>
-                              ))}
+                            {/* Individual Other Income Line Items with Grouping */}
+                            {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Other Income'))}
                           </>
                         )}
 
@@ -1864,27 +1905,8 @@ export default function FinancialsPage() {
                           <>
                             {renderSectionHeader('OTHER EXPENSES', '➖', 'Other Expenses', 'bg-purple-50', 'text-purple-900')}
                             
-                            {/* Individual Other Expense Line Items */}
-                            {currentData
-                              .filter((item: any) => item.category === 'Other Expenses')
-                              .map((item: any) => (
-                                <tr key={`other-expense-${item.name}`} className="hover:bg-gray-50">
-                                  <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
-                                    viewMode === 'detailed' ? 'sticky left-0 z-10 border-r-2 border-gray-200' : ''
-                                  }`}>
-                                    {item.name}
-                                    {item.entries && item.entries.length > 0 && (
-                                      <span className="ml-2 text-xs text-gray-500">
-                                        ({item.entries.length} transactions)
-                                      </span>
-                                    )}
-                                  </td>
-                                  {renderDataCells(item)}
-                                  <td className="px-4 py-2 text-right text-sm text-gray-500">
-                                    {kpis.revenue ? calculatePercentage(Math.abs(item.total), Math.abs(kpis.revenue)) : '0%'}
-                                  </td>
-                                </tr>
-                              ))}
+                            {/* Individual Other Expense Line Items with Grouping */}
+                            {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Other Expenses'))}
                           </>
                         )}
 
@@ -2165,6 +2187,9 @@ export default function FinancialsPage() {
                         </p>
                         <p className="text-sm text-blue-700 mt-2">
                           📊 <strong>Enhanced Classification:</strong> Accounts are automatically categorized based on their account_type and account_detail_type from Supabase.
+                        </p>
+                        <p className="text-sm text-blue-700 mt-2">
+                          🏗️ <strong>Account Grouping:</strong> Accounts with colons (e.g., "Utilities:Water & sewer") are automatically grouped under parent accounts. Click the arrows to expand/collapse.
                         </p>
                         {timePeriod === 'Monthly' && viewMode === 'detailed' && (
                           <p className="text-sm text-blue-700 mt-2">
