@@ -3,6 +3,17 @@ name: Claude Code Helper
 on:
   workflow_dispatch:
     inputs:
+      target_files:
+        description: 'Which files/folders should Claude focus on?'
+        required: true
+        type: choice
+        options:
+          - 'src/app/financials/page.tsx (P&L/Financials page)'
+          - 'src/app/dashboard/page.tsx (Main dashboard)'
+          - 'src/app/page.tsx (Home page)'
+          - 'src/components/ (All components)'
+          - 'src/app/ (All pages)'
+          - 'Entire codebase'
       custom_prompt:
         description: 'What should Claude do? (Be specific!)'
         required: true
@@ -34,8 +45,18 @@ jobs:
     - name: Run Claude Code Analysis and Fix
       uses: anthropics/claude-code-base-action@beta
       with:
-        # Your custom prompt
-        prompt: ${{ github.event.inputs.custom_prompt }}
+        # Your custom prompt with file targeting
+        prompt: |
+          ${{ 
+            github.event.inputs.target_files == 'src/app/financials/page.tsx (P&L/Financials page)' && 'ONLY analyze and fix src/app/financials/page.tsx file. Do not look at any other files.' ||
+            github.event.inputs.target_files == 'src/app/dashboard/page.tsx (Main dashboard)' && 'ONLY analyze and fix src/app/dashboard/page.tsx file. Do not look at any other files.' ||
+            github.event.inputs.target_files == 'src/app/page.tsx (Home page)' && 'ONLY analyze and fix src/app/page.tsx file. Do not look at any other files.' ||
+            github.event.inputs.target_files == 'src/components/ (All components)' && 'ONLY analyze and fix files in the src/components/ directory. Do not look at other files.' ||
+            github.event.inputs.target_files == 'src/app/ (All pages)' && 'ONLY analyze and fix files in the src/app/ directory. Do not look at other directories.' ||
+            'Analyze the entire codebase.'
+          }}
+          
+          ${{ github.event.inputs.custom_prompt }}
         
         # EXACT tools from official docs - including Edit for file modifications
         allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,Edit,BatchTool"
