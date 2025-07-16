@@ -460,10 +460,13 @@ const fetchTimeSeriesData = async (
               };
             }
             
-            if (!acc[accountName].propertyTotals[propertyName]) {
-              acc[accountName].propertyTotals[propertyName] = 0;
-              acc[accountName].propertyEntries[propertyName] = [];
-            }
+            // Initialize ALL properties for this account, not just the current one
+            propertiesInData.forEach(prop => {
+              if (!acc[accountName].propertyTotals[prop]) {
+                acc[accountName].propertyTotals[prop] = 0;
+                acc[accountName].propertyEntries[prop] = [];
+              }
+            });
             
             acc[accountName].total += (row.amount || 0);
             acc[accountName].propertyTotals[propertyName] += (row.amount || 0);
@@ -477,7 +480,8 @@ const fetchTimeSeriesData = async (
           console.log(`🏢 BY-PROPERTY GROUPED for ${range.label}:`, {
             accountsGrouped: Object.keys(groupedByAccount).length,
             sampleAccount: Object.keys(groupedByAccount)[0],
-            sampleData: groupedByAccount[Object.keys(groupedByAccount)[0]]
+            sampleData: groupedByAccount[Object.keys(groupedByAccount)[0]],
+            availableProperties: propertiesInData
           });
           
           allData[range.label] = groupedByAccount;
@@ -962,7 +966,16 @@ export default function FinancialsPage() {
         // For by-property view, get data from the first period
         const firstPeriodKey = timeSeriesData.periods[0];
         const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
-        return Object.values(firstPeriodData);
+        const result = Object.values(firstPeriodData);
+        
+        console.log('🏢 BY-PROPERTY getCurrentFinancialData:', {
+          periodKey: firstPeriodKey,
+          accountCount: result.length,
+          sampleAccount: result[0],
+          availableProperties: timeSeriesData.availableProperties
+        });
+        
+        return result;
       } else if (viewMode === 'detailed' || 
           (viewMode === 'total' && (timePeriod === 'Quarterly' || timePeriod === 'Yearly'))) {
         // Aggregate across multiple periods
