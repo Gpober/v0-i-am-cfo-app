@@ -2227,7 +2227,7 @@ export default function FinancialsPage() {
                 </div>
 
                 {/* P&L Table Content */}
-<div className="overflow-x-auto overflow-y-visible">
+<div className={`overflow-x-auto ${(viewMode === 'detailed' || viewMode === 'by-property') ? 'relative' : ''}`}>
   {isLoadingData ? (
     <div className="flex items-center justify-center py-8">
       <RefreshCw className="w-6 h-6 animate-spin mr-2" />
@@ -2238,23 +2238,27 @@ export default function FinancialsPage() {
       No financial data available for the selected filters
     </div>
   ) : (
-    <div className="min-w-full">
-      <table className="min-w-max w-full table-fixed">
-        <thead className="bg-gray-50 sticky top-0 z-10">
+    <div className="relative">
+      <table className="w-full">
+        <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 min-w-[250px] shadow-sm border-r border-gray-300">
+            <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+              (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+              (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+            }`}>
               Account
             </th>
-                            {renderColumnHeaders()}
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              % of Revenue
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {/* Revenue Section */}
-                          {renderSectionHeader('REVENUE', '💰', 'Revenue', 'bg-blue-50', 'text-blue-900')}
-                          {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Revenue'))}
+            {renderColumnHeaders()}
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              % of Revenue
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {/* Revenue Section */}
+          {renderSectionHeader('REVENUE', '💰', 'Revenue', 'bg-blue-50', 'text-blue-900')}
+          {renderGroupedAccounts(currentData.filter((item: any) => item.category === 'Revenue'))}
 
                           {/* TOTAL REVENUE */}
                           <tr className="bg-blue-100 border-t-2 border-blue-300">
