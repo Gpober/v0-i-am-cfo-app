@@ -228,10 +228,30 @@ const fetchTimeSeriesData = async (
     
     let dateRanges: Array<{start: string, end: string, label: string}> = [];
     
-    // ENHANCED: For by-property view, use month-by-month fetching like other views
+    // ENHANCED: For by-property view, use the SAME logic as other views
+    // Fetch month by month to avoid hitting row limits, then aggregate
     if (viewMode === 'by-property') {
-      // Use the SAME date range logic as detailed view to avoid row limits
-      if (timePeriod === 'Trailing 12') {
+      if (timePeriod === 'Monthly') {
+        const monthNum = selectedDate.getMonth() + 1;
+        const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+        const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
+        const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+        dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
+      } else if (timePeriod === 'Quarterly') {
+        const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
+        const qStart = new Date(parseInt(year), (quarter - 1) * 3, 1);
+        const qEnd = new Date(parseInt(year), quarter * 3, 0);
+        dateRanges = [{
+          start: qStart.toISOString().split('T')[0],
+          end: qEnd.toISOString().split('T')[0],
+          label: `Q${quarter} ${year}`
+        }];
+      } else if (timePeriod === 'Yearly') {
+        const yearStart = `${year}-01-01`;
+        const yearEnd = `${year}-12-31`;
+        dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
+      } else { // Trailing 12
+        // FIXED: Use month-by-month fetching like other views to avoid row limits
         for (let i = 11; i >= 0; i--) {
           const monthDate = new Date(selectedDate);
           monthDate.setMonth(monthDate.getMonth() - i);
@@ -248,13 +268,6 @@ const fetchTimeSeriesData = async (
             label: `${monthName} ${monthYear}`
           });
         }
-      } else {
-        // For other time periods, use single range
-        const monthNum = selectedDate.getMonth() + 1;
-        const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-        const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
-        const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
-        dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
       }
     } else {
       // Original logic for non-property views
@@ -527,6 +540,99 @@ const fetchTimeSeriesData = async (
         console.error(`Failed to fetch data for period ${range.label}:`, response.status);
         allData[range.label] = {};
       }
+    }
+    
+    // FIXED: For by-property Trailing 12, aggregate all monthly data 
+    if (viewMode === 'by-property' && timePeriod === 'Trailing 12') {
+      console.log('🔍 AGGREGATING BY-PROPERTY TRAILING 12 DATA...');
+      
+      const aggregatedData: any = {};
+      let allAvailableProperties: string[] = [];
+      
+      // First, collect all properties from all months
+      dateRanges.forEach((range) => {
+        const monthData = allData[range.label] || {};
+        Object.values(monthData).forEach((account: any) => {
+          if (account.propertyTotals) {
+            Object.keys(account.propertyTotals).forEach(prop => {
+              if (!allAvailableProperties.includes(prop)) {
+                allAvailableProperties.push(prop);
+              }
+            });
+          }
+        });
+      });
+      
+      // Then aggregate all months
+      dateRanges.forEach((range) => {
+        const monthData = allData[range.label] || {};
+        
+        Object.values(monthData).forEach((account: any) => {
+          const accountName = account.name;
+          
+          if (!aggregatedData[accountName]) {
+            aggregatedData[accountName] = {
+              name: accountName,
+              category: account.category,
+              type: account.category,
+              total: 0,
+              entries: [],
+              account_type: account.account_type,
+              account_detail_type: account.account_detail_type,
+              propertyTotals: {},
+              propertyEntries: {}
+            };
+            
+            // Initialize all properties for this account
+            allAvailableProperties.forEach(prop => {
+              aggregatedData[accountName].propertyTotals[prop] = 0;
+              aggregatedData[accountName].propertyEntries[prop] = [];
+            });
+          }
+          
+          aggregatedData[accountName].total += account.total;
+          aggregatedData[accountName].entries.push(...account.entries);
+          
+          // Aggregate property data
+          if (account.propertyTotals) {
+            Object.entries(account.propertyTotals).forEach(([prop, amount]: [string, any]) => {
+              aggregatedData[accountName].propertyTotals[prop] += amount;
+            });
+          }
+          
+          if (account.propertyEntries) {
+            Object.entries(account.propertyEntries).forEach(([prop, entries]: [string, any]) => {
+              aggregatedData[accountName].propertyEntries[prop].push(...entries);
+            });
+          }
+        });
+      });
+      
+      allData = {
+        'Trailing 12 Months': aggregatedData
+      };
+      
+      availableProperties = allAvailableProperties.sort();
+      
+      return {
+        success: true,
+        data: allData,
+        periods: ['Trailing 12 Months'],
+        availableProperties: availableProperties,
+        summary: {
+          timePeriod,
+          viewMode,
+          property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
+          dateRanges: [{
+            start: dateRanges[0].start,
+            end: dateRanges[dateRanges.length - 1].end,
+            label: 'Trailing 12 Months'
+          }],
+          totalEntriesProcessed,
+          periodsGenerated: 1,
+          monthsAggregated: dateRanges.length
+        }
+      };
     }
     
     // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
@@ -1246,15 +1352,15 @@ export default function FinancialsPage() {
       if (viewMode === 'by-property') {
         const properties = timeSeriesData.availableProperties || [];
         const headers = properties.map((property: string) => (
-          <th key={property} className="px-3 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0 min-w-[120px]">
-            <div className="truncate" title={property}>
+          <th key={property} className="px-3 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+            <div className="truncate max-w-20" title={property}>
               {property}
             </div>
           </th>
         ));
         
         headers.push(
-          <th key="total" className="px-3 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50 border-l border-blue-300 min-w-[120px] sticky right-0 z-20 shadow-sm">
+          <th key="total" className="px-3 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50 border-l border-blue-300">
             <div className="text-blue-600 font-semibold">Total</div>
           </th>
         );
@@ -1262,14 +1368,14 @@ export default function FinancialsPage() {
         return headers;
       } else {
         const headers = timeSeriesData.periods.map((period: string) => (
-          <th key={period} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+          <th key={period} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
             {period}
           </th>
         ));
         
         if (viewMode === 'detailed') {
           headers.push(
-            <th key="total" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-l border-gray-300 min-w-[120px] sticky right-0 z-20 shadow-sm">
+            <th key="total" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-l border-gray-300">
               Total
             </th>
           );
@@ -1492,7 +1598,11 @@ export default function FinancialsPage() {
           <React.Fragment key={`parent-${account.name}`}>
             {/* PARENT ACCOUNT ROW */}
             <tr className="hover:bg-blue-50 bg-blue-25 border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
-              <td className="px-6 py-3 text-left text-sm bg-blue-25 sticky left-0 z-10 min-w-[250px] shadow-sm border-r border-gray-300">
+              <td className={`px-6 py-3 text-left text-sm bg-blue-25 ${
+                (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+                (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                  ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
+              }`}>
                 <div className="flex items-center">
                   <button
                     onClick={() => toggleParentAccount(account.name)}
@@ -2117,7 +2227,7 @@ export default function FinancialsPage() {
                 </div>
 
                 {/* P&L Table Content */}
-                <div className="overflow-x-auto">
+                <div className={`overflow-x-auto ${(viewMode === 'detailed' || viewMode === 'by-property') ? 'relative' : ''}`}>
                   {isLoadingData ? (
                     <div className="flex items-center justify-center py-8">
                       <RefreshCw className="w-6 h-6 animate-spin mr-2" />
@@ -2128,15 +2238,19 @@ export default function FinancialsPage() {
                       No financial data available for the selected filters
                     </div>
                   ) : (
-                    <div className="min-w-full">
-                      <table className="w-full min-w-max">
-                        <thead className="bg-gray-50 sticky top-0 z-10">
+                    <div className="relative">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky left-0 z-20 min-w-[250px] shadow-sm border-r border-gray-300">
+                            <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+                              (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
+                              (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                            }`}>
                               Account
                             </th>
                             {renderColumnHeaders()}
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                               % of Revenue
                             </th>
                           </tr>
