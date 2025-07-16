@@ -220,11 +220,11 @@ const fetchTimeSeriesData = async (
 ) => {
   try {
     console.log('🔍 FETCHING TIME SERIES DATA:', { property, monthYear, timePeriod, viewMode });
-    console.log('🔍 Selected date object:', selectedDate);
-    console.log('🔍 Month:', month, 'Year:', year);
     
     const [month, year] = monthYear.split(' ');
     const selectedDate = new Date(`${month} 1, ${year}`);
+    console.log('🔍 Selected date object:', selectedDate);
+    console.log('🔍 Month:', month, 'Year:', year);
     
     let dateRanges: Array<{start: string, end: string, label: string}> = [];
     
