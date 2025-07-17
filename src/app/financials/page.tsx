@@ -2709,24 +2709,88 @@ export default function FinancialsPage() {
                           width={60}
                         />
                         
-                        {/* Professional tooltip */}
+                        {/* Professional tooltip with enhanced content */}
                         <Tooltip 
-                          formatter={(value: any, name: string) => [
-                            `${formatCurrency(Number(value))}`, 
-                            name === 'netIncome' ? 'Net Income' : 'Revenue'
-                          ]}
-                          labelStyle={{ 
-                            color: '#1e293b',
-                            fontWeight: 600,
-                            fontSize: '14px'
-                          }}
-                          contentStyle={{ 
-                            backgroundColor: 'white', 
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '12px',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                            fontSize: '13px',
-                            fontWeight: 500
+                          position={{ y: -10 }}
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const revenue = data.revenue || 0;
+                              const netIncome = data.netIncome || 0;
+                              
+                              // Calculate averages for Property View
+                              const showAverages = viewMode === 'by-property';
+                              let revenueAverage = 0;
+                              let netIncomeAverage = 0;
+                              
+                              if (showAverages && trendData.length > 0) {
+                                revenueAverage = trendData.reduce((sum, item) => sum + (item.revenue || 0), 0) / trendData.length;
+                                netIncomeAverage = trendData.reduce((sum, item) => sum + (item.netIncome || 0), 0) / trendData.length;
+                              }
+                              
+                              return (
+                                <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-xs">
+                                  {/* Header with IAM CFO branding */}
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+                                    <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+                                    <span className="text-sm font-semibold text-gray-900">{label}</span>
+                                  </div>
+                                  
+                                  {/* Content */}
+                                  <div className="space-y-2">
+                                    {/* Revenue */}
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                                        <span className="text-sm font-medium text-gray-700">Revenue {showAverages ? '(current)' : ''}</span>
+                                      </div>
+                                      <span className="text-sm font-semibold text-gray-900">{formatCurrency(revenue)}</span>
+                                    </div>
+                                    
+                                    {/* Revenue Average (Property View only) */}
+                                    {showAverages && (
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                                          <span className="text-sm font-medium text-gray-600">Revenue Average ({timePeriod})</span>
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-600">{formatCurrency(revenueAverage)}</span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Net Income */}
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${netIncome >= 0 ? 'bg-green-600' : 'bg-red-600'}`}></div>
+                                        <span className="text-sm font-medium text-gray-700">Net Income {showAverages ? '(current)' : ''}</span>
+                                      </div>
+                                      <span className={`text-sm font-semibold ${netIncome >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                        {formatCurrency(netIncome)}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Net Income Average (Property View only) */}
+                                    {showAverages && (
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <div className={`w-2 h-2 rounded-full ${netIncomeAverage >= 0 ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                                          <span className="text-sm font-medium text-gray-600">Net Income Average ({timePeriod})</span>
+                                        </div>
+                                        <span className={`text-sm font-medium ${netIncomeAverage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                          {formatCurrency(netIncomeAverage)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Footer with IAM CFO branding */}
+                                  <div className="mt-3 pt-2 border-t border-gray-100">
+                                    <div className="text-xs text-gray-500 font-medium">IAM CFO</div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
                           }}
                           cursor={{ 
                             fill: 'rgba(99, 102, 241, 0.05)',
