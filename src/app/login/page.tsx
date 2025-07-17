@@ -31,7 +31,7 @@ export default function Login() {
       <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
         <div className="flex justify-center mb-6">
           <img
-            src="/logo.png"
+            src="/favicon.png"
             alt="I AM CFO Logo"
             className="h-12 object-contain"
           />
