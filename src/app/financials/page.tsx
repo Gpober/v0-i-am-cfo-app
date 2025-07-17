@@ -2223,8 +2223,11 @@ export default function FinancialsPage() {
     <div className="relative overflow-auto" style={{ 
       maxHeight: '70vh',
       scrollBehavior: 'smooth',
-      WebkitOverflowScrolling: 'touch'
-    }}>
+      WebkitOverflowScrolling: 'touch',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none'
+    }} 
+    className="relative overflow-auto [&::-webkit-scrollbar]:hidden">
       <table className="w-full table-auto" style={{ 
         minWidth: viewMode === 'by-property' && timeSeriesData?.availableProperties ? 
           `${Math.max(800, (timeSeriesData.availableProperties.length + 2) * 150)}px` : '800px' 
