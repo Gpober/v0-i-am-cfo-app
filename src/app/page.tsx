@@ -888,10 +888,9 @@ export default function MobileResponsiveFinancialsPage() {
   const [activeTab, setActiveTab] = useState('p&l');
   const [selectedMonth, setSelectedMonth] = useState('May 2025');
   const [timePeriod, setTimePeriod] = useState('Trailing 12');
-  const [viewMode, setViewMode] = useState('total');
+  const [viewMode, setViewMode] = useState('by-property'); // Default to by-property
   const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
   const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false);
-  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState(new Set(['All Properties']));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
@@ -921,11 +920,12 @@ export default function MobileResponsiveFinancialsPage() {
   const deviceType = useDeviceType();
   
   // Mobile-specific states
-  const [tableMode, setTableMode] = useState('summary'); // 'summary', 'detailed', 'chart'
+  const [tableMode, setTableMode] = useState('summary'); // Default to summary
   const [activeKPICard, setActiveKPICard] = useState(null);
   const [selectedPropertyForPL, setSelectedPropertyForPL] = useState(null);
   const [showPropertyPL, setShowPropertyPL] = useState(false);
   const [showTransactionDetail, setShowTransactionDetail] = useState(false);
+  const [showCompanyPL, setShowCompanyPL] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
@@ -1077,13 +1077,19 @@ export default function MobileResponsiveFinancialsPage() {
 
   // Helper functions
   const formatCurrency = (value) => {
-    if (deviceType === 'mobile' && Math.abs(value) >= 1000) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        maximumFractionDigits: 0,
-        notation: 'compact'
-      }).format(value);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  // Compact currency formatting for KPI cards
+  const formatCompactCurrency = (value) => {
+    if (Math.abs(value) >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    } else if (Math.abs(value) >= 1000) {
+      return `${(value / 1000).toFixed(1)}K`;
     }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -1942,7 +1948,7 @@ export default function MobileResponsiveFinancialsPage() {
                 )}
               </div>
               <div className="text-xs text-gray-600 mb-1">{kpi.label}</div>
-              <div className="text-lg font-bold text-gray-900">{formatCurrency(kpi.value)}</div>
+              <div className="text-lg font-bold text-gray-900">{formatCompactCurrency(kpi.value)}</div>
               {kpi.margin && activeKPICard === kpi.key && (
                 <div className="text-xs text-green-600 mt-1">
                   {kpi.margin.toFixed(1)}% Margin
@@ -1966,7 +1972,7 @@ export default function MobileResponsiveFinancialsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-gray-600 text-sm font-medium mb-2">{kpi.label}</div>
-                <div className="text-xl font-bold text-gray-900 mb-1">{formatCurrency(kpi.value)}</div>
+                <div className="text-xl font-bold text-gray-900 mb-1">{formatCompactCurrency(kpi.value)}</div>
                 {kpi.margin && (
                   <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
                     {kpi.margin.toFixed(1)}% Margin
@@ -1981,7 +1987,221 @@ export default function MobileResponsiveFinancialsPage() {
     );
   };
 
-  // Side-by-side property cards (2x2 grid)
+  // Company total scorecard
+  const renderCompanyScorecard = () => {
+    return (
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all"
+           onClick={() => setShowCompanyPL(true)}>
+        <div className="p-6 text-white">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold">🏢 Company Total</h3>
+              <div className="text-sm opacity-90">
+                {timePeriod} Portfolio Performance
+              </div>
+            </div>
+            <div className="text-xs bg-white bg-opacity-20 px-3 py-1 rounded-full">
+              Tap for full P&L
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Revenue */}
+            <div>
+              <div className="text-xs opacity-75 mb-1">Total Revenue</div>
+              <div className="text-2xl font-bold">{formatCompactCurrency(kpis.revenue)}</div>
+            </div>
+
+            {/* Net Income */}
+            <div>
+              <div className="text-xs opacity-75 mb-1">Net Income</div>
+              <div className={`text-2xl font-bold ${kpis.netIncome >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                {formatCompactCurrency(kpis.netIncome)}
+              </div>
+            </div>
+
+            {/* Gross Profit */}
+            <div>
+              <div className="text-xs opacity-75 mb-1">Gross Profit</div>
+              <div className="text-xl font-semibold">{formatCompactCurrency(kpis.grossProfit)}</div>
+              <div className="text-xs opacity-75">{kpis.grossMargin.toFixed(1)}% margin</div>
+            </div>
+
+            {/* Operating Income */}
+            <div>
+              <div className="text-xs opacity-75 mb-1">Operating Income</div>
+              <div className={`text-xl font-semibold ${kpis.netOperatingIncome >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                {formatCompactCurrency(kpis.netOperatingIncome)}
+              </div>
+              <div className="text-xs opacity-75">{kpis.operatingMargin.toFixed(1)}% margin</div>
+            </div>
+          </div>
+
+          {/* Property count */}
+          <div className="mt-4 pt-4 border-t border-white border-opacity-20">
+            <div className="flex justify-between items-center text-sm">
+              <span className="opacity-75">Properties:</span>
+              <span className="font-semibold">{timeSeriesData?.availableProperties?.length || 0}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm mt-1">
+              <span className="opacity-75">Net Margin:</span>
+              <span className={`font-semibold ${kpis.netMargin >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                {kpis.netMargin.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Company P&L modal
+  const renderCompanyPLModal = () => {
+    if (!showCompanyPL) return null;
+
+    // Get all company data (aggregated across all properties)
+    const companyPLData = currentData
+      .filter((account) => account.total !== 0)
+      .sort((a, b) => {
+        const categoryOrder = { 'Revenue': 0, 'COGS': 1, 'Operating Expenses': 2, 'Other Income': 3, 'Other Expenses': 4 };
+        return categoryOrder[a.category] - categoryOrder[b.category];
+      });
+
+    const categories = ['Revenue', 'COGS', 'Operating Expenses', 'Other Income', 'Other Expenses'];
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+        <div className="fixed inset-0 bg-white overflow-y-auto">
+          {/* Header */}
+          <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 z-10">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold">🏢 Company P&L Statement</h2>
+                <div className="text-sm opacity-90">
+                  {timePeriod} • All Properties Combined
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCompanyPL(false)}
+                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Summary metrics */}
+            <div className="mt-4 grid grid-cols-4 gap-4 text-center">
+              <div>
+                <div className="text-xs opacity-75">Revenue</div>
+                <div className="text-lg font-bold">{formatCompactCurrency(kpis.revenue)}</div>
+              </div>
+              <div>
+                <div className="text-xs opacity-75">Gross Profit</div>
+                <div className="text-lg font-bold">{formatCompactCurrency(kpis.grossProfit)}</div>
+              </div>
+              <div>
+                <div className="text-xs opacity-75">Operating</div>
+                <div className={`text-lg font-bold ${kpis.netOperatingIncome >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                  {formatCompactCurrency(kpis.netOperatingIncome)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs opacity-75">Net Income</div>
+                <div className={`text-lg font-bold ${kpis.netIncome >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                  {formatCompactCurrency(kpis.netIncome)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* P&L Details */}
+          <div className="p-4 space-y-4">
+            {categories.map((category) => {
+              const categoryAccounts = companyPLData.filter(account => account.category === category);
+              if (categoryAccounts.length === 0) return null;
+
+              const categoryTotal = categoryAccounts.reduce((sum, account) => sum + account.total, 0);
+              const isExpense = ['COGS', 'Operating Expenses', 'Other Expenses'].includes(category);
+
+              return (
+                <div key={category} className="bg-gray-50 rounded-lg p-4">
+                  {/* Category Header */}
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-semibold text-gray-900 flex items-center">
+                      <span className="mr-2">
+                        {category === 'Revenue' ? '💰' : 
+                         category === 'COGS' ? '🏭' :
+                         category === 'Operating Expenses' ? '💸' :
+                         category === 'Other Income' ? '➕' : '➖'}
+                      </span>
+                      {category}
+                    </h4>
+                    <div className={`font-bold ${isExpense ? 'text-red-600' : 'text-green-600'}`}>
+                      {isExpense ? `(${formatCurrency(Math.abs(categoryTotal))})` : formatCurrency(categoryTotal)}
+                    </div>
+                  </div>
+
+                  {/* Accounts in Category */}
+                  <div className="space-y-2">
+                    {categoryAccounts.map((account) => (
+                      <div 
+                        key={account.name}
+                        className="flex justify-between items-center py-2 px-3 bg-white rounded cursor-pointer hover:bg-gray-50"
+                        onClick={() => {
+                          setSelectedAccountDetails(account);
+                          setShowTransactionDetail(true);
+                        }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 truncate">{account.name}</div>
+                          <div className="text-xs text-gray-500 truncate">
+                            {account.entries?.length || 0} transactions • {account.account_type}
+                          </div>
+                        </div>
+                        <div className="ml-3 text-right">
+                          <div className={`font-medium ${account.total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(account.total)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Summary totals */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-blue-900">📈 Gross Profit</span>
+                <span className="font-bold text-blue-600">
+                  {formatCurrency(kpis.grossProfit)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-blue-900">🏆 Operating Income</span>
+                <span className={`font-bold ${kpis.netOperatingIncome >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  {formatCurrency(kpis.netOperatingIncome)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-t border-blue-200 pt-3">
+                <span className="font-bold text-blue-900">🎯 Net Income</span>
+                <span className={`font-bold text-xl ${kpis.netIncome >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  {formatCurrency(kpis.netIncome)}
+                </span>
+              </div>
+              <div className="text-center text-sm text-blue-700 mt-3">
+                Net Margin: {kpis.netMargin.toFixed(1)}% • {timeSeriesData?.availableProperties?.length || 0} Properties
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const renderSideBySidePropertyCards = () => {
     if (!timeSeriesData?.availableProperties || timeSeriesData.availableProperties.length === 0) {
       return (
@@ -2132,27 +2352,6 @@ export default function MobileResponsiveFinancialsPage() {
         </select>
       </div>
 
-      {/* Property Selector - Only for non-by-property views */}
-      {viewMode !== 'by-property' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Property Classes</label>
-          <div className="space-y-2 max-h-32 overflow-y-auto">
-            {availableProperties.map((property) => (
-              <div key={property} className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={selectedProperties.has(property)}
-                  onChange={() => handlePropertyToggle(property)}
-                  className="mr-2 h-4 w-4 border-gray-300 rounded"
-                  style={{ accentColor: BRAND_COLORS.primary }}
-                />
-                <span className="text-sm text-gray-700">{property}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Time Period */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
@@ -2168,50 +2367,6 @@ export default function MobileResponsiveFinancialsPage() {
           ))}
         </select>
       </div>
-
-      {/* View Mode */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">View Mode</label>
-        <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-          {['total', 'detailed', 'by-property'].map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`flex-1 px-3 py-2 text-xs transition-colors ${
-                viewMode === mode
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-              style={{ backgroundColor: viewMode === mode ? BRAND_COLORS.primary : undefined }}
-            >
-              {mode === 'by-property' ? 'Property' : mode.charAt(0).toUpperCase() + mode.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table Mode for Mobile */}
-      {deviceType === 'mobile' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Table Mode</label>
-          <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-            {['summary', 'detailed', 'chart'].map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setTableMode(mode)}
-                className={`flex-1 px-3 py-2 text-xs transition-colors ${
-                  tableMode === mode
-                    ? 'text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-                style={{ backgroundColor: tableMode === mode ? BRAND_COLORS.primary : undefined }}
-              >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -2916,39 +3071,6 @@ export default function MobileResponsiveFinancialsPage() {
                 ))}
               </select>
 
-              {/* Property Selector */}
-              {viewMode !== 'by-property' && (
-                <div className="relative">
-                  <button
-                    onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
-                    className="flex items-center justify-between w-48 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
-                  >
-                    <span className="truncate">{getSelectedPropertiesText()}</span>
-                    <ChevronDown className="w-4 h-4 ml-2" />
-                  </button>
-                  
-                  {propertyDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                      {availableProperties.map((property) => (
-                        <div
-                          key={property}
-                          className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                          onClick={() => handlePropertyToggle(property)}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedProperties.has(property)}
-                            onChange={() => {}}
-                            className="mr-2 h-4 w-4 border-gray-300 rounded"
-                          />
-                          <span className="text-gray-700">{property}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Time Period */}
               <select
                 value={timePeriod}
@@ -2961,24 +3083,6 @@ export default function MobileResponsiveFinancialsPage() {
                   </option>
                 ))}
               </select>
-
-              {/* View Mode */}
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                {['total', 'detailed', 'by-property'].map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={`px-3 py-2 text-xs transition-colors ${
-                      viewMode === mode
-                        ? 'text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    style={{ backgroundColor: viewMode === mode ? BRAND_COLORS.primary : undefined }}
-                  >
-                    {mode === 'by-property' ? 'Property' : mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
           
@@ -3055,6 +3159,7 @@ export default function MobileResponsiveFinancialsPage() {
         {deviceType === 'mobile' ? (
           // Mobile: Property cards with drill-down
           <div className="space-y-6">
+            {renderCompanyScorecard()}
             {renderAchievementBadges()}
             {renderSideBySidePropertyCards()}
           </div>
@@ -3068,6 +3173,7 @@ export default function MobileResponsiveFinancialsPage() {
 
             {/* Charts */}
             <div className="lg:col-span-1">
+              {renderCompanyScorecard()}
               {renderAchievementBadges()}
               {renderMobileCharts()}
             </div>
@@ -3075,6 +3181,9 @@ export default function MobileResponsiveFinancialsPage() {
         )}
       </main>
 
+      {/* Company P&L Modal */}
+      {renderCompanyPLModal()}
+      
       {/* Mobile Property P&L Modal */}
       {renderPropertyPLModal()}
       
@@ -3096,12 +3205,11 @@ export default function MobileResponsiveFinancialsPage() {
       )}
 
       {/* Click outside to close dropdowns */}
-      {(timePeriodDropdownOpen || propertyDropdownOpen || mobileFilterOpen) && (
+      {(timePeriodDropdownOpen || mobileFilterOpen) && (
         <div
           className="fixed inset-0 z-10"
           onClick={() => {
             setTimePeriodDropdownOpen(false);
-            setPropertyDropdownOpen(false);
             setMobileFilterOpen(false);
           }}
         />
