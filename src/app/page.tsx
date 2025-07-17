@@ -926,9 +926,6 @@ export default function MobileResponsiveFinancialsPage() {
   const [selectedPropertyForPL, setSelectedPropertyForPL] = useState(null);
   const [showPropertyPL, setShowPropertyPL] = useState(false);
   const [showTransactionDetail, setShowTransactionDetail] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullDistance, setPullDistance] = useState(0);
-  const [startY, setStartY] = useState(0);
   
   // Auto-adjust settings based on device type
   useEffect(() => {
@@ -2647,37 +2644,7 @@ export default function MobileResponsiveFinancialsPage() {
       </div>
 
       {/* Main Content */}
-      <main 
-        id="mobile-container"
-        className="px-4 py-6 space-y-6 relative"
-        style={{
-          transform: deviceType === 'mobile' ? `translateY(${pullDistance}px)` : 'none',
-          transition: isRefreshing ? 'transform 0.3s ease' : 'none'
-        }}
-      >
-        {/* Pull-to-refresh indicator */}
-        {(deviceType === 'mobile' && (pullDistance > 0 || isRefreshing)) && (
-          <div 
-            className="absolute top-0 left-1/2 transform -translate-x-1/2 flex items-center justify-center"
-            style={{
-              top: deviceType === 'mobile' ? `${-40 + (pullDistance * 0.5)}px` : '-40px',
-              opacity: pullDistance > 20 || isRefreshing ? 1 : pullDistance / 20
-            }}
-          >
-            <div className="bg-white rounded-full p-2 shadow-lg border border-gray-200">
-              <RefreshCw 
-                className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''} ${
-                  pullDistance > 60 ? 'text-green-500' : 'text-gray-400'
-                }`}
-              />
-            </div>
-            <div className="ml-2 text-sm text-gray-600">
-              {isRefreshing ? 'Refreshing...' : 
-               pullDistance > 60 ? 'Release to refresh' : 'Pull to refresh'}
-            </div>
-          </div>
-        )}
-
+      <main className="px-4 py-6 space-y-6">
         {/* Loading State */}
         {isLoadingData && (
           <div className="flex items-center justify-center py-8">
@@ -2714,8 +2681,7 @@ export default function MobileResponsiveFinancialsPage() {
         {deviceType === 'mobile' ? (
           // Mobile: Property cards with drill-down
           <div className="space-y-6">
-            {renderAchievementBadges()}
-            {renderSideBySidePropertyCards()}
+            {renderMobilePropertyCards()}
           </div>
         ) : (
           // Tablet/Desktop: Side-by-side layout
@@ -2727,7 +2693,6 @@ export default function MobileResponsiveFinancialsPage() {
 
             {/* Charts */}
             <div className="lg:col-span-1">
-              {renderAchievementBadges()}
               {renderMobileCharts()}
             </div>
           </div>
