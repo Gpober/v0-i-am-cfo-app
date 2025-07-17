@@ -2680,9 +2680,8 @@ export default function FinancialsPage() {
                           height={trendData.length > 6 ? 80 : 60}
                         />
                         
-                        {/* Left Y-Axis for Net Income (Bars) */}
+                        {/* Single Y-Axis for both Revenue and Net Income */}
                         <YAxis 
-                          yAxisId="left"
                           tickFormatter={(value: any) => `$${(value / 1000).toFixed(0)}k`}
                           tick={{ 
                             fontSize: 12, 
@@ -2692,21 +2691,7 @@ export default function FinancialsPage() {
                           tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                           axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                           width={60}
-                        />
-                        
-                        {/* Right Y-Axis for Revenue (Line) */}
-                        <YAxis 
-                          yAxisId="right"
-                          orientation="right"
-                          tickFormatter={(value: any) => `$${(value / 1000).toFixed(0)}k`}
-                          tick={{ 
-                            fontSize: 12, 
-                            fontWeight: 500,
-                            fill: '#2563eb'
-                          }}
-                          tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                          axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                          width={60}
+                          domain={['dataMin', 'dataMax']}
                         />
                         
                         {/* Professional tooltip */}
@@ -2750,7 +2735,6 @@ export default function FinancialsPage() {
                         
                         {/* Net Income Bars - Professional styling with conditional colors */}
                         <Bar 
-                          yAxisId="left"
                           dataKey="netIncome" 
                           fill="#10b981"
                           fillOpacity={0.8}
@@ -2768,7 +2752,6 @@ export default function FinancialsPage() {
                         
                         {/* Revenue Line - Professional blue styling */}
                         <Line 
-                          yAxisId="right"
                           type="monotone" 
                           dataKey="revenue" 
                           stroke="#2563eb" 
