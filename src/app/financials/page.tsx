@@ -1310,7 +1310,7 @@ export default function FinancialsPage() {
         
         return result;
       } else if (viewMode === 'detailed' || 
-          (viewMode === 'total' && (timePeriod === 'Quarterly' || timePeriod === 'Yearly'))) {
+          (viewMode === 'total' && (timePeriod === 'Quarterly' || timePeriod === 'Yearly' || timePeriod === 'Monthly'))) {
         // Aggregate across multiple periods
         const allAccounts: Record<string, any> = {};
         
