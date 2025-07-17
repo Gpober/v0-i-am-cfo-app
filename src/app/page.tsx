@@ -1352,7 +1352,7 @@ export default function FinancialsPage() {
       if (viewMode === 'by-property') {
         const properties = timeSeriesData.availableProperties || [];
         const headers = properties.map((property: string) => (
-          <th key={property} className="px-2 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0 bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
+          <th key={property} className="px-2 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border border-gray-300 bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
             <div className="truncate text-center sm:text-right" title={property}>
               {property}
             </div>
@@ -1360,7 +1360,7 @@ export default function FinancialsPage() {
         ));
         
         headers.push(
-          <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border-r border-gray-200" style={{ minWidth: '140px' }}>
+          <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border border-gray-300" style={{ minWidth: '140px' }}>
             <div className="text-gray-700 font-bold">Total</div>
           </th>
         );
@@ -1368,14 +1368,14 @@ export default function FinancialsPage() {
         return headers;
       } else {
         const headers = timeSeriesData.periods.map((period: string) => (
-          <th key={period} className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border-r border-gray-200" style={{ minWidth: '140px' }}>
+          <th key={period} className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border border-gray-300" style={{ minWidth: '140px' }}>
             {period}
           </th>
         ));
         
         if (viewMode === 'detailed') {
           headers.push(
-            <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border-r border-gray-200" style={{ minWidth: '140px' }}>
+            <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border border-gray-300" style={{ minWidth: '140px' }}>
               <div className="text-gray-700 font-bold">Total</div>
             </th>
           );
@@ -1416,7 +1416,7 @@ export default function FinancialsPage() {
           };
           
           return (
-            <td key={property} className={`px-2 py-3 text-right text-sm font-medium border-r border-gray-200 last:border-r-0 ${
+            <td key={property} className={`px-2 py-3 text-right text-sm font-medium border border-gray-300 ${
               value >= 0 ? 'text-green-600' : 'text-red-600'
             }`} style={{ minWidth: '140px', maxWidth: '180px' }}>
               <span 
@@ -1437,7 +1437,7 @@ export default function FinancialsPage() {
         };
         
         cells.push(
-          <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-white border-r border-gray-200 ${
+          <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-white border border-gray-300 ${
             totalValue >= 0 ? 'text-gray-700' : 'text-gray-700'
           }`} style={{ minWidth: '120px' }}>
             <span 
@@ -1484,7 +1484,7 @@ export default function FinancialsPage() {
           };
           
           return (
-            <td key={period} className={`px-2 py-3 text-right text-sm font-medium border-r border-gray-200 ${
+            <td key={period} className={`px-2 py-3 text-right text-sm font-medium border border-gray-300 ${
               value >= 0 ? 'text-green-600' : 'text-red-600'
             }`} style={{ minWidth: '120px' }}>
               <span 
@@ -1541,7 +1541,7 @@ export default function FinancialsPage() {
           };
           
           cells.push(
-            <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-white border-r border-gray-200 ${
+            <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-white border border-gray-300 ${
               totalValue >= 0 ? 'text-gray-700' : 'text-gray-700'
             }`} style={{ minWidth: '120px' }}>
               <span 
@@ -1598,7 +1598,15 @@ export default function FinancialsPage() {
           <React.Fragment key={`parent-${account.name}`}>
             {/* PARENT ACCOUNT ROW */}
             <tr className="hover:bg-blue-50 bg-blue-25 border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
-              <td className={`px-6 py-3 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
+              <td className={`px-6 py-3 text-left text-sm bg-white sticky left-0 z-25 border border-gray-300`} style={{ 
+                minWidth: '400px', 
+                maxWidth: '450px', 
+                position: 'sticky', 
+                left: 0, 
+                zIndex: 25, 
+                backgroundColor: 'white',
+                borderLeft: '1px solid #e2e8f0'
+              }}>
                 <div className="flex items-center">
                   <button
                     onClick={() => toggleParentAccount(account.name)}
@@ -1621,7 +1629,7 @@ export default function FinancialsPage() {
                 </div>
               </td>
               {renderDataCells(account)}
-              <td className="px-2 py-3 text-right text-sm text-gray-500 bg-blue-25 border-r border-gray-200">
+              <td className="px-2 py-3 text-right text-sm text-gray-500 bg-blue-25 border border-gray-300">
                 {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
               </td>
             </tr>
@@ -1631,7 +1639,15 @@ export default function FinancialsPage() {
               <tr key={`sub-${account.name}-${subAccount.name}`} className={`hover:bg-gray-50 ${
                 subAccount.isParentAsSubAccount ? 'bg-yellow-25 border-l-4 border-yellow-300' : 'bg-blue-25 border-l-4 border-blue-200'
               }`}>
-                <td className={`px-6 py-2 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
+                <td className={`px-6 py-2 text-left text-sm bg-white sticky left-0 z-25 border border-gray-300`} style={{ 
+                  minWidth: '400px', 
+                  maxWidth: '450px', 
+                  position: 'sticky', 
+                  left: 0, 
+                  zIndex: 25, 
+                  backgroundColor: 'white',
+                  borderLeft: '1px solid #e2e8f0'
+                }}>
                   <div className="flex items-center pl-8">
                     <div className="w-4 h-4 mr-3 flex items-center justify-center">
                       <div className={`w-2 h-2 rounded-full ${
@@ -1648,7 +1664,7 @@ export default function FinancialsPage() {
                   </div>
                 </td>
                 {renderDataCells(subAccount)}
-                <td className={`px-2 py-2 text-right text-sm text-gray-500 border-r border-gray-200 ${
+                <td className={`px-2 py-2 text-right text-sm text-gray-500 border border-gray-300 ${
                   subAccount.isParentAsSubAccount ? 'bg-yellow-25' : 'bg-blue-25'
                 }`}>
                   {kpis.revenue ? calculatePercentage(Math.abs(subAccount.total), Math.abs(kpis.revenue)) : '0%'}
@@ -1661,13 +1677,21 @@ export default function FinancialsPage() {
         // Standalone account
         return (
           <tr key={`standalone-${account.name}`} className="hover:bg-gray-50">
-            <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
+            <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white sticky left-0 z-25 border border-gray-300`} style={{ 
+              minWidth: '400px', 
+              maxWidth: '450px', 
+              position: 'sticky', 
+              left: 0, 
+              zIndex: 25, 
+              backgroundColor: 'white',
+              borderLeft: '1px solid #e2e8f0'
+            }}>
               <div className="flex items-center">
                 <span className="text-gray-700">📄 {account.name}</span>
               </div>
             </td>
             {renderDataCells(account)}
-            <td className="px-2 py-2 text-right text-sm text-gray-500 border-r border-gray-200">
+            <td className="px-2 py-2 text-right text-sm text-gray-500 border border-gray-300">
               {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
             </td>
           </tr>
@@ -1679,7 +1703,15 @@ export default function FinancialsPage() {
   // Render section headers and totals with property support
   const renderSectionHeader = (title: string, emoji: string, category: PLCategory, bgClass: string, textClass: string) => (
     <tr className={`${bgClass} border-t-2 border-opacity-50`}>
-      <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} bg-white sticky left-0 z-20 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 20, backgroundColor: 'white' }}>
+      <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} bg-white sticky left-0 z-20 border border-gray-300`} style={{ 
+        minWidth: '400px', 
+        maxWidth: '450px', 
+        position: 'sticky', 
+        left: 0, 
+        zIndex: 20, 
+        backgroundColor: 'white',
+        borderLeft: '1px solid #e2e8f0'
+      }}>
         {emoji} {title}
       </td>
       {viewMode === 'by-property' && timeSeriesData ? (
@@ -1688,7 +1720,7 @@ export default function FinancialsPage() {
           {timeSeriesData.availableProperties?.map((property: string) => {
             const total = getCategoryTotal(category, undefined, property);
             return (
-              <td key={property} className={`px-3 py-4 text-right text-sm font-bold ${textClass} border-r border-gray-200 last:border-r-0`}>
+              <td key={property} className={`px-3 py-4 text-right text-sm font-bold ${textClass} border border-gray-300`}>
                 {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
                   ? `(${formatCurrency(Math.abs(total))})`
                   : formatCurrency(total)
@@ -1697,7 +1729,7 @@ export default function FinancialsPage() {
             );
           })}
           {/* Total column for section headers */}
-          <td className={`px-3 py-4 text-right text-sm font-bold text-gray-900 bg-white border-r border-gray-200`}>
+          <td className={`px-3 py-4 text-right text-sm font-bold text-gray-900 bg-white border border-gray-300`}>
             {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
               ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
               : formatCurrency(getCategoryTotal(category))
@@ -1705,7 +1737,7 @@ export default function FinancialsPage() {
           </td>
         </>
       ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
-        <td className={`px-4 py-4 text-right text-lg font-bold ${textClass} border-r border-gray-200`}>
+        <td className={`px-4 py-4 text-right text-lg font-bold ${textClass} border border-gray-300`}>
           {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
             ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
             : formatCurrency(getCategoryTotal(category))
@@ -1716,7 +1748,7 @@ export default function FinancialsPage() {
           {timeSeriesData.periods.map((period: string) => {
             const total = getCategoryTotal(category, period);
             return (
-              <td key={period} className={`px-4 py-4 text-right text-lg font-bold ${textClass} border-r border-gray-200`}>
+              <td key={period} className={`px-4 py-4 text-right text-lg font-bold ${textClass} border border-gray-300`}>
                 {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
                   ? `(${formatCurrency(Math.abs(total))})`
                   : formatCurrency(total)
@@ -1725,7 +1757,7 @@ export default function FinancialsPage() {
             );
           })}
           {viewMode === 'detailed' && (
-            <td className={`px-4 py-4 text-right text-lg font-bold text-gray-900 bg-white border-r border-gray-200`}>
+            <td className={`px-4 py-4 text-right text-lg font-bold text-gray-900 bg-white border border-gray-300`}>
               {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
                 ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
                 : formatCurrency(getCategoryTotal(category))
@@ -1734,7 +1766,7 @@ export default function FinancialsPage() {
           )}
         </>
       ) : null}
-      <td className={`px-4 py-4 text-right text-sm ${textClass} border-r border-gray-200`}>
+      <td className={`px-4 py-4 text-right text-sm ${textClass} border border-gray-300`}>
         {kpis.revenue ? calculatePercentage(Math.abs(getCategoryTotal(category)), Math.abs(kpis.revenue)) : '0%'}
       </td>
     </tr>
@@ -2202,25 +2234,32 @@ export default function FinancialsPage() {
     }} 
     className="relative [&::-webkit-scrollbar]:hidden"
     id="pl-table-container">
-      <table className="table-auto border-collapse border border-gray-200" style={{ 
+      <table className="table-auto border-collapse w-full" style={{ 
         minWidth: viewMode === 'by-property' && timeSeriesData?.availableProperties ? 
           `${Math.max(1400, (timeSeriesData.availableProperties.length + 2) * 180)}px` : 
           viewMode === 'detailed' && timeSeriesData?.periods ? 
           `${Math.max(1400, (timeSeriesData.periods.length + 2) * 180)}px` : '1200px',
         width: '100%',
-        tableLayout: 'fixed'
+        tableLayout: 'fixed',
+        border: '1px solid #e2e8f0'
       }}>
         <thead className="bg-gray-50 sticky top-0 z-20">
           <tr>
-            <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-white sticky left-0 z-50 border-r-2 border-gray-300 shadow-lg border-b border-gray-200 ${
-              (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
-              (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                ? 'border-b-2 border-gray-200' : ''
-            }`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', top: 0, left: 0, zIndex: 50, backgroundColor: 'white' }}>
+            <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-white sticky left-0 z-50 border-r border-gray-300 border-b border-gray-300`} style={{ 
+              minWidth: '400px', 
+              maxWidth: '450px', 
+              position: 'sticky', 
+              top: 0, 
+              left: 0, 
+              zIndex: 50, 
+              backgroundColor: 'white',
+              borderTop: '1px solid #e2e8f0',
+              borderLeft: '1px solid #e2e8f0'
+            }}>
               Account
             </th>
             {renderColumnHeaders()}
-            <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border-r border-gray-200" style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F9FAFB' }}>
+            <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20 border border-gray-300" style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F9FAFB' }}>
               % of Revenue
             </th>
           </tr>
@@ -2232,41 +2271,49 @@ export default function FinancialsPage() {
 
                           {/* TOTAL REVENUE */}
                           <tr className="bg-blue-100 border-t-2 border-blue-300">
-                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg border-b border-gray-200`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-white sticky left-0 z-30 border border-gray-300`} style={{ 
+                              minWidth: '400px', 
+                              maxWidth: '450px', 
+                              position: 'sticky', 
+                              left: 0, 
+                              zIndex: 30, 
+                              backgroundColor: 'white',
+                              borderLeft: '1px solid #e2e8f0'
+                            }}>
                               📊 TOTAL REVENUE
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
                               <>
                                 {/* Property columns for by-property view */}
                                 {timeSeriesData.availableProperties?.map((property: string) => (
-                                  <td key={property} className="px-3 py-4 text-right text-lg font-bold text-blue-800 border-r border-gray-200 last:border-r-0">
+                                  <td key={property} className="px-3 py-4 text-right text-lg font-bold text-blue-800 border border-gray-300">
                                     {formatCurrency(getCategoryTotal('Revenue', undefined, property))}
                                   </td>
                                 ))}
                                 {/* Total column for by-property view */}
-                                <td className="px-3 py-4 text-right text-lg font-bold text-gray-900 bg-white border-r border-gray-200">
+                                <td className="px-3 py-4 text-right text-lg font-bold text-gray-900 bg-white border border-gray-300">
                                   {formatCurrency(kpis.revenue)}
                                 </td>
                               </>
                             ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
-                              <td className="px-4 py-4 text-right text-lg font-bold text-blue-800 border-r border-gray-200">
+                              <td className="px-4 py-4 text-right text-lg font-bold text-blue-800 border border-gray-300">
                                 {formatCurrency(kpis.revenue)}
                               </td>
                             ) : timeSeriesData ? (
                               <>
                                 {timeSeriesData.periods.map((period: string) => (
-                                  <td key={period} className="px-4 py-4 text-right text-lg font-bold text-blue-800 border-r border-gray-200">
+                                  <td key={period} className="px-4 py-4 text-right text-lg font-bold text-blue-800 border border-gray-300">
                                     {formatCurrency(getCategoryTotal('Revenue', period))}
                                   </td>
                                 ))}
                                 {viewMode === 'detailed' && (
-                                  <td className="px-4 py-4 text-right text-lg font-bold text-gray-800 bg-white border-r border-gray-200">
+                                  <td className="px-4 py-4 text-right text-lg font-bold text-gray-800 bg-white border border-gray-300">
                                     {formatCurrency(kpis.revenue)}
                                   </td>
                                 )}
                               </>
                             ) : null}
-                            <td className="px-4 py-4 text-right text-sm font-bold text-blue-800 border-r border-gray-200">
+                            <td className="px-4 py-4 text-right text-sm font-bold text-blue-800 border border-gray-300">
                               100.0%
                             </td>
                           </tr>
@@ -2279,22 +2326,30 @@ export default function FinancialsPage() {
 
                               {/* TOTAL COGS */}
                               <tr className="bg-red-100 border-t-2 border-red-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg border-b border-gray-200`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-white sticky left-0 z-30 border border-gray-300`} style={{ 
+                                  minWidth: '400px', 
+                                  maxWidth: '450px', 
+                                  position: 'sticky', 
+                                  left: 0, 
+                                  zIndex: 30, 
+                                  backgroundColor: 'white',
+                                  borderLeft: '1px solid #e2e8f0'
+                                }}>
                                   📊 TOTAL COGS
                                 </td>
                                 {viewMode === 'by-property' && timeSeriesData ? (
                                   <>
                                     {timeSeriesData.availableProperties?.map((property: string) => (
-                                      <td key={property} className="px-3 py-4 text-right text-lg font-bold text-red-800 border-r border-gray-200 last:border-r-0">
+                                      <td key={property} className="px-3 py-4 text-right text-lg font-bold text-red-800 border border-gray-300">
                                         ({formatCurrency(Math.abs(getCategoryTotal('COGS', undefined, property)))})
                                       </td>
                                     ))}
-                                    <td className="px-3 py-4 text-right text-lg font-bold text-red-900 bg-red-200 border-l border-red-500 shadow-sm border-r border-gray-200">
+                                    <td className="px-3 py-4 text-right text-lg font-bold text-red-900 bg-red-200 border-l border-red-500 shadow-sm border border-gray-300">
                                       ({formatCurrency(kpis.cogs)})
                                     </td>
                                   </>
                                 ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
-                                  <td className="px-4 py-4 text-right text-lg font-bold text-red-800 border-r border-gray-200">
+                                  <td className="px-4 py-4 text-right text-lg font-bold text-red-800 border border-gray-300">
                                     ({formatCurrency(kpis.cogs)})
                                   </td>
                                 ) : timeSeriesData ? (
@@ -2302,19 +2357,19 @@ export default function FinancialsPage() {
                                     {timeSeriesData.periods.map((period: string) => {
                                       const total = Math.abs(getCategoryTotal('COGS', period));
                                       return (
-                                        <td key={period} className="px-4 py-4 text-right text-lg font-bold text-red-800 border-r border-gray-200">
+                                        <td key={period} className="px-4 py-4 text-right text-lg font-bold text-red-800 border border-gray-300">
                                           ({formatCurrency(total)})
                                         </td>
                                       );
                                     })}
                                     {viewMode === 'detailed' && (
-                                      <td className="px-4 py-4 text-right text-lg font-bold text-red-800 bg-white border-r border-gray-200">
+                                      <td className="px-4 py-4 text-right text-lg font-bold text-red-800 bg-white border border-gray-300">
                                         ({formatCurrency(kpis.cogs)})
                                       </td>
                                     )}
                                   </>
                                 ) : null}
-                                <td className="px-4 py-4 text-right text-sm font-bold text-red-800 border-r border-gray-200">
+                                <td className="px-4 py-4 text-right text-sm font-bold text-red-800 border border-gray-300">
                                   {kpis.revenue ? calculatePercentage(kpis.cogs, Math.abs(kpis.revenue)) : '0%'}
                                 </td>
                               </tr>
@@ -2323,7 +2378,16 @@ export default function FinancialsPage() {
 
                           {/* 📈 GROSS PROFIT */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.success }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg border-b border-gray-200`} style={{ color: BRAND_COLORS.success, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border border-gray-300`} style={{ 
+                              color: BRAND_COLORS.success, 
+                              minWidth: '400px', 
+                              maxWidth: '450px', 
+                              position: 'sticky', 
+                              left: 0, 
+                              zIndex: 30, 
+                              backgroundColor: 'white',
+                              borderLeft: '1px solid #e2e8f0'
+                            }}>
                               📈 GROSS PROFIT
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2334,17 +2398,17 @@ export default function FinancialsPage() {
                                   const grossProfit = revenue - Math.abs(cogs);
                                   
                                   return (
-                                    <td key={property} className={`px-3 py-5 text-right text-xl font-bold border-r border-gray-200 last:border-r-0`} style={{ color: BRAND_COLORS.success }}>
+                                    <td key={property} className={`px-3 py-5 text-right text-xl font-bold border border-gray-300`} style={{ color: BRAND_COLORS.success }}>
                                       {formatCurrency(grossProfit)}
                                     </td>
                                   );
                                 })}
-                                <td className={`px-3 py-5 text-right text-xl font-bold bg-green-200 border-l border-green-500 shadow-sm border-r border-gray-200`} style={{ color: BRAND_COLORS.success }}>
+                                <td className={`px-3 py-5 text-right text-xl font-bold bg-green-200 border-l border-green-500 shadow-sm border border-gray-300`} style={{ color: BRAND_COLORS.success }}>
                                   {formatCurrency(kpis.grossProfit)}
                                 </td>
                               </>
                             ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
-                              <td className={`px-4 py-5 text-right text-xl font-bold border-r border-gray-200`} style={{ color: BRAND_COLORS.success }}>
+                              <td className={`px-4 py-5 text-right text-xl font-bold border border-gray-300`} style={{ color: BRAND_COLORS.success }}>
                                 {formatCurrency(kpis.grossProfit)}
                               </td>
                             ) : timeSeriesData ? (
@@ -2355,19 +2419,19 @@ export default function FinancialsPage() {
                                   const grossProfit = revenue - Math.abs(cogs);
                                   
                                   return (
-                                    <td key={period} className={`px-4 py-5 text-right text-xl font-bold border-r border-gray-200`} style={{ color: BRAND_COLORS.success }}>
+                                    <td key={period} className={`px-4 py-5 text-right text-xl font-bold border border-gray-300`} style={{ color: BRAND_COLORS.success }}>
                                       {formatCurrency(grossProfit)}
                                     </td>
                                   );
                                 })}
                                 {viewMode === 'detailed' && (
-                                  <td className={`px-4 py-5 text-right text-xl font-bold bg-white border-r border-gray-200`} style={{ color: BRAND_COLORS.success }}>
+                                  <td className={`px-4 py-5 text-right text-xl font-bold bg-white border border-gray-300`} style={{ color: BRAND_COLORS.success }}>
                                     {formatCurrency(kpis.grossProfit)}
                                   </td>
                                 )}
                               </>
                             ) : null}
-                            <td className="px-4 py-5 text-right text-lg font-bold border-r border-gray-200" style={{ color: BRAND_COLORS.success }}>
+                            <td className="px-4 py-5 text-right text-lg font-bold border border-gray-300" style={{ color: BRAND_COLORS.success }}>
                               {kpis.grossMargin.toFixed(1)}%
                             </td>
                           </tr>
@@ -2380,22 +2444,30 @@ export default function FinancialsPage() {
 
                               {/* TOTAL OPERATING EXPENSES */}
                               <tr className="bg-orange-100 border-t-2 border-orange-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg border-b border-gray-200`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-white sticky left-0 z-30 border border-gray-300`} style={{ 
+                                  minWidth: '400px', 
+                                  maxWidth: '450px', 
+                                  position: 'sticky', 
+                                  left: 0, 
+                                  zIndex: 30, 
+                                  backgroundColor: 'white',
+                                  borderLeft: '1px solid #e2e8f0'
+                                }}>
                                   📊 TOTAL OPERATING EXPENSES
                                 </td>
                                 {viewMode === 'by-property' && timeSeriesData ? (
                                   <>
                                     {timeSeriesData.availableProperties?.map((property: string) => (
-                                      <td key={property} className="px-3 py-4 text-right text-lg font-bold text-orange-800 border-r border-gray-200 last:border-r-0">
+                                      <td key={property} className="px-3 py-4 text-right text-lg font-bold text-orange-800 border border-gray-300">
                                         ({formatCurrency(Math.abs(getCategoryTotal('Operating Expenses', undefined, property)))})
                                       </td>
                                     ))}
-                                    <td className="px-3 py-4 text-right text-lg font-bold text-orange-900 bg-orange-200 border-l border-orange-500 shadow-sm border-r border-gray-200">
+                                    <td className="px-3 py-4 text-right text-lg font-bold text-orange-900 bg-orange-200 border-l border-orange-500 shadow-sm border border-gray-300">
                                       ({formatCurrency(kpis.operatingExpenses)})
                                     </td>
                                   </>
                                 ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
-                                  <td className="px-4 py-4 text-right text-lg font-bold text-orange-800 border-r border-gray-200">
+                                  <td className="px-4 py-4 text-right text-lg font-bold text-orange-800 border border-gray-300">
                                     ({formatCurrency(kpis.operatingExpenses)})
                                   </td>
                                 ) : timeSeriesData ? (
@@ -2403,19 +2475,19 @@ export default function FinancialsPage() {
                                     {timeSeriesData.periods.map((period: string) => {
                                       const total = Math.abs(getCategoryTotal('Operating Expenses', period));
                                       return (
-                                        <td key={period} className="px-4 py-4 text-right text-lg font-bold text-orange-800 border-r border-gray-200">
+                                        <td key={period} className="px-4 py-4 text-right text-lg font-bold text-orange-800 border border-gray-300">
                                           ({formatCurrency(total)})
                                         </td>
                                       );
                                     })}
                                     {viewMode === 'detailed' && (
-                                      <td className="px-4 py-4 text-right text-lg font-bold text-orange-800 bg-white border-r border-gray-200">
+                                      <td className="px-4 py-4 text-right text-lg font-bold text-orange-800 bg-white border border-gray-300">
                                         ({formatCurrency(kpis.operatingExpenses)})
                                       </td>
                                     )}
                                   </>
                                 ) : null}
-                                <td className="px-4 py-4 text-right text-sm font-bold text-orange-800 border-r border-gray-200">
+                                <td className="px-4 py-4 text-right text-sm font-bold text-orange-800 border border-gray-300">
                                   {kpis.revenue ? calculatePercentage(kpis.operatingExpenses, Math.abs(kpis.revenue)) : '0%'}
                                 </td>
                               </tr>
@@ -2424,7 +2496,16 @@ export default function FinancialsPage() {
 
                           {/* 🏆 NET OPERATING INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.primary }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg border-b border-gray-200`} style={{ color: BRAND_COLORS.primary, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border border-gray-300`} style={{ 
+                              color: BRAND_COLORS.primary, 
+                              minWidth: '400px', 
+                              maxWidth: '450px', 
+                              position: 'sticky', 
+                              left: 0, 
+                              zIndex: 30, 
+                              backgroundColor: 'white',
+                              borderLeft: '1px solid #e2e8f0'
+                            }}>
                               🏆 NET OPERATING INCOME
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2436,7 +2517,7 @@ export default function FinancialsPage() {
                                   const netOpIncome = revenue - Math.abs(cogs) - Math.abs(opex);
                                   
                                   return (
-                                    <td key={property} className={`px-3 py-5 text-right text-xl font-bold border-r border-gray-200 last:border-r-0 ${
+                                    <td key={property} className={`px-3 py-5 text-right text-xl font-bold border border-gray-300 ${
                                       netOpIncome >= 0 ? 'text-green-700' : 'text-red-700'
                                     }`}>
                                       {formatCurrency(netOpIncome)}
@@ -2445,12 +2526,12 @@ export default function FinancialsPage() {
                                 })}
                                 <td className={`px-3 py-5 text-right text-xl font-bold ${
                                   kpis.netOperatingIncome >= 0 ? 'text-green-800 bg-green-200' : 'text-red-800 bg-red-200'
-                                } border-l border-blue-500 shadow-sm border-r border-gray-200`}>
+                                } border-l border-blue-500 shadow-sm border border-gray-300`}>
                                   {formatCurrency(kpis.netOperatingIncome)}
                                 </td>
                               </>
                             ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
-                              <td className={`px-4 py-5 text-right text-xl font-bold border-r border-gray-200 ${
+                              <td className={`px-4 py-5 text-right text-xl font-bold border border-gray-300 ${
                                 kpis.netOperatingIncome >= 0 ? 'text-green-700' : 'text-red-700'
                               }`}>
                                 {formatCurrency(kpis.netOperatingIncome)}
@@ -2464,7 +2545,7 @@ export default function FinancialsPage() {
                                   const netOpIncome = revenue - Math.abs(cogs) - Math.abs(opex);
                                   
                                   return (
-                                    <td key={period} className={`px-4 py-5 text-right text-xl font-bold border-r border-gray-200 ${
+                                    <td key={period} className={`px-4 py-5 text-right text-xl font-bold border border-gray-300 ${
                                       netOpIncome >= 0 ? 'text-green-700' : 'text-red-700'
                                     }`}>
                                       {formatCurrency(netOpIncome)}
@@ -2472,7 +2553,7 @@ export default function FinancialsPage() {
                                   );
                                 })}
                                 {viewMode === 'detailed' && (
-                                  <td className={`px-4 py-5 text-right text-xl font-bold bg-white border-r border-gray-200 ${
+                                  <td className={`px-4 py-5 text-right text-xl font-bold bg-white border border-gray-300 ${
                                     kpis.netOperatingIncome >= 0 ? 'text-green-700' : 'text-red-700'
                                   }`}>
                                     {formatCurrency(kpis.netOperatingIncome)}
@@ -2480,7 +2561,7 @@ export default function FinancialsPage() {
                                 )}
                               </>
                             ) : null}
-                            <td className="px-4 py-5 text-right text-lg font-bold border-r border-gray-200" style={{ color: BRAND_COLORS.primary }}>
+                            <td className="px-4 py-5 text-right text-lg font-bold border border-gray-300" style={{ color: BRAND_COLORS.primary }}>
                               {kpis.operatingMargin.toFixed(1)}%
                             </td>
                           </tr>
@@ -2503,7 +2584,16 @@ export default function FinancialsPage() {
 
                           {/* 🎯 FINAL NET INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.secondary }}>
-                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg border-b border-gray-200`} style={{ color: BRAND_COLORS.secondary, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-white sticky left-0 z-30 border border-gray-300`} style={{ 
+                              color: BRAND_COLORS.secondary, 
+                              minWidth: '400px', 
+                              maxWidth: '450px', 
+                              position: 'sticky', 
+                              left: 0, 
+                              zIndex: 30, 
+                              backgroundColor: 'white',
+                              borderLeft: '1px solid #e2e8f0'
+                            }}>
                               🎯 NET INCOME
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2517,7 +2607,7 @@ export default function FinancialsPage() {
                                   const finalNetIncome = revenue - Math.abs(cogs) - Math.abs(opex) + otherIncome - Math.abs(otherExpenses);
                                   
                                   return (
-                                    <td key={property} className={`px-3 py-6 text-right text-2xl font-bold border-r border-gray-200 last:border-r-0 ${
+                                    <td key={property} className={`px-3 py-6 text-right text-2xl font-bold border border-gray-300 ${
                                       finalNetIncome >= 0 ? 'text-green-700' : 'text-red-700'
                                     }`}>
                                       {formatCurrency(finalNetIncome)}
@@ -2526,12 +2616,12 @@ export default function FinancialsPage() {
                                 })}
                                 <td className={`px-3 py-6 text-right text-2xl font-bold ${
                                   kpis.netIncome >= 0 ? 'text-green-800 bg-green-200' : 'text-red-800 bg-red-200'
-                                } border-l border-blue-500 shadow-sm border-r border-gray-200`}>
+                                } border-l border-blue-500 shadow-sm border border-gray-300`}>
                                   {formatCurrency(kpis.netIncome)}
                                 </td>
                               </>
                             ) : timeSeriesData && timePeriod === 'Trailing 12' && viewMode === 'total' ? (
-                              <td className={`px-4 py-6 text-right text-2xl font-bold border-r border-gray-200 ${
+                              <td className={`px-4 py-6 text-right text-2xl font-bold border border-gray-300 ${
                                 kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
                               }`}>
                                 {formatCurrency(kpis.netIncome)}
@@ -2547,7 +2637,7 @@ export default function FinancialsPage() {
                                   const finalNetIncome = revenue - Math.abs(cogs) - Math.abs(opex) + otherIncome - Math.abs(otherExpenses);
                                   
                                   return (
-                                    <td key={period} className={`px-4 py-6 text-right text-2xl font-bold border-r border-gray-200 ${
+                                    <td key={period} className={`px-4 py-6 text-right text-2xl font-bold border border-gray-300 ${
                                       finalNetIncome >= 0 ? 'text-green-700' : 'text-red-700'
                                     }`}>
                                       {formatCurrency(finalNetIncome)}
@@ -2555,8 +2645,15 @@ export default function FinancialsPage() {
                                   );
                                 })}
                                 {viewMode === 'detailed' && (
-                                  <td className={`px-4 py-6 text-right text-2xl font-bold bg-white border-r border-gray-200 ${
+                                  <td className={`px-4 py-6 text-right text-2xl font-bold bg-white border border-gray-300 ${
                                     kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
+                                  }`}>
+                                    {formatCurrency(kpis.netIncome)}
+                                  </td>
+                                )}
+                              </>
+                            ) : null}
+                            <td className="px-4 py-6 text-right text-xl font-bold border border-gray-300" style={{ color: BRAND_COLORS.secondary }}>700'
                                   }`}>
                                     {formatCurrency(kpis.netIncome)}
                                   </td>
