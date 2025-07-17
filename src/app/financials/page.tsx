@@ -2180,7 +2180,7 @@ export default function FinancialsPage() {
                 </div>
 
                 {/* P&L Table Content */}
-<div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ height: '70vh' }}>
+<div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ height: '85vh' }}>
   {isLoadingData ? (
     <div className="flex items-center justify-center py-8">
       <RefreshCw className="w-6 h-6 animate-spin mr-2" />
@@ -2192,7 +2192,7 @@ export default function FinancialsPage() {
     </div>
   ) : (
     <div className="relative" style={{ 
-      height: '70vh',
+      height: '85vh',
       overflowX: 'auto',
       overflowY: 'auto',
       scrollBehavior: 'smooth',
@@ -2232,7 +2232,7 @@ export default function FinancialsPage() {
 
                           {/* TOTAL REVENUE */}
                           <tr className="bg-blue-100 border-t-2 border-blue-300">
-                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-blue-100 sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'rgb(219 234 254)' }}>
                               📊 TOTAL REVENUE
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2279,7 +2279,7 @@ export default function FinancialsPage() {
 
                               {/* TOTAL COGS */}
                               <tr className="bg-red-100 border-t-2 border-red-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-red-100 sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'rgb(254 226 226)' }}>
                                   📊 TOTAL COGS
                                 </td>
                                 {viewMode === 'by-property' && timeSeriesData ? (
@@ -2323,7 +2323,7 @@ export default function FinancialsPage() {
 
                           {/* 📈 GROSS PROFIT */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.success }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.success, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-green-100 sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.success, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'rgb(220 252 231)' }}>
                               📈 GROSS PROFIT
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2380,7 +2380,7 @@ export default function FinancialsPage() {
 
                               {/* TOTAL OPERATING EXPENSES */}
                               <tr className="bg-orange-100 border-t-2 border-orange-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-orange-100 sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'rgb(254 215 170)' }}>
                                   📊 TOTAL OPERATING EXPENSES
                                 </td>
                                 {viewMode === 'by-property' && timeSeriesData ? (
@@ -2424,7 +2424,7 @@ export default function FinancialsPage() {
 
                           {/* 🏆 NET OPERATING INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.primary }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.primary, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-green-100 sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.primary, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'rgb(220 252 231)' }}>
                               🏆 NET OPERATING INCOME
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2503,7 +2503,7 @@ export default function FinancialsPage() {
 
                           {/* 🎯 FINAL NET INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.secondary }}>
-                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.secondary, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-green-100 sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.secondary, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'rgb(220 252 231)' }}>
                               🎯 NET INCOME
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
