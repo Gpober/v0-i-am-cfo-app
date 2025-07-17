@@ -1360,8 +1360,8 @@ export default function FinancialsPage() {
         ));
         
         headers.push(
-          <th key="total" className="px-2 py-3 text-right text-xs font-medium text-blue-800 uppercase tracking-wider bg-blue-100 border-l-2 border-blue-600 shadow-sm sticky top-0 z-20" style={{ minWidth: '140px' }}>
-            <div className="text-blue-800 font-bold">Total</div>
+          <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
+            <div className="text-gray-700 font-bold">Total</div>
           </th>
         );
         
@@ -1375,8 +1375,8 @@ export default function FinancialsPage() {
         
         if (viewMode === 'detailed') {
           headers.push(
-            <th key="total" className="px-2 py-3 text-right text-xs font-medium text-blue-800 uppercase tracking-wider bg-blue-100 border-l-2 border-blue-600 shadow-sm sticky top-0 z-20" style={{ minWidth: '140px' }}>
-              <div className="text-blue-800 font-bold">Total</div>
+            <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
+              <div className="text-gray-700 font-bold">Total</div>
             </th>
           );
         }
@@ -1437,11 +1437,11 @@ export default function FinancialsPage() {
         };
         
         cells.push(
-          <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-blue-50 border-l border-blue-300 ${
-            totalValue >= 0 ? 'text-blue-700' : 'text-blue-700'
+          <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-white ${
+            totalValue >= 0 ? 'text-gray-700' : 'text-gray-700'
           }`} style={{ minWidth: '120px' }}>
             <span 
-              className="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-400"
+              className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-gray-400"
               onClick={() => handleAccountClick(totalItem)}
             >
               {formatCurrency(totalValue)}
@@ -1541,11 +1541,11 @@ export default function FinancialsPage() {
           };
           
           cells.push(
-            <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-blue-50 border-l border-blue-300 ${
-              totalValue >= 0 ? 'text-blue-700' : 'text-blue-700'
+            <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-white ${
+              totalValue >= 0 ? 'text-gray-700' : 'text-gray-700'
             }`} style={{ minWidth: '120px' }}>
               <span 
-                className="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-blue-400"
+                className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors border border-transparent hover:border-gray-400"
                 onClick={() => handleAccountClick(totalItem)}
               >
                 {formatCurrency(totalValue)}
@@ -1697,7 +1697,7 @@ export default function FinancialsPage() {
             );
           })}
           {/* Total column for section headers */}
-          <td className={`px-3 py-4 text-right text-sm font-bold text-blue-900 bg-blue-200 border-l-2 border-blue-600 shadow-sm`}>
+          <td className={`px-3 py-4 text-right text-sm font-bold text-gray-900 bg-white`}>
             {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
               ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
               : formatCurrency(getCategoryTotal(category))
@@ -1725,7 +1725,7 @@ export default function FinancialsPage() {
             );
           })}
           {viewMode === 'detailed' && (
-            <td className={`px-4 py-4 text-right text-lg font-bold text-blue-900 bg-blue-200 border-l-2 border-blue-600 shadow-sm`}>
+            <td className={`px-4 py-4 text-right text-lg font-bold text-gray-900 bg-white`}>
               {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
                 ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
                 : formatCurrency(getCategoryTotal(category))
@@ -2244,7 +2244,7 @@ export default function FinancialsPage() {
                                   </td>
                                 ))}
                                 {/* Total column for by-property view */}
-                                <td className="px-3 py-4 text-right text-lg font-bold text-blue-900 bg-blue-200 border-l-2 border-blue-600 shadow-sm">
+                                <td className="px-3 py-4 text-right text-lg font-bold text-gray-900 bg-white">
                                   {formatCurrency(kpis.revenue)}
                                 </td>
                               </>
@@ -2260,7 +2260,7 @@ export default function FinancialsPage() {
                                   </td>
                                 ))}
                                 {viewMode === 'detailed' && (
-                                  <td className="px-4 py-4 text-right text-lg font-bold text-blue-800 bg-blue-50 border-l-2 border-blue-200">
+                                  <td className="px-4 py-4 text-right text-lg font-bold text-gray-800 bg-white">
                                     {formatCurrency(kpis.revenue)}
                                   </td>
                                 )}
@@ -2308,7 +2308,7 @@ export default function FinancialsPage() {
                                       );
                                     })}
                                     {viewMode === 'detailed' && (
-                                      <td className="px-4 py-4 text-right text-lg font-bold text-red-800 bg-blue-50 border-l-2 border-blue-200">
+                                      <td className="px-4 py-4 text-right text-lg font-bold text-red-800 bg-white">
                                         ({formatCurrency(kpis.cogs)})
                                       </td>
                                     )}
@@ -2361,7 +2361,7 @@ export default function FinancialsPage() {
                                   );
                                 })}
                                 {viewMode === 'detailed' && (
-                                  <td className={`px-4 py-5 text-right text-xl font-bold bg-blue-50 border-l-2 border-blue-200`} style={{ color: BRAND_COLORS.success }}>
+                                  <td className={`px-4 py-5 text-right text-xl font-bold bg-white`} style={{ color: BRAND_COLORS.success }}>
                                     {formatCurrency(kpis.grossProfit)}
                                   </td>
                                 )}
@@ -2409,7 +2409,7 @@ export default function FinancialsPage() {
                                       );
                                     })}
                                     {viewMode === 'detailed' && (
-                                      <td className="px-4 py-4 text-right text-lg font-bold text-orange-800 bg-blue-50 border-l-2 border-blue-200">
+                                      <td className="px-4 py-4 text-right text-lg font-bold text-orange-800 bg-white">
                                         ({formatCurrency(kpis.operatingExpenses)})
                                       </td>
                                     )}
@@ -2472,7 +2472,7 @@ export default function FinancialsPage() {
                                   );
                                 })}
                                 {viewMode === 'detailed' && (
-                                  <td className={`px-4 py-5 text-right text-xl font-bold bg-blue-50 border-l-2 border-blue-200 ${
+                                  <td className={`px-4 py-5 text-right text-xl font-bold bg-white ${
                                     kpis.netOperatingIncome >= 0 ? 'text-green-700' : 'text-red-700'
                                   }`}>
                                     {formatCurrency(kpis.netOperatingIncome)}
@@ -2555,7 +2555,7 @@ export default function FinancialsPage() {
                                   );
                                 })}
                                 {viewMode === 'detailed' && (
-                                  <td className={`px-4 py-6 text-right text-2xl font-bold bg-blue-50 border-l-2 border-blue-200 ${
+                                  <td className={`px-4 py-6 text-right text-2xl font-bold bg-white ${
                                     kpis.netIncome >= 0 ? 'text-green-700' : 'text-red-700'
                                   }`}>
                                     {formatCurrency(kpis.netIncome)}
