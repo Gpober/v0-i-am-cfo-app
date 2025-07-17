@@ -2633,10 +2633,10 @@ export default function FinancialsPage() {
                 </div>
               </div>
 
-              {/* Revenue & Net Income Trend Chart - 50% width */}
+             {/* Revenue & Net Income Trend Chart - 50% width */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full">
-                  <div className="p-6 border-b border-gray-200">
+                  <div className="p-4 border-b border-gray-200">
                     <h3 className="text-lg font-semibold text-gray-900">Revenue & Net Income</h3>
                     <div className="text-sm text-gray-600 mt-1">
                       {viewMode === 'by-property' ? 
@@ -2650,16 +2650,16 @@ export default function FinancialsPage() {
                       )}
                     </div>
                   </div>
-                  <div className="p-4">
+                  <div className="p-2">
                     {trendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={140}>
+                      <ResponsiveContainer width="100%" height={300}>
                         <ComposedChart 
                           data={trendData}
                           margin={{ 
                             top: 20, 
-                            right: 10, 
-                            left: 10, 
-                            bottom: trendData.length > 4 ? 40 : 20 
+                            right: 20, 
+                            left: 20, 
+                            bottom: trendData.length > 4 ? 60 : 40 
                           }}
                         >
                           <CartesianGrid 
@@ -2672,7 +2672,7 @@ export default function FinancialsPage() {
                           <XAxis 
                             dataKey="period" 
                             tick={{ 
-                              fontSize: 9, 
+                              fontSize: 11, 
                               fontWeight: 500,
                               fill: '#475569'
                             }}
@@ -2680,20 +2680,21 @@ export default function FinancialsPage() {
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             angle={trendData.length > 4 ? -45 : 0}
                             textAnchor={trendData.length > 4 ? 'end' : 'middle'}
-                            height={trendData.length > 4 ? 40 : 20}
+                            height={trendData.length > 4 ? 60 : 40}
+                            interval={0}
                           />
                           
                           <YAxis 
                             tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`}
                             tick={{ 
-                              fontSize: 9, 
+                              fontSize: 11, 
                               fontWeight: 500,
                               fill: '#475569'
                             }}
                             tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                            width={40}
-                            domain={['dataMin', 'dataMax']}
+                            width={50}
+                            domain={[0, 'dataMax']}
                           />
                           
                           <Tooltip 
@@ -2705,9 +2706,27 @@ export default function FinancialsPage() {
                               backgroundColor: 'white', 
                               border: '1px solid #e2e8f0',
                               borderRadius: '8px',
-                              fontSize: '10px',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            }}
+                            labelStyle={{
+                              fontWeight: 'bold',
+                              fontSize: '12px',
+                              color: '#1f2937'
+                            }}
+                          />
+                          
+                          <Legend 
+                            wrapperStyle={{ 
+                              paddingTop: '15px',
+                              fontSize: '11px',
                               fontWeight: 500
                             }}
+                            iconType="plainline"
+                            formatter={(value: string) => 
+                              value === 'netIncome' ? 'Net Income' : 'Revenue'
+                            }
                           />
                           
                           <Bar 
@@ -2715,7 +2734,8 @@ export default function FinancialsPage() {
                             fill="#10b981"
                             fillOpacity={0.8}
                             name="netIncome"
-                            radius={[2, 2, 0, 0]}
+                            radius={[3, 3, 0, 0]}
+                            stroke="none"
                           >
                             {trendData.map((entry, index) => (
                               <Cell 
@@ -2729,26 +2749,34 @@ export default function FinancialsPage() {
                             type="monotone" 
                             dataKey="revenue" 
                             stroke="#2563eb" 
-                            strokeWidth={2}
-                            dot={{ r: 2, fill: '#2563eb', strokeWidth: 1, stroke: 'white' }}
-                            activeDot={{ r: 3, fill: '#2563eb', strokeWidth: 2, stroke: 'white' }}
+                            strokeWidth={3}
+                            dot={{ 
+                              r: 4, 
+                              fill: '#2563eb', 
+                              strokeWidth: 2, 
+                              stroke: 'white'
+                            }}
+                            activeDot={{ 
+                              r: 6, 
+                              fill: '#2563eb', 
+                              strokeWidth: 3, 
+                              stroke: 'white'
+                            }}
                             name="revenue"
                           />
                         </ComposedChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="flex items-center justify-center h-32 text-gray-500">
+                      <div className="flex items-center justify-center h-72 text-gray-500">
                         <div className="text-center">
-                          <BarChart3 className="w-6 h-6 mx-auto mb-2 text-gray-400" />
-                          <p className="text-xs font-medium text-gray-600">No trend data</p>
+                          <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                          <p className="text-sm font-medium text-gray-600">No trend data</p>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
-
             {/* Main Content Grid - P&L and Transaction Details Below */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
               {/* P&L Table - 80% width (4/5) */}
