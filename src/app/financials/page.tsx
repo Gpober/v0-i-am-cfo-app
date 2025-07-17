@@ -970,6 +970,256 @@ export default function FinancialsPage() {
       source: validation.source
     });
   };
+
+  // Excel export function
+  const exportToExcel = () => {
+    try {
+      // Get the current P&L data
+      const data = currentData;
+      
+      // Create worksheet data
+      const worksheetData = [];
+      
+      // Add header row
+      const headerRow = ['Account'];
+      if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+        headerRow.push(...timeSeriesData.availableProperties);
+        headerRow.push('Total');
+      } else if (timeSeriesData?.periods) {
+        headerRow.push(...timeSeriesData.periods);
+        if (viewMode === 'detailed') {
+          headerRow.push('Total');
+        }
+      } else {
+        headerRow.push('Amount');
+      }
+      headerRow.push('% of Revenue');
+      worksheetData.push(headerRow);
+      
+      // Add revenue section
+      worksheetData.push(['REVENUE']);
+      const revenueData = data.filter((item: any) => item.category === 'Revenue');
+      revenueData.forEach((item: any) => {
+        const row = [item.account];
+        if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+          timeSeriesData.availableProperties.forEach((property: string) => {
+            const propertyData = data.find((d: any) => d.account === item.account && d.property === property);
+            row.push(propertyData ? propertyData.amount : 0);
+          });
+          row.push(item.amount);
+        } else if (timeSeriesData?.periods) {
+          timeSeriesData.periods.forEach((period: string) => {
+            const periodData = data.find((d: any) => d.account === item.account && d.period === period);
+            row.push(periodData ? periodData.amount : 0);
+          });
+          if (viewMode === 'detailed') {
+            row.push(item.amount);
+          }
+        } else {
+          row.push(item.amount);
+        }
+        row.push(kpis.revenue ? ((item.amount / Math.abs(kpis.revenue)) * 100).toFixed(1) + '%' : '0%');
+        worksheetData.push(row);
+      });
+      
+      // Add total revenue row
+      const totalRevenueRow = ['TOTAL REVENUE'];
+      if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+        timeSeriesData.availableProperties.forEach((property: string) => {
+          totalRevenueRow.push(getCategoryTotal('Revenue', undefined, property));
+        });
+        totalRevenueRow.push(kpis.revenue);
+      } else if (timeSeriesData?.periods) {
+        timeSeriesData.periods.forEach((period: string) => {
+          totalRevenueRow.push(getCategoryTotal('Revenue', period));
+        });
+        if (viewMode === 'detailed') {
+          totalRevenueRow.push(kpis.revenue);
+        }
+      } else {
+        totalRevenueRow.push(kpis.revenue);
+      }
+      totalRevenueRow.push('100.0%');
+      worksheetData.push(totalRevenueRow);
+      
+      // Add COGS section if exists
+      const cogsData = data.filter((item: any) => item.category === 'COGS');
+      if (cogsData.length > 0) {
+        worksheetData.push(['COST OF GOODS SOLD']);
+        cogsData.forEach((item: any) => {
+          const row = [item.account];
+          if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+            timeSeriesData.availableProperties.forEach((property: string) => {
+              const propertyData = data.find((d: any) => d.account === item.account && d.property === property);
+              row.push(propertyData ? propertyData.amount : 0);
+            });
+            row.push(item.amount);
+          } else if (timeSeriesData?.periods) {
+            timeSeriesData.periods.forEach((period: string) => {
+              const periodData = data.find((d: any) => d.account === item.account && d.period === period);
+              row.push(periodData ? periodData.amount : 0);
+            });
+            if (viewMode === 'detailed') {
+              row.push(item.amount);
+            }
+          } else {
+            row.push(item.amount);
+          }
+          row.push(kpis.revenue ? ((Math.abs(item.amount) / Math.abs(kpis.revenue)) * 100).toFixed(1) + '%' : '0%');
+          worksheetData.push(row);
+        });
+        
+        // Add total COGS row
+        const totalCogsRow = ['TOTAL COGS'];
+        if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+          timeSeriesData.availableProperties.forEach((property: string) => {
+            totalCogsRow.push(getCategoryTotal('COGS', undefined, property));
+          });
+          totalCogsRow.push(kpis.cogs);
+        } else if (timeSeriesData?.periods) {
+          timeSeriesData.periods.forEach((period: string) => {
+            totalCogsRow.push(getCategoryTotal('COGS', period));
+          });
+          if (viewMode === 'detailed') {
+            totalCogsRow.push(kpis.cogs);
+          }
+        } else {
+          totalCogsRow.push(kpis.cogs);
+        }
+        totalCogsRow.push(kpis.revenue ? ((kpis.cogs / Math.abs(kpis.revenue)) * 100).toFixed(1) + '%' : '0%');
+        worksheetData.push(totalCogsRow);
+      }
+      
+      // Add Gross Profit row
+      const grossProfitRow = ['GROSS PROFIT'];
+      if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+        timeSeriesData.availableProperties.forEach((property: string) => {
+          const revenue = getCategoryTotal('Revenue', undefined, property);
+          const cogs = getCategoryTotal('COGS', undefined, property);
+          grossProfitRow.push(revenue - Math.abs(cogs));
+        });
+        grossProfitRow.push(kpis.grossProfit);
+      } else if (timeSeriesData?.periods) {
+        timeSeriesData.periods.forEach((period: string) => {
+          const revenue = getCategoryTotal('Revenue', period);
+          const cogs = getCategoryTotal('COGS', period);
+          grossProfitRow.push(revenue - Math.abs(cogs));
+        });
+        if (viewMode === 'detailed') {
+          grossProfitRow.push(kpis.grossProfit);
+        }
+      } else {
+        grossProfitRow.push(kpis.grossProfit);
+      }
+      grossProfitRow.push(kpis.revenue ? ((kpis.grossProfit / Math.abs(kpis.revenue)) * 100).toFixed(1) + '%' : '0%');
+      worksheetData.push(grossProfitRow);
+      
+      // Add Operating Expenses section
+      const expenseData = data.filter((item: any) => item.category === 'Operating Expenses');
+      if (expenseData.length > 0) {
+        worksheetData.push(['OPERATING EXPENSES']);
+        expenseData.forEach((item: any) => {
+          const row = [item.account];
+          if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+            timeSeriesData.availableProperties.forEach((property: string) => {
+              const propertyData = data.find((d: any) => d.account === item.account && d.property === property);
+              row.push(propertyData ? propertyData.amount : 0);
+            });
+            row.push(item.amount);
+          } else if (timeSeriesData?.periods) {
+            timeSeriesData.periods.forEach((period: string) => {
+              const periodData = data.find((d: any) => d.account === item.account && d.period === period);
+              row.push(periodData ? periodData.amount : 0);
+            });
+            if (viewMode === 'detailed') {
+              row.push(item.amount);
+            }
+          } else {
+            row.push(item.amount);
+          }
+          row.push(kpis.revenue ? ((Math.abs(item.amount) / Math.abs(kpis.revenue)) * 100).toFixed(1) + '%' : '0%');
+          worksheetData.push(row);
+        });
+        
+        // Add total operating expenses row
+        const totalExpensesRow = ['TOTAL OPERATING EXPENSES'];
+        if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+          timeSeriesData.availableProperties.forEach((property: string) => {
+            totalExpensesRow.push(getCategoryTotal('Operating Expenses', undefined, property));
+          });
+          totalExpensesRow.push(kpis.operatingExpenses);
+        } else if (timeSeriesData?.periods) {
+          timeSeriesData.periods.forEach((period: string) => {
+            totalExpensesRow.push(getCategoryTotal('Operating Expenses', period));
+          });
+          if (viewMode === 'detailed') {
+            totalExpensesRow.push(kpis.operatingExpenses);
+          }
+        } else {
+          totalExpensesRow.push(kpis.operatingExpenses);
+        }
+        totalExpensesRow.push(kpis.revenue ? ((Math.abs(kpis.operatingExpenses) / Math.abs(kpis.revenue)) * 100).toFixed(1) + '%' : '0%');
+        worksheetData.push(totalExpensesRow);
+      }
+      
+      // Add Net Income row
+      const netIncomeRow = ['NET INCOME'];
+      if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+        timeSeriesData.availableProperties.forEach((property: string) => {
+          const revenue = getCategoryTotal('Revenue', undefined, property);
+          const cogs = getCategoryTotal('COGS', undefined, property);
+          const expenses = getCategoryTotal('Operating Expenses', undefined, property);
+          netIncomeRow.push(revenue - Math.abs(cogs) - Math.abs(expenses));
+        });
+        netIncomeRow.push(kpis.netIncome);
+      } else if (timeSeriesData?.periods) {
+        timeSeriesData.periods.forEach((period: string) => {
+          const revenue = getCategoryTotal('Revenue', period);
+          const cogs = getCategoryTotal('COGS', period);
+          const expenses = getCategoryTotal('Operating Expenses', period);
+          netIncomeRow.push(revenue - Math.abs(cogs) - Math.abs(expenses));
+        });
+        if (viewMode === 'detailed') {
+          netIncomeRow.push(kpis.netIncome);
+        }
+      } else {
+        netIncomeRow.push(kpis.netIncome);
+      }
+      netIncomeRow.push(kpis.revenue ? ((kpis.netIncome / Math.abs(kpis.revenue)) * 100).toFixed(1) + '%' : '0%');
+      worksheetData.push(netIncomeRow);
+      
+      // Convert to CSV format
+      const csvContent = worksheetData.map(row => 
+        row.map(cell => {
+          if (typeof cell === 'number') {
+            return cell.toFixed(2);
+          }
+          return `"${cell.toString().replace(/"/g, '""')}"`;
+        }).join(',')
+      ).join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      
+      // Generate filename with current date and view mode
+      const currentDate = new Date().toISOString().split('T')[0];
+      const filename = `P&L_Statement_${viewMode}_${currentDate}.csv`;
+      link.setAttribute('download', filename);
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showNotification(`P&L data exported successfully as ${filename}`, 'success');
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      showNotification('Export failed. Please try again.', 'error');
+    }
+  };
   
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
@@ -2154,12 +2404,12 @@ export default function FinancialsPage() {
                 </div>
               </div>
               <button
-                onClick={() => showNotification('Financial data exported', 'success')}
+                onClick={exportToExcel}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
                 style={{ backgroundColor: BRAND_COLORS.primary }}
               >
                 <Download className="w-4 h-4" />
-                Export
+                Export to Excel
               </button>
 
               <button
