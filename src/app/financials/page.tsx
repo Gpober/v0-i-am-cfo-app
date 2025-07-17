@@ -2422,210 +2422,18 @@ export default function FinancialsPage() {
 
            {/* Charts Row - 50/50 Split */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-             {/* Property Performance Chart - 50% width */}
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <div className="p-4 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold text-gray-900">Property Performance</h3>
-                      
-                      {/* Toggle Buttons for Revenue/GP/NI */}
-                      <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                        <button
-                          onClick={() => setPropertyChartMetric('income')}
-                          className={`px-3 py-1 text-xs transition-colors ${
-                            propertyChartMetric === 'income'
-                              ? 'text-white'
-                              : 'bg-white text-gray-700 hover:bg-gray-50'
-                          }`}
-                          style={{ backgroundColor: propertyChartMetric === 'income' ? BRAND_COLORS.primary : undefined }}
-                        >
-                          Revenue
-                        </button>
-                        
-                        {/* Only show Gross Profit button if GP differs from Revenue */}
-                        {(() => {
-                          const chartData = generatePropertyChartData();
-                          const hasGrossProfit = chartData.some(item => 
-                            Math.abs(item.revenue - item.grossProfit) > 0.01
-                          );
-                          
-                          return hasGrossProfit ? (
-                            <button
-                              onClick={() => setPropertyChartMetric('gp')}
-                              className={`px-3 py-1 text-xs transition-colors ${
-                                propertyChartMetric === 'gp'
-                                  ? 'text-white'
-                                  : 'bg-white text-gray-700 hover:bg-gray-50'
-                              }`}
-                              style={{ backgroundColor: propertyChartMetric === 'gp' ? BRAND_COLORS.success : undefined }}
-                            >
-                              Gross Profit
-                            </button>
-                          ) : null;
-                        })()}
-                        
-                        <button
-                          onClick={() => setPropertyChartMetric('ni')}
-                          className={`px-3 py-1 text-xs transition-colors ${
-                            propertyChartMetric === 'ni'
-                              ? 'text-white'
-                              : 'bg-white text-gray-700 hover:bg-gray-50'
-                          }`}
-                          style={{ backgroundColor: propertyChartMetric === 'ni' ? BRAND_COLORS.secondary : undefined }}
-                        >
-                          Net Income
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="text-sm text-gray-600 mt-2">
-                      {propertyChartMetric === 'income' ? 
-                        `Revenue breakdown by property for ${timePeriod} period` :
-                        propertyChartMetric === 'gp' ?
-                        `Gross Profit (Revenue - COGS) by property for ${timePeriod} period` :
-                        `Net Income by property for ${timePeriod} period`
-                      }
-                      {viewMode === 'by-property' && (
-                        <span className="ml-2 text-purple-600">• Property View Active</span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="p-2">
-                    {generatePropertyChartData().length > 0 ? (
-                      <div className="flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height={300}>
-                          <RechartsPieChart>
-                            <defs>
-                              {generatePropertyChartData().map((entry, index) => (
-                                <radialGradient key={`gradient-${index}`} id={`gradient-${index}`} cx="30%" cy="30%">
-                                  <stop offset="0%" stopColor={COLORS[index % COLORS.length]} stopOpacity="1" />
-                                  <stop offset="70%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.8" />
-                                  <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.6" />
-                                </radialGradient>
-                              ))}
-                            </defs>
-                            
-                            <Pie
-                              data={generatePropertyChartData()}
-                              cx="50%"
-                              cy="52%"
-                              outerRadius={90}
-                              fill="#000000"
-                              fillOpacity={0.08}
-                              dataKey="value"
-                              startAngle={0}
-                              endAngle={360}
-                              isAnimationActive={false}
-                            />
-                            
-                            <Pie
-                              data={generatePropertyChartData()}
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={90}
-                              innerRadius={0}
-                              paddingAngle={2}
-                              dataKey="value"
-                              startAngle={0}
-                              endAngle={360}
-                              animationDuration={1000}
-                              animationEasing="ease-out"
-                              label={({ name, percent, value }) => 
-                                percent > 0.08 ? `${(percent * 100).toFixed(1)}%` : ''
-                              }
-                              labelLine={false}
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                fill: 'white',
-                                textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                              }}
-                            >
-                              {generatePropertyChartData().map((entry, index) => (
-                                <Cell 
-                                  key={`cell-${index}`} 
-                                  fill={`url(#gradient-${index})`}
-                                  stroke="#ffffff"
-                                  strokeWidth={2}
-                                  style={{
-                                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-                                    cursor: 'pointer'
-                                  }}
-                                />
-                              ))}
-                            </Pie>
-                            
-                            <Tooltip 
-                              formatter={(value: any, name: string, props: any) => {
-                                const metricName = propertyChartMetric === 'income' ? 'Revenue' :
-                                               propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
-                                
-                                return [
-                                  `${formatCurrency(Number(value))}`,
-                                  metricName
-                                ];
-                              }}
-                              labelFormatter={(label: string, payload: any) => {
-                                // Return the property name as the tooltip header
-                                if (payload && payload.length > 0) {
-                                  return payload[0].payload.name;
-                                }
-                                return label;
-                              }}
-                              contentStyle={{ 
-                                backgroundColor: 'white', 
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                fontSize: '12px',
-                                fontWeight: 500
-                              }}
-                              labelStyle={{
-                                fontWeight: 'bold',
-                                fontSize: '13px',
-                                color: '#1f2937',
-                                marginBottom: '4px',
-                                borderBottom: '1px solid #e5e7eb',
-                                paddingBottom: '2px'
-                              }}
-                            />
-                          </RechartsPieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center h-72 text-gray-500">
-                        <div className="text-center">
-                          <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                          <p className="text-lg font-medium text-gray-600">No property data available</p>
-                          <p className="text-sm mt-2 text-gray-500">
-                            {viewMode === 'by-property' ? 
-                              'Switch to a different time period or check your data filters' :
-                              'Switch to "By Property" view to see property breakdown'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-             {/* Charts Row - 50/50 Split */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Property Performance Chart - 50% width */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <div className="p-4 border-b border-gray-200">
+                  <div className="p-6 border-b border-gray-200">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold text-gray-900">Property Performance</h3>
+                      <h3 className="text-xl font-semibold text-gray-900">Property Performance Analysis</h3>
                       
                       {/* Toggle Buttons for Revenue/GP/NI */}
                       <div className="flex rounded-lg border border-gray-300 overflow-hidden">
                         <button
                           onClick={() => setPropertyChartMetric('income')}
-                          className={`px-3 py-1 text-xs transition-colors ${
+                          className={`px-4 py-2 text-sm transition-colors ${
                             propertyChartMetric === 'income'
                               ? 'text-white'
                               : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -2645,7 +2453,7 @@ export default function FinancialsPage() {
                           return hasGrossProfit ? (
                             <button
                               onClick={() => setPropertyChartMetric('gp')}
-                              className={`px-3 py-1 text-xs transition-colors ${
+                              className={`px-4 py-2 text-sm transition-colors ${
                                 propertyChartMetric === 'gp'
                                   ? 'text-white'
                                   : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -2659,7 +2467,7 @@ export default function FinancialsPage() {
                         
                         <button
                           onClick={() => setPropertyChartMetric('ni')}
-                          className={`px-3 py-1 text-xs transition-colors ${
+                          className={`px-4 py-2 text-sm transition-colors ${
                             propertyChartMetric === 'ni'
                               ? 'text-white'
                               : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -2684,110 +2492,131 @@ export default function FinancialsPage() {
                     </div>
                   </div>
                   
-                  <div className="p-2">
+                  <div className="p-6">
                     {generatePropertyChartData().length > 0 ? (
-                      <div className="flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height={300}>
-                          <RechartsPieChart>
-                            <defs>
-                              {generatePropertyChartData().map((entry, index) => (
-                                <radialGradient key={`gradient-${index}`} id={`gradient-${index}`} cx="30%" cy="30%">
-                                  <stop offset="0%" stopColor={COLORS[index % COLORS.length]} stopOpacity="1" />
-                                  <stop offset="70%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.8" />
-                                  <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.6" />
-                                </radialGradient>
-                              ))}
-                            </defs>
-                            
-                            <Pie
-                              data={generatePropertyChartData()}
-                              cx="50%"
-                              cy="52%"
-                              outerRadius={90}
-                              fill="#000000"
-                              fillOpacity={0.08}
-                              dataKey="value"
-                              startAngle={0}
-                              endAngle={360}
-                              isAnimationActive={false}
-                            />
-                            
-                            <Pie
-                              data={generatePropertyChartData()}
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={90}
-                              innerRadius={0}
-                              paddingAngle={2}
-                              dataKey="value"
-                              startAngle={0}
-                              endAngle={360}
-                              animationDuration={1000}
-                              animationEasing="ease-out"
-                              label={({ name, percent, value }) => 
-                                percent > 0.08 ? `${(percent * 100).toFixed(1)}%` : ''
-                              }
-                              labelLine={false}
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                fill: 'white',
-                                textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                              }}
-                            >
-                              {generatePropertyChartData().map((entry, index) => (
-                                <Cell 
-                                  key={`cell-${index}`} 
-                                  fill={`url(#gradient-${index})`}
-                                  stroke="#ffffff"
-                                  strokeWidth={2}
-                                  style={{
-                                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-                                    cursor: 'pointer'
-                                  }}
-                                />
-                              ))}
-                            </Pie>
-                            
-                            <Tooltip 
-                              formatter={(value: any, name: string, props: any) => {
-                                const metricName = propertyChartMetric === 'income' ? 'Revenue' :
-                                               propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
-                                
-                                return [
-                                  `${formatCurrency(Number(value))}`,
-                                  metricName
-                                ];
-                              }}
-                              labelFormatter={(label: string, payload: any) => {
-                                // Return the property name as the tooltip header
-                                if (payload && payload.length > 0) {
-                                  return payload[0].payload.name;
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Pie Chart */}
+                        <div className="flex items-center justify-center">
+                          <ResponsiveContainer width="100%" height={150}>
+                            <RechartsPieChart>
+                              <defs>
+                                {generatePropertyChartData().map((entry, index) => (
+                                  <radialGradient key={`gradient-${index}`} id={`gradient-${index}`} cx="30%" cy="30%">
+                                    <stop offset="0%" stopColor={COLORS[index % COLORS.length]} stopOpacity="1" />
+                                    <stop offset="70%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.8" />
+                                    <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.6" />
+                                  </radialGradient>
+                                ))}
+                              </defs>
+                              
+                              <Pie
+                                data={generatePropertyChartData()}
+                                cx="50%"
+                                cy="52%"
+                                outerRadius={55}
+                                fill="#000000"
+                                fillOpacity={0.08}
+                                dataKey="value"
+                                startAngle={0}
+                                endAngle={360}
+                                isAnimationActive={false}
+                              />
+                              
+                              <Pie
+                                data={generatePropertyChartData()}
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={55}
+                                innerRadius={0}
+                                paddingAngle={1}
+                                dataKey="value"
+                                startAngle={0}
+                                endAngle={360}
+                                animationDuration={1000}
+                                animationEasing="ease-out"
+                                label={({ name, percent, value }) => 
+                                  percent > 0.1 ? `${(percent * 100).toFixed(1)}%` : ''
                                 }
-                                return label;
-                              }}
-                              contentStyle={{ 
-                                backgroundColor: 'white', 
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                fontSize: '12px',
-                                fontWeight: 500
-                              }}
-                              labelStyle={{
-                                fontWeight: 'bold',
-                                fontSize: '13px',
-                                color: '#1f2937',
-                                marginBottom: '4px',
-                                borderBottom: '1px solid #e5e7eb',
-                                paddingBottom: '2px'
-                              }}
-                            />
-                          </RechartsPieChart>
-                        </ResponsiveContainer>
+                                labelLine={false}
+                                style={{
+                                  fontSize: '9px',
+                                  fontWeight: 'bold',
+                                  fill: 'white',
+                                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                }}
+                              >
+                                {generatePropertyChartData().map((entry, index) => (
+                                  <Cell 
+                                    key={`cell-${index}`} 
+                                    fill={`url(#gradient-${index})`}
+                                    stroke="#ffffff"
+                                    strokeWidth={2}
+                                    style={{
+                                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                                      cursor: 'pointer'
+                                    }}
+                                  />
+                                ))}
+                              </Pie>
+                              
+                              <Tooltip 
+                                formatter={(value: any, name: string, props: any) => {
+                                  const metricName = propertyChartMetric === 'income' ? 'Revenue' :
+                                                 propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
+                                  
+                                  return [
+                                    `${formatCurrency(Number(value))}`,
+                                    metricName
+                                  ];
+                                }}
+                                labelFormatter={(label: string, payload: any) => {
+                                  return payload && payload.length > 0 ? payload[0].payload.name : label;
+                                }}
+                                contentStyle={{ 
+                                  backgroundColor: 'white', 
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                  fontSize: '11px',
+                                  fontWeight: 500
+                                }}
+                                labelStyle={{
+                                  fontWeight: 'bold',
+                                  fontSize: '12px',
+                                  color: '#1f2937',
+                                  marginBottom: '4px',
+                                  borderBottom: '1px solid #e5e7eb',
+                                  paddingBottom: '2px'
+                                }}
+                              />
+                            </RechartsPieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        
+                        {/* Legend */}
+                        <div className="flex flex-col justify-center">
+                          <div className="grid grid-cols-1 gap-1 text-xs">
+                            {generatePropertyChartData().slice(0, 6).map((entry, index) => (
+                              <div key={entry.name} className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                                <div className="flex items-center">
+                                  <div 
+                                    className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
+                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                  />
+                                  <span className="font-medium text-gray-700 text-xs truncate">
+                                    {entry.name.length > 8 ? entry.name.substring(0, 8) + '...' : entry.name}
+                                  </span>
+                                </div>
+                                <span className="font-semibold text-gray-900 text-xs ml-1">
+                                  {formatCurrency(entry.value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center h-72 text-gray-500">
+                      <div className="flex items-center justify-center h-30 text-gray-500">
                         <div className="text-center">
                           <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                           <p className="text-lg font-medium text-gray-600">No property data available</p>
@@ -2807,7 +2636,7 @@ export default function FinancialsPage() {
               {/* Revenue & Net Income Trend Chart - 50% width */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full">
-                  <div className="p-4 border-b border-gray-200">
+                  <div className="p-6 border-b border-gray-200">
                     <h3 className="text-lg font-semibold text-gray-900">Revenue & Net Income</h3>
                     <div className="text-sm text-gray-600 mt-1">
                       {viewMode === 'by-property' ? 
@@ -2821,16 +2650,16 @@ export default function FinancialsPage() {
                       )}
                     </div>
                   </div>
-                  <div className="p-2">
+                  <div className="p-4">
                     {trendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ResponsiveContainer width="100%" height={140}>
                         <ComposedChart 
                           data={trendData}
                           margin={{ 
                             top: 20, 
-                            right: 20, 
-                            left: 20, 
-                            bottom: trendData.length > 4 ? 60 : 40 
+                            right: 10, 
+                            left: 10, 
+                            bottom: trendData.length > 4 ? 40 : 20 
                           }}
                         >
                           <CartesianGrid 
@@ -2843,7 +2672,7 @@ export default function FinancialsPage() {
                           <XAxis 
                             dataKey="period" 
                             tick={{ 
-                              fontSize: 11, 
+                              fontSize: 9, 
                               fontWeight: 500,
                               fill: '#475569'
                             }}
@@ -2851,21 +2680,20 @@ export default function FinancialsPage() {
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             angle={trendData.length > 4 ? -45 : 0}
                             textAnchor={trendData.length > 4 ? 'end' : 'middle'}
-                            height={trendData.length > 4 ? 60 : 40}
-                            interval={0}
+                            height={trendData.length > 4 ? 40 : 20}
                           />
                           
                           <YAxis 
                             tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`}
                             tick={{ 
-                              fontSize: 11, 
+                              fontSize: 9, 
                               fontWeight: 500,
                               fill: '#475569'
                             }}
                             tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                            width={50}
-                            domain={[0, 'dataMax']}
+                            width={40}
+                            domain={['dataMin', 'dataMax']}
                           />
                           
                           <Tooltip 
@@ -2877,27 +2705,9 @@ export default function FinancialsPage() {
                               backgroundColor: 'white', 
                               border: '1px solid #e2e8f0',
                               borderRadius: '8px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                            }}
-                            labelStyle={{
-                              fontWeight: 'bold',
-                              fontSize: '12px',
-                              color: '#1f2937'
-                            }}
-                          />
-                          
-                          <Legend 
-                            wrapperStyle={{ 
-                              paddingTop: '15px',
-                              fontSize: '11px',
+                              fontSize: '10px',
                               fontWeight: 500
                             }}
-                            iconType="plainline"
-                            formatter={(value: string) => 
-                              value === 'netIncome' ? 'Net Income' : 'Revenue'
-                            }
                           />
                           
                           <Bar 
@@ -2905,8 +2715,7 @@ export default function FinancialsPage() {
                             fill="#10b981"
                             fillOpacity={0.8}
                             name="netIncome"
-                            radius={[3, 3, 0, 0]}
-                            stroke="none"
+                            radius={[2, 2, 0, 0]}
                           >
                             {trendData.map((entry, index) => (
                               <Cell 
@@ -2920,28 +2729,18 @@ export default function FinancialsPage() {
                             type="monotone" 
                             dataKey="revenue" 
                             stroke="#2563eb" 
-                            strokeWidth={3}
-                            dot={{ 
-                              r: 4, 
-                              fill: '#2563eb', 
-                              strokeWidth: 2, 
-                              stroke: 'white'
-                            }}
-                            activeDot={{ 
-                              r: 6, 
-                              fill: '#2563eb', 
-                              strokeWidth: 3, 
-                              stroke: 'white'
-                            }}
+                            strokeWidth={2}
+                            dot={{ r: 2, fill: '#2563eb', strokeWidth: 1, stroke: 'white' }}
+                            activeDot={{ r: 3, fill: '#2563eb', strokeWidth: 2, stroke: 'white' }}
                             name="revenue"
                           />
                         </ComposedChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="flex items-center justify-center h-72 text-gray-500">
+                      <div className="flex items-center justify-center h-32 text-gray-500">
                         <div className="text-center">
-                          <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                          <p className="text-sm font-medium text-gray-600">No trend data</p>
+                          <BarChart3 className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+                          <p className="text-xs font-medium text-gray-600">No trend data</p>
                         </div>
                       </div>
                     )}
@@ -2949,6 +2748,60 @@ export default function FinancialsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Main Content Grid - P&L and Transaction Details Below */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+              {/* P&L Table - 80% width (4/5) */}
+              <div className="lg:col-span-4">
+                {/* Your existing P&L table code goes here */}
+              </div>
+
+              {/* Transaction Detail Panel - 20% width (1/5) */}
+              <div className="lg:col-span-1">
+                {/* Your existing transaction detail code goes here */}
+              </div>
+            </div>
+
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+              {/* Left Column: Financial Tables */}
+              <div className="lg:col-span-4">
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          Profit & Loss Statement {viewMode === 'by-property' ? `(By Property - ${timePeriod})` : '(By Property Class)'}
+                        </h3>
+                        <div className="mt-2 text-sm text-gray-600">
+                          {viewMode === 'by-property'
+                            ? `Showing ${timePeriod.toLowerCase()} property comparison for ${
+                                timePeriod === 'Monthly' ? selectedMonth :
+                                timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
+                                timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
+                                `past 12 months ending ${selectedMonth}`
+                              } • ${timeSeriesData?.availableProperties?.length || 0} properties`
+                            : timePeriod === 'Trailing 12' && viewMode === 'total' 
+                            ? 'Showing aggregated totals for the past 12 months'
+                            : timePeriod === 'Monthly' && viewMode === 'detailed'
+                            ? 'Showing weekly breakdown for the selected month'
+                            : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
+                          }
+                          {viewMode === 'by-property' && (
+                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                              🏢 Property View
+                            </span>
+                          )}
+                          <div className="mt-1 text-xs text-green-600">
+                            ✅ P&L accounts automatically classified • Balance Sheet accounts excluded • 🏗️ Account grouping enabled
+                            {viewMode === 'by-property' && (
+                              <span className="ml-1">• 🏢 Property dimension active</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                 {/* P&L Table Content */}
 <div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ height: '105vh' }}>
@@ -3348,8 +3201,8 @@ export default function FinancialsPage() {
 
                          
             {/* Right Column: Charts */}
-            <div className="lg:col-span-1">          
-          
+            <div className="lg:col-span-1">
+             
               {/* Transaction Detail Panel */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200">
@@ -3411,7 +3264,8 @@ export default function FinancialsPage() {
                                         className={`w-2 h-2 rounded-full ${
                                           entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
                                         }`}
-                                      />                                      
+                                      />
+                                      <span className="text-xs text-gray-500">ID: {entry.id}</span>
                                     </div>
                                     <div className="text-right">
                                       <div className={`text-sm font-semibold ${
@@ -3434,7 +3288,10 @@ export default function FinancialsPage() {
                                   <div className="flex justify-between text-xs text-gray-600">
                                     <span>
                                       <strong>Class:</strong> {entry.class || 'No Class'}
-                                    </span>                                    
+                                    </span>
+                                    <span>
+                                      <strong>Detail:</strong> {entry.account_detail_type || 'None'}
+                                    </span>
                                   </div>
                                 </div>
                               ))
