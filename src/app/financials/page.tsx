@@ -387,7 +387,7 @@ const fetchProperties = async (): Promise<string[]> => {
   }
 };
 
-// ENHANCED: Time series data fetching with Property Dimension support
+// ENHANCED: Time series data fetching with unified weekly aggregation for ALL time periods
 const fetchTimeSeriesData = async (
   property: string = 'All Properties',
   monthYear: string,
@@ -397,206 +397,171 @@ const fetchTimeSeriesData = async (
 ) => {
   try {
     const perfStart = performanceTracker.startTime('fetchTimeSeriesData');
-    smartLog('🔍 FETCHING TIME SERIES DATA:', { property, monthYear, timePeriod, viewMode });
+    smartLog('🔍 UNIFIED WEEKLY FETCHING - All periods use week-by-week approach:', { property, monthYear, timePeriod, viewMode });
     
     const [month, year] = monthYear.split(' ');
     const selectedDate = new Date(`${month} 1, ${year}`);
     smartLog('🔍 Selected date object:', selectedDate);
     smartLog('🔍 Month:', month, 'Year:', year);
     
-    let dateRanges: Array<{start: string, end: string, label: string}> = [];
+    // UNIFIED APPROACH: Generate weeks for ALL time periods, then group as needed
+    let allWeeks: Array<{start: string, end: string, label: string, groupLabel?: string}> = [];
     
-    // ENHANCED: For by-property view, use the SAME logic as other views
-    // Fetch month by month to avoid hitting row limits, then aggregate
-    if (viewMode === 'by-property') {
-      if (timePeriod === 'Monthly') {
+    switch (timePeriod) {
+      case 'Monthly':
+        // Generate weeks within the selected month
         const monthNum = selectedDate.getMonth() + 1;
-        const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-        const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
-        const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
-        dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
-      } else if (timePeriod === 'Quarterly') {
-        const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
-        const qStart = new Date(parseInt(year), (quarter - 1) * 3, 1);
-        const qEnd = new Date(parseInt(year), quarter * 3, 0);
-        dateRanges = [{
-          start: qStart.toISOString().split('T')[0],
-          end: qEnd.toISOString().split('T')[0],
-          label: `Q${quarter} ${year}`
-        }];
-      } else if (timePeriod === 'Yearly') {
-        const yearStart = `${year}-01-01`;
-        const yearEnd = `${year}-12-31`;
-        dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
-      } else { // Trailing 12
-        // FIXED: Use month-by-month fetching like other views to avoid row limits
-        for (let i = 11; i >= 0; i--) {
-          const monthDate = new Date(selectedDate);
-          monthDate.setMonth(monthDate.getMonth() - i);
+        const firstDay = new Date(parseInt(year), monthNum - 1, 1);
+        const lastDay = new Date(parseInt(year), monthNum, 0);
+        
+        let weekStart = new Date(firstDay);
+        let weekNumber = 1;
+        
+        while (weekStart <= lastDay) {
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
           
-          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+          if (weekEnd > lastDay) {
+            weekEnd.setTime(lastDay.getTime());
+          }
           
-          const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
-          const monthYear = monthStart.getFullYear();
-          
-          dateRanges.push({
-            start: monthStart.toISOString().split('T')[0],
-            end: monthEnd.toISOString().split('T')[0],
-            label: `${monthName} ${monthYear}`
+          allWeeks.push({
+            start: weekStart.toISOString().split('T')[0],
+            end: weekEnd.toISOString().split('T')[0],
+            label: `Week ${weekNumber} (${weekStart.getDate()}-${weekEnd.getDate()})`,
+            groupLabel: monthYear
           });
+          
+          weekStart.setDate(weekStart.getDate() + 7);
+          weekNumber++;
         }
-      }
-    } else {
-      // Original logic for non-property views
-      switch (timePeriod) {
-        case 'Monthly':
-          if (viewMode === 'total') {
-            const monthNum = selectedDate.getMonth() + 1;
-            const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-            const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
-            const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
-            dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
-          } else {
-            // Weekly breakdown
-            const monthNum = selectedDate.getMonth() + 1;
-            const firstDay = new Date(parseInt(year), monthNum - 1, 1);
-            const lastDay = new Date(parseInt(year), monthNum, 0);
+        break;
+        
+      case 'Quarterly':
+        // Generate weeks for each month in the quarter
+        const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
+        const quarterStartMonth = (quarter - 1) * 3;
+        
+        for (let monthOffset = 0; monthOffset < 3; monthOffset++) {
+          const currentMonth = quarterStartMonth + monthOffset;
+          if (currentMonth <= selectedDate.getMonth()) { // Only up to selected month
+            const monthStart = new Date(parseInt(year), currentMonth, 1);
+            const monthEnd = new Date(parseInt(year), currentMonth + 1, 0);
+            const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
             
-            const weeks = [];
-            let weekStart = new Date(firstDay);
+            let weekStart = new Date(monthStart);
             let weekNumber = 1;
             
-            while (weekStart <= lastDay) {
+            while (weekStart <= monthEnd) {
               const weekEnd = new Date(weekStart);
               weekEnd.setDate(weekStart.getDate() + 6);
               
-              if (weekEnd > lastDay) {
-                weekEnd.setTime(lastDay.getTime());
+              if (weekEnd > monthEnd) {
+                weekEnd.setTime(monthEnd.getTime());
               }
               
-              const weekStartStr = weekStart.toISOString().split('T')[0];
-              const weekEndStr = weekEnd.toISOString().split('T')[0];
-              
-              const startDay = weekStart.getDate();
-              const endDay = weekEnd.getDate();
-              
-              weeks.push({
-                start: weekStartStr,
-                end: weekEndStr,
-                label: `Week ${weekNumber} (${startDay}-${endDay})`
+              allWeeks.push({
+                start: weekStart.toISOString().split('T')[0],
+                end: weekEnd.toISOString().split('T')[0],
+                label: `${monthName} W${weekNumber}`,
+                groupLabel: viewMode === 'detailed' ? `${monthName} ${year}` : `Q${quarter} ${year}`
               });
               
               weekStart.setDate(weekStart.getDate() + 7);
               weekNumber++;
             }
-            
-            dateRanges = weeks;
           }
-          break;
+        }
+        break;
+        
+      case 'Yearly':
+        // Generate weeks for each month in the year up to selected month
+        const currentMonth = selectedDate.getMonth() + 1;
+        
+        for (let month = 1; month <= currentMonth; month++) {
+          const monthStart = new Date(parseInt(year), month - 1, 1);
+          const monthEnd = new Date(parseInt(year), month, 0);
+          const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
           
-        case 'Quarterly':
-          const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
-          if (viewMode === 'total') {
-            const qStart = new Date(parseInt(year), (quarter - 1) * 3, 1);
-            const qEnd = new Date(parseInt(year), quarter * 3, 0);
-            dateRanges = [{
-              start: qStart.toISOString().split('T')[0],
-              end: qEnd.toISOString().split('T')[0],
-              label: `Q${quarter} ${year}`
-            }];
-          } else {
-            for (let q = 1; q <= quarter; q++) {
-              const qStart = new Date(parseInt(year), (q - 1) * 3, 1);
-              const qEnd = new Date(parseInt(year), q * 3, 0);
-              dateRanges.push({
-                start: qStart.toISOString().split('T')[0],
-                end: qEnd.toISOString().split('T')[0],
-                label: `Q${q} ${year}`
-              });
-            }
-          }
-          break;
+          let weekStart = new Date(monthStart);
+          let weekNumber = 1;
           
-        case 'Yearly':
-          if (viewMode === 'total') {
-            const yearStart = `${year}-01-01`;
-            const yearEnd = `${year}-12-31`;
-            dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
-          } else {
-            const currentMonth = selectedDate.getMonth() + 1;
-            for (let m = 1; m <= currentMonth; m++) {
-              const monthStart = `${year}-${m.toString().padStart(2, '0')}-01`;
-              const monthEnd = new Date(parseInt(year), m, 0);
-              const monthEndStr = monthEnd.toISOString().split('T')[0];
-              const monthName = new Date(parseInt(year), m - 1, 1).toLocaleDateString('en-US', { month: 'short' });
-              dateRanges.push({
-                start: monthStart,
-                end: monthEndStr,
-                label: `${monthName} ${year}`
-              });
+          while (weekStart <= monthEnd) {
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            
+            if (weekEnd > monthEnd) {
+              weekEnd.setTime(monthEnd.getTime());
             }
+            
+            allWeeks.push({
+              start: weekStart.toISOString().split('T')[0],
+              end: weekEnd.toISOString().split('T')[0],
+              label: `${monthName} W${weekNumber}`,
+              groupLabel: viewMode === 'detailed' ? `${monthName} ${year}` : year
+            });
+            
+            weekStart.setDate(weekStart.getDate() + 7);
+            weekNumber++;
           }
-          break;
+        }
+        break;
+        
+      case 'Trailing 12':
+        // Generate weeks for past 12 months
+        for (let monthOffset = 11; monthOffset >= 0; monthOffset--) {
+          const targetDate = new Date(selectedDate);
+          targetDate.setMonth(targetDate.getMonth() - monthOffset);
           
-        case 'Trailing 12':
-          if (viewMode === 'total') {
-            dateRanges = [];
+          const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+          const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+          const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
+          const monthYear = targetDate.getFullYear();
+          
+          let weekStart = new Date(monthStart);
+          let weekNumber = 1;
+          
+          while (weekStart <= monthEnd) {
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
             
-            for (let i = 11; i >= 0; i--) {
-              const monthDate = new Date(selectedDate);
-              monthDate.setMonth(monthDate.getMonth() - i);
-              
-              const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-              const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-              
-              const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
-              const monthYear = monthStart.getFullYear();
-              
-              dateRanges.push({
-                start: monthStart.toISOString().split('T')[0],
-                end: monthEnd.toISOString().split('T')[0],
-                label: `${monthName} ${monthYear}`
-              });
+            if (weekEnd > monthEnd) {
+              weekEnd.setTime(monthEnd.getTime());
             }
-          } else {
-            dateRanges = [];
             
-            for (let i = 11; i >= 0; i--) {
-              const monthDate = new Date(selectedDate);
-              monthDate.setMonth(monthDate.getMonth() - i);
-              
-              const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-              const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-              
-              const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
-              const monthYear = monthStart.getFullYear();
-              
-              dateRanges.push({
-                start: monthStart.toISOString().split('T')[0],
-                end: monthEnd.toISOString().split('T')[0],
-                label: `${monthName} ${monthYear}`
-              });
-            }
+            allWeeks.push({
+              start: weekStart.toISOString().split('T')[0],
+              end: weekEnd.toISOString().split('T')[0],
+              label: `${monthName} ${monthYear} W${weekNumber}`,
+              groupLabel: viewMode === 'detailed' ? `${monthName} ${monthYear}` : 'Trailing 12 Months'
+            });
+            
+            weekStart.setDate(weekStart.getDate() + 7);
+            weekNumber++;
           }
-          break;
-      }
+        }
+        break;
     }
     
-    smartLog('🔍 CALCULATED DATE RANGES:', dateRanges);
-    smartLog('🔍 Total date ranges for', viewMode, 'view:', dateRanges.length);
+    smartLog('🔍 GENERATED WEEKS:', {
+      totalWeeks: allWeeks.length,
+      timePeriod,
+      viewMode,
+      dateRange: `${allWeeks[0]?.start} to ${allWeeks[allWeeks.length - 1]?.end}`,
+      sampleWeeks: allWeeks.slice(0, 3).map(w => w.label)
+    });
     
-    // Fetch data for all date ranges
-    const allData: any = {};
+    // Fetch data for ALL weeks
+    const weeklyData: any = {};
     let totalEntriesProcessed = 0;
     let availableProperties: string[] = [];
     
-    for (const range of dateRanges) {
-      smartLog(`🔍 Fetching data for period: ${range.label} (${range.start} to ${range.end})`);
+    for (const week of allWeeks) {
+      smartLog(`📅 Fetching week: ${week.label} (${week.start} to ${week.end})`);
       
       // CRITICAL FIX: Fetch ALL data without row limits
       // Supabase might have a default limit, so we'll use a very high limit
-      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end}&limit=100000`;
+      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${week.start}&date=lte.${week.end}&limit=100000`;
       
       // FIXED: For by-property view, NEVER filter by property - we need ALL property data
       // Only filter by property for non-by-property views
@@ -618,12 +583,9 @@ const fetchTimeSeriesData = async (
         const rawData = await response.json();
         
         // Validate data integrity
-        const validation = validateDataIntegrity(rawData, `${range.label} (${viewMode})`, undefined, onDataValidation);
+        const validation = validateDataIntegrity(rawData, `${week.label} (${viewMode})`, undefined, onDataValidation);
         
-        smartLog(`🔍 Period ${range.label}: ${rawData.length} transactions`);
-        smartLog(`🔍 Sample transactions for ${range.label}:`, rawData.slice(0, 3));
-        smartLog(`🔍 Date range: ${range.start} to ${range.end}`);
-        smartLog(`🔍 View mode: ${viewMode}, Property filter: ${property}`);
+        smartLog(`🔍 Week ${week.label}: ${rawData.length} transactions`);
         totalEntriesProcessed += rawData.length;
         
         if (viewMode === 'by-property') {
@@ -633,7 +595,7 @@ const fetchTimeSeriesData = async (
             availableProperties = propertiesInData;
           }
           
-          smartLog(`🏢 BY-PROPERTY DATA PROCESSING for ${range.label}:`, {
+          smartLog(`🏢 BY-PROPERTY DATA PROCESSING for ${week.label}:`, {
             totalTransactions: rawData.length,
             propertiesFound: propertiesInData.length,
             properties: propertiesInData
@@ -680,14 +642,7 @@ const fetchTimeSeriesData = async (
             return acc;
           }, {});
           
-          smartLog(`🏢 BY-PROPERTY GROUPED for ${range.label}:`, {
-            accountsGrouped: Object.keys(groupedByAccount).length,
-            sampleAccount: Object.keys(groupedByAccount)[0],
-            sampleData: groupedByAccount[Object.keys(groupedByAccount)[0]],
-            availableProperties: propertiesInData
-          });
-          
-          allData[range.label] = groupedByAccount;
+          weeklyData[week.label] = groupedByAccount;
         } else {
           // Original grouping logic for non-property views
           const grouped = rawData.reduce((acc: any, row: any) => {
@@ -716,122 +671,91 @@ const fetchTimeSeriesData = async (
             return acc;
           }, {});
           
-          allData[range.label] = grouped;
+          weeklyData[week.label] = grouped;
         }
       } else {
-        console.error(`Failed to fetch data for period ${range.label}:`, response.status);
-        allData[range.label] = {};
+        console.error(`Failed to fetch data for week ${week.label}:`, response.status);
+        weeklyData[week.label] = {};
       }
     }
     
-    // FIXED: For by-property Trailing 12, aggregate all monthly data 
-    if (viewMode === 'by-property' && timePeriod === 'Trailing 12') {
-      smartLog('🔍 AGGREGATING BY-PROPERTY TRAILING 12 DATA...');
-      
-      const aggregatedData: any = {};
-      let allAvailableProperties: string[] = [];
-      
-      // First, collect all properties from all months
-      dateRanges.forEach((range) => {
-        const monthData = allData[range.label] || {};
-        Object.values(monthData).forEach((account: any) => {
-          if (account.propertyTotals) {
-            Object.keys(account.propertyTotals).forEach(prop => {
-              if (!allAvailableProperties.includes(prop)) {
-                allAvailableProperties.push(prop);
-              }
-            });
-          }
-        });
-      });
-      
-      // Then aggregate all months
-      dateRanges.forEach((range) => {
-        const monthData = allData[range.label] || {};
-        
-        Object.values(monthData).forEach((account: any) => {
-          const accountName = account.name;
-          
-          if (!aggregatedData[accountName]) {
-            aggregatedData[accountName] = {
-              name: accountName,
-              category: account.category,
-              type: account.category,
-              total: 0,
-              entries: [],
-              account_type: account.account_type,
-              account_detail_type: account.account_detail_type,
-              propertyTotals: {},
-              propertyEntries: {}
-            };
-            
-            // Initialize all properties for this account
-            allAvailableProperties.forEach(prop => {
-              aggregatedData[accountName].propertyTotals[prop] = 0;
-              aggregatedData[accountName].propertyEntries[prop] = [];
-            });
-          }
-          
-          aggregatedData[accountName].total += account.total;
-          aggregatedData[accountName].entries.push(...account.entries);
-          
-          // Aggregate property data
-          if (account.propertyTotals) {
-            Object.entries(account.propertyTotals).forEach(([prop, amount]: [string, any]) => {
-              aggregatedData[accountName].propertyTotals[prop] += amount;
-            });
-          }
-          
-          if (account.propertyEntries) {
-            Object.entries(account.propertyEntries).forEach(([prop, entries]: [string, any]) => {
-              aggregatedData[accountName].propertyEntries[prop].push(...entries);
-            });
-          }
-        });
-      });
-      
-      allData = {
-        'Trailing 12 Months': aggregatedData
-      };
-      
-      availableProperties = allAvailableProperties.sort();
-      
-      return {
-        success: true,
-        data: allData,
-        periods: ['Trailing 12 Months'],
-        availableProperties: availableProperties,
-        summary: {
-          timePeriod,
-          viewMode,
-          property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
-          dateRanges: [{
-            start: dateRanges[0].start,
-            end: dateRanges[dateRanges.length - 1].end,
-            label: 'Trailing 12 Months'
-          }],
-          totalEntriesProcessed,
-          periodsGenerated: 1,
-          monthsAggregated: dateRanges.length
-        }
-      };
-    }
+    // Now aggregate weeks into the requested groupings
+    const finalData: any = {};
     
-    // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
-    if (timePeriod === 'Trailing 12' && viewMode === 'total') {
-      smartLog('🔍 AGGREGATING TRAILING 12 TOTAL DATA...');
+    if (viewMode === 'detailed') {
+      // For detailed view, group weeks by their groupLabel (months/quarters)
+      const groupedWeeks: Record<string, any[]> = {};
       
+      allWeeks.forEach(week => {
+        const groupKey = week.groupLabel || week.label;
+        if (!groupedWeeks[groupKey]) {
+          groupedWeeks[groupKey] = [];
+        }
+        groupedWeeks[groupKey].push(week.label);
+      });
+      
+      // Create aggregated data for each group
+      Object.entries(groupedWeeks).forEach(([groupKey, weekLabels]) => {
+        const aggregatedData: any = {};
+        
+        weekLabels.forEach(weekLabel => {
+          const weekData = weeklyData[weekLabel] || {};
+          
+          Object.values(weekData).forEach((account: any) => {
+            if (!aggregatedData[account.name]) {
+              aggregatedData[account.name] = {
+                name: account.name,
+                category: account.category,
+                type: account.category,
+                total: 0,
+                entries: [],
+                account_type: account.account_type,
+                account_detail_type: account.account_detail_type
+              };
+              
+              if (viewMode === 'by-property') {
+                aggregatedData[account.name].propertyTotals = {};
+                aggregatedData[account.name].propertyEntries = {};
+                availableProperties.forEach(prop => {
+                  aggregatedData[account.name].propertyTotals[prop] = 0;
+                  aggregatedData[account.name].propertyEntries[prop] = [];
+                });
+              }
+            }
+            
+            aggregatedData[account.name].total += account.total;
+            aggregatedData[account.name].entries.push(...account.entries);
+            
+            if (viewMode === 'by-property' && account.propertyTotals) {
+              Object.entries(account.propertyTotals).forEach(([prop, amount]: [string, any]) => {
+                aggregatedData[account.name].propertyTotals[prop] += amount;
+                if (account.propertyEntries && account.propertyEntries[prop]) {
+                  aggregatedData[account.name].propertyEntries[prop].push(...account.propertyEntries[prop]);
+                }
+              });
+            }
+          });
+        });
+        
+        finalData[groupKey] = aggregatedData;
+      });
+      
+      smartLog('📊 DETAILED VIEW - Aggregated by groups:', {
+        totalGroups: Object.keys(finalData).length,
+        groups: Object.keys(finalData)
+      });
+      
+    } else {
+      // For total view, aggregate ALL weeks into one total
       const aggregatedData: any = {};
       
-      dateRanges.forEach((range) => {
-        const monthData = allData[range.label] || {};
+      allWeeks.forEach(week => {
+        const weekData = weeklyData[week.label] || {};
         
-        Object.values(monthData).forEach((account: any) => {
-          const accountName = account.name;
-          
-          if (!aggregatedData[accountName]) {
-            aggregatedData[accountName] = {
-              name: accountName,
+        Object.values(weekData).forEach((account: any) => {
+          if (!aggregatedData[account.name]) {
+            aggregatedData[account.name] = {
+              name: account.name,
               category: account.category,
               type: account.category,
               total: 0,
@@ -839,58 +763,66 @@ const fetchTimeSeriesData = async (
               account_type: account.account_type,
               account_detail_type: account.account_detail_type
             };
+            
+            if (viewMode === 'by-property') {
+              aggregatedData[account.name].propertyTotals = {};
+              aggregatedData[account.name].propertyEntries = {};
+              availableProperties.forEach(prop => {
+                aggregatedData[account.name].propertyTotals[prop] = 0;
+                aggregatedData[account.name].propertyEntries[prop] = [];
+              });
+            }
           }
           
-          aggregatedData[accountName].total += account.total;
-          aggregatedData[accountName].entries.push(...account.entries);
+          aggregatedData[account.name].total += account.total;
+          aggregatedData[account.name].entries.push(...account.entries);
+          
+          if (viewMode === 'by-property' && account.propertyTotals) {
+            Object.entries(account.propertyTotals).forEach(([prop, amount]: [string, any]) => {
+              aggregatedData[account.name].propertyTotals[prop] += amount;
+              if (account.propertyEntries && account.propertyEntries[prop]) {
+                aggregatedData[account.name].propertyEntries[prop].push(...account.propertyEntries[prop]);
+              }
+            });
+          }
         });
       });
       
-      allData = {
-        'Trailing 12 Months': aggregatedData
-      };
+      const totalLabel = viewMode === 'by-property' && timePeriod === 'Trailing 12' ? 'Trailing 12 Months' :
+                        timePeriod === 'Trailing 12' ? 'Trailing 12 Months' :
+                        timePeriod === 'Monthly' ? monthYear :
+                        timePeriod === 'Quarterly' ? `Q${Math.floor(selectedDate.getMonth() / 3) + 1} ${year}` :
+                        year;
       
-      return {
-        success: true,
-        data: allData,
-        periods: ['Trailing 12 Months'],
-        availableProperties: viewMode === 'by-property' ? availableProperties : [],
-        summary: {
-          timePeriod,
-          viewMode,
-          property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
-          dateRanges: [{
-            start: dateRanges[0].start,
-            end: dateRanges[dateRanges.length - 1].end,
-            label: 'Trailing 12 Months'
-          }],
-          totalEntriesProcessed,
-          periodsGenerated: 1,
-          monthsAggregated: dateRanges.length
-        }
-      };
+      finalData[totalLabel] = aggregatedData;
+      
+      smartLog('📊 TOTAL VIEW - Single aggregation:', {
+        totalLabel,
+        totalAccounts: Object.keys(aggregatedData).length,
+        totalWeeksAggregated: allWeeks.length
+      });
     }
     
     return {
       success: true,
-      data: allData,
-      periods: dateRanges.map(r => r.label),
+      data: finalData,
+      periods: Object.keys(finalData),
       availableProperties: viewMode === 'by-property' ? availableProperties : [],
       summary: {
         timePeriod,
         viewMode,
         property: property === 'All Properties' ? 'ALL PROPERTIES' : property,
-        dateRanges: dateRanges,
         totalEntriesProcessed,
-        periodsGenerated: dateRanges.length
+        totalWeeksProcessed: allWeeks.length,
+        periodsGenerated: Object.keys(finalData).length,
+        consistency: 'All data fetched week-by-week for maximum consistency'
       }
     };
     
     performanceTracker.endTime('fetchTimeSeriesData', perfStart);
-    return result;
     
   } catch (error) {
-    smartLog('Error fetching time series data:', error, 'error');
+    smartLog('Error in unified weekly fetching:', error, 'error');
     return {
       success: false,
       error: (error as Error).message,
