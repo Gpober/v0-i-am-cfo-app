@@ -412,8 +412,8 @@ const fetchTimeSeriesData = async (
       if (timePeriod === 'Monthly') {
         const monthNum = selectedDate.getMonth() + 1;
         const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-        const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
-        const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+        const lastDay = new Date(parseInt(year), monthNum, 0);
+        const endDate = lastDay.toISOString().split('T')[0];
         dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
       } else if (timePeriod === 'Quarterly') {
         const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
@@ -454,8 +454,8 @@ const fetchTimeSeriesData = async (
           if (viewMode === 'total') {
             const monthNum = selectedDate.getMonth() + 1;
             const startDate = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
-            const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
-            const endDate = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+            const lastDay = new Date(parseInt(year), monthNum, 0);
+            const endDate = lastDay.toISOString().split('T')[0];
             dateRanges = [{ start: startDate, end: endDate, label: monthYear }];
           } else {
             // Weekly breakdown
@@ -586,6 +586,20 @@ const fetchTimeSeriesData = async (
     smartLog('🔍 CALCULATED DATE RANGES:', dateRanges);
     smartLog('🔍 Total date ranges for', viewMode, 'view:', dateRanges.length);
     
+    // CRITICAL DEBUG: Log exact date ranges for both views
+    if (timePeriod === 'Monthly') {
+      smartLog('🚨 MONTHLY DATE DEBUGGING:', {
+        selectedMonth: monthYear,
+        viewMode: viewMode,
+        dateRanges: dateRanges.map(r => ({
+          label: r.label,
+          start: r.start,
+          end: r.end,
+          dayCount: Math.ceil((new Date(r.end).getTime() - new Date(r.start).getTime()) / (1000 * 60 * 60 * 24)) + 1
+        }))
+      });
+    }
+    
     // Fetch data for all date ranges
     const allData: any = {};
     let totalEntriesProcessed = 0;
@@ -624,6 +638,11 @@ const fetchTimeSeriesData = async (
         smartLog(`🔍 Sample transactions for ${range.label}:`, rawData.slice(0, 3));
         smartLog(`🔍 Date range: ${range.start} to ${range.end}`);
         smartLog(`🔍 View mode: ${viewMode}, Property filter: ${property}`);
+        
+        // CRITICAL DEBUG: Calculate period total for comparison
+        const periodTotal = rawData.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+        smartLog(`🚨 PERIOD TOTAL for ${range.label}: $${periodTotal.toLocaleString()}`);
+        
         totalEntriesProcessed += rawData.length;
         
         if (viewMode === 'by-property') {
