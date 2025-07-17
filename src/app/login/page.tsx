@@ -16,7 +16,7 @@ export default function Login() {
     const isAllowed = approvedEmails.includes(email.trim().toLowerCase())
     if (!isAllowed) return setError('Access denied: email not authorized.')
 
-    if (password !== 'your_secure_password') {
+    if (password !== 'Terra2') {
       return setError('Incorrect password.')
     }
 
