@@ -1360,8 +1360,8 @@ export default function FinancialsPage() {
         ));
         
         headers.push(
-          <th key="total" className="px-3 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50 border-l border-blue-300" style={{ minWidth: '120px' }}>
-            <div className="text-blue-600 font-semibold">Total</div>
+          <th key="total" className="px-3 py-3 text-right text-xs font-medium text-blue-800 uppercase tracking-wider bg-blue-100 border-l-2 border-blue-600 shadow-sm" style={{ minWidth: '120px' }}>
+            <div className="text-blue-800 font-bold">Total</div>
           </th>
         );
         
@@ -1375,8 +1375,8 @@ export default function FinancialsPage() {
         
         if (viewMode === 'detailed') {
           headers.push(
-            <th key="total" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-l border-gray-300" style={{ minWidth: '120px' }}>
-              Total
+            <th key="total" className="px-4 py-3 text-right text-xs font-medium text-blue-800 uppercase tracking-wider bg-blue-100 border-l-2 border-blue-600 shadow-sm" style={{ minWidth: '120px' }}>
+              <div className="text-blue-800 font-bold">Total</div>
             </th>
           );
         }
@@ -1746,7 +1746,7 @@ export default function FinancialsPage() {
             );
           })}
           {/* Total column for section headers */}
-          <td className={`px-3 py-4 text-right text-sm font-bold text-blue-800 bg-blue-100 border-l border-blue-400`}>
+          <td className={`px-3 py-4 text-right text-sm font-bold text-blue-900 bg-blue-200 border-l-2 border-blue-600 shadow-sm`}>
             {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
               ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
               : formatCurrency(getCategoryTotal(category))
@@ -1774,7 +1774,7 @@ export default function FinancialsPage() {
             );
           })}
           {viewMode === 'detailed' && (
-            <td className={`px-4 py-4 text-right text-lg font-bold text-blue-800 bg-blue-100 border-l border-blue-400`}>
+            <td className={`px-4 py-4 text-right text-lg font-bold text-blue-900 bg-blue-200 border-l-2 border-blue-600 shadow-sm`}>
               {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
                 ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
                 : formatCurrency(getCategoryTotal(category))
@@ -2278,7 +2278,7 @@ export default function FinancialsPage() {
                                   </td>
                                 ))}
                                 {/* Total column for by-property view */}
-                                <td className="px-3 py-4 text-right text-lg font-bold text-blue-900 bg-blue-200 border-l border-blue-500 shadow-sm">
+                                <td className="px-3 py-4 text-right text-lg font-bold text-blue-900 bg-blue-200 border-l-2 border-blue-600 shadow-sm">
                                   {formatCurrency(kpis.revenue)}
                                 </td>
                               </>
