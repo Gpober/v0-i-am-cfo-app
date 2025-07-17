@@ -3426,8 +3426,7 @@ export default function FinancialsPage() {
                                         className={`w-2 h-2 rounded-full ${
                                           entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
                                         }`}
-                                      />
-                                      <span className="text-xs text-gray-500">ID: {entry.id}</span>
+                                      />                                      
                                     </div>
                                     <div className="text-right">
                                       <div className={`text-sm font-semibold ${
@@ -3450,10 +3449,7 @@ export default function FinancialsPage() {
                                   <div className="flex justify-between text-xs text-gray-600">
                                     <span>
                                       <strong>Class:</strong> {entry.class || 'No Class'}
-                                    </span>
-                                    <span>
-                                      <strong>Detail:</strong> {entry.account_detail_type || 'None'}
-                                    </span>
+                                    </span>                                    
                                   </div>
                                 </div>
                               ))
