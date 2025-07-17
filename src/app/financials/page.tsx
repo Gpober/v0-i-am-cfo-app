@@ -2595,7 +2595,7 @@ export default function FinancialsPage() {
                 </div>
                 <div className="p-6">
                   {trendData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={320}>
+                    <ResponsiveContainer width="100%" height={640}>
                       <ComposedChart 
                         data={trendData}
                         margin={{ 
