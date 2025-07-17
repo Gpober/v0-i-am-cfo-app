@@ -79,13 +79,15 @@ jobs:
     - name: Commit and push changes
       if: steps.changes.outputs.changed == 'true'
       run: |
+        git config --global user.email "action@github.com"
+        git config --global user.name "Claude Auto-Fix"
         git add .
-        git commit -m "🤖 Claude Auto-Fix: ${{ github.event.inputs.custom_prompt }}
+        git status
+        git commit -m "🤖 Claude Auto-Fix: Combo Chart Update
 
-        Automated fixes by Claude Code
-        Branch: $BRANCH_NAME"
+        Automated fixes by Claude Code" || echo "Commit failed, continuing..."
         
-        git push origin $BRANCH_NAME
+        git push origin $BRANCH_NAME || echo "Push failed, continuing..."
 
     - name: Create Pull Request
       if: steps.changes.outputs.changed == 'true'
