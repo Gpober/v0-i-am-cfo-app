@@ -1578,7 +1578,7 @@ export default function FinancialsPage() {
         ));
         
         headers.push(
-          <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
+          <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '80px' }}>
             <div className="text-gray-700 font-bold">Total</div>
           </th>
         );
@@ -1593,7 +1593,7 @@ export default function FinancialsPage() {
         
         if (viewMode === 'detailed') {
           headers.push(
-            <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
+            <th key="total" className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '80px' }}>
               <div className="text-gray-700 font-bold">Total</div>
             </th>
           );
@@ -2492,7 +2492,7 @@ export default function FinancialsPage() {
               Account
             </th>
             {renderColumnHeaders()}
-            <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F9FAFB' }}>
+            <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '70px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F9FAFB' }}>
               % of Revenue
             </th>
           </tr>
