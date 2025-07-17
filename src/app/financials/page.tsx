@@ -2558,37 +2558,39 @@ export default function FinancialsPage() {
                             </Pie>
                             
                             <Tooltip 
-                              formatter={(value: any, name: string, props: any) => {
-                                const metricName = propertyChartMetric === 'income' ? 'Revenue' :
-                                               propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
-                                
-                                return [
-                                  `${formatCurrency(Number(value))}`,
-                                  metricName
-                                ];
-                              }}
-                              labelFormatter={(label: string, payload: any) => {
-                                // Return the property name as the tooltip header
-                                if (payload && payload.length > 0) {
-                                  return payload[0].payload.name;
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length > 0) {
+                                  const data = payload[0].payload;
+                                  const metricName = propertyChartMetric === 'income' ? 'Revenue' :
+                                                   propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
+                                  
+                                  return (
+                                    <div style={{ 
+                                      backgroundColor: 'white', 
+                                      border: '1px solid #e2e8f0',
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                      padding: '8px 12px',
+                                      fontSize: '12px',
+                                      fontWeight: 500
+                                    }}>
+                                      <div style={{
+                                        fontWeight: 'bold',
+                                        fontSize: '13px',
+                                        color: '#1f2937',
+                                        marginBottom: '4px',
+                                        borderBottom: '1px solid #e5e7eb',
+                                        paddingBottom: '2px'
+                                      }}>
+                                        {data.name}
+                                      </div>
+                                      <div style={{ color: '#374151' }}>
+                                        {metricName}: {formatCurrency(data.value)}
+                                      </div>
+                                    </div>
+                                  );
                                 }
-                                return label;
-                              }}
-                              contentStyle={{ 
-                                backgroundColor: 'white', 
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                fontSize: '12px',
-                                fontWeight: 500
-                              }}
-                              labelStyle={{
-                                fontWeight: 'bold',
-                                fontSize: '13px',
-                                color: '#1f2937',
-                                marginBottom: '4px',
-                                borderBottom: '1px solid #e5e7eb',
-                                paddingBottom: '2px'
+                                return null;
                               }}
                             />
                           </RechartsPieChart>
@@ -2708,41 +2710,32 @@ export default function FinancialsPage() {
                             }
                           />
                           
+                          {/* Revenue Bar - Light IAM CFO Blue (background) */}
+                          <Bar 
+                            dataKey="revenue" 
+                            fill="#7CC4ED"
+                            fillOpacity={0.4}
+                            name="revenue"
+                            radius={[4, 4, 0, 0]}
+                            stroke="none"
+                          />
+                          
+                          {/* Net Income Bar - Full IAM CFO Blue (layered on top) */}
                           <Bar 
                             dataKey="netIncome" 
-                            fill="#10b981"
-                            fillOpacity={0.8}
+                            fill="#56B6E9"
+                            fillOpacity={1}
                             name="netIncome"
-                            radius={[3, 3, 0, 0]}
+                            radius={[4, 4, 0, 0]}
                             stroke="none"
                           >
                             {trendData.map((entry, index) => (
                               <Cell 
                                 key={`cell-${index}`} 
-                                fill={entry.netIncome >= 0 ? '#10b981' : '#ef4444'}
+                                fill={entry.netIncome >= 0 ? '#56B6E9' : '#ef4444'}
                               />
                             ))}
                           </Bar>
-                          
-                          <Line 
-                            type="monotone" 
-                            dataKey="revenue" 
-                            stroke="#2563eb" 
-                            strokeWidth={3}
-                            dot={{ 
-                              r: 4, 
-                              fill: '#2563eb', 
-                              strokeWidth: 2, 
-                              stroke: 'white'
-                            }}
-                            activeDot={{ 
-                              r: 6, 
-                              fill: '#2563eb', 
-                              strokeWidth: 3, 
-                              stroke: 'white'
-                            }}
-                            name="revenue"
-                          />
                         </ComposedChart>
                       </ResponsiveContainer>
                     ) : (
@@ -2757,6 +2750,7 @@ export default function FinancialsPage() {
                 </div>
               </div>
             </div>
+            
             {/* Main Content Grid - P&L and Transaction Details Below */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
               {/* P&L Table - 80% width (4/5) */}
