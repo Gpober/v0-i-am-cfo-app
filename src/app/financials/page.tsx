@@ -1130,6 +1130,136 @@ export default function FinancialsPage() {
     }, 3000);
   };
 
+  // Excel export function
+  const exportToExcel = () => {
+    try {
+      const currentData = getCurrentFinancialData();
+      const kpis = calculateKPIs();
+      
+      // Create CSV content
+      let csvContent = '';
+      
+      // Add report settings header
+      csvContent += 'PROFIT & LOSS STATEMENT\n';
+      csvContent += `Report Date: ${new Date().toLocaleDateString()}\n`;
+      csvContent += `Period: ${selectedMonth}\n`;
+      csvContent += `Time Period: ${timePeriod}\n`;
+      csvContent += `View Mode: ${viewMode}\n`;
+      csvContent += `Selected Properties: ${selectedProperties.has('All Properties') ? 'All Properties' : Array.from(selectedProperties).join(', ')}\n`;
+      csvContent += '\n';
+      
+      // Add KPI Summary
+      csvContent += 'KEY PERFORMANCE INDICATORS\n';
+      csvContent += `Revenue,"${formatCurrency(kpis.revenue)}",${kpis.revenue.toFixed(2)}\n`;
+      csvContent += `Cost of Goods Sold,"${formatCurrency(kpis.cogs)}",${kpis.cogs.toFixed(2)}\n`;
+      csvContent += `Gross Profit,"${formatCurrency(kpis.grossProfit)}",${kpis.grossProfit.toFixed(2)}\n`;
+      csvContent += `Operating Expenses,"${formatCurrency(kpis.operatingExpenses)}",${kpis.operatingExpenses.toFixed(2)}\n`;
+      csvContent += `Net Operating Income,"${formatCurrency(kpis.netOperatingIncome)}",${kpis.netOperatingIncome.toFixed(2)}\n`;
+      csvContent += `Other Income,"${formatCurrency(kpis.otherIncome)}",${kpis.otherIncome.toFixed(2)}\n`;
+      csvContent += `Other Expenses,"${formatCurrency(kpis.otherExpenses)}",${kpis.otherExpenses.toFixed(2)}\n`;
+      csvContent += `Net Income,"${formatCurrency(kpis.netIncome)}",${kpis.netIncome.toFixed(2)}\n`;
+      csvContent += `Gross Margin,${kpis.grossMargin.toFixed(1)}%,${kpis.grossMargin.toFixed(1)}\n`;
+      csvContent += `Operating Margin,${kpis.operatingMargin.toFixed(1)}%,${kpis.operatingMargin.toFixed(1)}\n`;
+      csvContent += `Net Margin,${kpis.netMargin.toFixed(1)}%,${kpis.netMargin.toFixed(1)}\n`;
+      csvContent += '\n';
+      
+      // Add detailed P&L data
+      csvContent += 'DETAILED PROFIT & LOSS DATA\n';
+      
+      if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+        // Property-based export
+        const properties = timeSeriesData.availableProperties;
+        csvContent += `Account Name,Category,${properties.join(',')},Total\n`;
+        
+        // Group by category
+        const categories = ['Revenue', 'COGS', 'Operating Expenses', 'Other Income', 'Other Expenses'];
+        
+        categories.forEach(category => {
+          const categoryData = groupAndSortFinancialData(currentData).filter(item => item.category === category);
+          
+          if (categoryData.length > 0) {
+            csvContent += `\n${category.toUpperCase()}\n`;
+            
+            categoryData.forEach(item => {
+              const row = [
+                `"${item.name}"`,
+                `"${item.category}"`
+              ];
+              
+              // Add property values
+              properties.forEach(property => {
+                const value = item.propertyTotals?.[property] || 0;
+                row.push(value.toFixed(2));
+              });
+              
+              // Add total
+              row.push(item.total.toFixed(2));
+              
+              csvContent += row.join(',') + '\n';
+            });
+          }
+        });
+      } else {
+        // Time-based export
+        const periods = timeSeriesData?.periods || [selectedMonth];
+        csvContent += `Account Name,Category,${periods.join(',')},Total\n`;
+        
+        // Group by category
+        const categories = ['Revenue', 'COGS', 'Operating Expenses', 'Other Income', 'Other Expenses'];
+        
+        categories.forEach(category => {
+          const categoryData = groupAndSortFinancialData(currentData).filter(item => item.category === category);
+          
+          if (categoryData.length > 0) {
+            csvContent += `\n${category.toUpperCase()}\n`;
+            
+            categoryData.forEach(item => {
+              const row = [
+                `"${item.name}"`,
+                `"${item.category}"`
+              ];
+              
+              // Add period values
+              periods.forEach(period => {
+                let value = 0;
+                if (timeSeriesData?.data[period]?.[item.name]) {
+                  value = timeSeriesData.data[period][item.name].total || 0;
+                } else if (periods.length === 1) {
+                  value = item.total;
+                }
+                row.push(value.toFixed(2));
+              });
+              
+              // Add total
+              row.push(item.total.toFixed(2));
+              
+              csvContent += row.join(',') + '\n';
+            });
+          }
+        });
+      }
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `PL_Report_${selectedMonth.replace(' ', '_')}_${timePeriod.replace(' ', '_')}_${viewMode}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showNotification('P&L data exported successfully!', 'success');
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      showNotification('Failed to export data', 'error');
+    }
+  };
+
   const handleAccountClick = (accountItem: FinancialDataItem): void => {
     setSelectedAccountDetails(accountItem);
   };
@@ -2154,12 +2284,13 @@ export default function FinancialsPage() {
                 </div>
               </div>
               <button
-                onClick={() => showNotification('Financial data exported', 'success')}
+                onClick={exportToExcel}
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
                 style={{ backgroundColor: BRAND_COLORS.primary }}
+                title="Export P&L data to Excel/CSV with report settings"
               >
                 <Download className="w-4 h-4" />
-                Export
+                Export to Excel
               </button>
 
               <button
