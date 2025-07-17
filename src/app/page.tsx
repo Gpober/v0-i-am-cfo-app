@@ -1857,7 +1857,7 @@ export default function MobileResponsiveFinancialsPage() {
         </div>
 
         <div className="p-4">
-          <div className="grid grid-cols-1 gap-3">
+          <div className={`grid ${deviceType === 'mobile' ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
             {achievements.map((achievement) => (
               <div
                 key={achievement.id}
@@ -3554,8 +3554,8 @@ export default function MobileResponsiveFinancialsPage() {
         )}
       </main>
 
-      {/* Company P&L Modal */}
-      {renderCompanyPLModal()}
+      {/* Company P&L Modal - Mobile Only */}
+      {deviceType === 'mobile' && renderCompanyPLModal()}
       
       {/* Mobile Property P&L Modal */}
       {renderPropertyPLModal()}
