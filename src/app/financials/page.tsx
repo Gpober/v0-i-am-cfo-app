@@ -2072,568 +2072,567 @@ export default function FinancialsPage() {
         {kpis.revenue ? calculatePercentage(Math.abs(getCategoryTotal(category)), Math.abs(kpis.revenue)) : '0%'}
       </td>
     </tr>
-
   );
 
  return (
     <>
       <style jsx>{scrollbarStyles}</style>
       <div className="min-h-screen bg-gray-50">
-      {/* Page Header with IAM CFO Branding */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center">
-            <IAMCFOLogo className="w-8 h-8 mr-4" />
-            <div>
-              <div className="flex items-center space-x-3">
-                <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
-                <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
-                  Financial Management
-                </span>
-                {timeSeriesData && (
-                  <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
-                    Connected to financial_transactions
+        {/* Page Header with IAM CFO Branding */}
+        <div className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center">
+              <IAMCFOLogo className="w-8 h-8 mr-4" />
+              <div>
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-2xl font-bold text-gray-900">IAM CFO</h1>
+                  <span className="text-sm px-3 py-1 rounded-full text-white" style={{ backgroundColor: BRAND_COLORS.primary }}>
+                    Financial Management
                   </span>
-                )}
+                  {timeSeriesData && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                      Connected to financial_transactions
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 mt-1">
+                  Real-time P&L by Property Class • From financial_transactions table
+                  {timeSeriesData?.summary && (
+                    <span className="ml-2 text-green-600">
+                      • {timeSeriesData.summary.totalEntriesProcessed} entries loaded • {timeSeriesData.summary.periodsGenerated} periods
+                    </span>
+                  )}
+                </p>
               </div>
-              <p className="text-sm text-gray-600 mt-1">
-                Real-time P&L by Property Class • From financial_transactions table
-                {timeSeriesData?.summary && (
-                  <span className="ml-2 text-green-600">
-                    • {timeSeriesData.summary.totalEntriesProcessed} entries loaded • {timeSeriesData.summary.periodsGenerated} periods
-                  </span>
-                )}
-              </p>
             </div>
           </div>
         </div>
-      </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Header Controls */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Financial Management</h2>
-            <div className="flex flex-wrap gap-4 items-center">
-              {/* Month Selector */}
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value as MonthString)}
-                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
-              >
-                {monthsList.map((month) => (
-                  <option key={month} value={month}>
-                    {month}
-                  </option>
-                ))}
-              </select>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-8">
+            {/* Header Controls */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+              <h2 className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>Financial Management</h2>
+              <div className="flex flex-wrap gap-4 items-center">
+                {/* Month Selector */}
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value as MonthString)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+                >
+                  {monthsList.map((month) => (
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
 
-              {/* Property Class Multi-Select Dropdown - Only for non-by-property views */}
-              {viewMode !== 'by-property' && (
-                <div className="relative">
-                  <button
-                    onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
-                    className="flex items-center justify-between w-56 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                    style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
-                  >
-                    <span className="truncate">
-                      {getSelectedPropertiesText()}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {propertyDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
-                      {/* All Properties Option */}
-                      <div
-                        className="flex items-center px-4 py-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePropertyToggle('All Properties');
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedProperties.has('All Properties')}
-                          onChange={() => {}}
-                          className="mr-3 h-4 w-4 border-gray-300 rounded"
-                          style={{ accentColor: BRAND_COLORS.primary }}
-                        />
-                        <span className="font-medium text-blue-900">
-                          All Property Classes
-                        </span>
-                      </div>
-                      
-                      {/* Individual Property Classes */}
-                      <div className="max-h-60 overflow-y-auto">
-                        {availableProperties.length > 1 ? (
-                          availableProperties
-                            .filter(property => property !== 'All Properties')
-                            .map((property) => (
-                              <div
-                                key={property}
-                                className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handlePropertyToggle(property);
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={selectedProperties.has(property)}
-                                  onChange={() => {}}
-                                  className="mr-3 h-4 w-4 border-gray-300 rounded"
-                                  style={{ accentColor: BRAND_COLORS.primary }}
-                                />
-                                <span className="text-gray-700">
-                                  {property}
-                                </span>
-                              </div>
-                            ))
-                        ) : (
-                          <div className="px-4 py-3 text-sm text-gray-500 italic">
-                            Loading property classes...
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Time Period and View Mode Controls */}
-              <div className="flex items-center gap-2">
-                {/* Time Period Dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => setTimePeriodDropdownOpen(!timePeriodDropdownOpen)}
-                    className="flex items-center justify-between w-32 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                    style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
-                  >
-                    <span className="truncate">{timePeriod}</span>
-                    <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${timePeriodDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {timePeriodDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
-                      {(['Monthly', 'Quarterly', 'Yearly', 'Trailing 12'] as TimePeriod[]).map((period) => (
+                {/* Property Class Multi-Select Dropdown - Only for non-by-property views */}
+                {viewMode !== 'by-property' && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
+                      className="flex items-center justify-between w-56 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                      style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+                    >
+                      <span className="truncate">
+                        {getSelectedPropertiesText()}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {propertyDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                        {/* All Properties Option */}
                         <div
-                          key={period}
-                          className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                          onClick={() => {
-                            setTimePeriod(period);
-                            setTimePeriodDropdownOpen(false);
+                          className="flex items-center px-4 py-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePropertyToggle('All Properties');
                           }}
                         >
-                          {period}
+                          <input
+                            type="checkbox"
+                            checked={selectedProperties.has('All Properties')}
+                            onChange={() => {}}
+                            className="mr-3 h-4 w-4 border-gray-300 rounded"
+                            style={{ accentColor: BRAND_COLORS.primary }}
+                          />
+                          <span className="font-medium text-blue-900">
+                            All Property Classes
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* ENHANCED: View Mode Toggle - Now includes by-property option */}
-                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                  <button
-                    onClick={() => setViewMode('total')}
-                    className={`px-3 py-2 text-xs transition-colors ${
-                      viewMode === 'total'
-                        ? 'text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
-                  >
-                    Total
-                  </button>
-                  <button
-                    onClick={() => setViewMode('detailed')}
-                    className={`px-3 py-2 text-xs transition-colors ${
-                      viewMode === 'detailed'
-                        ? 'text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
-                  >
-                    Detail
-                  </button>
-                  <button
-                    onClick={() => setViewMode('by-property')}
-                    className={`px-3 py-2 text-xs transition-colors ${
-                      viewMode === 'by-property'
-                        ? 'text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    style={{ backgroundColor: viewMode === 'by-property' ? BRAND_COLORS.primary : undefined }}
-                    title="View P&L with properties as columns"
-                  >
-                    By Property
-                  </button>
-                </div>
-              </div>
-              <button
-                onClick={() => showNotification('Financial data exported', 'success')}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
-                style={{ backgroundColor: BRAND_COLORS.primary }}
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-
-              <button
-                onClick={loadRealFinancialData}
-                disabled={isLoadingData}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
-                {isLoadingData ? 'Loading...' : 'Refresh'}
-              </button>
-              
-              {/* Data Integrity Status Indicator */}
-              {dataIntegrityStatus && (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                  dataIntegrityStatus.isValid
-                    ? 'bg-green-100 text-green-800 border border-green-200'
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  <span className="text-lg">
-                    {dataIntegrityStatus.isValid ? '✅' : '❌'}
-                  </span>
-                  <span>
-                    {dataIntegrityStatus.isValid ? 'Data Valid' : 'Data Issues'}
-                  </span>
-                  <span className="text-xs opacity-75">
-                    ({dataIntegrityStatus.totalRecords} records)
-                  </span>
-                  {!dataIntegrityStatus.isValid && (
-                    <div className="ml-2 text-xs">
-                      <button
-                        onClick={() => {
-                          if (DEBUG_CONFIG.isDevelopment || DEBUG_CONFIG.isDebugMode) {
-                            console.log('Data integrity issues:', dataIntegrityStatus.issues);
-                          }
-                          setNotification({
-                            show: true,
-                            message: `Data integrity issues found: ${dataIntegrityStatus.issues.slice(0, 3).join(', ')}${dataIntegrityStatus.issues.length > 3 ? '...' : ''}`,
-                            type: 'error'
-                          });
-                        }}
-                        className="underline hover:no-underline"
-                      >
-                        View Issues
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Debug Mode Toggle - Only show in development */}
-              {DEBUG_CONFIG.isDevelopment && (
-                <button
-                  onClick={toggleDebugMode}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    debugMode
-                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-200 hover:bg-yellow-200'
-                      : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
-                  }`}
-                  title="Toggle debug mode for detailed logging"
-                >
-                  <span className="text-lg">🔧</span>
-                  <span>Debug {debugMode ? 'ON' : 'OFF'}</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-         
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-            {/* Revenue */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.primary }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Revenue</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
-                  <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
-                    {viewMode === 'by-property' ? 
-                      `All Properties (${timePeriod}${timePeriod === 'Trailing 12' ? ' Months' : ''})` :
-                     timePeriod === 'Trailing 12' && viewMode === 'total' ? 'Past 12 Months' : 
-                     timePeriod === 'Monthly' && viewMode === 'detailed' ? 'Monthly Total' : 'Past 12 Months'}
+                        
+                        {/* Individual Property Classes */}
+                        <div className="max-h-60 overflow-y-auto">
+                          {availableProperties.length > 1 ? (
+                            availableProperties
+                              .filter(property => property !== 'All Properties')
+                              .map((property) => (
+                                <div
+                                  key={property}
+                                  className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePropertyToggle(property);
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedProperties.has(property)}
+                                    onChange={() => {}}
+                                    className="mr-3 h-4 w-4 border-gray-300 rounded"
+                                    style={{ accentColor: BRAND_COLORS.primary }}
+                                  />
+                                  <span className="text-gray-700">
+                                    {property}
+                                  </span>
+                                </div>
+                              ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-gray-500 italic">
+                              Loading property classes...
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
-              </div>
-            </div>
-            
-            {/* Gross Profit */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Gross Profit</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.grossProfit)}</div>
-                  <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
-                    {kpis.grossMargin.toFixed(1)}% Margin
-                  </div>
-                </div>
-                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
-              </div>
-            </div>
+                )}
 
-            {/* Operating Income */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.success }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Income</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netOperatingIncome)}</div>
-                  <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
-                    {kpis.operatingMargin.toFixed(1)}% Margin
-                  </div>
-                </div>
-                <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
-              </div>
-            </div>
-            
-            {/* Net Income */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.secondary }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
-                  <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
-                    {kpis.netMargin.toFixed(1)}% Margin
-                  </div>
-                </div>
-                <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
-              </div>
-            </div>
-
-            {/* Operating Expenses */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.tertiary }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Operating Expenses</div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingExpenses)}</div>
-                  <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full inline-block">
-                    Operating Costs
-                  </div>
-                </div>
-                <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.tertiary }} />
-              </div>
-            </div>
-          </div>
-
-          {/* Property Performance Chart - REPLACE THE NOTES WITH THIS */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-gray-900">Property Performance Analysis</h3>
-                
-                {/* Toggle Buttons for Revenue/GP/NI - Show GP only if different from Revenue */}
-                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                  <button
-                    onClick={() => setPropertyChartMetric('income')}
-                    className={`px-4 py-2 text-sm transition-colors ${
-                      propertyChartMetric === 'income'
-                        ? 'text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    style={{ backgroundColor: propertyChartMetric === 'income' ? BRAND_COLORS.primary : undefined }}
-                  >
-                    Revenue
-                  </button>
-                  
-                  {/* Only show Gross Profit button if GP differs from Revenue */}
-                  {(() => {
-                    const chartData = generatePropertyChartData();
-                    const hasGrossProfit = chartData.some(item => 
-                      Math.abs(item.revenue - item.grossProfit) > 0.01
-                    );
+                {/* Time Period and View Mode Controls */}
+                <div className="flex items-center gap-2">
+                  {/* Time Period Dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setTimePeriodDropdownOpen(!timePeriodDropdownOpen)}
+                      className="flex items-center justify-between w-32 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                      style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+                    >
+                      <span className="truncate">{timePeriod}</span>
+                      <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${timePeriodDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
                     
-                    return hasGrossProfit ? (
-                      <button
-                        onClick={() => setPropertyChartMetric('gp')}
-                        className={`px-4 py-2 text-sm transition-colors ${
-                          propertyChartMetric === 'gp'
-                            ? 'text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-50'
-                        }`}
-                        style={{ backgroundColor: propertyChartMetric === 'gp' ? BRAND_COLORS.success : undefined }}
-                      >
-                        Gross Profit
-                      </button>
-                    ) : null;
-                  })()}
-                  
-                  <button
-                    onClick={() => setPropertyChartMetric('ni')}
-                    className={`px-4 py-2 text-sm transition-colors ${
-                      propertyChartMetric === 'ni'
-                        ? 'text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    style={{ backgroundColor: propertyChartMetric === 'ni' ? BRAND_COLORS.secondary : undefined }}
-                  >
-                    Net Income
-                  </button>
+                    {timePeriodDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                        {(['Monthly', 'Quarterly', 'Yearly', 'Trailing 12'] as TimePeriod[]).map((period) => (
+                          <div
+                            key={period}
+                            className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                            onClick={() => {
+                              setTimePeriod(period);
+                              setTimePeriodDropdownOpen(false);
+                            }}
+                          >
+                            {period}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ENHANCED: View Mode Toggle - Now includes by-property option */}
+                  <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                    <button
+                      onClick={() => setViewMode('total')}
+                      className={`px-3 py-2 text-xs transition-colors ${
+                        viewMode === 'total'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
+                    >
+                      Total
+                    </button>
+                    <button
+                      onClick={() => setViewMode('detailed')}
+                      className={`px-3 py-2 text-xs transition-colors ${
+                        viewMode === 'detailed'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
+                    >
+                      Detail
+                    </button>
+                    <button
+                      onClick={() => setViewMode('by-property')}
+                      className={`px-3 py-2 text-xs transition-colors ${
+                        viewMode === 'by-property'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ backgroundColor: viewMode === 'by-property' ? BRAND_COLORS.primary : undefined }}
+                      title="View P&L with properties as columns"
+                    >
+                      By Property
+                    </button>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="text-sm text-gray-600 mt-2">
-                {propertyChartMetric === 'income' ? 
-                  `Revenue breakdown by property for ${timePeriod} period` :
-                  propertyChartMetric === 'gp' ?
-                  `Gross Profit (Revenue - COGS) by property for ${timePeriod} period` :
-                  `Net Income by property for ${timePeriod} period`
-                }
-                {viewMode === 'by-property' && (
-                  <span className="ml-2 text-purple-600">• Property View Active</span>
+                <button
+                  onClick={() => showNotification('Financial data exported', 'success')}
+                  className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
+                  style={{ backgroundColor: BRAND_COLORS.primary }}
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+
+                <button
+                  onClick={loadRealFinancialData}
+                  disabled={isLoadingData}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
+                  {isLoadingData ? 'Loading...' : 'Refresh'}
+                </button>
+                
+                {/* Data Integrity Status Indicator */}
+                {dataIntegrityStatus && (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                    dataIntegrityStatus.isValid
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : 'bg-red-100 text-red-800 border border-red-200'
+                  }`}>
+                    <span className="text-lg">
+                      {dataIntegrityStatus.isValid ? '✅' : '❌'}
+                    </span>
+                    <span>
+                      {dataIntegrityStatus.isValid ? 'Data Valid' : 'Data Issues'}
+                    </span>
+                    <span className="text-xs opacity-75">
+                      ({dataIntegrityStatus.totalRecords} records)
+                    </span>
+                    {!dataIntegrityStatus.isValid && (
+                      <div className="ml-2 text-xs">
+                        <button
+                          onClick={() => {
+                            if (DEBUG_CONFIG.isDevelopment || DEBUG_CONFIG.isDebugMode) {
+                              console.log('Data integrity issues:', dataIntegrityStatus.issues);
+                            }
+                            setNotification({
+                              show: true,
+                              message: `Data integrity issues found: ${dataIntegrityStatus.issues.slice(0, 3).join(', ')}${dataIntegrityStatus.issues.length > 3 ? '...' : ''}`,
+                              type: 'error'
+                            });
+                          }}
+                          className="underline hover:no-underline"
+                        >
+                          View Issues
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Debug Mode Toggle - Only show in development */}
+                {DEBUG_CONFIG.isDevelopment && (
+                  <button
+                    onClick={toggleDebugMode}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      debugMode
+                        ? 'bg-yellow-100 text-yellow-800 border border-yellow-200 hover:bg-yellow-200'
+                        : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                    }`}
+                    title="Toggle debug mode for detailed logging"
+                  >
+                    <span className="text-lg">🔧</span>
+                    <span>Debug {debugMode ? 'ON' : 'OFF'}</span>
+                  </button>
                 )}
               </div>
             </div>
-            
-            <div className="p-6">
-              {generatePropertyChartData().length > 0 ? (
-                <div className="flex items-center justify-center">
-                  <div className="w-full max-w-lg">
-                    <ResponsiveContainer width="100%" height={400}>
-                      <RechartsPieChart>
-                        <defs>
-                          {/* Enhanced gradients for better 3D effect */}
-                          {generatePropertyChartData().map((entry, index) => (
-                            <radialGradient key={`gradient-${index}`} id={`gradient-${index}`} cx="30%" cy="30%">
-                              <stop offset="0%" stopColor={COLORS[index % COLORS.length]} stopOpacity="1" />
-                              <stop offset="70%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.8" />
-                              <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.6" />
-                            </radialGradient>
-                          ))}
-                        </defs>
-                        
-                        {/* Shadow effect for 3D appearance */}
-                        <Pie
-                          data={generatePropertyChartData()}
-                          cx="50%"
-                          cy="52%"
-                          outerRadius={120}
-                          fill="#000000"
-                          fillOpacity={0.08}
-                          dataKey="value"
-                          startAngle={0}
-                          endAngle={360}
-                          isAnimationActive={false}
-                        />
-                        
-                        {/* Main pie chart - full circle, no inner radius */}
-                        <Pie
-                          data={generatePropertyChartData()}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={120}
-                          innerRadius={0}
-                          paddingAngle={1}
-                          dataKey="value"
-                          startAngle={0}
-                          endAngle={360}
-                          animationDuration={1000}
-                          animationEasing="ease-out"
-                          label={({ name, percent, value }) => 
-                            percent > 0.05 ? `${(percent * 100).toFixed(1)}%` : ''
-                          }
-                          labelLine={false}
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            fill: 'white',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                          }}
-                        >
-                          {generatePropertyChartData().map((entry, index) => (
-                            <Cell 
-                              key={`cell-${index}`} 
-                              fill={`url(#gradient-${index})`}
-                              stroke="#ffffff"
-                              strokeWidth={2}
-                              style={{
-                                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-                                cursor: 'pointer'
-                              }}
-                            />
-                          ))}
-                        </Pie>
-                        
-                        <Tooltip 
-                          formatter={(value: any, name: string, props: any) => {
-                            const propertyName = props.payload?.name || 'Unknown Property';
-                            const metricName = propertyChartMetric === 'income' ? 'Revenue' :
-                                           propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
-                            
-                            return [
-                              `${formatCurrency(Number(value))}`,
-                              metricName
-                            ];
-                          }}
-                          labelFormatter={(label: string, payload: any) => {
-                            // Return the property name as the tooltip header
-                            return payload && payload.length > 0 ? payload[0].payload.name : label;
-                          }}
-                          contentStyle={{ 
-                            backgroundColor: 'white', 
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                            fontSize: '13px',
-                            fontWeight: 500
-                          }}
-                          labelStyle={{
-                            fontWeight: 'bold',
-                            fontSize: '14px',
-                            color: '#1f2937',
-                            marginBottom: '8px',
-                            borderBottom: '1px solid #e5e7eb',
-                            paddingBottom: '4px'
-                          }}
-                        />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                    
-                    {/* Custom Legend with values like your reference image */}
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                      {generatePropertyChartData().map((entry, index) => (
-                        <div key={entry.name} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex items-center">
-                            <div 
-                              className="w-3 h-3 rounded-full mr-2"
-                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                            />
-                            <span className="font-medium text-gray-700">
-                              {entry.name.length > 10 ? entry.name.substring(0, 10) + '...' : entry.name}
-                            </span>
-                          </div>
-                          <span className="font-semibold text-gray-900">
-                            {formatCurrency(entry.value)}
-                          </span>
-                        </div>
-                      ))}
+
+            {/* KPIs */}
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+              {/* Revenue */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.primary }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Revenue</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.revenue)}</div>
+                    <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
+                      {viewMode === 'by-property' ? 
+                        `All Properties (${timePeriod}${timePeriod === 'Trailing 12' ? ' Months' : ''})` :
+                       timePeriod === 'Trailing 12' && viewMode === 'total' ? 'Past 12 Months' : 
+                       timePeriod === 'Monthly' && viewMode === 'detailed' ? 'Monthly Total' : 'Past 12 Months'}
                     </div>
                   </div>
+                  <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
                 </div>
-              ) : (
-                <div className="flex items-center justify-center h-80 text-gray-500">
-                  <div className="text-center">
-                    <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                    <p className="text-lg font-medium text-gray-600">No property data available</p>
-                    <p className="text-sm mt-2 text-gray-500">
-                      {viewMode === 'by-property' ? 
-                        'Switch to a different time period or check your data filters' :
-                        'Switch to "By Property" view to see property breakdown'
-                      }
-                    </p>
+              </div>
+              
+              {/* Gross Profit */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.warning }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Gross Profit</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.grossProfit)}</div>
+                    <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
+                      {kpis.grossMargin.toFixed(1)}% Margin
+                    </div>
+                  </div>
+                  <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
+                </div>
+              </div>
+
+              {/* Operating Income */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.success }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Operating Income</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netOperatingIncome)}</div>
+                    <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full inline-block">
+                      {kpis.operatingMargin.toFixed(1)}% Margin
+                    </div>
+                  </div>
+                  <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.success }} />
+                </div>
+              </div>
+              
+              {/* Net Income */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.secondary }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
+                    <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
+                      {kpis.netMargin.toFixed(1)}% Margin
+                    </div>
+                  </div>
+                  <PieChart className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
+                </div>
+              </div>
+
+              {/* Operating Expenses */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: BRAND_COLORS.tertiary }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Operating Expenses</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.operatingExpenses)}</div>
+                    <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full inline-block">
+                      Operating Costs
+                    </div>
+                  </div>
+                  <BarChart3 className="w-8 h-8" style={{ color: BRAND_COLORS.tertiary }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Property Performance Chart */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-semibold text-gray-900">Property Performance Analysis</h3>
+                  
+                  {/* Toggle Buttons for Revenue/GP/NI - Show GP only if different from Revenue */}
+                  <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                    <button
+                      onClick={() => setPropertyChartMetric('income')}
+                      className={`px-4 py-2 text-sm transition-colors ${
+                        propertyChartMetric === 'income'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ backgroundColor: propertyChartMetric === 'income' ? BRAND_COLORS.primary : undefined }}
+                    >
+                      Revenue
+                    </button>
+                    
+                    {/* Only show Gross Profit button if GP differs from Revenue */}
+                    {(() => {
+                      const chartData = generatePropertyChartData();
+                      const hasGrossProfit = chartData.some(item => 
+                        Math.abs(item.revenue - item.grossProfit) > 0.01
+                      );
+                      
+                      return hasGrossProfit ? (
+                        <button
+                          onClick={() => setPropertyChartMetric('gp')}
+                          className={`px-4 py-2 text-sm transition-colors ${
+                            propertyChartMetric === 'gp'
+                              ? 'text-white'
+                              : 'bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                          style={{ backgroundColor: propertyChartMetric === 'gp' ? BRAND_COLORS.success : undefined }}
+                        >
+                          Gross Profit
+                        </button>
+                      ) : null;
+                    })()}
+                    
+                    <button
+                      onClick={() => setPropertyChartMetric('ni')}
+                      className={`px-4 py-2 text-sm transition-colors ${
+                        propertyChartMetric === 'ni'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                      style={{ backgroundColor: propertyChartMetric === 'ni' ? BRAND_COLORS.secondary : undefined }}
+                    >
+                      Net Income
+                    </button>
                   </div>
                 </div>
-              )}
+                
+                <div className="text-sm text-gray-600 mt-2">
+                  {propertyChartMetric === 'income' ? 
+                    `Revenue breakdown by property for ${timePeriod} period` :
+                    propertyChartMetric === 'gp' ?
+                    `Gross Profit (Revenue - COGS) by property for ${timePeriod} period` :
+                    `Net Income by property for ${timePeriod} period`
+                  }
+                  {viewMode === 'by-property' && (
+                    <span className="ml-2 text-purple-600">• Property View Active</span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="p-6">
+                {generatePropertyChartData().length > 0 ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-full max-w-lg">
+                      <ResponsiveContainer width="100%" height={400}>
+                        <RechartsPieChart>
+                          <defs>
+                            {/* Enhanced gradients for better 3D effect */}
+                            {generatePropertyChartData().map((entry, index) => (
+                              <radialGradient key={`gradient-${index}`} id={`gradient-${index}`} cx="30%" cy="30%">
+                                <stop offset="0%" stopColor={COLORS[index % COLORS.length]} stopOpacity="1" />
+                                <stop offset="70%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.8" />
+                                <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.6" />
+                              </radialGradient>
+                            ))}
+                          </defs>
+                          
+                          {/* Shadow effect for 3D appearance */}
+                          <Pie
+                            data={generatePropertyChartData()}
+                            cx="50%"
+                            cy="52%"
+                            outerRadius={120}
+                            fill="#000000"
+                            fillOpacity={0.08}
+                            dataKey="value"
+                            startAngle={0}
+                            endAngle={360}
+                            isAnimationActive={false}
+                          />
+                          
+                          {/* Main pie chart - full circle, no inner radius */}
+                          <Pie
+                            data={generatePropertyChartData()}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={120}
+                            innerRadius={0}
+                            paddingAngle={1}
+                            dataKey="value"
+                            startAngle={0}
+                            endAngle={360}
+                            animationDuration={1000}
+                            animationEasing="ease-out"
+                            label={({ name, percent, value }) => 
+                              percent > 0.05 ? `${(percent * 100).toFixed(1)}%` : ''
+                            }
+                            labelLine={false}
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              fill: 'white',
+                              textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                            }}
+                          >
+                            {generatePropertyChartData().map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={`url(#gradient-${index})`}
+                                stroke="#ffffff"
+                                strokeWidth={2}
+                                style={{
+                                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                            ))}
+                          </Pie>
+                          
+                          <Tooltip 
+                            formatter={(value: any, name: string, props: any) => {
+                              const propertyName = props.payload?.name || 'Unknown Property';
+                              const metricName = propertyChartMetric === 'income' ? 'Revenue' :
+                                             propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
+                              
+                              return [
+                                `${formatCurrency(Number(value))}`,
+                                metricName
+                              ];
+                            }}
+                            labelFormatter={(label: string, payload: any) => {
+                              // Return the property name as the tooltip header
+                              return payload && payload.length > 0 ? payload[0].payload.name : label;
+                            }}
+                            contentStyle={{ 
+                              backgroundColor: 'white', 
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              fontSize: '13px',
+                              fontWeight: 500
+                            }}
+                            labelStyle={{
+                              fontWeight: 'bold',
+                              fontSize: '14px',
+                              color: '#1f2937',
+                              marginBottom: '8px',
+                              borderBottom: '1px solid #e5e7eb',
+                              paddingBottom: '4px'
+                            }}
+                          />
+                        </RechartsPieChart>
+                      </ResponsiveContainer>
+                      
+                      {/* Custom Legend with values like your reference image */}
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                        {generatePropertyChartData().map((entry, index) => (
+                          <div key={entry.name} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                            <div className="flex items-center">
+                              <div 
+                                className="w-3 h-3 rounded-full mr-2"
+                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                              />
+                              <span className="font-medium text-gray-700">
+                                {entry.name.length > 10 ? entry.name.substring(0, 10) + '...' : entry.name}
+                              </span>
+                            </div>
+                            <span className="font-semibold text-gray-900">
+                              {formatCurrency(entry.value)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-80 text-gray-500">
+                    <div className="text-center">
+                      <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                      <p className="text-lg font-medium text-gray-600">No property data available</p>
+                      <p className="text-sm mt-2 text-gray-500">
+                        {viewMode === 'by-property' ? 
+                          'Switch to a different time period or check your data filters' :
+                          'Switch to "By Property" view to see property breakdown'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Main Content Grid - P&L starts here */}
+
+            {/* Main Content Grid - P&L starts here */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column: Financial Tables */}
             <div className="lg:col-span-2">
