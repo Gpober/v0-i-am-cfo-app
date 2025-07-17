@@ -1352,7 +1352,7 @@ export default function FinancialsPage() {
       if (viewMode === 'by-property') {
         const properties = timeSeriesData.availableProperties || [];
         const headers = properties.map((property: string) => (
-          <th key={property} className="px-3 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0 bg-gray-50 sticky top-0 z-20" style={{ minWidth: '160px', maxWidth: '200px' }}>
+          <th key={property} className="px-2 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0 bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
             <div className="truncate text-center sm:text-right" title={property}>
               {property}
             </div>
@@ -1360,7 +1360,7 @@ export default function FinancialsPage() {
         ));
         
         headers.push(
-          <th key="total" className="px-3 py-3 text-right text-xs font-medium text-blue-800 uppercase tracking-wider bg-blue-100 border-l-2 border-blue-600 shadow-sm sticky top-0 z-20" style={{ minWidth: '140px' }}>
+          <th key="total" className="px-2 py-3 text-right text-xs font-medium text-blue-800 uppercase tracking-wider bg-blue-100 border-l-2 border-blue-600 shadow-sm sticky top-0 z-20" style={{ minWidth: '140px' }}>
             <div className="text-blue-800 font-bold">Total</div>
           </th>
         );
@@ -1368,14 +1368,14 @@ export default function FinancialsPage() {
         return headers;
       } else {
         const headers = timeSeriesData.periods.map((period: string) => (
-          <th key={period} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
+          <th key={period} className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '140px' }}>
             {period}
           </th>
         ));
         
         if (viewMode === 'detailed') {
           headers.push(
-            <th key="total" className="px-4 py-3 text-right text-xs font-medium text-blue-800 uppercase tracking-wider bg-blue-100 border-l-2 border-blue-600 shadow-sm sticky top-0 z-20" style={{ minWidth: '140px' }}>
+            <th key="total" className="px-2 py-3 text-right text-xs font-medium text-blue-800 uppercase tracking-wider bg-blue-100 border-l-2 border-blue-600 shadow-sm sticky top-0 z-20" style={{ minWidth: '140px' }}>
               <div className="text-blue-800 font-bold">Total</div>
             </th>
           );
@@ -1416,7 +1416,7 @@ export default function FinancialsPage() {
           };
           
           return (
-            <td key={property} className={`px-3 py-3 text-right text-sm font-medium border-r border-gray-200 last:border-r-0 ${
+            <td key={property} className={`px-2 py-3 text-right text-sm font-medium border-r border-gray-200 last:border-r-0 ${
               value >= 0 ? 'text-green-600' : 'text-red-600'
             }`} style={{ minWidth: '140px', maxWidth: '180px' }}>
               <span 
@@ -1437,7 +1437,7 @@ export default function FinancialsPage() {
         };
         
         cells.push(
-          <td key="total" className={`px-3 py-3 text-right text-sm font-medium bg-blue-50 border-l border-blue-300 ${
+          <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-blue-50 border-l border-blue-300 ${
             totalValue >= 0 ? 'text-blue-700' : 'text-blue-700'
           }`} style={{ minWidth: '120px' }}>
             <span 
@@ -1484,7 +1484,7 @@ export default function FinancialsPage() {
           };
           
           return (
-            <td key={period} className={`px-4 py-3 text-right text-sm font-medium ${
+            <td key={period} className={`px-2 py-3 text-right text-sm font-medium ${
               value >= 0 ? 'text-green-600' : 'text-red-600'
             }`} style={{ minWidth: '120px' }}>
               <span 
@@ -1541,7 +1541,7 @@ export default function FinancialsPage() {
           };
           
           cells.push(
-            <td key="total" className={`px-4 py-3 text-right text-sm font-medium bg-blue-50 border-l border-blue-300 ${
+            <td key="total" className={`px-2 py-3 text-right text-sm font-medium bg-blue-50 border-l border-blue-300 ${
               totalValue >= 0 ? 'text-blue-700' : 'text-blue-700'
             }`} style={{ minWidth: '120px' }}>
               <span 
@@ -1598,7 +1598,7 @@ export default function FinancialsPage() {
           <React.Fragment key={`parent-${account.name}`}>
             {/* PARENT ACCOUNT ROW */}
             <tr className="hover:bg-blue-50 bg-blue-25 border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
-              <td className={`px-6 py-3 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
+              <td className={`px-6 py-3 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
                 <div className="flex items-center">
                   <button
                     onClick={() => toggleParentAccount(account.name)}
@@ -1616,18 +1616,12 @@ export default function FinancialsPage() {
                       <span className="font-bold text-gray-800" style={{ color: BRAND_COLORS.primary }}>
                         📁 {account.name}
                       </span>
-                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        Parent
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      🔢 {subAccountCount} sub-accounts • {totalTransactions} total transactions
                     </div>
                   </div>
                 </div>
               </td>
               {renderDataCells(account)}
-              <td className="px-4 py-3 text-right text-sm text-gray-500 bg-blue-25">
+              <td className="px-2 py-3 text-right text-sm text-gray-500 bg-blue-25">
                 {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
               </td>
             </tr>
@@ -1637,7 +1631,7 @@ export default function FinancialsPage() {
               <tr key={`sub-${account.name}-${subAccount.name}`} className={`hover:bg-gray-50 ${
                 subAccount.isParentAsSubAccount ? 'bg-yellow-25 border-l-4 border-yellow-300' : 'bg-blue-25 border-l-4 border-blue-200'
               }`}>
-                <td className={`px-6 py-2 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
+                <td className={`px-6 py-2 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
                   <div className="flex items-center pl-8">
                     <div className="w-4 h-4 mr-3 flex items-center justify-center">
                       <div className={`w-2 h-2 rounded-full ${
@@ -1649,29 +1643,12 @@ export default function FinancialsPage() {
                         <span className="text-gray-700 font-medium">
                           {subAccount.isParentAsSubAccount ? '📁' : '💧'} {subAccount.name}
                         </span>
-                        <span className={`ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                          subAccount.isParentAsSubAccount 
-                            ? 'bg-yellow-100 text-yellow-800' 
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {subAccount.isParentAsSubAccount ? 'Parent' : 'Sub'}
-                        </span>
                       </div>
-                      {subAccount.entries && subAccount.entries.length > 0 && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          🔍 {subAccount.entries.length} transactions
-                          {subAccount.isParentAsSubAccount && (
-                            <span className="ml-2 text-yellow-600 font-medium">
-                              (Direct to {account.name})
-                            </span>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </td>
                 {renderDataCells(subAccount)}
-                <td className={`px-4 py-2 text-right text-sm text-gray-500 ${
+                <td className={`px-2 py-2 text-right text-sm text-gray-500 ${
                   subAccount.isParentAsSubAccount ? 'bg-yellow-25' : 'bg-blue-25'
                 }`}>
                   {kpis.revenue ? calculatePercentage(Math.abs(subAccount.total), Math.abs(kpis.revenue)) : '0%'}
@@ -1684,21 +1661,13 @@ export default function FinancialsPage() {
         // Standalone account
         return (
           <tr key={`standalone-${account.name}`} className="hover:bg-gray-50">
-            <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
+            <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
               <div className="flex items-center">
                 <span className="text-gray-700">📄 {account.name}</span>
-                <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
-                  Individual
-                </span>
               </div>
-              {account.entries && account.entries.length > 0 && (
-                <div className="text-xs text-gray-500 mt-1">
-                  🔍 {account.entries.length} transactions
-                </div>
-              )}
             </td>
             {renderDataCells(account)}
-            <td className="px-4 py-2 text-right text-sm text-gray-500">
+            <td className="px-2 py-2 text-right text-sm text-gray-500">
               {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
             </td>
           </tr>
@@ -1710,7 +1679,7 @@ export default function FinancialsPage() {
   // Render section headers and totals with property support
   const renderSectionHeader = (title: string, emoji: string, category: PLCategory, bgClass: string, textClass: string) => (
     <tr className={`${bgClass} border-t-2 border-opacity-50`}>
-      <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} bg-white sticky left-0 z-20 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 20, backgroundColor: 'white' }}>
+      <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} bg-white sticky left-0 z-20 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 20, backgroundColor: 'white' }}>
         {emoji} {title}
       </td>
       {viewMode === 'by-property' && timeSeriesData ? (
@@ -2237,7 +2206,7 @@ export default function FinancialsPage() {
         minWidth: viewMode === 'by-property' && timeSeriesData?.availableProperties ? 
           `${Math.max(1400, (timeSeriesData.availableProperties.length + 2) * 180)}px` : 
           viewMode === 'detailed' && timeSeriesData?.periods ? 
-          `${Math.max(1400, (timeSeriesData.periods.length + 2) * 180)}px` : '1400px',
+          `${Math.max(1400, (timeSeriesData.periods.length + 2) * 180)}px` : '1200px',
         width: '100%',
         tableLayout: 'fixed'
       }}>
@@ -2247,11 +2216,11 @@ export default function FinancialsPage() {
               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
                 ? 'border-b-2 border-gray-200' : ''
-            }`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', top: 0, left: 0, zIndex: 50, backgroundColor: 'white' }}>
+            }`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', top: 0, left: 0, zIndex: 50, backgroundColor: 'white' }}>
               Account
             </th>
             {renderColumnHeaders()}
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F9FAFB' }}>
+            <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F9FAFB' }}>
               % of Revenue
             </th>
           </tr>
@@ -2263,7 +2232,7 @@ export default function FinancialsPage() {
 
                           {/* TOTAL REVENUE */}
                           <tr className="bg-blue-100 border-t-2 border-blue-300">
-                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                               📊 TOTAL REVENUE
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2310,7 +2279,7 @@ export default function FinancialsPage() {
 
                               {/* TOTAL COGS */}
                               <tr className="bg-red-100 border-t-2 border-red-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                                   📊 TOTAL COGS
                                 </td>
                                 {viewMode === 'by-property' && timeSeriesData ? (
@@ -2354,7 +2323,7 @@ export default function FinancialsPage() {
 
                           {/* 📈 GROSS PROFIT */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.success }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.success, minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.success, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                               📈 GROSS PROFIT
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2411,7 +2380,7 @@ export default function FinancialsPage() {
 
                               {/* TOTAL OPERATING EXPENSES */}
                               <tr className="bg-orange-100 border-t-2 border-orange-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                                   📊 TOTAL OPERATING EXPENSES
                                 </td>
                                 {viewMode === 'by-property' && timeSeriesData ? (
@@ -2455,7 +2424,7 @@ export default function FinancialsPage() {
 
                           {/* 🏆 NET OPERATING INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.primary }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.primary, minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.primary, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                               🏆 NET OPERATING INCOME
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2534,7 +2503,7 @@ export default function FinancialsPage() {
 
                           {/* 🎯 FINAL NET INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.secondary }}>
-                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.secondary, minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
+                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.secondary, minWidth: '400px', maxWidth: '450px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                               🎯 NET INCOME
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
