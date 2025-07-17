@@ -926,6 +926,9 @@ export default function MobileResponsiveFinancialsPage() {
   const [selectedPropertyForPL, setSelectedPropertyForPL] = useState(null);
   const [showPropertyPL, setShowPropertyPL] = useState(false);
   const [showTransactionDetail, setShowTransactionDetail] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [startY, setStartY] = useState(0);
   
   // Auto-adjust settings based on device type
   useEffect(() => {
@@ -943,6 +946,16 @@ export default function MobileResponsiveFinancialsPage() {
       setTableMode('detailed');
     }
   }, [deviceType]);
+
+  // Load initial data
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  // Load data when filters change
+  useEffect(() => {
+    loadRealFinancialData();
+  }, [selectedProperties, selectedMonth, timePeriod, viewMode]);
 
   // Generate months list
   const generateMonthsList = () => {
@@ -962,16 +975,6 @@ export default function MobileResponsiveFinancialsPage() {
   };
 
   const monthsList = generateMonthsList();
-
-  // Load initial data
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  // Load data when filters change
-  useEffect(() => {
-    loadRealFinancialData();
-  }, [selectedProperties, selectedMonth, timePeriod, viewMode]);
 
   const loadInitialData = async () => {
     try {
@@ -1678,6 +1681,215 @@ export default function MobileResponsiveFinancialsPage() {
   const trendData = generateTrendData();
   const expenseData = generateExpenseBreakdown();
 
+  // Achievement system
+  const calculateAchievements = () => {
+    if (!timeSeriesData?.availableProperties || timeSeriesData.availableProperties.length === 0) {
+      return [];
+    }
+
+    const achievements = [];
+    
+    // Get property performance data
+    const propertyData = timeSeriesData.availableProperties.map((property) => {
+      const revenue = currentData
+        .filter((item) => item.category === 'Revenue')
+        .reduce((sum, item) => sum + (item.propertyTotals?.[property] || 0), 0);
+      
+      const cogs = currentData
+        .filter((item) => item.category === 'COGS')
+        .reduce((sum, item) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
+      
+      const operatingExpenses = currentData
+        .filter((item) => item.category === 'Operating Expenses')
+        .reduce((sum, item) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
+      
+      const otherIncome = currentData
+        .filter((item) => item.category === 'Other Income')
+        .reduce((sum, item) => sum + (item.propertyTotals?.[property] || 0), 0);
+      
+      const otherExpenses = currentData
+        .filter((item) => item.category === 'Other Expenses')
+        .reduce((sum, item) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
+
+      const totalExpenses = cogs + operatingExpenses + otherExpenses;
+      const profit = revenue - totalExpenses + otherIncome;
+      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+      return {
+        name: property,
+        revenue,
+        expenses: totalExpenses,
+        profit,
+        margin
+      };
+    });
+
+    // Sort by different metrics
+    const sortedByProfit = [...propertyData].sort((a, b) => b.profit - a.profit);
+    const sortedByRevenue = [...propertyData].sort((a, b) => b.revenue - a.revenue);
+    const sortedByMargin = [...propertyData].sort((a, b) => b.margin - a.margin);
+    
+    // Calculate totals
+    const totalRevenue = propertyData.reduce((sum, p) => sum + p.revenue, 0);
+    const totalProfit = propertyData.reduce((sum, p) => sum + p.profit, 0);
+    const profitableProperties = propertyData.filter(p => p.profit > 0);
+    const highMarginProperties = propertyData.filter(p => p.margin > 20);
+
+    // Achievement: Top Performer
+    if (sortedByProfit.length > 0 && sortedByProfit[0].profit > 0) {
+      achievements.push({
+        id: 'top-performer',
+        title: '🏆 Top Performer',
+        description: `${sortedByProfit[0].name} leads with ${formatCurrency(sortedByProfit[0].profit)} profit`,
+        type: 'success',
+        property: sortedByProfit[0].name,
+        metric: sortedByProfit[0].profit
+      });
+    }
+
+    // Achievement: Revenue Champion
+    if (sortedByRevenue.length > 0 && sortedByRevenue[0].revenue > 0) {
+      achievements.push({
+        id: 'revenue-champion',
+        title: '💰 Revenue Champion',
+        description: `${sortedByRevenue[0].name} generates ${formatCurrency(sortedByRevenue[0].revenue)} in revenue`,
+        type: 'success',
+        property: sortedByRevenue[0].name,
+        metric: sortedByRevenue[0].revenue
+      });
+    }
+
+    // Achievement: Margin Master
+    if (sortedByMargin.length > 0 && sortedByMargin[0].margin > 0) {
+      achievements.push({
+        id: 'margin-master',
+        title: '📈 Margin Master',
+        description: `${sortedByMargin[0].name} achieves ${sortedByMargin[0].margin.toFixed(1)}% profit margin`,
+        type: 'success',
+        property: sortedByMargin[0].name,
+        metric: sortedByMargin[0].margin
+      });
+    }
+
+    // Achievement: Portfolio Powerhouse
+    if (profitableProperties.length > 0) {
+      const profitablePercentage = (profitableProperties.length / propertyData.length) * 100;
+      achievements.push({
+        id: 'portfolio-powerhouse',
+        title: '🌟 Portfolio Powerhouse',
+        description: `${profitableProperties.length} of ${propertyData.length} properties (${profitablePercentage.toFixed(0)}%) are profitable`,
+        type: 'info',
+        metric: profitableProperties.length
+      });
+    }
+
+    // Achievement: Efficiency Expert
+    if (highMarginProperties.length > 0) {
+      achievements.push({
+        id: 'efficiency-expert',
+        title: '⚡ Efficiency Expert',
+        description: `${highMarginProperties.length} properties achieve 20%+ profit margins`,
+        type: 'info',
+        metric: highMarginProperties.length
+      });
+    }
+
+    // Achievement: Growth Alert
+    if (totalRevenue > 100000) {
+      achievements.push({
+        id: 'growth-milestone',
+        title: '🚀 Growth Milestone',
+        description: `Portfolio revenue: ${formatCurrency(totalRevenue)} - Strong performance!`,
+        type: 'success',
+        metric: totalRevenue
+      });
+    }
+
+    // Achievement: Needs Attention
+    const lossProperties = propertyData.filter(p => p.profit < 0);
+    if (lossProperties.length > 0) {
+      achievements.push({
+        id: 'needs-attention',
+        title: '⚠️ Needs Attention',
+        description: `${lossProperties.length} properties need optimization`,
+        type: 'warning',
+        metric: lossProperties.length
+      });
+    }
+
+    // Achievement: Consistent Performer
+    const consistentProperties = propertyData.filter(p => p.margin > 10 && p.margin < 30);
+    if (consistentProperties.length >= 3) {
+      achievements.push({
+        id: 'consistent-performer',
+        title: '🎯 Consistent Performer',
+        description: `${consistentProperties.length} properties maintain steady 10-30% margins`,
+        type: 'info',
+        metric: consistentProperties.length
+      });
+    }
+
+    return achievements;
+  };
+
+  const achievements = calculateAchievements();
+
+  // Achievement badges component
+  const renderAchievementBadges = () => {
+    if (achievements.length === 0) return null;
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">🏆 Achievements</h3>
+            <div className="text-sm text-gray-600">
+              {achievements.length} earned
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4">
+          <div className="grid grid-cols-1 gap-3">
+            {achievements.map((achievement) => (
+              <div
+                key={achievement.id}
+                className={`p-3 rounded-lg border-l-4 ${
+                  achievement.type === 'success' ? 'bg-green-50 border-green-400' :
+                  achievement.type === 'warning' ? 'bg-yellow-50 border-yellow-400' :
+                  'bg-blue-50 border-blue-400'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-900 mb-1">
+                      {achievement.title}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {achievement.description}
+                    </div>
+                  </div>
+                  {achievement.property && (
+                    <div className="ml-3 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                      {achievement.property}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Achievement summary */}
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <div className="text-sm text-gray-600 text-center">
+              🎉 Keep up the great work! Your portfolio is showing strong performance across multiple metrics.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Helper function to get category totals with property support
   const getCategoryTotal = (category, period, property) => {
     if (timeSeriesData) {
@@ -1765,6 +1977,138 @@ export default function MobileResponsiveFinancialsPage() {
             </div>
           </div>
         ))}
+      </div>
+    );
+  };
+
+  // Side-by-side property cards (2x2 grid)
+  const renderSideBySidePropertyCards = () => {
+    if (!timeSeriesData?.availableProperties || timeSeriesData.availableProperties.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500">
+          <div className="text-center">
+            <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+            <p className="text-lg font-medium text-gray-600">No property data available</p>
+            <p className="text-sm mt-2 text-gray-500">Switch to "By Property" view to see property breakdown</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Get property data and sort by profit (best performers first)
+    const propertyData = timeSeriesData.availableProperties.map((property) => {
+      const revenue = currentData
+        .filter((item) => item.category === 'Revenue')
+        .reduce((sum, item) => sum + (item.propertyTotals?.[property] || 0), 0);
+      
+      const cogs = currentData
+        .filter((item) => item.category === 'COGS')
+        .reduce((sum, item) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
+      
+      const operatingExpenses = currentData
+        .filter((item) => item.category === 'Operating Expenses')
+        .reduce((sum, item) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
+      
+      const otherIncome = currentData
+        .filter((item) => item.category === 'Other Income')
+        .reduce((sum, item) => sum + (item.propertyTotals?.[property] || 0), 0);
+      
+      const otherExpenses = currentData
+        .filter((item) => item.category === 'Other Expenses')
+        .reduce((sum, item) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
+
+      const totalExpenses = cogs + operatingExpenses + otherExpenses;
+      const profit = revenue - totalExpenses + otherIncome;
+
+      return {
+        name: property,
+        revenue,
+        expenses: totalExpenses,
+        profit,
+        data: {
+          revenue,
+          cogs,
+          operatingExpenses,
+          otherIncome,
+          otherExpenses
+        }
+      };
+    }).sort((a, b) => b.profit - a.profit); // Sort by profit (highest first)
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Property Performance</h3>
+              <div className="text-sm text-gray-600 mt-1">
+                {timePeriod} period • {propertyData.length} properties • Sorted by profit
+              </div>
+            </div>
+            <div className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+              🏢 Tap to view P&L
+            </div>
+          </div>
+        </div>
+
+        {/* Side-by-side property cards */}
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4">
+            {propertyData.map((property, index) => (
+              <div
+                key={property.name}
+                className="bg-gradient-to-br from-white to-gray-50 rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                onClick={() => {
+                  setSelectedPropertyForPL(property);
+                  setShowPropertyPL(true);
+                }}
+                style={{
+                  boxShadow: index === 0 ? `0 4px 6px -1px ${BRAND_COLORS.primary}33` : undefined
+                }}
+              >
+                {/* Property name */}
+                <div className="text-sm font-semibold text-gray-900 mb-3 truncate" title={property.name}>
+                  {property.name}
+                  {index === 0 && <span className="ml-1 text-xs">🏆</span>}
+                </div>
+
+                {/* Revenue */}
+                <div className="mb-3">
+                  <div className="text-xs text-gray-500 mb-1">Revenue</div>
+                  <div className="text-lg font-bold text-green-600">
+                    {formatCurrency(property.revenue)}
+                  </div>
+                </div>
+
+                {/* Expenses */}
+                <div className="mb-3">
+                  <div className="text-xs text-gray-500 mb-1">Expenses</div>
+                  <div className="text-lg font-bold text-red-600">
+                    {formatCurrency(property.expenses)}
+                  </div>
+                </div>
+
+                {/* Profit */}
+                <div className="mb-2">
+                  <div className="text-xs text-gray-500 mb-1">Profit</div>
+                  <div className={`text-lg font-bold ${property.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                    {formatCurrency(property.profit)}
+                  </div>
+                </div>
+
+                {/* Profit margin indicator */}
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="text-xs text-gray-500">
+                    {property.revenue > 0 ? 
+                      `${((property.profit / property.revenue) * 100).toFixed(1)}% margin` :
+                      'No revenue'
+                    }
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -2644,7 +2988,37 @@ export default function MobileResponsiveFinancialsPage() {
       </div>
 
       {/* Main Content */}
-      <main className="px-4 py-6 space-y-6">
+      <main 
+        id="mobile-container"
+        className="px-4 py-6 space-y-6 relative"
+        style={{
+          transform: deviceType === 'mobile' ? `translateY(${pullDistance}px)` : 'none',
+          transition: isRefreshing ? 'transform 0.3s ease' : 'none'
+        }}
+      >
+        {/* Pull-to-refresh indicator */}
+        {(deviceType === 'mobile' && (pullDistance > 0 || isRefreshing)) && (
+          <div 
+            className="absolute top-0 left-1/2 transform -translate-x-1/2 flex items-center justify-center"
+            style={{
+              top: deviceType === 'mobile' ? `${-40 + (pullDistance * 0.5)}px` : '-40px',
+              opacity: pullDistance > 20 || isRefreshing ? 1 : pullDistance / 20
+            }}
+          >
+            <div className="bg-white rounded-full p-2 shadow-lg border border-gray-200">
+              <RefreshCw 
+                className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''} ${
+                  pullDistance > 60 ? 'text-green-500' : 'text-gray-400'
+                }`}
+              />
+            </div>
+            <div className="ml-2 text-sm text-gray-600">
+              {isRefreshing ? 'Refreshing...' : 
+               pullDistance > 60 ? 'Release to refresh' : 'Pull to refresh'}
+            </div>
+          </div>
+        )}
+
         {/* Loading State */}
         {isLoadingData && (
           <div className="flex items-center justify-center py-8">
@@ -2681,7 +3055,8 @@ export default function MobileResponsiveFinancialsPage() {
         {deviceType === 'mobile' ? (
           // Mobile: Property cards with drill-down
           <div className="space-y-6">
-            {renderMobilePropertyCards()}
+            {renderAchievementBadges()}
+            {renderSideBySidePropertyCards()}
           </div>
         ) : (
           // Tablet/Desktop: Side-by-side layout
@@ -2693,6 +3068,7 @@ export default function MobileResponsiveFinancialsPage() {
 
             {/* Charts */}
             <div className="lg:col-span-1">
+              {renderAchievementBadges()}
               {renderMobileCharts()}
             </div>
           </div>
