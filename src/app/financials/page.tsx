@@ -2072,9 +2072,10 @@ export default function FinancialsPage() {
         {kpis.revenue ? calculatePercentage(Math.abs(getCategoryTotal(category)), Math.abs(kpis.revenue)) : '0%'}
       </td>
     </tr>
+
   );
 
-  return (
+ return (
     <>
       <style jsx>{scrollbarStyles}</style>
       <div className="min-h-screen bg-gray-50">
