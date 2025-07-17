@@ -26,18 +26,15 @@ export default function Login() {
     setError('')
     setIsConnecting(true)
 
-    // Start QuickBooks OAuth flow after successful login
+    // Replace with your FastAPI auth URL
     window.location.href = 'http://localhost:8000/auth/qbo/initiate'
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
-        {/* Logo/Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-            I AM CFO
-          </h1>
+          <h1 className="text-3xl font-bold text-blue-700">I AM CFO</h1>
           <p className="text-gray-600 mt-2">Log in to connect your QuickBooks</p>
         </div>
 
@@ -62,18 +59,10 @@ export default function Login() {
             disabled={isConnecting}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isConnecting ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Connecting...
-              </div>
-            ) : (
-              'Connect QuickBooks'
-            )}
+            {isConnecting ? 'Connecting...' : 'Connect QuickBooks'}
           </button>
         </form>
 
-        {/* Security notice */}
         <div className="text-center text-sm text-gray-500 mt-6">
           <div className="flex items-center justify-center mb-2">
             <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -82,16 +71,6 @@ export default function Login() {
             Secure OAuth Connection
           </div>
           <p>Your data is encrypted and we never store your QuickBooks credentials</p>
-        </div>
-
-        {/* What happens next */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2">What happens next:</h4>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Log in to I AM CFO</li>
-            <li>• Authorize QuickBooks access</li>
-            <li>• Instantly sync your financial data</li>
-          </ul>
         </div>
       </div>
     </div>
