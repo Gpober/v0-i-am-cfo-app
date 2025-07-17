@@ -4,6 +4,44 @@ import React, { useState, useEffect } from 'react';
 import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie, ComposedChart } from 'recharts';
 
+// TypeScript interfaces
+type FinancialTab = 'p&l' | 'balance-sheet' | 'cash-flow';
+type MonthString = string;
+type TimePeriod = 'Monthly' | 'Quarterly' | 'Yearly' | 'Trailing 12';
+type ViewMode = 'total' | 'detailed' | 'by-property';
+type PLCategory = 'Revenue' | 'COGS' | 'Operating Expenses' | 'Other Income' | 'Other Expenses';
+
+interface FinancialDataItem {
+  name: string;
+  total: number;
+  category: PLCategory;
+  account_type?: string;
+  account_detail_type?: string;
+  entries?: any[];
+  isParent?: boolean;
+  isSubAccount?: boolean;
+  isParentAsSubAccount?: boolean;
+  subAccounts?: FinancialDataItem[];
+  originalName?: string;
+  propertyTotals?: { [key: string]: number };
+  propertyEntries?: { [key: string]: any[] };
+}
+
+interface NotificationState {
+  show: boolean;
+  message: string;
+  type: 'info' | 'success' | 'error';
+}
+
+interface DataIntegrityStatus {
+  isValid: boolean;
+  totalRecords: number;
+  issues: string[];
+  details: any;
+  lastValidated?: Date;
+  source?: string;
+}
+
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
   primary: '#56B6E9',
