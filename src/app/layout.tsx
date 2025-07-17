@@ -1,3 +1,5 @@
+'use client'
+
 import './globals.css';
 import { Inter } from 'next/font/google'
 import Link from 'next/link'
@@ -14,7 +16,7 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const isLoginPage = typeof window !== 'undefined' && window.location.pathname === '/IAMCFO_LOGIN'
+  
 
   return (
     <html lang="en">
