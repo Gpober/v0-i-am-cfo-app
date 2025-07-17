@@ -1310,31 +1310,32 @@ export default function FinancialsPage() {
         
         return result;
       } else if (viewMode === 'detailed' || 
-          (viewMode === 'total' && (timePeriod === 'Quarterly' || timePeriod === 'Yearly'))) {
-        // Aggregate across multiple periods
-        const allAccounts: Record<string, any> = {};
-        
-        timeSeriesData.periods.forEach((period: string) => {
-          const periodData = timeSeriesData.data[period] || {};
-          
-          Object.values(periodData).forEach((account: any) => {
-            if (!allAccounts[account.name]) {
-              allAccounts[account.name] = {
-                name: account.name,
-                category: account.category,
-                type: account.category,
-                total: 0,
-                entries: [],
-                account_type: account.account_type,
-                account_detail_type: account.account_detail_type
-              };
-            }
-            allAccounts[account.name].total += account.total;
-            allAccounts[account.name].entries.push(...account.entries);
-          });
-        });
-        
-        return Object.values(allAccounts);
+    (viewMode === 'total' && (timePeriod === 'Quarterly' || timePeriod === 'Yearly')) ||
+    (timePeriod === 'Monthly' && viewMode === 'total')) {  // ADD THIS LINE
+  // Aggregate across multiple periods
+  const allAccounts: Record<string, any> = {};
+  
+  timeSeriesData.periods.forEach((period: string) => {
+    const periodData = timeSeriesData.data[period] || {};
+    
+    Object.values(periodData).forEach((account: any) => {
+      if (!allAccounts[account.name]) {
+        allAccounts[account.name] = {
+          name: account.name,
+          category: account.category,
+          type: account.category,
+          total: 0,
+          entries: [],
+          account_type: account.account_type,
+          account_detail_type: account.account_detail_type
+        };
+      }
+      allAccounts[account.name].total += account.total;
+      allAccounts[account.name].entries.push(...account.entries);
+    });
+  });
+  
+  return Object.values(allAccounts);
       } else {
         // For single-period total modes
         if (timePeriod === 'Trailing 12' && viewMode === 'total') {
