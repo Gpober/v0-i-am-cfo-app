@@ -2632,87 +2632,46 @@ export default function FinancialsPage() {
             </div>
 
 
-            {/* Main Content Grid - P&L starts here */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column: Financial Tables */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900">
-                        Profit & Loss Statement {viewMode === 'by-property' ? `(By Property - ${timePeriod})` : '(By Property Class)'}
-                      </h3>
-                      <div className="mt-2 text-sm text-gray-600">
-                        {viewMode === 'by-property'
-                          ? `Showing ${timePeriod.toLowerCase()} property comparison for ${
-                              timePeriod === 'Monthly' ? selectedMonth :
-                              timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
-                              timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
-                              `past 12 months ending ${selectedMonth}`
-                            } • ${timeSeriesData?.availableProperties?.length || 0} properties`
-                          : timePeriod === 'Trailing 12' && viewMode === 'total' 
-                          ? 'Showing aggregated totals for the past 12 months'
-                          : timePeriod === 'Monthly' && viewMode === 'detailed'
-                          ? 'Showing weekly breakdown for the selected month'
-                          : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
-                        }
-                        {viewMode === 'by-property' && (
-                          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                            🏢 Property View
-                          </span>
-                        )}
-                        <div className="mt-1 text-xs text-green-600">
-                          ✅ P&L accounts automatically classified • Balance Sheet accounts excluded • 🏗️ Account grouping enabled
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Left Column: Financial Tables */}
+              <div className="lg:col-span-2">
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          Profit & Loss Statement {viewMode === 'by-property' ? `(By Property - ${timePeriod})` : '(By Property Class)'}
+                        </h3>
+                        <div className="mt-2 text-sm text-gray-600">
+                          {viewMode === 'by-property'
+                            ? `Showing ${timePeriod.toLowerCase()} property comparison for ${
+                                timePeriod === 'Monthly' ? selectedMonth :
+                                timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
+                                timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
+                                `past 12 months ending ${selectedMonth}`
+                              } • ${timeSeriesData?.availableProperties?.length || 0} properties`
+                            : timePeriod === 'Trailing 12' && viewMode === 'total' 
+                            ? 'Showing aggregated totals for the past 12 months'
+                            : timePeriod === 'Monthly' && viewMode === 'detailed'
+                            ? 'Showing weekly breakdown for the selected month'
+                            : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
+                          }
                           {viewMode === 'by-property' && (
-                            <span className="ml-1">• 🏢 Property dimension active</span>
+                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                              🏢 Property View
+                            </span>
                           )}
+                          <div className="mt-1 text-xs text-green-600">
+                            ✅ P&L accounts automatically classified • Balance Sheet accounts excluded • 🏗️ Account grouping enabled
+                            {viewMode === 'by-property' && (
+                              <span className="ml-1">• 🏢 Property dimension active</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column: Financial Tables */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900">
-                        Profit & Loss Statement {viewMode === 'by-property' ? `(By Property - ${timePeriod})` : '(By Property Class)'}
-                      </h3>
-                      <div className="mt-2 text-sm text-gray-600">
-                        {viewMode === 'by-property'
-                          ? `Showing ${timePeriod.toLowerCase()} property comparison for ${
-                              timePeriod === 'Monthly' ? selectedMonth :
-                              timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
-                              timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
-                              `past 12 months ending ${selectedMonth}`
-                            } • ${timeSeriesData?.availableProperties?.length || 0} properties`
-                          : timePeriod === 'Trailing 12' && viewMode === 'total' 
-                          ? 'Showing aggregated totals for the past 12 months'
-                          : timePeriod === 'Monthly' && viewMode === 'detailed'
-                          ? 'Showing weekly breakdown for the selected month'
-                          : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
-                        }
-                        {viewMode === 'by-property' && (
-                          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                            🏢 Property View
-                          </span>
-                        )}
-                        <div className="mt-1 text-xs text-green-600">
-                          ✅ P&L accounts automatically classified • Balance Sheet accounts excluded • 🏗️ Account grouping enabled
-                          {viewMode === 'by-property' && (
-                            <span className="ml-1">• 🏢 Property dimension active</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
                 {/* P&L Table Content */}
 <div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ height: '105vh' }}>
