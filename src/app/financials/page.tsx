@@ -3025,9 +3025,23 @@ const scrollbarStyles = `
   }
   
   /* Enhanced sticky positioning for better browser support */
+  #pl-table-container thead {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  
+  #pl-table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    background-color: #F9FAFB;
+  }
+  
   #pl-table-container thead th:first-child {
     position: sticky;
     left: 0;
+    top: 0;
     z-index: 50;
     background-color: white;
     box-shadow: 2px 0 4px rgba(0,0,0,0.1);
