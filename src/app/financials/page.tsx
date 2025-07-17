@@ -2420,10 +2420,10 @@ export default function FinancialsPage() {
               </div>
             </div>
 
-            {/* Charts Row - Pie Chart 2/3 + Trend Chart 1/3 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Property Performance Chart - 2/3 width */}
-              <div className="lg:col-span-2">
+           {/* Charts Row - 50/50 Split */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Property Performance Chart - 50% width */}
+              <div className="lg:col-span-1">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                   <div className="p-6 border-b border-gray-200">
                     <div className="flex justify-between items-center">
@@ -2494,10 +2494,10 @@ export default function FinancialsPage() {
                   
                   <div className="p-6">
                     {generatePropertyChartData().length > 0 ? (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {/* Pie Chart */}
                         <div className="flex items-center justify-center">
-                          <ResponsiveContainer width="100%" height={300}>
+                          <ResponsiveContainer width="100%" height={150}>
                             <RechartsPieChart>
                               <defs>
                                 {generatePropertyChartData().map((entry, index) => (
@@ -2513,7 +2513,7 @@ export default function FinancialsPage() {
                                 data={generatePropertyChartData()}
                                 cx="50%"
                                 cy="52%"
-                                outerRadius={90}
+                                outerRadius={55}
                                 fill="#000000"
                                 fillOpacity={0.08}
                                 dataKey="value"
@@ -2526,7 +2526,7 @@ export default function FinancialsPage() {
                                 data={generatePropertyChartData()}
                                 cx="50%"
                                 cy="50%"
-                                outerRadius={90}
+                                outerRadius={55}
                                 innerRadius={0}
                                 paddingAngle={1}
                                 dataKey="value"
@@ -2535,11 +2535,11 @@ export default function FinancialsPage() {
                                 animationDuration={1000}
                                 animationEasing="ease-out"
                                 label={({ name, percent, value }) => 
-                                  percent > 0.08 ? `${(percent * 100).toFixed(1)}%` : ''
+                                  percent > 0.1 ? `${(percent * 100).toFixed(1)}%` : ''
                                 }
                                 labelLine={false}
                                 style={{
-                                  fontSize: '11px',
+                                  fontSize: '9px',
                                   fontWeight: 'bold',
                                   fill: 'white',
                                   textShadow: '0 1px 2px rgba(0,0,0,0.5)'
@@ -2577,16 +2577,16 @@ export default function FinancialsPage() {
                                   border: '1px solid #e2e8f0',
                                   borderRadius: '8px',
                                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                  fontSize: '12px',
+                                  fontSize: '11px',
                                   fontWeight: 500
                                 }}
                                 labelStyle={{
                                   fontWeight: 'bold',
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: '#1f2937',
-                                  marginBottom: '6px',
+                                  marginBottom: '4px',
                                   borderBottom: '1px solid #e5e7eb',
-                                  paddingBottom: '3px'
+                                  paddingBottom: '2px'
                                 }}
                               />
                             </RechartsPieChart>
@@ -2595,19 +2595,19 @@ export default function FinancialsPage() {
                         
                         {/* Legend */}
                         <div className="flex flex-col justify-center">
-                          <div className="grid grid-cols-1 gap-2 text-sm">
-                            {generatePropertyChartData().map((entry, index) => (
-                              <div key={entry.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                          <div className="grid grid-cols-1 gap-1 text-xs">
+                            {generatePropertyChartData().slice(0, 6).map((entry, index) => (
+                              <div key={entry.name} className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
                                 <div className="flex items-center">
                                   <div 
-                                    className="w-3 h-3 rounded-full mr-3 flex-shrink-0"
+                                    className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
                                     style={{ backgroundColor: COLORS[index % COLORS.length] }}
                                   />
-                                  <span className="font-medium text-gray-700 text-sm">
-                                    {entry.name.length > 12 ? entry.name.substring(0, 12) + '...' : entry.name}
+                                  <span className="font-medium text-gray-700 text-xs truncate">
+                                    {entry.name.length > 8 ? entry.name.substring(0, 8) + '...' : entry.name}
                                   </span>
                                 </div>
-                                <span className="font-semibold text-gray-900 text-sm">
+                                <span className="font-semibold text-gray-900 text-xs ml-1">
                                   {formatCurrency(entry.value)}
                                 </span>
                               </div>
@@ -2616,7 +2616,7 @@ export default function FinancialsPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center h-60 text-gray-500">
+                      <div className="flex items-center justify-center h-30 text-gray-500">
                         <div className="text-center">
                           <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                           <p className="text-lg font-medium text-gray-600">No property data available</p>
@@ -2633,7 +2633,7 @@ export default function FinancialsPage() {
                 </div>
               </div>
 
-              {/* Revenue & Net Income Trend Chart - 1/3 width */}
+              {/* Revenue & Net Income Trend Chart - 50% width */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full">
                   <div className="p-6 border-b border-gray-200">
@@ -2652,14 +2652,14 @@ export default function FinancialsPage() {
                   </div>
                   <div className="p-4">
                     {trendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={280}>
+                      <ResponsiveContainer width="100%" height={140}>
                         <ComposedChart 
                           data={trendData}
                           margin={{ 
                             top: 20, 
                             right: 10, 
                             left: 10, 
-                            bottom: trendData.length > 4 ? 60 : 40 
+                            bottom: trendData.length > 4 ? 40 : 20 
                           }}
                         >
                           <CartesianGrid 
@@ -2672,7 +2672,7 @@ export default function FinancialsPage() {
                           <XAxis 
                             dataKey="period" 
                             tick={{ 
-                              fontSize: 10, 
+                              fontSize: 9, 
                               fontWeight: 500,
                               fill: '#475569'
                             }}
@@ -2680,19 +2680,19 @@ export default function FinancialsPage() {
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             angle={trendData.length > 4 ? -45 : 0}
                             textAnchor={trendData.length > 4 ? 'end' : 'middle'}
-                            height={trendData.length > 4 ? 60 : 40}
+                            height={trendData.length > 4 ? 40 : 20}
                           />
                           
                           <YAxis 
-                            tickFormatter={(value: any) => `$${(value / 1000).toFixed(0)}k`}
+                            tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`}
                             tick={{ 
-                              fontSize: 10, 
+                              fontSize: 9, 
                               fontWeight: 500,
                               fill: '#475569'
                             }}
                             tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                             axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                            width={50}
+                            width={40}
                             domain={['dataMin', 'dataMax']}
                           />
                           
@@ -2705,7 +2705,7 @@ export default function FinancialsPage() {
                               backgroundColor: 'white', 
                               border: '1px solid #e2e8f0',
                               borderRadius: '8px',
-                              fontSize: '11px',
+                              fontSize: '10px',
                               fontWeight: 500
                             }}
                           />
@@ -2730,17 +2730,17 @@ export default function FinancialsPage() {
                             dataKey="revenue" 
                             stroke="#2563eb" 
                             strokeWidth={2}
-                            dot={{ r: 3, fill: '#2563eb', strokeWidth: 1, stroke: 'white' }}
-                            activeDot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: 'white' }}
+                            dot={{ r: 2, fill: '#2563eb', strokeWidth: 1, stroke: 'white' }}
+                            activeDot={{ r: 3, fill: '#2563eb', strokeWidth: 2, stroke: 'white' }}
                             name="revenue"
                           />
                         </ComposedChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="flex items-center justify-center h-64 text-gray-500">
+                      <div className="flex items-center justify-center h-32 text-gray-500">
                         <div className="text-center">
-                          <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                          <p className="text-sm font-medium text-gray-600">No trend data</p>
+                          <BarChart3 className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+                          <p className="text-xs font-medium text-gray-600">No trend data</p>
                         </div>
                       </div>
                     )}
@@ -2749,6 +2749,18 @@ export default function FinancialsPage() {
               </div>
             </div>
 
+            {/* Main Content Grid - P&L and Transaction Details Below */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+              {/* P&L Table - 80% width (4/5) */}
+              <div className="lg:col-span-4">
+                {/* Your existing P&L table code goes here */}
+              </div>
+
+              {/* Transaction Detail Panel - 20% width (1/5) */}
+              <div className="lg:col-span-1">
+                {/* Your existing transaction detail code goes here */}
+              </div>
+            </div>
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
