@@ -2696,10 +2696,15 @@ export default function FinancialsPage() {
                         
                         {/* Professional tooltip */}
                         <Tooltip 
-                          formatter={(value: any, name: string) => [
-                            `${formatCurrency(Number(value))}`, 
-                            name === 'netIncome' ? 'Net Income' : 'Revenue'
-                          ]}
+                          position={{ y: -20 }}
+                          formatter={(value: any, name: string, props: any) => {
+                            const label = name === 'netIncome' ? 'Net Income' : 'Revenue';
+                            return [`${formatCurrency(Number(value))}`, label];
+                          }}
+                          itemSorter={(item: any) => {
+                            // Revenue first (return -1), Net Income second (return 1)
+                            return item.dataKey === 'revenue' ? -1 : 1;
+                          }}
                           labelStyle={{ 
                             color: '#1e293b',
                             fontWeight: 600,
