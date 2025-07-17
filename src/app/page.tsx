@@ -2536,11 +2536,62 @@ export default function MobileResponsiveFinancialsPage() {
                     <Cell 
                       key={`cell-${index}`} 
                       fill={COLORS[index % COLORS.length]}
+                      style={{
+                        cursor: 'pointer',
+                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                      }}
                     />
                   ))}
                 </Pie>
                 <Tooltip 
-                  formatter={(value) => [formatCurrency(value), propertyChartMetric === 'income' ? 'Revenue' : 'Net Income']}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length > 0) {
+                      const data = payload[0].payload;
+                      const metricName = propertyChartMetric === 'income' ? 'Revenue' : 'Net Income';
+                      const percentage = payload[0].percent;
+                      
+                      return (
+                        <div style={{ 
+                          backgroundColor: 'white', 
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                          padding: '12px 16px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          maxWidth: '200px'
+                        }}>
+                          <div style={{
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            color: '#1f2937',
+                            marginBottom: '6px',
+                            borderBottom: '1px solid #e5e7eb',
+                            paddingBottom: '4px'
+                          }}>
+                            {data.name}
+                          </div>
+                          <div style={{ color: '#374151', marginBottom: '4px' }}>
+                            <strong>{metricName}:</strong> {formatCurrency(data.value)}
+                          </div>
+                          <div style={{ color: '#6b7280', marginBottom: '4px' }}>
+                            <strong>Share:</strong> {(percentage * 100).toFixed(1)}%
+                          </div>
+                          <div style={{ 
+                            fontSize: '11px', 
+                            color: '#9ca3af',
+                            borderTop: '1px solid #f3f4f6',
+                            paddingTop: '4px',
+                            marginTop: '4px'
+                          }}>
+                            <div>Revenue: {formatCurrency(data.revenue)}</div>
+                            <div>Net Income: {formatCurrency(data.netIncome)}</div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
                 />
               </RechartsPieChart>
             </ResponsiveContainer>
@@ -3166,18 +3217,29 @@ export default function MobileResponsiveFinancialsPage() {
             {renderSideBySidePropertyCards()}
           </div>
         ) : (
-          // Tablet/Desktop: Side-by-side layout
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Financial Table */}
-            <div className="lg:col-span-2">
-              {renderMobileTable()}
+          // Tablet/Desktop: Charts on top, P&L below
+          <div className="space-y-6">
+            {/* Top Section: Charts and Company Info */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Company Scorecard */}
+              <div>
+                {renderCompanyScorecard()}
+              </div>
+              
+              {/* Achievement Badges */}
+              <div>
+                {renderAchievementBadges()}
+              </div>
             </div>
-
-            {/* Charts */}
-            <div className="lg:col-span-1">
-              {renderCompanyScorecard()}
-              {renderAchievementBadges()}
+            
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {renderMobileCharts()}
+            </div>
+            
+            {/* P&L Table - Full Width */}
+            <div>
+              {renderMobileTable()}
             </div>
           </div>
         )}
