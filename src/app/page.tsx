@@ -2335,7 +2335,7 @@ export default function MobileResponsiveFinancialsPage() {
 
   // Mobile-optimized filter controls
   const renderMobileFilters = () => (
-    <div className={`${mobileFilterOpen ? 'block' : 'hidden'} lg:hidden absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 space-y-4`}>
+    <div className={`${mobileFilterOpen ? 'block' : 'hidden'} lg:hidden absolute top-full right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 space-y-4`} style={{ minWidth: '280px' }}>
       {/* Month Selector */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
@@ -3026,7 +3026,7 @@ export default function MobileResponsiveFinancialsPage() {
             </div>
             
             {/* Mobile Menu Controls */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 relative">
               {deviceType === 'mobile' && (
                 <>
                   <button
@@ -3052,6 +3052,9 @@ export default function MobileResponsiveFinancialsPage() {
                 <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
                 {deviceType !== 'mobile' && (isLoadingData ? 'Loading...' : 'Refresh')}
               </button>
+              
+              {/* Mobile Filter Panel */}
+              {renderMobileFilters()}
             </div>
           </div>
           
@@ -3085,7 +3088,6 @@ export default function MobileResponsiveFinancialsPage() {
               </select>
             </div>
           )}
-          
           {/* Mobile Filter Panel */}
           {renderMobileFilters()}
         </div>
