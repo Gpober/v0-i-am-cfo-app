@@ -1772,47 +1772,55 @@ export default function FinancialsPage() {
     </tr>
   );
 
+  // CSS styles for scrollbar hiding
+  const scrollbarStyles = {
+    WebkitScrollbar: { display: 'none' },
+    msOverflowStyle: 'none',
+    scrollbarWidth: 'none'
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <style jsx>{`
-        #pl-table-container::-webkit-scrollbar {
-          display: none;
-          width: 0;
-          height: 0;
-        }
-        
-        #pl-table-container::-webkit-scrollbar-track {
-          display: none;
-        }
-        
-        #pl-table-container::-webkit-scrollbar-thumb {
-          display: none;
-        }
-        
-        #pl-table-container {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-          overflow-x: auto;
-          overflow-y: auto;
-        }
-        
-        /* Enhanced sticky positioning for better browser support */
-        #pl-table-container thead th:first-child {
-          position: sticky;
-          left: 0;
-          z-index: 50;
-          background-color: white;
-          box-shadow: 2px 0 4px rgba(0,0,0,0.1);
-        }
-        
-        #pl-table-container tbody td:first-child {
-          position: sticky;
-          left: 0;
-          z-index: 25;
-          background-color: white;
-          box-shadow: 2px 0 4px rgba(0,0,0,0.1);
-        }
-      `}</style>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          #pl-table-container::-webkit-scrollbar {
+            display: none;
+            width: 0;
+            height: 0;
+          }
+          
+          #pl-table-container::-webkit-scrollbar-track {
+            display: none;
+          }
+          
+          #pl-table-container::-webkit-scrollbar-thumb {
+            display: none;
+          }
+          
+          #pl-table-container {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+            overflow-x: auto;
+            overflow-y: auto;
+          }
+          
+          #pl-table-container thead th:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 50;
+            background-color: white;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+          }
+          
+          #pl-table-container tbody td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 25;
+            background-color: white;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+          }
+        `
+      }} />
       {/* Page Header with IAM CFO Branding */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
