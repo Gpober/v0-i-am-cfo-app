@@ -3266,11 +3266,17 @@ export default function FinancialsPage() {
               </Pie>
               
               <Tooltip 
-                formatter={(value: any, name: string) => [
+                formatter={(value: any, name: string, props: any) => [
                   `${formatCurrency(Number(value))}`,
                   propertyChartMetric === 'income' ? 'Revenue' :
                   propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income'
                 ]}
+                labelFormatter={(label: string, payload: any) => {
+                  if (payload && payload.length > 0) {
+                    return `${payload[0].payload.name}`;
+                  }
+                  return label;
+                }}
                 contentStyle={{ 
                   backgroundColor: 'white', 
                   border: '1px solid #e2e8f0',
@@ -3278,6 +3284,12 @@ export default function FinancialsPage() {
                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                   fontSize: '13px',
                   fontWeight: 500
+                }}
+                labelStyle={{
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                  color: '#1f2937',
+                  marginBottom: '4px'
                 }}
               />
             </RechartsPieChart>
