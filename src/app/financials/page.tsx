@@ -1292,63 +1292,70 @@ export default function FinancialsPage() {
     return result;
   };
 
-  // Get current financial data with property support
-  const getCurrentFinancialData = () => {
-    if (timeSeriesData) {
-      if (viewMode === 'by-property') {
-        // For by-property view, get data from the first period
-        const firstPeriodKey = timeSeriesData.periods[0];
-        const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
-        const result = Object.values(firstPeriodData);
+  // SIMPLIFIED: Since all data is now consistently aggregated week-by-week
+const getCurrentFinancialData = () => {
+  if (timeSeriesData) {
+    if (viewMode === 'by-property') {
+      // For by-property view, get data from the first (and usually only) period
+      const firstPeriodKey = timeSeriesData.periods[0];
+      const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
+      const result = Object.values(firstPeriodData);
+      
+      smartLog('🏢 BY-PROPERTY getCurrentFinancialData:', {
+        periodKey: firstPeriodKey,
+        accountCount: result.length,
+        availableProperties: timeSeriesData.availableProperties
+      });
+      
+      return result;
+    } else if (viewMode === 'detailed') {
+      // For detailed view, we already have properly grouped periods from the unified fetching
+      // We need to aggregate across all periods for the summary calculations
+      const allAccounts: Record<string, any> = {};
+      
+      timeSeriesData.periods.forEach((period: string) => {
+        const periodData = timeSeriesData.data[period] || {};
         
-        smartLog('🏢 BY-PROPERTY getCurrentFinancialData:', {
-          periodKey: firstPeriodKey,
-          accountCount: result.length,
-          sampleAccount: result[0],
-          availableProperties: timeSeriesData.availableProperties
+        Object.values(periodData).forEach((account: any) => {
+          if (!allAccounts[account.name]) {
+            allAccounts[account.name] = {
+              name: account.name,
+              category: account.category,
+              type: account.category,
+              total: 0,
+              entries: [],
+              account_type: account.account_type,
+              account_detail_type: account.account_detail_type
+            };
+          }
+          allAccounts[account.name].total += account.total;
+          allAccounts[account.name].entries.push(...account.entries);
         });
-        
-        return result;
-      } else if (viewMode === 'detailed' || 
-          (viewMode === 'total' && (timePeriod === 'Quarterly' || timePeriod === 'Yearly'))) {
-        // Aggregate across multiple periods
-        const allAccounts: Record<string, any> = {};
-        
-        timeSeriesData.periods.forEach((period: string) => {
-          const periodData = timeSeriesData.data[period] || {};
-          
-          Object.values(periodData).forEach((account: any) => {
-            if (!allAccounts[account.name]) {
-              allAccounts[account.name] = {
-                name: account.name,
-                category: account.category,
-                type: account.category,
-                total: 0,
-                entries: [],
-                account_type: account.account_type,
-                account_detail_type: account.account_detail_type
-              };
-            }
-            allAccounts[account.name].total += account.total;
-            allAccounts[account.name].entries.push(...account.entries);
-          });
-        });
-        
-        return Object.values(allAccounts);
-      } else {
-        // For single-period total modes
-        if (timePeriod === 'Trailing 12' && viewMode === 'total') {
-          const trailingData = timeSeriesData.data['Trailing 12 Months'] || {};
-          return Object.values(trailingData);
-        } else {
-          const firstPeriodKey = timeSeriesData.periods[0];
-          const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
-          return Object.values(firstPeriodData);
-        }
-      }
+      });
+      
+      smartLog('📊 DETAILED VIEW getCurrentFinancialData:', {
+        periodsAggregated: timeSeriesData.periods.length,
+        totalAccounts: Object.keys(allAccounts).length
+      });
+      
+      return Object.values(allAccounts);
+    } else {
+      // For total view, we have a single aggregated period
+      const firstPeriodKey = timeSeriesData.periods[0];
+      const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
+      const result = Object.values(firstPeriodData);
+      
+      smartLog('📊 TOTAL VIEW getCurrentFinancialData:', {
+        periodKey: firstPeriodKey,
+        totalAccounts: result.length,
+        consistency: 'Week-by-week aggregated data'
+      });
+      
+      return result;
     }
-    return [];
-  };
+  }
+  return [];
+};
 
   const currentData = getCurrentFinancialData();
 
