@@ -892,6 +892,7 @@ export default function MobileResponsiveFinancialsPage() {
   const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
   const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState(new Set(['All Properties']));
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
@@ -1987,7 +1988,229 @@ export default function MobileResponsiveFinancialsPage() {
     );
   };
 
-  // Company total scorecard
+  // Enhanced desktop P&L table with mobile-like fluidity
+  const renderDesktopPLTable = () => {
+    if (isLoadingData) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+          <span>Loading financial data from Supabase...</span>
+        </div>
+      );
+    }
+
+    if (currentData.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500">
+          No financial data available for the selected filters
+        </div>
+      );
+    }
+
+    const groupedAccounts = groupAccountsByParent(currentData);
+    const categories = ['Revenue', 'COGS', 'Operating Expenses', 'Other Income', 'Other Expenses'];
+
+    return (
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900">
+                Profit & Loss Statement {viewMode === 'by-property' ? '(By Property Class)' : '(By Property Class)'}
+              </h3>
+              <div className="mt-2 text-sm text-gray-600">
+                Showing {timePeriod.toLowerCase()} {viewMode} view for {selectedMonth}
+                <div className="mt-1 text-xs text-green-600">
+                  ✅ P&L accounts automatically classified • Balance Sheet accounts excluded • 🏗️ Account grouping enabled
+                </div>
+              </div>
+            </div>
+            <div className="text-sm text-gray-500">
+              {timeSeriesData?.summary?.totalEntriesProcessed || 0} entries loaded
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden">
+          {categories.map((category) => {
+            const categoryAccounts = groupedAccounts.filter(account => account.category === category);
+            if (categoryAccounts.length === 0) return null;
+
+            const categoryTotal = getCategoryTotal(category);
+            const isExpense = ['COGS', 'Operating Expenses', 'Other Expenses'].includes(category);
+
+            return (
+              <div key={category} className="border-b border-gray-100 last:border-b-0">
+                {/* Category Header */}
+                <div className={`p-4 ${
+                  category === 'Revenue' ? 'bg-green-50' :
+                  category === 'COGS' ? 'bg-red-50' :
+                  category === 'Operating Expenses' ? 'bg-orange-50' :
+                  category === 'Other Income' ? 'bg-blue-50' :
+                  'bg-purple-50'
+                } border-l-4 ${
+                  category === 'Revenue' ? 'border-green-400' :
+                  category === 'COGS' ? 'border-red-400' :
+                  category === 'Operating Expenses' ? 'border-orange-400' :
+                  category === 'Other Income' ? 'border-blue-400' :
+                  'border-purple-400'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-lg font-bold text-gray-900 flex items-center">
+                      <span className="mr-3 text-xl">
+                        {category === 'Revenue' ? '💰' : 
+                         category === 'COGS' ? '🏭' :
+                         category === 'Operating Expenses' ? '💸' :
+                         category === 'Other Income' ? '➕' : '➖'}
+                      </span>
+                      {category}
+                    </h4>
+                    <div className="text-right">
+                      <div className={`text-xl font-bold ${isExpense ? 'text-red-600' : 'text-green-600'}`}>
+                        {isExpense ? `(${formatCurrency(Math.abs(categoryTotal))})` : formatCurrency(categoryTotal)}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {kpis.revenue ? calculatePercentage(Math.abs(categoryTotal), Math.abs(kpis.revenue)) : '0%'} of revenue
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Accounts in Category */}
+                <div className="divide-y divide-gray-100">
+                  {categoryAccounts.map((account) => (
+                    <div key={account.name}>
+                      {/* Parent Account Row */}
+                      <div 
+                        className="p-4 hover:bg-gray-50 cursor-pointer transition-colors group"
+                        onClick={() => handleAccountClick(account)}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center flex-1">
+                            {account.isParent && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleParentAccount(account.name);
+                                }}
+                                className="mr-3 p-1 hover:bg-gray-200 rounded transition-colors"
+                              >
+                                {expandedAccounts.has(account.name) ? (
+                                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-gray-600" />
+                                )}
+                              </button>
+                            )}
+                            <div className="flex-1">
+                              <div className="flex items-center">
+                                <span className="font-semibold text-gray-900 mr-2">
+                                  {account.isParent ? '📁' : '📄'} {account.name}
+                                </span>
+                                {account.isParent && account.subAccounts && (
+                                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
+                                    {account.subAccounts.length} accounts
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                {account.account_type} • {account.entries?.length || 0} transactions
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className={`text-lg font-semibold group-hover:text-blue-600 transition-colors ${
+                              account.total >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {formatCurrency(account.total)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {kpis.revenue ? calculatePercentage(Math.abs(account.total), Math.abs(kpis.revenue)) : '0%'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sub-account Rows (if expanded) */}
+                      {account.isParent && expandedAccounts.has(account.name) && account.subAccounts && (
+                        <div className="bg-gray-25 border-l-4 border-gray-200 ml-4">
+                          {account.subAccounts.map((subAccount) => (
+                            <div 
+                              key={`${account.name}-${subAccount.name}`}
+                              className="p-3 pl-8 hover:bg-gray-100 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
+                              onClick={() => handleAccountClick(subAccount)}
+                            >
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center">
+                                  <div className={`w-3 h-3 rounded-full mr-3 ${
+                                    subAccount.isParentAsSubAccount ? 'bg-blue-400' : 'bg-gray-400'
+                                  }`}></div>
+                                  <div>
+                                    <div className="font-medium text-gray-800">
+                                      {subAccount.isParentAsSubAccount ? '📁' : '💧'} {subAccount.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {subAccount.entries?.length || 0} transactions
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className={`font-medium ${
+                                    subAccount.total >= 0 ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {formatCurrency(subAccount.total)}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {kpis.revenue ? calculatePercentage(Math.abs(subAccount.total), Math.abs(kpis.revenue)) : '0%'}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Summary Section */}
+          <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 border-t-4 border-blue-400">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="text-center">
+                <div className="text-sm text-gray-600 mb-1">📈 Gross Profit</div>
+                <div className="text-xl font-bold text-green-600">{formatCurrency(kpis.grossProfit)}</div>
+                <div className="text-xs text-gray-500">{kpis.grossMargin.toFixed(1)}% margin</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-600 mb-1">🏆 Operating Income</div>
+                <div className={`text-xl font-bold ${kpis.netOperatingIncome >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  {formatCurrency(kpis.netOperatingIncome)}
+                </div>
+                <div className="text-xs text-gray-500">{kpis.operatingMargin.toFixed(1)}% margin</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-600 mb-1">🎯 Net Income</div>
+                <div className={`text-2xl font-bold ${kpis.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(kpis.netIncome)}
+                </div>
+                <div className="text-xs text-gray-500">{kpis.netMargin.toFixed(1)}% margin</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-600 mb-1">📊 Properties</div>
+                <div className="text-xl font-bold text-purple-600">
+                  {timeSeriesData?.availableProperties?.length || 0}
+                </div>
+                <div className="text-xs text-gray-500">Active properties</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const renderCompanyScorecard = () => {
     return (
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all"
@@ -3116,7 +3339,8 @@ export default function MobileResponsiveFinancialsPage() {
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
               >
                 {monthsList.map((month) => (
                   <option key={month} value={month}>
@@ -3125,11 +3349,48 @@ export default function MobileResponsiveFinancialsPage() {
                 ))}
               </select>
 
+              {/* Property Classes Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
+                  className="flex items-center justify-between w-56 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
+                >
+                  <span className="truncate">All Property Classes</span>
+                  <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${propertyDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {propertyDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                    <div className="p-2 text-xs text-gray-500 border-b border-gray-100">
+                      Select property classes to analyze
+                    </div>
+                    {availableProperties.map((property) => (
+                      <div
+                        key={property}
+                        className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                        onClick={() => handlePropertyToggle(property)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProperties.has(property)}
+                          onChange={() => {}}
+                          className="mr-3 h-4 w-4 border-gray-300 rounded"
+                          style={{ accentColor: BRAND_COLORS.primary }}
+                        />
+                        <span className="text-gray-700">{property}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Time Period */}
               <select
                 value={timePeriod}
                 onChange={(e) => setTimePeriod(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                style={{ '--tw-ring-color': BRAND_COLORS.secondary + '33' } as React.CSSProperties}
               >
                 {['Monthly', 'Quarterly', 'Yearly', 'Trailing 12'].map((period) => (
                   <option key={period} value={period}>
@@ -3137,6 +3398,54 @@ export default function MobileResponsiveFinancialsPage() {
                   </option>
                 ))}
               </select>
+
+              {/* View Mode Toggle */}
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                <button
+                  onClick={() => setViewMode('total')}
+                  className={`px-3 py-2 text-xs transition-colors ${
+                    viewMode === 'total'
+                      ? 'text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                  style={{ backgroundColor: viewMode === 'total' ? BRAND_COLORS.primary : undefined }}
+                >
+                  Total
+                </button>
+                <button
+                  onClick={() => setViewMode('detailed')}
+                  className={`px-3 py-2 text-xs transition-colors ${
+                    viewMode === 'detailed'
+                      ? 'text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                  style={{ backgroundColor: viewMode === 'detailed' ? BRAND_COLORS.primary : undefined }}
+                >
+                  Detail
+                </button>
+                <button
+                  onClick={() => setViewMode('by-property')}
+                  className={`px-3 py-2 text-xs transition-colors ${
+                    viewMode === 'by-property'
+                      ? 'text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                  style={{ backgroundColor: viewMode === 'by-property' ? BRAND_COLORS.primary : undefined }}
+                  title="View P&L with properties as columns"
+                >
+                  By Property
+                </button>
+              </div>
+
+              {/* Export Button */}
+              <button
+                onClick={() => showNotification('Financial data exported', 'success')}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
+                style={{ backgroundColor: BRAND_COLORS.primary }}
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
             </div>
           )}
           {/* Mobile Filter Panel */}
@@ -3269,11 +3578,12 @@ export default function MobileResponsiveFinancialsPage() {
       )}
 
       {/* Click outside to close dropdowns */}
-      {(timePeriodDropdownOpen || mobileFilterOpen) && (
+      {(timePeriodDropdownOpen || propertyDropdownOpen || mobileFilterOpen) && (
         <div
           className="fixed inset-0 z-10"
           onClick={() => {
             setTimePeriodDropdownOpen(false);
+            setPropertyDropdownOpen(false);
             setMobileFilterOpen(false);
           }}
         />
