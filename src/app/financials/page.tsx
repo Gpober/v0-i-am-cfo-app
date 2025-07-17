@@ -596,7 +596,7 @@ const fetchTimeSeriesData = async (
       
       // CRITICAL FIX: Fetch ALL data without row limits
       // Supabase might have a default limit, so we'll use a very high limit
-      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end};
+      let url = `${SUPABASE_URL}/rest/v1/financial_transactions?select=*&date=gte.${range.start}&date=lte.${range.end}&limit=100000`;
       
       // FIXED: For by-property view, NEVER filter by property - we need ALL property data
       // Only filter by property for non-by-property views
