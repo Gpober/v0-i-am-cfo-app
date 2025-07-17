@@ -27,6 +27,174 @@ const BRAND_COLORS = {
   }
 };
 
+// Smart debugging configuration
+const DEBUG_CONFIG = {
+  isDevelopment: process.env.NODE_ENV === 'development',
+  isDebugMode: typeof window !== 'undefined' && 
+    (localStorage.getItem('iam-cfo-debug') === 'true' || 
+     process.env.NEXT_PUBLIC_DEBUG === 'true'),
+  enableDataValidation: true,
+  enablePerformanceTracking: true
+};
+
+// Smart console logging - only in development or debug mode
+const smartLog = (message: string, data?: any, level: 'info' | 'warn' | 'error' = 'info') => {
+  if (DEBUG_CONFIG.isDevelopment || DEBUG_CONFIG.isDebugMode) {
+    const timestamp = new Date().toISOString();
+    const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
+    
+    switch (level) {
+      case 'warn':
+        console.warn(prefix, message, data);
+        break;
+      case 'error':
+        console.error(prefix, message, data);
+        break;
+      default:
+        console.log(prefix, message, data);
+    }
+  }
+};
+
+// Data validation cache
+const validationCache = new Map<string, { timestamp: number; result: any }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cache performance metrics
+const cacheMetrics = {
+  hits: 0,
+  misses: 0,
+  getHitRate: () => {
+    const total = cacheMetrics.hits + cacheMetrics.misses;
+    return total > 0 ? (cacheMetrics.hits / total * 100).toFixed(1) : '0.0';
+  }
+};
+
+// Performance-conscious cache cleanup
+const cleanupCache = () => {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  
+  validationCache.forEach((value, key) => {
+    if (now - value.timestamp > CACHE_TTL) {
+      keysToDelete.push(key);
+    }
+  });
+  
+  keysToDelete.forEach(key => validationCache.delete(key));
+  
+  if (DEBUG_CONFIG.isDebugMode) {
+    smartLog(`🧹 Cache cleanup: removed ${keysToDelete.length} expired entries, ${validationCache.size} remaining`);
+  }
+};
+
+// Auto-cleanup cache every 10 minutes
+if (typeof window !== 'undefined') {
+  setInterval(cleanupCache, 10 * 60 * 1000);
+}
+
+// Performance tracking
+const performanceTracker = {
+  startTime: (operation: string) => {
+    if (DEBUG_CONFIG.enablePerformanceTracking) {
+      return performance.now();
+    }
+    return 0;
+  },
+  endTime: (operation: string, startTime: number) => {
+    if (DEBUG_CONFIG.enablePerformanceTracking && startTime > 0) {
+      const duration = performance.now() - startTime;
+      smartLog(`⚡ Performance: ${operation} took ${duration.toFixed(2)}ms`);
+    }
+  }
+};
+
+// Data integrity validator
+const validateDataIntegrity = (data: any[], source: string, expectedCount?: number, callback?: (validation: any) => void) => {
+  const cacheKey = `${source}-${JSON.stringify(data?.slice(0, 5))}`;
+  const cached = validationCache.get(cacheKey);
+  
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    cacheMetrics.hits++;
+    smartLog(`🎯 Cache hit for ${source} (${cacheMetrics.getHitRate()}% hit rate)`);
+    return cached.result;
+  }
+  
+  cacheMetrics.misses++;
+  
+  const validation = {
+    source,
+    isValid: true,
+    issues: [] as string[],
+    stats: {
+      totalRecords: data?.length || 0,
+      nullRecords: 0,
+      invalidAmounts: 0,
+      missingDates: 0,
+      duplicateIds: 0
+    }
+  };
+  
+  if (!data || !Array.isArray(data)) {
+    validation.isValid = false;
+    validation.issues.push('Data is not an array');
+    return validation;
+  }
+  
+  const seenIds = new Set();
+  
+  data.forEach((item, index) => {
+    if (!item) {
+      validation.stats.nullRecords++;
+      validation.issues.push(`Record ${index} is null/undefined`);
+    } else {
+      if (typeof item.amount !== 'number' || isNaN(item.amount)) {
+        validation.stats.invalidAmounts++;
+        validation.issues.push(`Record ${index} has invalid amount: ${item.amount}`);
+      }
+      
+      if (!item.date) {
+        validation.stats.missingDates++;
+        validation.issues.push(`Record ${index} has missing date`);
+      }
+      
+      if (item.id && seenIds.has(item.id)) {
+        validation.stats.duplicateIds++;
+        validation.issues.push(`Duplicate ID found: ${item.id}`);
+      } else if (item.id) {
+        seenIds.add(item.id);
+      }
+    }
+  });
+  
+  if (expectedCount && validation.stats.totalRecords !== expectedCount) {
+    validation.isValid = false;
+    validation.issues.push(`Expected ${expectedCount} records, got ${validation.stats.totalRecords}`);
+  }
+  
+  validation.isValid = validation.issues.length === 0;
+  
+  // Cache the result
+  validationCache.set(cacheKey, {
+    timestamp: Date.now(),
+    result: validation
+  });
+  
+  // Log validation results
+  if (!validation.isValid) {
+    smartLog(`❌ Data integrity issues in ${source}:`, validation, 'error');
+  } else if (DEBUG_CONFIG.isDebugMode) {
+    smartLog(`✅ Data integrity validated for ${source}:`, validation.stats);
+  }
+  
+  // Call the callback if provided
+  if (callback) {
+    callback(validation);
+  }
+  
+  return validation;
+};
+
 // Updated Supabase Configuration
 const SUPABASE_URL = 'https://pjaieumtjszcwussmwel.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqYWlldW10anN6Y3d1c3Ntd2VsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIwNDQyMTgsImV4cCI6MjA2NzYyMDIxOH0.E1y-qx4EW7dbdN_2sijZaiQVO7ZcqnwC9hTSIccChP0';
@@ -85,6 +253,14 @@ interface NotificationState {
   show: boolean;
   message: string;
   type: 'info' | 'success' | 'error';
+}
+
+interface DataIntegrityStatus {
+  isValid: boolean;
+  lastValidated: Date;
+  totalRecords: number;
+  issues: string[];
+  source: string;
 }
 
 // P&L ONLY Account Classification - EXCLUDES Balance Sheet accounts
@@ -216,15 +392,17 @@ const fetchTimeSeriesData = async (
   property: string = 'All Properties',
   monthYear: string,
   timePeriod: TimePeriod,
-  viewMode: ViewMode
+  viewMode: ViewMode,
+  onDataValidation?: (validation: any) => void
 ) => {
   try {
-    console.log('🔍 FETCHING TIME SERIES DATA:', { property, monthYear, timePeriod, viewMode });
+    const perfStart = performanceTracker.startTime('fetchTimeSeriesData');
+    smartLog('🔍 FETCHING TIME SERIES DATA:', { property, monthYear, timePeriod, viewMode });
     
     const [month, year] = monthYear.split(' ');
     const selectedDate = new Date(`${month} 1, ${year}`);
-    console.log('🔍 Selected date object:', selectedDate);
-    console.log('🔍 Month:', month, 'Year:', year);
+    smartLog('🔍 Selected date object:', selectedDate);
+    smartLog('🔍 Month:', month, 'Year:', year);
     
     let dateRanges: Array<{start: string, end: string, label: string}> = [];
     
@@ -405,8 +583,8 @@ const fetchTimeSeriesData = async (
       }
     }
     
-    console.log('🔍 CALCULATED DATE RANGES:', dateRanges);
-    console.log('🔍 Total date ranges for', viewMode, 'view:', dateRanges.length);
+    smartLog('🔍 CALCULATED DATE RANGES:', dateRanges);
+    smartLog('🔍 Total date ranges for', viewMode, 'view:', dateRanges.length);
     
     // Fetch data for all date ranges
     const allData: any = {};
@@ -414,7 +592,7 @@ const fetchTimeSeriesData = async (
     let availableProperties: string[] = [];
     
     for (const range of dateRanges) {
-      console.log(`🔍 Fetching data for period: ${range.label} (${range.start} to ${range.end})`);
+      smartLog(`🔍 Fetching data for period: ${range.label} (${range.start} to ${range.end})`);
       
       // CRITICAL FIX: Fetch ALL data without row limits
       // Supabase might have a default limit, so we'll use a very high limit
@@ -426,7 +604,7 @@ const fetchTimeSeriesData = async (
         url += `&class=eq.${encodeURIComponent(property)}`;
       }
       
-      console.log(`🔍 FETCHING URL for ${viewMode} view:`, url);
+      smartLog(`🔍 FETCHING URL for ${viewMode} view:`, url);
       
       const response = await fetch(url, {
         headers: {
@@ -438,10 +616,14 @@ const fetchTimeSeriesData = async (
       
       if (response.ok) {
         const rawData = await response.json();
-        console.log(`🔍 Period ${range.label}: ${rawData.length} transactions`);
-        console.log(`🔍 Sample transactions for ${range.label}:`, rawData.slice(0, 3));
-        console.log(`🔍 Date range: ${range.start} to ${range.end}`);
-        console.log(`🔍 View mode: ${viewMode}, Property filter: ${property}`);
+        
+        // Validate data integrity
+        const validation = validateDataIntegrity(rawData, `${range.label} (${viewMode})`, undefined, onDataValidation);
+        
+        smartLog(`🔍 Period ${range.label}: ${rawData.length} transactions`);
+        smartLog(`🔍 Sample transactions for ${range.label}:`, rawData.slice(0, 3));
+        smartLog(`🔍 Date range: ${range.start} to ${range.end}`);
+        smartLog(`🔍 View mode: ${viewMode}, Property filter: ${property}`);
         totalEntriesProcessed += rawData.length;
         
         if (viewMode === 'by-property') {
@@ -451,7 +633,7 @@ const fetchTimeSeriesData = async (
             availableProperties = propertiesInData;
           }
           
-          console.log(`🏢 BY-PROPERTY DATA PROCESSING for ${range.label}:`, {
+          smartLog(`🏢 BY-PROPERTY DATA PROCESSING for ${range.label}:`, {
             totalTransactions: rawData.length,
             propertiesFound: propertiesInData.length,
             properties: propertiesInData
@@ -498,7 +680,7 @@ const fetchTimeSeriesData = async (
             return acc;
           }, {});
           
-          console.log(`🏢 BY-PROPERTY GROUPED for ${range.label}:`, {
+          smartLog(`🏢 BY-PROPERTY GROUPED for ${range.label}:`, {
             accountsGrouped: Object.keys(groupedByAccount).length,
             sampleAccount: Object.keys(groupedByAccount)[0],
             sampleData: groupedByAccount[Object.keys(groupedByAccount)[0]],
@@ -544,7 +726,7 @@ const fetchTimeSeriesData = async (
     
     // FIXED: For by-property Trailing 12, aggregate all monthly data 
     if (viewMode === 'by-property' && timePeriod === 'Trailing 12') {
-      console.log('🔍 AGGREGATING BY-PROPERTY TRAILING 12 DATA...');
+      smartLog('🔍 AGGREGATING BY-PROPERTY TRAILING 12 DATA...');
       
       const aggregatedData: any = {};
       let allAvailableProperties: string[] = [];
@@ -637,7 +819,7 @@ const fetchTimeSeriesData = async (
     
     // FIXED: For Trailing 12 Total mode, aggregate all monthly data into one summary
     if (timePeriod === 'Trailing 12' && viewMode === 'total') {
-      console.log('🔍 AGGREGATING TRAILING 12 TOTAL DATA...');
+      smartLog('🔍 AGGREGATING TRAILING 12 TOTAL DATA...');
       
       const aggregatedData: any = {};
       
@@ -704,8 +886,11 @@ const fetchTimeSeriesData = async (
       }
     };
     
+    performanceTracker.endTime('fetchTimeSeriesData', perfStart);
+    return result;
+    
   } catch (error) {
-    console.error('Error fetching time series data:', error);
+    smartLog('Error fetching time series data:', error, 'error');
     return {
       success: false,
       error: (error as Error).message,
@@ -754,6 +939,38 @@ export default function FinancialsPage() {
   // Expandable accounts state
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   
+  // Data integrity state
+  const [dataIntegrityStatus, setDataIntegrityStatus] = useState<DataIntegrityStatus | null>(null);
+  
+  // Debug mode state
+  const [debugMode, setDebugMode] = useState(DEBUG_CONFIG.isDebugMode);
+  
+  // Function to toggle debug mode
+  const toggleDebugMode = () => {
+    const newDebugMode = !debugMode;
+    setDebugMode(newDebugMode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('iam-cfo-debug', newDebugMode.toString());
+    }
+    DEBUG_CONFIG.isDebugMode = newDebugMode;
+    smartLog(`🔧 Debug mode ${newDebugMode ? 'enabled' : 'disabled'}`);
+    
+    if (newDebugMode) {
+      smartLog(`📊 Cache stats: ${validationCache.size} entries cached, ${cacheMetrics.getHitRate()}% hit rate`);
+    }
+  };
+  
+  // Function to update data integrity status
+  const updateDataIntegrityStatus = (validation: any) => {
+    setDataIntegrityStatus({
+      isValid: validation.isValid,
+      lastValidated: new Date(),
+      totalRecords: validation.stats.totalRecords,
+      issues: validation.issues,
+      source: validation.source
+    });
+  };
+  
   const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(['All Properties']));
 
@@ -799,7 +1016,7 @@ export default function FinancialsPage() {
       setIsLoadingData(true);
       
       const properties = await fetchProperties();
-      console.log('🏠 Available properties loaded:', properties);
+      smartLog('🏠 Available properties loaded:', properties);
       setAvailableProperties(properties);
       
       await loadRealFinancialData();
@@ -823,7 +1040,7 @@ export default function FinancialsPage() {
         propertyFilter = Array.from(selectedProperties)[0];
       }
       
-      console.log('🔍 LOADING DATA WITH FILTERS:', {
+      smartLog('🔍 LOADING DATA WITH FILTERS:', {
         selectedProperties: Array.from(selectedProperties),
         propertyFilter,
         month: selectedMonth,
@@ -832,7 +1049,7 @@ export default function FinancialsPage() {
         note: viewMode === 'by-property' ? 'FORCING All Properties for by-property view' : 'Using selected property filter'
       });
       
-      const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode);
+      const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode, updateDataIntegrityStatus);
       
       if (timeSeriesResult.success) {
         setTimeSeriesData(timeSeriesResult);
@@ -880,7 +1097,7 @@ export default function FinancialsPage() {
     }
     
     setSelectedProperties(newSelected);
-    console.log('🏠 Property selection changed:', Array.from(newSelected));
+    smartLog('🏠 Property selection changed:', Array.from(newSelected));
   };
 
   const getSelectedPropertiesText = () => {
@@ -930,7 +1147,7 @@ export default function FinancialsPage() {
 
   // Account Grouping with Colon Detection and Parent-as-Sub handling
   const groupAccountsByParent = (accounts: FinancialDataItem[]): FinancialDataItem[] => {
-    console.log('🏗️ GROUPING ACCOUNTS - Starting with', accounts.length, 'accounts');
+    smartLog('🏗️ GROUPING ACCOUNTS - Starting with', accounts.length, 'accounts');
     
     const grouped: Record<string, FinancialDataItem> = {};
     const standalone: FinancialDataItem[] = [];
@@ -1084,7 +1301,7 @@ export default function FinancialsPage() {
         const firstPeriodData = timeSeriesData.data[firstPeriodKey] || {};
         const result = Object.values(firstPeriodData);
         
-        console.log('🏢 BY-PROPERTY getCurrentFinancialData:', {
+        smartLog('🏢 BY-PROPERTY getCurrentFinancialData:', {
           periodKey: firstPeriodKey,
           accountCount: result.length,
           sampleAccount: result[0],
@@ -1198,7 +1415,7 @@ export default function FinancialsPage() {
       return [];
     }
 
-    console.log('🔍 GENERATING TREND DATA:', {
+    smartLog('🔍 GENERATING TREND DATA:', {
       timePeriod,
       viewMode,
       periods: timeSeriesData.periods,
@@ -1245,7 +1462,7 @@ export default function FinancialsPage() {
         };
       }).filter(item => item.revenue > 0 || item.netIncome !== 0); // Only show properties with activity
       
-      console.log('🏢 BY-PROPERTY TREND DATA:', propertyTrendData);
+      smartLog('🏢 BY-PROPERTY TREND DATA:', propertyTrendData);
       return propertyTrendData;
     }
 
@@ -1285,11 +1502,11 @@ export default function FinancialsPage() {
           operatingIncome: revenue - cogs - operatingExpenses
         };
         
-        console.log(`📊 Period ${period}:`, result);
+        smartLog(`📊 Period ${period}:`, result);
         return result;
       }).filter(item => item.revenue > 0 || item.netIncome !== 0); // Only show periods with activity
       
-      console.log('📊 FINAL TREND DATA:', trendResult);
+      smartLog('📊 FINAL TREND DATA:', trendResult);
       return trendResult;
     }
 
@@ -1328,7 +1545,7 @@ export default function FinancialsPage() {
       operatingIncome: revenue - cogs - operatingExpenses
     }];
     
-    console.log('📊 SINGLE PERIOD DATA:', result);
+    smartLog('📊 SINGLE PERIOD DATA:', result);
     return result;
   };
 
@@ -1953,6 +2170,60 @@ export default function FinancialsPage() {
                 <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
                 {isLoadingData ? 'Loading...' : 'Refresh'}
               </button>
+              
+              {/* Data Integrity Status Indicator */}
+              {dataIntegrityStatus && (
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                  dataIntegrityStatus.isValid
+                    ? 'bg-green-100 text-green-800 border border-green-200'
+                    : 'bg-red-100 text-red-800 border border-red-200'
+                }`}>
+                  <span className="text-lg">
+                    {dataIntegrityStatus.isValid ? '✅' : '❌'}
+                  </span>
+                  <span>
+                    {dataIntegrityStatus.isValid ? 'Data Valid' : 'Data Issues'}
+                  </span>
+                  <span className="text-xs opacity-75">
+                    ({dataIntegrityStatus.totalRecords} records)
+                  </span>
+                  {!dataIntegrityStatus.isValid && (
+                    <div className="ml-2 text-xs">
+                      <button
+                        onClick={() => {
+                          if (DEBUG_CONFIG.isDevelopment || DEBUG_CONFIG.isDebugMode) {
+                            console.log('Data integrity issues:', dataIntegrityStatus.issues);
+                          }
+                          setNotification({
+                            show: true,
+                            message: `Data integrity issues found: ${dataIntegrityStatus.issues.slice(0, 3).join(', ')}${dataIntegrityStatus.issues.length > 3 ? '...' : ''}`,
+                            type: 'error'
+                          });
+                        }}
+                        className="underline hover:no-underline"
+                      >
+                        View Issues
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Debug Mode Toggle - Only show in development */}
+              {DEBUG_CONFIG.isDevelopment && (
+                <button
+                  onClick={toggleDebugMode}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    debugMode
+                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-200 hover:bg-yellow-200'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                  }`}
+                  title="Toggle debug mode for detailed logging"
+                >
+                  <span className="text-lg">🔧</span>
+                  <span>Debug {debugMode ? 'ON' : 'OFF'}</span>
+                </button>
+              )}
             </div>
           </div>
 
