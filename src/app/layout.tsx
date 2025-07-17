@@ -1,6 +1,7 @@
 import './globals.css';
 import { Inter } from 'next/font/google'
 import Link from 'next/link'
+import RequireIAMCFOLogin from '@/components/RequireIAMCFOLogin'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -13,6 +14,8 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const isLoginPage = typeof window !== 'undefined' && window.location.pathname === '/IAMCFO_LOGIN'
+
   return (
     <html lang="en">
       <head>
@@ -20,7 +23,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className + ' bg-gray-50 font-sans'}>
         <nav className="bg-white shadow px-6 py-4 flex items-center justify-between">
-          {/* Left side nav links */}
           <div className="flex space-x-4">
             <Link href="/">Dashboard</Link>
             <Link href="/reservations">Reservations</Link>
@@ -28,8 +30,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/payroll">Payroll</Link>
             <Link href="/statements">Statements</Link>
           </div>
-
-          {/* Right side logout button */}
           <button
             onClick={() => {
               localStorage.removeItem('IAMCFO_LOGIN')
@@ -42,7 +42,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </button>
         </nav>
 
-        <main className="px-6 py-4">{children}</main>
+        <main className="px-6 py-4">
+          {/* Don’t wrap the login page */}
+          {isLoginPage ? children : <RequireIAMCFOLogin>{children}</RequireIAMCFOLogin>}
+        </main>
       </body>
     </html>
   )
