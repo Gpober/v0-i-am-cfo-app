@@ -2180,7 +2180,7 @@ export default function FinancialsPage() {
                 </div>
 
                 {/* P&L Table Content */}
-<div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ height: '70vh' }}>
+<div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ height: '140vh' }}>
   {isLoadingData ? (
     <div className="flex items-center justify-center py-8">
       <RefreshCw className="w-6 h-6 animate-spin mr-2" />
@@ -2192,7 +2192,7 @@ export default function FinancialsPage() {
     </div>
   ) : (
     <div className="relative" style={{ 
-      height: '70vh',
+      height: '140vh',
       overflowX: 'auto',
       overflowY: 'auto',
       scrollBehavior: 'smooth',
