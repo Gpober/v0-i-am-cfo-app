@@ -2420,7 +2420,7 @@ export default function FinancialsPage() {
               </div>
             </div>
 
-            {/* Property Performance Chart */}
+            {/* Property Performance Chart - SMALLER VERSION */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
@@ -2489,11 +2489,12 @@ export default function FinancialsPage() {
                 </div>
               </div>
               
-              <div className="p-6">
+              <div className="p-4">
                 {generatePropertyChartData().length > 0 ? (
-                  <div className="flex items-center justify-center">
-                    <div className="w-full max-w-lg">
-                      <ResponsiveContainer width="100%" height={400}>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Pie Chart - Much Smaller */}
+                    <div className="flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height={280}>
                         <RechartsPieChart>
                           <defs>
                             {/* Enhanced gradients for better 3D effect */}
@@ -2511,7 +2512,7 @@ export default function FinancialsPage() {
                             data={generatePropertyChartData()}
                             cx="50%"
                             cy="52%"
-                            outerRadius={120}
+                            outerRadius={80}
                             fill="#000000"
                             fillOpacity={0.08}
                             dataKey="value"
@@ -2525,7 +2526,7 @@ export default function FinancialsPage() {
                             data={generatePropertyChartData()}
                             cx="50%"
                             cy="50%"
-                            outerRadius={120}
+                            outerRadius={80}
                             innerRadius={0}
                             paddingAngle={1}
                             dataKey="value"
@@ -2534,11 +2535,11 @@ export default function FinancialsPage() {
                             animationDuration={1000}
                             animationEasing="ease-out"
                             label={({ name, percent, value }) => 
-                              percent > 0.05 ? `${(percent * 100).toFixed(1)}%` : ''
+                              percent > 0.08 ? `${(percent * 100).toFixed(1)}%` : ''
                             }
                             labelLine={false}
                             style={{
-                              fontSize: '12px',
+                              fontSize: '10px',
                               fontWeight: 'bold',
                               fill: 'white',
                               textShadow: '0 1px 2px rgba(0,0,0,0.5)'
@@ -2578,35 +2579,37 @@ export default function FinancialsPage() {
                               border: '1px solid #e2e8f0',
                               borderRadius: '8px',
                               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                              fontSize: '13px',
+                              fontSize: '12px',
                               fontWeight: 500
                             }}
                             labelStyle={{
                               fontWeight: 'bold',
-                              fontSize: '14px',
+                              fontSize: '13px',
                               color: '#1f2937',
-                              marginBottom: '8px',
+                              marginBottom: '6px',
                               borderBottom: '1px solid #e5e7eb',
-                              paddingBottom: '4px'
+                              paddingBottom: '3px'
                             }}
                           />
                         </RechartsPieChart>
                       </ResponsiveContainer>
-                      
-                      {/* Custom Legend with values like your reference image */}
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                    </div>
+                    
+                    {/* Legend - Right Side */}
+                    <div className="flex flex-col justify-center">
+                      <div className="grid grid-cols-1 gap-3 text-sm">
                         {generatePropertyChartData().map((entry, index) => (
-                          <div key={entry.name} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div key={entry.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                             <div className="flex items-center">
                               <div 
-                                className="w-3 h-3 rounded-full mr-2"
+                                className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
                                 style={{ backgroundColor: COLORS[index % COLORS.length] }}
                               />
-                              <span className="font-medium text-gray-700">
-                                {entry.name.length > 10 ? entry.name.substring(0, 10) + '...' : entry.name}
+                              <span className="font-medium text-gray-700 text-sm">
+                                {entry.name.length > 12 ? entry.name.substring(0, 12) + '...' : entry.name}
                               </span>
                             </div>
-                            <span className="font-semibold text-gray-900">
+                            <span className="font-semibold text-gray-900 text-sm">
                               {formatCurrency(entry.value)}
                             </span>
                           </div>
@@ -2615,7 +2618,7 @@ export default function FinancialsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-80 text-gray-500">
+                  <div className="flex items-center justify-center h-60 text-gray-500">
                     <div className="text-center">
                       <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                       <p className="text-lg font-medium text-gray-600">No property data available</p>
