@@ -2344,112 +2344,7 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* NEW: 🏢 By Property View Info Banner */}
-          {viewMode === 'by-property' && (
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                    <span className="text-purple-600 font-bold">🏢</span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-bold text-purple-900 mb-2">Property Dimension View Active</h3>
-                  <div className="text-xs text-purple-800 space-y-1">
-                    <p><strong>🔍 How It Works:</strong> Each property class appears as a separate column showing P&L performance side-by-side</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                      <div>
-                        <p><strong>📊 Property Columns:</strong> {timeSeriesData?.availableProperties?.length || 0} property classes found</p>
-                        <p><strong>📈 Comparison:</strong> Compare revenue, expenses, and profitability across properties</p>
-                        <p><strong>🎯 Total Column:</strong> Aggregated totals across all properties (subtle styling)</p>
-                      </div>
-                      <div>
-                        <p><strong>🔢 Period:</strong> {timePeriod} view for {
-                          timePeriod === 'Monthly' ? selectedMonth :
-                          timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
-                          timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
-                          `past 12 months ending ${selectedMonth}`
-                        }</p>
-                        <p><strong>📱 Usage:</strong> Click amounts for transaction details • Compare property performance across {timePeriod.toLowerCase()} period</p>
-                        <p><strong>🏗️ Grouping:</strong> Account grouping still active for better organization</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded text-xs">
-                      <strong>💡 Example:</strong> See how "Cleveland" property revenue compares to "Detroit" property revenue for the selected {timePeriod.toLowerCase()} period
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Account Grouping Info Banner - Only show if not by-property view */}
-          {viewMode !== 'by-property' && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600 font-bold">🏗️</span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-bold text-blue-900 mb-2">Enhanced Account Grouping Active</h3>
-                  <div className="text-xs text-blue-800 space-y-1">
-                    <p><strong>🔍 How It Works:</strong> Accounts with ":" are automatically grouped (e.g., "Utilities:Water & sewer")</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                      <div>
-                        <p><strong>📁 Parent Accounts:</strong> Show aggregated totals with expand/collapse arrows</p>
-                        <p><strong>📋 Sub-Accounts:</strong> Hidden by default, show when parent is expanded</p>
-                      </div>
-                      <div>
-                        <p><strong>🎯 Features:</strong> ▶️ Expand arrows • 🔢 Transaction counts • 📊 Aggregated totals</p>
-                        <p><strong>📱 Usage:</strong> Click arrows to expand, click amounts for transaction details</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Data Status */}
-          {timeSeriesData && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="text-green-800 text-sm">
-                <strong>Data Status:</strong> {
-                  viewMode === 'by-property' ?
-                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData?.availableProperties?.length || 0} properties • Property Dimension View (${timePeriod} - ${
-                      timePeriod === 'Monthly' ? selectedMonth :
-                      timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
-                      timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
-                      `Trailing 12 ending ${selectedMonth}`
-                    })` :
-                  timePeriod === 'Trailing 12' && viewMode === 'total' ? 
-                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.monthsAggregated || timeSeriesData.summary.periodsGenerated} months • Aggregated into Trailing 12 Total` :
-                    timePeriod === 'Monthly' && viewMode === 'detailed' ?
-                      `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} weeks • Monthly Detail with Weekly Breakdown` :
-                    `Loaded ${timeSeriesData.summary.totalEntriesProcessed} entries across ${timeSeriesData.summary.periodsGenerated} periods • Time Series Mode`
-                }
-                <div className="mt-1 text-xs">
-                  <strong>Current Filters:</strong> {viewMode === 'by-property' ? `All Properties (${timePeriod} Property View)` : getSelectedPropertiesText()} • {selectedMonth} • {timePeriod} {viewMode}
-                  {viewMode === 'by-property' && (
-                    <span className="ml-2 font-medium text-purple-700">🏢 {
-                      timePeriod === 'Monthly' ? 'Monthly Comparison' :
-                      timePeriod === 'Quarterly' ? 'Quarterly Comparison' :
-                      timePeriod === 'Yearly' ? 'Yearly Comparison' :
-                      'Trailing 12 Comparison'
-                    }</span>
-                  )}
-                </div>
-                {viewMode === 'by-property' && timeSeriesData?.availableProperties && (
-                  <div className="mt-1 text-xs">
-                    <strong>Properties Found:</strong> {timeSeriesData.availableProperties.join(', ')}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
+         
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
             {/* Revenue */}
@@ -2525,6 +2420,258 @@ export default function FinancialsPage() {
               </div>
             </div>
           </div>
+
+          {/* Property Performance Chart - REPLACE THE NOTES WITH THIS */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-gray-900">Property Performance Analysis</h3>
+                
+                {/* Toggle Buttons for Revenue/GP/NI - Show GP only if different from Revenue */}
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                  <button
+                    onClick={() => setPropertyChartMetric('income')}
+                    className={`px-4 py-2 text-sm transition-colors ${
+                      propertyChartMetric === 'income'
+                        ? 'text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={{ backgroundColor: propertyChartMetric === 'income' ? BRAND_COLORS.primary : undefined }}
+                  >
+                    Revenue
+                  </button>
+                  
+                  {/* Only show Gross Profit button if GP differs from Revenue */}
+                  {(() => {
+                    const chartData = generatePropertyChartData();
+                    const hasGrossProfit = chartData.some(item => 
+                      Math.abs(item.revenue - item.grossProfit) > 0.01
+                    );
+                    
+                    return hasGrossProfit ? (
+                      <button
+                        onClick={() => setPropertyChartMetric('gp')}
+                        className={`px-4 py-2 text-sm transition-colors ${
+                          propertyChartMetric === 'gp'
+                            ? 'text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                        style={{ backgroundColor: propertyChartMetric === 'gp' ? BRAND_COLORS.success : undefined }}
+                      >
+                        Gross Profit
+                      </button>
+                    ) : null;
+                  })()}
+                  
+                  <button
+                    onClick={() => setPropertyChartMetric('ni')}
+                    className={`px-4 py-2 text-sm transition-colors ${
+                      propertyChartMetric === 'ni'
+                        ? 'text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={{ backgroundColor: propertyChartMetric === 'ni' ? BRAND_COLORS.secondary : undefined }}
+                  >
+                    Net Income
+                  </button>
+                </div>
+              </div>
+              
+              <div className="text-sm text-gray-600 mt-2">
+                {propertyChartMetric === 'income' ? 
+                  `Revenue breakdown by property for ${timePeriod} period` :
+                  propertyChartMetric === 'gp' ?
+                  `Gross Profit (Revenue - COGS) by property for ${timePeriod} period` :
+                  `Net Income by property for ${timePeriod} period`
+                }
+                {viewMode === 'by-property' && (
+                  <span className="ml-2 text-purple-600">• Property View Active</span>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {generatePropertyChartData().length > 0 ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-full max-w-lg">
+                    <ResponsiveContainer width="100%" height={400}>
+                      <RechartsPieChart>
+                        <defs>
+                          {/* Enhanced gradients for better 3D effect */}
+                          {generatePropertyChartData().map((entry, index) => (
+                            <radialGradient key={`gradient-${index}`} id={`gradient-${index}`} cx="30%" cy="30%">
+                              <stop offset="0%" stopColor={COLORS[index % COLORS.length]} stopOpacity="1" />
+                              <stop offset="70%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.8" />
+                              <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.6" />
+                            </radialGradient>
+                          ))}
+                        </defs>
+                        
+                        {/* Shadow effect for 3D appearance */}
+                        <Pie
+                          data={generatePropertyChartData()}
+                          cx="50%"
+                          cy="52%"
+                          outerRadius={120}
+                          fill="#000000"
+                          fillOpacity={0.08}
+                          dataKey="value"
+                          startAngle={0}
+                          endAngle={360}
+                          isAnimationActive={false}
+                        />
+                        
+                        {/* Main pie chart - full circle, no inner radius */}
+                        <Pie
+                          data={generatePropertyChartData()}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={120}
+                          innerRadius={0}
+                          paddingAngle={1}
+                          dataKey="value"
+                          startAngle={0}
+                          endAngle={360}
+                          animationDuration={1000}
+                          animationEasing="ease-out"
+                          label={({ name, percent, value }) => 
+                            percent > 0.05 ? `${(percent * 100).toFixed(1)}%` : ''
+                          }
+                          labelLine={false}
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            fill: 'white',
+                            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                          }}
+                        >
+                          {generatePropertyChartData().map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={`url(#gradient-${index})`}
+                              stroke="#ffffff"
+                              strokeWidth={2}
+                              style={{
+                                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                                cursor: 'pointer'
+                              }}
+                            />
+                          ))}
+                        </Pie>
+                        
+                        <Tooltip 
+                          formatter={(value: any, name: string, props: any) => {
+                            const propertyName = props.payload?.name || 'Unknown Property';
+                            const metricName = propertyChartMetric === 'income' ? 'Revenue' :
+                                           propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
+                            
+                            return [
+                              `${formatCurrency(Number(value))}`,
+                              metricName
+                            ];
+                          }}
+                          labelFormatter={(label: string, payload: any) => {
+                            // Return the property name as the tooltip header
+                            return payload && payload.length > 0 ? payload[0].payload.name : label;
+                          }}
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            fontSize: '13px',
+                            fontWeight: 500
+                          }}
+                          labelStyle={{
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            color: '#1f2937',
+                            marginBottom: '8px',
+                            borderBottom: '1px solid #e5e7eb',
+                            paddingBottom: '4px'
+                          }}
+                        />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                    
+                    {/* Custom Legend with values like your reference image */}
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                      {generatePropertyChartData().map((entry, index) => (
+                        <div key={entry.name} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex items-center">
+                            <div 
+                              className="w-3 h-3 rounded-full mr-2"
+                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            />
+                            <span className="font-medium text-gray-700">
+                              {entry.name.length > 10 ? entry.name.substring(0, 10) + '...' : entry.name}
+                            </span>
+                          </div>
+                          <span className="font-semibold text-gray-900">
+                            {formatCurrency(entry.value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-gray-500">
+                  <div className="text-center">
+                    <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p className="text-lg font-medium text-gray-600">No property data available</p>
+                    <p className="text-sm mt-2 text-gray-500">
+                      {viewMode === 'by-property' ? 
+                        'Switch to a different time period or check your data filters' :
+                        'Switch to "By Property" view to see property breakdown'
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Main Content Grid - P&L starts here */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column: Financial Tables */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        Profit & Loss Statement {viewMode === 'by-property' ? `(By Property - ${timePeriod})` : '(By Property Class)'}
+                      </h3>
+                      <div className="mt-2 text-sm text-gray-600">
+                        {viewMode === 'by-property'
+                          ? `Showing ${timePeriod.toLowerCase()} property comparison for ${
+                              timePeriod === 'Monthly' ? selectedMonth :
+                              timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
+                              timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
+                              `past 12 months ending ${selectedMonth}`
+                            } • ${timeSeriesData?.availableProperties?.length || 0} properties`
+                          : timePeriod === 'Trailing 12' && viewMode === 'total' 
+                          ? 'Showing aggregated totals for the past 12 months'
+                          : timePeriod === 'Monthly' && viewMode === 'detailed'
+                          ? 'Showing weekly breakdown for the selected month'
+                          : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
+                        }
+                        {viewMode === 'by-property' && (
+                          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                            🏢 Property View
+                          </span>
+                        )}
+                        <div className="mt-1 text-xs text-green-600">
+                          ✅ P&L accounts automatically classified • Balance Sheet accounts excluded • 🏗️ Account grouping enabled
+                          {viewMode === 'by-property' && (
+                            <span className="ml-1">• 🏢 Property dimension active</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -3330,217 +3477,7 @@ export default function FinancialsPage() {
             </div>
           </div>
 
-          {/* Property Performance Pie Chart - Updated Style */}
-<div className="bg-white rounded-xl shadow-sm overflow-hidden">
-  <div className="p-6 border-b border-gray-200">
-    <div className="flex justify-between items-center">
-      <h3 className="text-xl font-semibold text-gray-900">Property Performance Analysis</h3>
-      
-      {/* Toggle Buttons for Revenue/GP/NI - Show GP only if different from Revenue */}
-      <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-        <button
-          onClick={() => setPropertyChartMetric('income')}
-          className={`px-4 py-2 text-sm transition-colors ${
-            propertyChartMetric === 'income'
-              ? 'text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
-          }`}
-          style={{ backgroundColor: propertyChartMetric === 'income' ? BRAND_COLORS.primary : undefined }}
-        >
-          Revenue
-        </button>
-        
-        {/* Only show Gross Profit button if GP differs from Revenue */}
-        {(() => {
-          const chartData = generatePropertyChartData();
-          const hasGrossProfit = chartData.some(item => 
-            Math.abs(item.revenue - item.grossProfit) > 0.01
-          );
-          
-          return hasGrossProfit ? (
-            <button
-              onClick={() => setPropertyChartMetric('gp')}
-              className={`px-4 py-2 text-sm transition-colors ${
-                propertyChartMetric === 'gp'
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-              style={{ backgroundColor: propertyChartMetric === 'gp' ? BRAND_COLORS.success : undefined }}
-            >
-              Gross Profit
-            </button>
-          ) : null;
-        })()}
-        
-        <button
-          onClick={() => setPropertyChartMetric('ni')}
-          className={`px-4 py-2 text-sm transition-colors ${
-            propertyChartMetric === 'ni'
-              ? 'text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
-          }`}
-          style={{ backgroundColor: propertyChartMetric === 'ni' ? BRAND_COLORS.secondary : undefined }}
-        >
-          Net Income
-        </button>
-      </div>
-    </div>
-    
-    <div className="text-sm text-gray-600 mt-2">
-      {propertyChartMetric === 'income' ? 
-        `Revenue breakdown by property for ${timePeriod} period` :
-        propertyChartMetric === 'gp' ?
-        `Gross Profit (Revenue - COGS) by property for ${timePeriod} period` :
-        `Net Income by property for ${timePeriod} period`
-      }
-      {viewMode === 'by-property' && (
-        <span className="ml-2 text-purple-600">• Property View Active</span>
-      )}
-    </div>
-  </div>
-  
-  <div className="p-6">
-    {generatePropertyChartData().length > 0 ? (
-      <div className="flex items-center justify-center">
-        <div className="w-full max-w-lg">
-          <ResponsiveContainer width="100%" height={400}>
-            <RechartsPieChart>
-              <defs>
-                {/* Enhanced gradients for better 3D effect */}
-                {generatePropertyChartData().map((entry, index) => (
-                  <radialGradient key={`gradient-${index}`} id={`gradient-${index}`} cx="30%" cy="30%">
-                    <stop offset="0%" stopColor={COLORS[index % COLORS.length]} stopOpacity="1" />
-                    <stop offset="70%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.8" />
-                    <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.6" />
-                  </radialGradient>
-                ))}
-              </defs>
-              
-              {/* Shadow effect for 3D appearance */}
-              <Pie
-                data={generatePropertyChartData()}
-                cx="50%"
-                cy="52%"
-                outerRadius={120}
-                fill="#000000"
-                fillOpacity={0.08}
-                dataKey="value"
-                startAngle={0}
-                endAngle={360}
-                isAnimationActive={false}
-              />
-              
-              {/* Main pie chart - full circle, no inner radius */}
-              <Pie
-                data={generatePropertyChartData()}
-                cx="50%"
-                cy="50%"
-                outerRadius={120}
-                innerRadius={0}
-                paddingAngle={1}
-                dataKey="value"
-                startAngle={0}
-                endAngle={360}
-                animationDuration={1000}
-                animationEasing="ease-out"
-                label={({ name, percent, value }) => 
-                  percent > 0.05 ? `${(percent * 100).toFixed(1)}%` : ''
-                }
-                labelLine={false}
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  fill: 'white',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                }}
-              >
-                {generatePropertyChartData().map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={`url(#gradient-${index})`}
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    style={{
-                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-                      cursor: 'pointer'
-                    }}
-                  />
-                ))}
-              </Pie>
-              
-              <Tooltip 
-                formatter={(value: any, name: string, props: any) => {
-                  const propertyName = props.payload?.name || 'Unknown Property';
-                  const metricName = propertyChartMetric === 'income' ? 'Revenue' :
-                                   propertyChartMetric === 'gp' ? 'Gross Profit' : 'Net Income';
-                  
-                  return [
-                    `${formatCurrency(Number(value))}`,
-                    metricName
-                  ];
-                }}
-                labelFormatter={(label: string, payload: any) => {
-                  // Return the property name as the tooltip header
-                  return payload && payload.length > 0 ? payload[0].payload.name : label;
-                }}
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                  fontSize: '13px',
-                  fontWeight: 500
-                }}
-                labelStyle={{
-                  fontWeight: 'bold',
-                  fontSize: '14px',
-                  color: '#1f2937',
-                  marginBottom: '8px',
-                  borderBottom: '1px solid #e5e7eb',
-                  paddingBottom: '4px'
-                }}
-              />
-            </RechartsPieChart>
-          </ResponsiveContainer>
-          
-          {/* Custom Legend with values like your reference image */}
-          <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-            {generatePropertyChartData().map((entry, index) => (
-              <div key={entry.name} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                <div className="flex items-center">
-                  <div 
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  />
-                  <span className="font-medium text-gray-700">
-                    {entry.name.length > 10 ? entry.name.substring(0, 10) + '...' : entry.name}
-                  </span>
-                </div>
-                <span className="font-semibold text-gray-900">
-                  {formatCurrency(entry.value)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    ) : (
-      <div className="flex items-center justify-center h-80 text-gray-500">
-        <div className="text-center">
-          <PieChart className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-          <p className="text-lg font-medium text-gray-600">No property data available</p>
-          <p className="text-sm mt-2 text-gray-500">
-            {viewMode === 'by-property' ? 
-              'Switch to a different time period or check your data filters' :
-              'Switch to "By Property" view to see property breakdown'
-            }
-          </p>
-        </div>
-      </div>
-    )}
-  </div>
-</div>
-
+         
           {/* Notification */}
           {notification.show && (
             <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-lg text-white font-medium shadow-lg transition-transform ${
