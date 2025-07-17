@@ -1598,7 +1598,7 @@ export default function FinancialsPage() {
           <React.Fragment key={`parent-${account.name}`}>
             {/* PARENT ACCOUNT ROW */}
             <tr className="hover:bg-blue-50 bg-blue-25 border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
-              <td className={`px-6 py-3 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px' }}>
+              <td className={`px-6 py-3 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
                 <div className="flex items-center">
                   <button
                     onClick={() => toggleParentAccount(account.name)}
@@ -1637,7 +1637,7 @@ export default function FinancialsPage() {
               <tr key={`sub-${account.name}-${subAccount.name}`} className={`hover:bg-gray-50 ${
                 subAccount.isParentAsSubAccount ? 'bg-yellow-25 border-l-4 border-yellow-300' : 'bg-blue-25 border-l-4 border-blue-200'
               }`}>
-                <td className={`px-6 py-2 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px' }}>
+                <td className={`px-6 py-2 text-left text-sm bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
                   <div className="flex items-center pl-8">
                     <div className="w-4 h-4 mr-3 flex items-center justify-center">
                       <div className={`w-2 h-2 rounded-full ${
@@ -1684,7 +1684,7 @@ export default function FinancialsPage() {
         // Standalone account
         return (
           <tr key={`standalone-${account.name}`} className="hover:bg-gray-50">
-            <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px' }}>
+            <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 25, backgroundColor: 'white' }}>
               <div className="flex items-center">
                 <span className="text-gray-700">📄 {account.name}</span>
                 <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
@@ -1710,7 +1710,7 @@ export default function FinancialsPage() {
   // Render section headers and totals with property support
   const renderSectionHeader = (title: string, emoji: string, category: PLCategory, bgClass: string, textClass: string) => (
     <tr className={`${bgClass} border-t-2 border-opacity-50`}>
-      <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} bg-white sticky left-0 z-20 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px' }}>
+      <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} bg-white sticky left-0 z-20 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 20, backgroundColor: 'white' }}>
         {emoji} {title}
       </td>
       {viewMode === 'by-property' && timeSeriesData ? (
@@ -1772,7 +1772,9 @@ export default function FinancialsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      <style jsx>{scrollbarStyles}</style>
+      <div className="min-h-screen bg-gray-50">
       {/* Page Header with IAM CFO Branding */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -2209,7 +2211,7 @@ export default function FinancialsPage() {
                 </div>
 
                 {/* P&L Table Content */}
-<div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ maxHeight: '70vh' }}>
+<div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ height: '70vh' }}>
   {isLoadingData ? (
     <div className="flex items-center justify-center py-8">
       <RefreshCw className="w-6 h-6 animate-spin mr-2" />
@@ -2221,7 +2223,7 @@ export default function FinancialsPage() {
     </div>
   ) : (
     <div className="relative" style={{ 
-      maxHeight: '70vh',
+      height: '70vh',
       overflowX: 'auto',
       overflowY: 'auto',
       scrollBehavior: 'smooth',
@@ -2229,13 +2231,15 @@ export default function FinancialsPage() {
       scrollbarWidth: 'none',
       msOverflowStyle: 'none'
     }} 
-    className="relative [&::-webkit-scrollbar]:hidden">
+    className="relative [&::-webkit-scrollbar]:hidden"
+    id="pl-table-container">
       <table className="table-auto" style={{ 
         minWidth: viewMode === 'by-property' && timeSeriesData?.availableProperties ? 
-          `${Math.max(1200, (timeSeriesData.availableProperties.length + 2) * 150)}px` : 
+          `${Math.max(1400, (timeSeriesData.availableProperties.length + 2) * 180)}px` : 
           viewMode === 'detailed' && timeSeriesData?.periods ? 
-          `${Math.max(1200, (timeSeriesData.periods.length + 2) * 150)}px` : '1200px',
-        width: '100%'
+          `${Math.max(1400, (timeSeriesData.periods.length + 2) * 180)}px` : '1400px',
+        width: '100%',
+        tableLayout: 'fixed'
       }}>
         <thead className="bg-gray-50 sticky top-0 z-20">
           <tr>
@@ -2243,11 +2247,11 @@ export default function FinancialsPage() {
               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
                 ? 'border-b-2 border-gray-200' : ''
-            }`} style={{ minWidth: '280px', maxWidth: '320px' }}>
+            }`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', top: 0, left: 0, zIndex: 50, backgroundColor: 'white' }}>
               Account
             </th>
             {renderColumnHeaders()}
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '120px' }}>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-20" style={{ minWidth: '120px', position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F9FAFB' }}>
               % of Revenue
             </th>
           </tr>
@@ -2259,7 +2263,7 @@ export default function FinancialsPage() {
 
                           {/* TOTAL REVENUE */}
                           <tr className="bg-blue-100 border-t-2 border-blue-300">
-                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px' }}>
+                            <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                               📊 TOTAL REVENUE
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2306,7 +2310,7 @@ export default function FinancialsPage() {
 
                               {/* TOTAL COGS */}
                               <tr className="bg-red-100 border-t-2 border-red-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px' }}>
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-red-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                                   📊 TOTAL COGS
                                 </td>
                                 {viewMode === 'by-property' && timeSeriesData ? (
@@ -2350,7 +2354,7 @@ export default function FinancialsPage() {
 
                           {/* 📈 GROSS PROFIT */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.success }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.success, minWidth: '280px', maxWidth: '320px' }}>
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.success, minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                               📈 GROSS PROFIT
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2407,7 +2411,7 @@ export default function FinancialsPage() {
 
                               {/* TOTAL OPERATING EXPENSES */}
                               <tr className="bg-orange-100 border-t-2 border-orange-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px' }}>
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                                   📊 TOTAL OPERATING EXPENSES
                                 </td>
                                 {viewMode === 'by-property' && timeSeriesData ? (
@@ -2451,7 +2455,7 @@ export default function FinancialsPage() {
 
                           {/* 🏆 NET OPERATING INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.primary }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.primary, minWidth: '280px', maxWidth: '320px' }}>
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.primary, minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                               🏆 NET OPERATING INCOME
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2530,7 +2534,7 @@ export default function FinancialsPage() {
 
                           {/* 🎯 FINAL NET INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.secondary }}>
-                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.secondary, minWidth: '280px', maxWidth: '320px' }}>
+                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-white sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg`} style={{ color: BRAND_COLORS.secondary, minWidth: '280px', maxWidth: '320px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: 'white' }}>
                               🎯 NET INCOME
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -3024,5 +3028,47 @@ export default function FinancialsPage() {
         </div>
       </main>
     </div>
+    </>
   );
 }
+
+// Cross-browser scrollbar hiding styles
+const scrollbarStyles = `
+  #pl-table-container::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  
+  #pl-table-container::-webkit-scrollbar-track {
+    display: none;
+  }
+  
+  #pl-table-container::-webkit-scrollbar-thumb {
+    display: none;
+  }
+  
+  #pl-table-container {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  
+  /* Enhanced sticky positioning for better browser support */
+  #pl-table-container thead th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 50;
+    background-color: white;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+  }
+  
+  #pl-table-container tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 25;
+    background-color: white;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+  }
+`;
