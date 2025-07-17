@@ -2647,93 +2647,220 @@ export default function FinancialsPage() {
                 </div>
                 <div className="p-6">
                   {trendData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <div className="relative">
-                        {/* Combined Chart using ComposedChart */}
-                        <LineChart data={trendData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis 
-                            dataKey="period" 
-                            tick={{ fontSize: 12 }}
-                            angle={trendData.length > 6 ? -45 : 0}
-                            textAnchor={trendData.length > 6 ? 'end' : 'middle'}
-                            height={trendData.length > 6 ? 80 : 60}
-                          />
-                          <YAxis 
-                            yAxisId="left"
-                            tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`}
-                            tick={{ fontSize: 12 }}
-                            stroke={BRAND_COLORS.primary}
-                          />
-                          <YAxis 
-                            yAxisId="right"
-                            orientation="right"
-                            tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`}
-                            tick={{ fontSize: 12 }}
-                            stroke={BRAND_COLORS.success}
-                          />
-                          <Tooltip 
-                            formatter={(value: any, name: string) => [
-                              `${formatCurrency(Number(value))}`, 
-                              name === 'revenue' ? 'Revenue' : 'Net Income'
-                            ]}
-                            labelStyle={{ color: '#374151' }}
-                            contentStyle={{ 
-                              backgroundColor: 'white', 
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '8px',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                            }}
-                          />
-                          <Legend 
-                            wrapperStyle={{ paddingTop: '20px' }}
-                            iconType="plainline"
-                          />
-                          
-                          {/* Revenue Line */}
-                          <Line 
-                            yAxisId="left"
-                            type="monotone" 
-                            dataKey="revenue" 
-                            stroke={BRAND_COLORS.primary} 
-                            strokeWidth={3}
-                            dot={{ r: 5, fill: BRAND_COLORS.primary, strokeWidth: 2, stroke: 'white' }}
-                            activeDot={{ r: 7, fill: BRAND_COLORS.primary, strokeWidth: 2, stroke: 'white' }}
-                            name="Revenue"
-                          />
-                          
-                          {/* Net Income Bars (rendered as a second chart overlay) */}
-                        </LineChart>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <ComposedChart 
+                        data={trendData}
+                        margin={{ 
+                          top: 20, 
+                          right: 40, 
+                          left: 20, 
+                          bottom: trendData.length > 6 ? 80 : 60 
+                        }}
+                      >
+                        {/* Professional grid lines */}
+                        <CartesianGrid 
+                          strokeDasharray="2 2" 
+                          stroke="#f1f5f9" 
+                          strokeOpacity={0.8}
+                          vertical={false}
+                        />
                         
-                        {/* Net Income Bar Chart Overlay */}
-                        <div className="absolute inset-0 pointer-events-none">
-                          <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                              <XAxis dataKey="period" hide />
-                              <YAxis 
-                                yAxisId="right"
-                                orientation="right"
-                                hide
-                              />
-                              <Bar 
-                                yAxisId="right"
-                                dataKey="netIncome" 
-                                fill={BRAND_COLORS.success}
-                                fillOpacity={0.7}
-                                name="Net Income"
-                                radius={[2, 2, 0, 0]}
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
+                        {/* X-Axis with professional styling */}
+                        <XAxis 
+                          dataKey="period" 
+                          tick={{ 
+                            fontSize: 12, 
+                            fontWeight: 500,
+                            fill: '#475569'
+                          }}
+                          tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                          axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                          angle={trendData.length > 6 ? -45 : 0}
+                          textAnchor={trendData.length > 6 ? 'end' : 'middle'}
+                          height={trendData.length > 6 ? 80 : 60}
+                        />
+                        
+                        {/* Left Y-Axis for Net Income (Bars) */}
+                        <YAxis 
+                          yAxisId="left"
+                          tickFormatter={(value: any) => `$${(value / 1000).toFixed(0)}k`}
+                          tick={{ 
+                            fontSize: 12, 
+                            fontWeight: 500,
+                            fill: '#475569'
+                          }}
+                          tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                          axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                          width={60}
+                        />
+                        
+                        {/* Right Y-Axis for Revenue (Line) */}
+                        <YAxis 
+                          yAxisId="right"
+                          orientation="right"
+                          tickFormatter={(value: any) => `$${(value / 1000).toFixed(0)}k`}
+                          tick={{ 
+                            fontSize: 12, 
+                            fontWeight: 500,
+                            fill: '#2563eb'
+                          }}
+                          tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                          axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                          width={60}
+                        />
+                        
+                        {/* Professional tooltip with enhanced content */}
+                        <Tooltip 
+                          position={{ y: -10 }}
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const revenue = data.revenue || 0;
+                              const netIncome = data.netIncome || 0;
+                              
+                              // Calculate averages for Property View
+                              const showAverages = viewMode === 'by-property';
+                              let revenueAverage = 0;
+                              let netIncomeAverage = 0;
+                              
+                              if (showAverages && trendData.length > 0) {
+                                revenueAverage = trendData.reduce((sum, item) => sum + (item.revenue || 0), 0) / trendData.length;
+                                netIncomeAverage = trendData.reduce((sum, item) => sum + (item.netIncome || 0), 0) / trendData.length;
+                              }
+                              
+                              return (
+                                <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-xs">
+                                  {/* Header with IAM CFO branding */}
+                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+                                    <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+                                    <span className="text-sm font-semibold text-gray-900">{label}</span>
+                                  </div>
+                                  
+                                  {/* Content */}
+                                  <div className="space-y-2">
+                                    {/* Revenue */}
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                                        <span className="text-sm font-medium text-gray-700">Revenue {showAverages ? '(current)' : ''}</span>
+                                      </div>
+                                      <span className="text-sm font-semibold text-gray-900">{formatCurrency(revenue)}</span>
+                                    </div>
+                                    
+                                    {/* Revenue Average (Property View only) */}
+                                    {showAverages && (
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                                          <span className="text-sm font-medium text-gray-600">Revenue Average ({timePeriod})</span>
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-600">{formatCurrency(revenueAverage)}</span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Net Income */}
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${netIncome >= 0 ? 'bg-green-600' : 'bg-red-600'}`}></div>
+                                        <span className="text-sm font-medium text-gray-700">Net Income {showAverages ? '(current)' : ''}</span>
+                                      </div>
+                                      <span className={`text-sm font-semibold ${netIncome >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                        {formatCurrency(netIncome)}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Net Income Average (Property View only) */}
+                                    {showAverages && (
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <div className={`w-2 h-2 rounded-full ${netIncomeAverage >= 0 ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                                          <span className="text-sm font-medium text-gray-600">Net Income Average ({timePeriod})</span>
+                                        </div>
+                                        <span className={`text-sm font-medium ${netIncomeAverage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                          {formatCurrency(netIncomeAverage)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Footer with IAM CFO branding */}
+                                  <div className="mt-3 pt-2 border-t border-gray-100">
+                                    <div className="text-xs text-gray-500 font-medium">IAM CFO</div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                          cursor={{ 
+                            fill: 'rgba(99, 102, 241, 0.05)',
+                            stroke: 'rgba(99, 102, 241, 0.2)',
+                            strokeWidth: 1
+                          }}
+                        />
+                        
+                        {/* Executive-style legend */}
+                        <Legend 
+                          wrapperStyle={{ 
+                            paddingTop: '25px',
+                            fontSize: '14px',
+                            fontWeight: 500
+                          }}
+                          iconType="plainline"
+                          formatter={(value: string) => 
+                            value === 'netIncome' ? 'Net Income' : 'Revenue'
+                          }
+                        />
+                        
+                        {/* Net Income Bars - Professional styling with conditional colors */}
+                        <Bar 
+                          yAxisId="left"
+                          dataKey="netIncome" 
+                          fill="#10b981"
+                          fillOpacity={0.8}
+                          name="netIncome"
+                          radius={[3, 3, 0, 0]}
+                          stroke="none"
+                        >
+                          {trendData.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={entry.netIncome >= 0 ? '#10b981' : '#ef4444'}
+                            />
+                          ))}
+                        </Bar>
+                        
+                        {/* Revenue Line - Professional blue styling */}
+                        <Line 
+                          yAxisId="right"
+                          type="monotone" 
+                          dataKey="revenue" 
+                          stroke="#2563eb" 
+                          strokeWidth={3}
+                          dot={{ 
+                            r: 5, 
+                            fill: '#2563eb', 
+                            strokeWidth: 2, 
+                            stroke: 'white',
+                            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                          }}
+                          activeDot={{ 
+                            r: 7, 
+                            fill: '#2563eb', 
+                            strokeWidth: 3, 
+                            stroke: 'white',
+                            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15))'
+                          }}
+                          name="revenue"
+                        />
+                      </ComposedChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-64 text-gray-500">
+                    <div className="flex items-center justify-center h-80 text-gray-500">
                       <div className="text-center">
-                        <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                        <p>No trend data available</p>
-                        <p className="text-sm mt-1">Try selecting a different time period or view mode</p>
+                        <BarChart3 className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p className="text-lg font-medium text-gray-600">No trend data available</p>
+                        <p className="text-sm mt-2 text-gray-500">Try selecting a different time period or view mode</p>
                       </div>
                     </div>
                   )}
