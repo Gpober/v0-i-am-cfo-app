@@ -1598,10 +1598,10 @@ export default function FinancialsPage() {
           <React.Fragment key={`parent-${account.name}`}>
             {/* PARENT ACCOUNT ROW */}
             <tr className="hover:bg-blue-50 bg-blue-25 border-l-4" style={{ borderLeftColor: BRAND_COLORS.primary }}>
-              <td className={`px-6 py-3 text-left text-sm bg-blue-25 ${
+              <td className={`px-6 py-3 text-left text-sm bg-white ${
                 (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                 (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                  ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
+                  ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg' : ''
               }`} style={{ minWidth: '240px', maxWidth: '300px' }}>
                 <div className="flex items-center">
                   <button
@@ -1642,11 +1642,11 @@ export default function FinancialsPage() {
                 subAccount.isParentAsSubAccount ? 'bg-yellow-25 border-l-4 border-yellow-300' : 'bg-blue-25 border-l-4 border-blue-200'
               }`}>
                 <td className={`px-6 py-2 text-left text-sm ${
-                  subAccount.isParentAsSubAccount ? 'bg-yellow-25' : 'bg-blue-25'
+                  subAccount.isParentAsSubAccount ? 'bg-white' : 'bg-white'
                 } ${
                   (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                   (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                    ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
+                    ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg' : ''
                 }`} style={{ minWidth: '240px', maxWidth: '300px' }}>
                   <div className="flex items-center pl-8">
                     <div className="w-4 h-4 mr-3 flex items-center justify-center">
@@ -1697,7 +1697,7 @@ export default function FinancialsPage() {
             <td className={`px-6 py-2 text-left text-sm text-gray-700 pl-12 bg-white ${
               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-sm' : ''
+                ? 'sticky left-0 z-25 border-r-2 border-gray-300 shadow-lg' : ''
             }`} style={{ minWidth: '240px', maxWidth: '300px' }}>
               <div className="flex items-center">
                 <span className="text-gray-700">📄 {account.name}</span>
@@ -1727,8 +1727,8 @@ export default function FinancialsPage() {
       <td className={`px-6 py-4 text-left text-lg font-bold ${textClass} ${
         (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
         (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-          ? 'sticky left-0 z-20 border-r-2 border-gray-200 shadow-lg' : ''
-      } ${bgClass}`}>
+          ? 'sticky left-0 z-20 border-r-2 border-gray-300 shadow-lg' : ''
+      } bg-white`}>
         {emoji} {title}
       </td>
       {viewMode === 'by-property' && timeSeriesData ? (
@@ -2242,10 +2242,10 @@ export default function FinancialsPage() {
       <table className="w-full table-auto" style={{ minWidth: viewMode === 'by-property' && timeSeriesData?.availableProperties ? `${Math.max(800, (timeSeriesData.availableProperties.length + 2) * 150)}px` : '800px' }}>
         <thead className="bg-gray-50">
           <tr>
-            <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+            <th className={`px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-white ${
               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
             }`} style={{ minWidth: '240px', maxWidth: '300px' }}>
               Account
             </th>
@@ -2265,8 +2265,8 @@ export default function FinancialsPage() {
                             <td className={`px-6 py-4 text-left text-lg font-bold text-blue-800 ${
                               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
-                            } bg-blue-100`} style={{ minWidth: '240px', maxWidth: '300px' }}>
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
+                            } bg-white`} style={{ minWidth: '240px', maxWidth: '300px' }}>
                               📊 TOTAL REVENUE
                             </td>
                             {viewMode === 'by-property' && timeSeriesData ? (
@@ -2359,10 +2359,10 @@ export default function FinancialsPage() {
 
                           {/* 📈 GROSS PROFIT */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.success }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-green-100 ${
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white ${
                               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
                             }`} style={{ color: BRAND_COLORS.success }}>
                               📈 GROSS PROFIT
                             </td>
@@ -2420,10 +2420,10 @@ export default function FinancialsPage() {
 
                               {/* TOTAL OPERATING EXPENSES */}
                               <tr className="bg-orange-100 border-t-2 border-orange-300">
-                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-orange-100 ${
+                                <td className={`px-6 py-4 text-left text-lg font-bold text-orange-800 bg-white ${
                                   (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                                   (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                    ? 'sticky left-0 z-30 border-r-2 border-gray-200 shadow-lg' : ''
+                                    ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
                                 }`}>
                                   📊 TOTAL OPERATING EXPENSES
                                 </td>
@@ -2468,10 +2468,10 @@ export default function FinancialsPage() {
 
                           {/* 🏆 NET OPERATING INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.primary }}>
-                            <td className={`px-6 py-5 text-left text-xl font-bold bg-green-100 ${
+                            <td className={`px-6 py-5 text-left text-xl font-bold bg-white ${
                               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
                             }`} style={{ color: BRAND_COLORS.primary }}>
                               🏆 NET OPERATING INCOME
                             </td>
@@ -2551,10 +2551,10 @@ export default function FinancialsPage() {
 
                           {/* 🎯 FINAL NET INCOME */}
                           <tr className="border-t-4 bg-green-100" style={{ borderTopColor: BRAND_COLORS.secondary }}>
-                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-green-100 ${
+                            <td className={`px-6 py-6 text-left text-2xl font-bold bg-white ${
                               (timeSeriesData && timeSeriesData.periods && timeSeriesData.periods.length > 1) || 
                               (viewMode === 'by-property' && timeSeriesData?.availableProperties?.length > 0) 
-                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-sm' : ''
+                                ? 'sticky left-0 z-30 border-r-2 border-gray-300 shadow-lg' : ''
                             }`} style={{ color: BRAND_COLORS.secondary }}>
                               🎯 NET INCOME
                             </td>
