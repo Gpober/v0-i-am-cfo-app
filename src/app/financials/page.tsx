@@ -2489,7 +2489,7 @@ export default function FinancialsPage() {
                   ? 'text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
-              style={{ backgroundColor: propertyChartMetric === 'expenses' ? BRAND_COLORS.warning || '#f59e0b' : undefined }}
+              style={{ backgroundColor: propertyChartMetric === 'expenses' ? BRAND_COLORS.primary : undefined }}
             >
               Expenses
             </button>
