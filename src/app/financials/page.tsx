@@ -3320,7 +3320,6 @@ export default function FinancialsPage() {
     </div>
   </div>
 </div>
-
          
           {/* Notification */}
           {notification.show && (
