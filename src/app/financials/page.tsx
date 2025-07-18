@@ -2645,142 +2645,259 @@ export default function FinancialsPage() {
     </div>
   </div>
 
-              {/* Revenue & Net Income Trend Chart - 50% width */}
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full">
-                  <div className="p-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">Revenue & Net Income</h3>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {viewMode === 'by-property' ? 
-                        `${timePeriod} comparison • ${trendData.length} properties` :
-                        timePeriod === 'Trailing 12' && viewMode === 'total' ? 
-                          'Past 12 months' :
-                          `${timePeriod} ${viewMode}`
-                      }
-                      {trendData.length > 1 && viewMode !== 'by-property' && (
-                        <span className="ml-1 text-green-600">• {trendData.length} periods</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="p-2">
-                    {trendData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <ComposedChart 
-                          data={trendData}
-                          margin={{ 
-                            top: 20, 
-                            right: 20, 
-                            left: 20, 
-                            bottom: trendData.length > 4 ? 60 : 40 
-                          }}
-                        >
-                          <CartesianGrid 
-                            strokeDasharray="2 2" 
-                            stroke="#f1f5f9" 
-                            strokeOpacity={0.8}
-                            vertical={false}
-                          />
-                          
-                          <XAxis 
-                            dataKey="period" 
-                            tick={{ 
-                              fontSize: 11, 
-                              fontWeight: 500,
-                              fill: '#475569'
-                            }}
-                            tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                            axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                            angle={trendData.length > 4 ? -45 : 0}
-                            textAnchor={trendData.length > 4 ? 'end' : 'middle'}
-                            height={trendData.length > 4 ? 60 : 40}
-                            interval={0}
-                          />
-                          
-                          <YAxis 
-                            tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`}
-                            tick={{ 
-                              fontSize: 11, 
-                              fontWeight: 500,
-                              fill: '#475569'
-                            }}
-                            tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                            axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                            width={50}
-                            domain={[0, 'dataMax']}
-                          />
-                          
-                          <Tooltip 
-                            formatter={(value: any, name: string) => {
-                              const label = name === 'netIncome' ? 'Net Income' : 'Revenue';
-                              return [`${formatCurrency(Number(value))}`, label];
-                            }}
-                            contentStyle={{ 
-                              backgroundColor: 'white', 
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                            }}
-                            labelStyle={{
-                              fontWeight: 'bold',
-                              fontSize: '12px',
-                              color: '#1f2937'
-                            }}
-                          />
-                          
-                          <Legend 
-                            wrapperStyle={{ 
-                              paddingTop: '15px',
-                              fontSize: '11px',
-                              fontWeight: 500
-                            }}
-                            iconType="plainline"
-                            formatter={(value: string) => 
-                              value === 'netIncome' ? 'Net Income' : 'Revenue'
-                            }
-                          />
-                          
-                          {/* Revenue Bar - Light IAM CFO Blue (background) */}
-                          <Bar 
-                            dataKey="revenue" 
-                            fill="#7CC4ED"
-                            fillOpacity={0.4}
-                            name="revenue"
-                            radius={[4, 4, 0, 0]}
-                            stroke="none"
-                          />
-                          
-                          {/* Net Income Bar - Full IAM CFO Blue (layered on top) */}
-                          <Bar 
-                            dataKey="netIncome" 
-                            fill="#56B6E9"
-                            fillOpacity={1}
-                            name="netIncome"
-                            radius={[4, 4, 0, 0]}
-                            stroke="none"
-                          >
-                            {trendData.map((entry, index) => (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={entry.netIncome >= 0 ? '#56B6E9' : '#ef4444'}
-                              />
-                            ))}
-                          </Bar>
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-72 text-gray-500">
-                        <div className="text-center">
-                          <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                          <p className="text-sm font-medium text-gray-600">No trend data</p>
-                        </div>
+             {/* Revenue & Net Income Trend Chart - 50% width */}
+<div className="lg:col-span-1">
+  <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full">
+    <div className="p-4 border-b border-gray-200">
+      <h3 className="text-lg font-semibold text-gray-900">Revenue, Gross Profit & Net Income</h3>
+      <div className="text-sm text-gray-600 mt-1">
+        {viewMode === 'by-property' ? 
+          `${timePeriod} comparison • ${trendData.length} properties` :
+          timePeriod === 'Trailing 12' && viewMode === 'total' ? 
+            'Past 12 months' :
+            `${timePeriod} ${viewMode}`
+        }
+        {trendData.length > 1 && viewMode !== 'by-property' && (
+          <span className="ml-1 text-green-600">• {trendData.length} periods</span>
+        )}
+      </div>
+    </div>
+    <div className="p-2">
+      {trendData.length > 0 ? (
+        <ResponsiveContainer width="100%" height={300}>
+          <ComposedChart 
+            data={trendData}
+            margin={{ 
+              top: 20, 
+              right: 20, 
+              left: 20, 
+              bottom: trendData.length > 4 ? 60 : 40 
+            }}
+          >
+            <CartesianGrid 
+              strokeDasharray="2 2" 
+              stroke="#f1f5f9" 
+              strokeOpacity={0.8}
+              vertical={false}
+            />
+            
+            <XAxis 
+              dataKey="period" 
+              tick={{ 
+                fontSize: 11, 
+                fontWeight: 500,
+                fill: '#475569'
+              }}
+              tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+              axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+              angle={trendData.length > 4 ? -45 : 0}
+              textAnchor={trendData.length > 4 ? 'end' : 'middle'}
+              height={trendData.length > 4 ? 60 : 40}
+              interval={0}
+            />
+            
+            <YAxis 
+              tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`}
+              tick={{ 
+                fontSize: 11, 
+                fontWeight: 500,
+                fill: '#475569'
+              }}
+              tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+              axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+              width={50}
+              domain={[0, 'dataMax']}
+            />
+            
+            <Tooltip 
+              content={({ active, payload, label }) => {
+                if (active && payload && payload.length > 0) {
+                  const data = payload[0].payload;
+                  
+                  return (
+                    <div style={{ 
+                      backgroundColor: 'white', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      padding: '12px'
+                    }}>
+                      <div style={{
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        color: '#1f2937',
+                        marginBottom: '8px',
+                        borderBottom: '1px solid #e5e7eb',
+                        paddingBottom: '4px'
+                      }}>
+                        {data.fullPeriodName || data.fullPropertyName || label}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+                      
+                      {/* Revenue */}
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        marginBottom: '4px',
+                        color: '#374151'
+                      }}>
+                        <div style={{
+                          width: '12px',
+                          height: '3px',
+                          backgroundColor: '#B8E0F5',
+                          marginRight: '8px',
+                          borderRadius: '2px'
+                        }}></div>
+                        <span style={{ minWidth: '80px' }}>Revenue:</span>
+                        <span style={{ fontWeight: 'bold', color: '#1f2937' }}>
+                          {formatCurrency(data.revenue || 0)}
+                        </span>
+                      </div>
+                      
+                      {/* Gross Profit - only if available and different from revenue */}
+                      {data.grossProfit !== undefined && Math.abs((data.grossProfit || 0) - (data.revenue || 0)) > 0.01 && (
+                        <>
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            marginBottom: '4px',
+                            color: '#374151'
+                          }}>
+                            <div style={{
+                              width: '12px',
+                              height: '3px',
+                              backgroundColor: '#7CC4ED',
+                              marginRight: '8px',
+                              borderRadius: '2px'
+                            }}></div>
+                            <span style={{ minWidth: '80px' }}>Gross Profit:</span>
+                            <span style={{ fontWeight: 'bold', color: '#1f2937' }}>
+                              {formatCurrency(data.grossProfit || 0)}
+                            </span>
+                          </div>
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            marginBottom: '4px',
+                            color: '#6b7280',
+                            fontSize: '10px'
+                          }}>
+                            <span style={{ marginLeft: '20px', minWidth: '80px' }}>GP Margin:</span>
+                            <span style={{ fontWeight: 'bold' }}>
+                              {data.revenue ? (((data.grossProfit || 0) / data.revenue) * 100).toFixed(1) : '0.0'}%
+                            </span>
+                          </div>
+                        </>
+                      )}
+                      
+                      {/* Net Income */}
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        marginBottom: '4px',
+                        color: '#374151'
+                      }}>
+                        <div style={{
+                          width: '12px',
+                          height: '3px',
+                          backgroundColor: (data.netIncome || 0) >= 0 ? '#56B6E9' : '#ef4444',
+                          marginRight: '8px',
+                          borderRadius: '2px'
+                        }}></div>
+                        <span style={{ minWidth: '80px' }}>Net Income:</span>
+                        <span style={{ 
+                          fontWeight: 'bold', 
+                          color: (data.netIncome || 0) >= 0 ? '#059669' : '#dc2626'
+                        }}>
+                          {formatCurrency(data.netIncome || 0)}
+                        </span>
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        color: '#6b7280',
+                        fontSize: '10px'
+                      }}>
+                        <span style={{ marginLeft: '20px', minWidth: '80px' }}>NI Margin:</span>
+                        <span style={{ 
+                          fontWeight: 'bold',
+                          color: (data.netIncome || 0) >= 0 ? '#059669' : '#dc2626'
+                        }}>
+                          {data.revenue ? (((data.netIncome || 0) / data.revenue) * 100).toFixed(1) : '0.0'}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            
+            <Legend 
+              wrapperStyle={{ 
+                paddingTop: '15px',
+                fontSize: '11px',
+                fontWeight: 500
+              }}
+              iconType="rect"
+              formatter={(value: string) => {
+                if (value === 'revenue') return 'Revenue';
+                if (value === 'grossProfit') return 'Gross Profit';
+                if (value === 'netIncome') return 'Net Income';
+                return value;
+              }}
+            />
+            
+            {/* Revenue Bar - Lightest blue, shows full revenue amount */}
+            <Bar 
+              dataKey="revenue" 
+              fill="#B8E0F5"
+              fillOpacity={0.7}
+              name="revenue"
+              radius={[2, 2, 0, 0]}
+              stroke="none"
+            />
+            
+            {/* Gross Profit Bar - Medium blue, shows actual GP amount (not layered) */}
+            <Bar 
+              dataKey="grossProfit" 
+              fill="#7CC4ED"
+              fillOpacity={0.85}
+              name="grossProfit"
+              radius={[2, 2, 0, 0]}
+              stroke="none"
+            />
+            
+            {/* Net Income Bar - Darkest blue, shows actual NI amount (not layered) */}
+            <Bar 
+              dataKey="netIncome" 
+              fill="#56B6E9"
+              fillOpacity={1}
+              name="netIncome"
+              radius={[2, 2, 0, 0]}
+              stroke="none"
+            >
+              {trendData.map((entry, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={(entry.netIncome || 0) >= 0 ? '#56B6E9' : '#ef4444'}
+                />
+              ))}
+            </Bar>
+          </ComposedChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="flex items-center justify-center h-72 text-gray-500">
+          <div className="text-center">
+            <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+            <p className="text-sm font-medium text-gray-600">No trend data</p>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
             
             {/* Main Content Grid - P&L and Transaction Details Below */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
