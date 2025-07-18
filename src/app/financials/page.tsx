@@ -982,6 +982,7 @@ export default function FinancialsPage() {
   const [availableProperties, setAvailableProperties] = useState<string[]>(HARDCODED_PROPERTIES);
   const [selectedAccountDetails, setSelectedAccountDetails] = useState<FinancialDataItem | null>(null);
   const [timeSeriesData, setTimeSeriesData] = useState<any>(null);
+  const [chartView, setChartView] = useState<'revenue-ni' | 'revenue-gp'>('revenue-ni');
 
   // Generate months list
   const generateMonthsList = () => {
@@ -2651,7 +2652,7 @@ export default function FinancialsPage() {
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full">
                   <div className="p-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">Revenue & Net Income</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Revenue & Financial Performance</h3>
                     <div className="text-sm text-gray-600 mt-1">
                       {viewMode === 'by-property' ? 
                         `${timePeriod} comparison • ${trendData.length} properties` :
@@ -2661,6 +2662,33 @@ export default function FinancialsPage() {
                       }
                       {trendData.length > 1 && viewMode !== 'by-property' && (
                         <span className="ml-1 text-green-600">• {trendData.length} periods</span>
+                      )}
+                    </div>
+                    
+                    {/* Toggle buttons */}
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={() => setChartView('revenue-ni')}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                          chartView === 'revenue-ni'
+                            ? 'bg-blue-500 text-white shadow-sm'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Revenue & Net Income
+                      </button>
+                      {/* Only show Gross Profit toggle if GP differs from Revenue by >$0.01 */}
+                      {trendData.some((data: any) => Math.abs(data.revenue - data.grossProfit) > 0.01) && (
+                        <button
+                          onClick={() => setChartView('revenue-gp')}
+                          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                            chartView === 'revenue-gp'
+                              ? 'bg-blue-500 text-white shadow-sm'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          Revenue & Gross Profit
+                        </button>
                       )}
                     </div>
                   </div>
@@ -2712,22 +2740,56 @@ export default function FinancialsPage() {
                           />
                           
                           <Tooltip 
-                            formatter={(value: any, name: string) => {
-                              const label = name === 'netIncome' ? 'Net Income' : 'Revenue';
-                              return [`${formatCurrency(Number(value))}`, label];
+                            formatter={(value: any, name: string, props: any) => {
+                              if (chartView === 'revenue-ni') {
+                                const label = name === 'netIncome' ? 'Net Income' : 'Revenue';
+                                return [`${formatCurrency(Number(value))}`, label];
+                              } else {
+                                const label = name === 'grossProfit' ? 'Gross Profit' : 'Revenue';
+                                return [`${formatCurrency(Number(value))}`, label];
+                              }
                             }}
-                            contentStyle={{ 
-                              backgroundColor: 'white', 
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                            }}
-                            labelStyle={{
-                              fontWeight: 'bold',
-                              fontSize: '12px',
-                              color: '#1f2937'
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                const revenue = data.revenue;
+                                const secondMetric = chartView === 'revenue-ni' ? data.netIncome : data.grossProfit;
+                                const margin = chartView === 'revenue-ni' 
+                                  ? (revenue > 0 ? ((secondMetric / revenue) * 100).toFixed(1) + '%' : 'N/A')
+                                  : (revenue > 0 ? ((secondMetric / revenue) * 100).toFixed(1) + '%' : 'N/A');
+                                const marginLabel = chartView === 'revenue-ni' ? 'NI Margin' : 'GP Margin';
+                                
+                                return (
+                                  <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
+                                    <p className="font-bold text-gray-900 mb-2">{label}</p>
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between items-center">
+                                        <span className="flex items-center">
+                                          <span className="w-3 h-3 bg-blue-400 rounded-full mr-2 opacity-40"></span>
+                                          Revenue:
+                                        </span>
+                                        <span className="font-medium">{formatCurrency(revenue)}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span className="flex items-center">
+                                          <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+                                          {chartView === 'revenue-ni' ? 'Net Income:' : 'Gross Profit:'}
+                                        </span>
+                                        <span className={`font-medium ${secondMetric < 0 ? 'text-red-600' : ''}`}>
+                                          {formatCurrency(secondMetric)}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+                                        <span className="text-sm text-gray-600">{marginLabel}:</span>
+                                        <span className={`text-sm font-medium ${secondMetric < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                          {margin}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
                             }}
                           />
                           
@@ -2737,13 +2799,17 @@ export default function FinancialsPage() {
                               fontSize: '11px',
                               fontWeight: 500
                             }}
-                            iconType="plainline"
-                            formatter={(value: string) => 
-                              value === 'netIncome' ? 'Net Income' : 'Revenue'
-                            }
+                            iconType="rect"
+                            formatter={(value: string) => {
+                              if (chartView === 'revenue-ni') {
+                                return value === 'netIncome' ? 'Net Income' : 'Revenue';
+                              } else {
+                                return value === 'grossProfit' ? 'Gross Profit' : 'Revenue';
+                              }
+                            }}
                           />
                           
-                          {/* Revenue Bar - Light IAM CFO Blue (background) */}
+                          {/* Revenue Bar - Light IAM CFO Blue */}
                           <Bar 
                             dataKey="revenue" 
                             fill="#7CC4ED"
@@ -2753,21 +2819,24 @@ export default function FinancialsPage() {
                             stroke="none"
                           />
                           
-                          {/* Net Income Bar - Full IAM CFO Blue (layered on top) */}
+                          {/* Conditional second metric bar */}
                           <Bar 
-                            dataKey="netIncome" 
+                            dataKey={chartView === 'revenue-ni' ? 'netIncome' : 'grossProfit'}
                             fill="#56B6E9"
                             fillOpacity={1}
-                            name="netIncome"
+                            name={chartView === 'revenue-ni' ? 'netIncome' : 'grossProfit'}
                             radius={[4, 4, 0, 0]}
                             stroke="none"
                           >
-                            {trendData.map((entry, index) => (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={entry.netIncome >= 0 ? '#56B6E9' : '#ef4444'}
-                              />
-                            ))}
+                            {trendData.map((entry, index) => {
+                              const value = chartView === 'revenue-ni' ? entry.netIncome : entry.grossProfit;
+                              return (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={value >= 0 ? '#56B6E9' : '#ef4444'}
+                                />
+                              );
+                            })}
                           </Bar>
                         </ComposedChart>
                       </ResponsiveContainer>
