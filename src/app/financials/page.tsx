@@ -3240,8 +3240,8 @@ export default function FinancialsPage() {
              
               {/* Transaction Detail Panel */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Transaction Details</h3>
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Transaction Details</h3>
                   {selectedAccountDetails && (
                     <div className="mt-2 flex items-center justify-between">
                       <div>
@@ -3262,7 +3262,7 @@ export default function FinancialsPage() {
                     </div>
                   )}
                 </div>
-                <div className="p-6">
+                <div className="p-4">
                   {selectedAccountDetails ? (
                     <div className="space-y-4">
                       {/* Summary Stats */}
@@ -3275,64 +3275,45 @@ export default function FinancialsPage() {
                           <span className="text-xs text-gray-500">P&L Category</span>
                           <div className="text-lg font-semibold">{selectedAccountDetails.category}</div>
                         </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Account Type</span>
-                          <div className="text-sm text-gray-700">{selectedAccountDetails.account_type}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Detail Type</span>
-                          <div className="text-sm text-gray-700">{selectedAccountDetails.account_detail_type || 'None'}</div>
-                        </div>
                       </div>
 
                       {/* Transaction List */}
-                      <div className="max-h-96 overflow-y-auto">
+                      <div className="max-h-80 overflow-y-auto">
                         <div className="space-y-2">
                           {selectedAccountDetails.entries && selectedAccountDetails.entries.length > 0 ? (
                             selectedAccountDetails.entries
                               .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
                               .map((entry: any, index: number) => (
-                                <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                                  <div className="flex justify-between items-start mb-2">
+                                <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-2 hover:bg-gray-50 transition-colors">
+                                  <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                       <div 
                                         className={`w-2 h-2 rounded-full ${
                                           entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
                                         }`}
                                       />
-                                      <span className="text-xs text-gray-500">ID: {entry.id}</span>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className={`text-sm font-semibold ${
-                                        entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                                      }`}>
-                                        {formatCurrency(entry.amount)}
-                                      </div>
-                                      <div className="text-xs text-gray-500">
+                                      <span className="text-xs text-gray-500">
                                         {new Date(entry.date).toLocaleDateString()}
-                                      </div>
+                                      </span>
+                                    </div>
+                                    <div className={`text-sm font-semibold ${
+                                      entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {formatCurrency(entry.amount)}
                                     </div>
                                   </div>
                                   
                                   {entry.memo && (
-                                    <div className="mb-2 p-2 bg-blue-50 rounded text-xs">
+                                    <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
                                       <span className="text-blue-700">💬 {entry.memo}</span>
                                     </div>
                                   )}
-                                  
-                                  <div className="flex justify-between text-xs text-gray-600">
-                                    <span>
-                                      <strong>Class:</strong> {entry.class || 'No Class'}
-                                    </span>
-                                    <span>
-                                      <strong>Detail:</strong> {entry.account_detail_type || 'None'}
-                                    </span>
-                                  </div>
                                 </div>
                               ))
                           ) : (
                             <div className="text-center py-8 text-gray-500">
-                              No transaction details available
+                              <div className="text-sm">📊 No transactions found</div>
+                              <div className="text-xs mt-1">Select an account to view transaction details</div>
                             </div>
                           )}
                         </div>
