@@ -456,7 +456,7 @@ const fetchTimeSeriesData = async (
         case 'Yearly':
           if (viewMode === 'total') {
             const yearStart = `${year}-01-01`;
-            const yearEnd = `${year}-12-31`;
+            const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
             dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
           } else {
             const currentMonth = selectedDate.getMonth() + 1;
