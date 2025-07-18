@@ -2091,9 +2091,8 @@ export default function FinancialsPage() {
   );
 
  return (
-     <>
-      <style jsx>{scrollbarStyles}</style>
       <div className="min-h-screen bg-gray-50">
+        <style jsx>{scrollbarStyles}</style>
         {/* Page Header with IAM CFO Branding */}
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -3635,3 +3634,4 @@ const scrollbarStyles = `
     box-shadow: 2px 0 4px rgba(0,0,0,0.1);
   }
 `;
+export default FinancialsPage;
