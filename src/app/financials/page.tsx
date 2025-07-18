@@ -1562,8 +1562,8 @@ export default function FinancialsPage() {
 };
 
   const generatePropertyChartData = () => {
-  // Only show property data if we have it
-  if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
+  // First try: Use availableProperties if we have them
+  if (timeSeriesData?.availableProperties) {
     return timeSeriesData.availableProperties.map((property: string) => {
       const revenue = currentData
         .filter((item: any) => item.category === 'Revenue')
@@ -1584,10 +1584,10 @@ export default function FinancialsPage() {
       const otherExpenses = currentData
         .filter((item: any) => item.category === 'Other Expenses')
         .reduce((sum: number, item: any) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
-
+      
       const grossProfit = revenue - cogs;
       const netIncome = revenue - cogs - operatingExpenses + otherIncome - otherExpenses;
-
+      
       let value = 0;
       switch (propertyChartMetric) {
         case 'income':
@@ -1596,22 +1596,30 @@ export default function FinancialsPage() {
         case 'gp':
           value = grossProfit;
           break;
+        case 'cogs':
+          value = cogs;
+          break;
+        case 'expenses':
+          value = operatingExpenses;
+          break;
         case 'ni':
           value = netIncome;
           break;
       }
-
+      
       return {
         name: property,
         value: value,
         revenue: revenue,
         grossProfit: grossProfit,
+        cogs: cogs,
+        operatingExpenses: operatingExpenses,
         netIncome: netIncome
       };
     }).filter(item => item.value > 0); // Only show properties with positive values
   }
   
-  // Fallback: If not in by-property mode, create property data from current data
+  // Fallback: Extract properties from entries in currentData
   if (currentData.length > 0) {
     // Extract properties from entries
     const propertyData: Record<string, { revenue: number; cogs: number; opex: number; otherIncome: number; otherExpenses: number }> = {};
@@ -1658,6 +1666,12 @@ export default function FinancialsPage() {
         case 'gp':
           value = grossProfit;
           break;
+        case 'cogs':
+          value = data.cogs;
+          break;
+        case 'expenses':
+          value = data.opex;
+          break;
         case 'ni':
           value = netIncome;
           break;
@@ -1668,6 +1682,8 @@ export default function FinancialsPage() {
         value: value,
         revenue: data.revenue,
         grossProfit: grossProfit,
+        cogs: data.cogs,
+        operatingExpenses: data.opex,
         netIncome: netIncome
       };
     }).filter(item => item.value > 0);
@@ -2420,7 +2436,7 @@ export default function FinancialsPage() {
               </div>
             </div>
 
-          {/* Charts Row - 50/50 Split */}
+         {/* Charts Row - 50/50 Split */}
 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
   {/* Property Performance Chart - 50% width */}
   <div className="lg:col-span-1">
