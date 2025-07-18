@@ -12,7 +12,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     <>
       <nav className="bg-white shadow px-6 py-4 flex items-center justify-between">
         <div className="flex space-x-4">
-          <Link href="/">Dashboard</Link>
+          <Link href="/Dashboard">Dashboard</Link>
           <Link href="/reservations">Reservations</Link>
           <Link href="/financials">Financials</Link>
           <Link href="/payroll">Payroll</Link>
