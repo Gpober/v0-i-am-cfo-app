@@ -2681,69 +2681,50 @@ export default function FinancialsPage() {
 
             
             <Tooltip 
-              content={({ active, payload, label }) => {
-                if (!active || !payload || !payload.length) return null;
-                
+              formatter={(value, name) => {
+                const label = name === 'netIncome' ? 'Net Income' : 
+                             name === 'grossProfit' ? 'Gross Profit' : 'Revenue';
+                return [`${formatCurrency(Number(value))}`, label];
+              }}
+              labelFormatter={(label) => {
                 const dataPoint = trendData.find(item => item.period === label);
-                if (!dataPoint) return null;
+                if (!dataPoint) return label;
                 
                 // Check if COGS exists (GP !== Revenue)
                 const hasCOGS = dataPoint.grossProfit !== undefined && 
                                dataPoint.grossProfit !== dataPoint.revenue;
                 
-                return (
-                  <div style={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    minWidth: '200px'
-                  }}>
-                    <div style={{
-                      fontWeight: 'bold',
-                      fontSize: '12px',
-                      color: '#1f2937',
-                      marginBottom: '8px'
-                    }}>
-                      {label}
-                    </div>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {/* Revenue */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: '#7CC4ED' }}>Revenue:</span>
-                        <span>{formatCurrency(dataPoint.revenue)}</span>
-                      </div>
-                      
-                      {/* Gross Profit - only if COGS exists */}
-                      {hasCOGS && (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ color: '#56B6E9' }}>Gross Profit:</span>
-                            <span>{formatCurrency(dataPoint.grossProfit)}</span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ color: '#56B6E9' }}>GP%:</span>
-                            <span>{dataPoint.grossProfitPercent ? dataPoint.grossProfitPercent.toFixed(1) + '%' : 'N/A'}</span>
-                          </div>
-                        </>
-                      )}
-                      
-                      {/* Net Income */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: dataPoint.netIncome >= 0 ? '#2563eb' : '#ef4444' }}>Net Income:</span>
-                        <span>{formatCurrency(dataPoint.netIncome)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: dataPoint.netIncome >= 0 ? '#2563eb' : '#ef4444' }}>NI%:</span>
-                        <span>{dataPoint.netIncomePercent ? dataPoint.netIncomePercent.toFixed(1) + '%' : 'N/A'}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
+                let result = label;
+                
+                if (hasCOGS) {
+                  // Show: Rev, GP, GP%, NI, NI%
+                  result += `\nRevenue: ${formatCurrency(dataPoint.revenue)}`;
+                  result += `\nGross Profit: ${formatCurrency(dataPoint.grossProfit)}`;
+                  result += `\nGP%: ${dataPoint.grossProfitPercent ? dataPoint.grossProfitPercent.toFixed(1) + '%' : 'N/A'}`;
+                  result += `\nNet Income: ${formatCurrency(dataPoint.netIncome)}`;
+                  result += `\nNI%: ${dataPoint.netIncomePercent ? dataPoint.netIncomePercent.toFixed(1) + '%' : 'N/A'}`;
+                } else {
+                  // Show: Rev, NI, NI%
+                  result += `\nRevenue: ${formatCurrency(dataPoint.revenue)}`;
+                  result += `\nNet Income: ${formatCurrency(dataPoint.netIncome)}`;
+                  result += `\nNI%: ${dataPoint.netIncomePercent ? dataPoint.netIncomePercent.toFixed(1) + '%' : 'N/A'}`;
+                }
+                
+                return result;
+              }}
+              contentStyle={{ 
+                backgroundColor: 'white', 
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontWeight: 500,
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                whiteSpace: 'pre-line'
+              }}
+              labelStyle={{
+                fontWeight: 'bold',
+                fontSize: '12px',
+                color: '#1f2937'
               }}
             />
             
@@ -2817,60 +2798,6 @@ export default function FinancialsPage() {
     </div>
   </div>
 </div>
-            
-            {/* Main Content Grid - P&L and Transaction Details Below */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-              {/* P&L Table - 80% width (4/5) */}
-              <div className="lg:col-span-4">
-                {/* Your existing P&L table code goes here */}
-              </div>
-
-              {/* Transaction Detail Panel - 20% width (1/5) */}
-              <div className="lg:col-span-1">
-                {/* Your existing transaction detail code goes here */}
-              </div>
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-              {/* Left Column: Financial Tables */}
-              <div className="lg:col-span-4">
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <div className="p-6 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          Profit & Loss Statement {viewMode === 'by-property' ? `(By Property - ${timePeriod})` : '(By Property Class)'}
-                        </h3>
-                        <div className="mt-2 text-sm text-gray-600">
-                          {viewMode === 'by-property'
-                            ? `Showing ${timePeriod.toLowerCase()} property comparison for ${
-                                timePeriod === 'Monthly' ? selectedMonth :
-                                timePeriod === 'Quarterly' ? `Q${Math.floor(new Date(`${selectedMonth.split(' ')[0]} 1, ${selectedMonth.split(' ')[1]}`).getMonth() / 3) + 1} ${selectedMonth.split(' ')[1]}` :
-                                timePeriod === 'Yearly' ? selectedMonth.split(' ')[1] :
-                                `past 12 months ending ${selectedMonth}`
-                              } • ${timeSeriesData?.availableProperties?.length || 0} properties`
-                            : timePeriod === 'Trailing 12' && viewMode === 'total' 
-                            ? 'Showing aggregated totals for the past 12 months'
-                            : timePeriod === 'Monthly' && viewMode === 'detailed'
-                            ? 'Showing weekly breakdown for the selected month'
-                            : `Showing ${timePeriod.toLowerCase()} ${viewMode} view`
-                          }
-                          {viewMode === 'by-property' && (
-                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                              🏢 Property View
-                            </span>
-                          )}
-                          <div className="mt-1 text-xs text-green-600">
-                            ✅ P&L accounts automatically classified • Balance Sheet accounts excluded • 🏗️ Account grouping enabled
-                            {viewMode === 'by-property' && (
-                              <span className="ml-1">• 🏢 Property dimension active</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
                 {/* P&L Table Content */}
 <div className="relative bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200" style={{ height: '105vh' }}>
