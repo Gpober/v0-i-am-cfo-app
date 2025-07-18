@@ -454,12 +454,15 @@ const fetchTimeSeriesData = async (
           break;
           
         case 'Yearly':
+          const currentMonth = selectedDate.getMonth() + 1;
           if (viewMode === 'total') {
+            // Show January 1st through the selected month (Year-to-Date)
             const yearStart = `${year}-01-01`;
-            const yearEnd = `${year}-12-31`;
-            dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
+            const lastDay = new Date(parseInt(year), currentMonth, 0).getDate();
+            const yearEnd = `${year}-${currentMonth.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+            dateRanges = [{ start: yearStart, end: yearEnd, label: `${year} YTD (through ${month})` }];
           } else {
-            const currentMonth = selectedDate.getMonth() + 1;
+            // Show month-by-month breakdown from January through selected month
             for (let m = 1; m <= currentMonth; m++) {
               const monthStart = `${year}-${m.toString().padStart(2, '0')}-01`;
               const monthEnd = new Date(parseInt(year), m, 0);
