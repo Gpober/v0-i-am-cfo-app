@@ -360,9 +360,11 @@ const fetchTimeSeriesData = async (
           label: `Q${quarter} ${year}`
         }];
       } else if (timePeriod === 'Yearly') {
-        const yearStart = `${year}-01-01`;
-        const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-        dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
+  const yearStart = `${year}-01-01`;
+  const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+  const yearEnd = monthEnd.toISOString().split('T')[0];
+  const monthName = selectedDate.toLocaleDateString('en-US', { month: 'long' });
+  dateRanges = [{ start: yearStart, end: yearEnd, label: `${year} YTD (through ${monthName})` }];
       } else { // Trailing 12
         // FIXED: Use month-by-month fetching like other views to avoid row limits
         for (let i = 11; i >= 0; i--) {
