@@ -2436,7 +2436,7 @@ export default function FinancialsPage() {
               </div>
             </div>
 
-         {/* Charts Row - 50/50 Split */}
+        {/* Charts Row - 50/50 Split */}
 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
   {/* Property Performance Chart - 50% width */}
   <div className="lg:col-span-1">
