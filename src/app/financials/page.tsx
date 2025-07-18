@@ -941,7 +941,7 @@ export default function FinancialsPage() {
   
   // Data integrity state
   const [dataIntegrityStatus, setDataIntegrityStatus] = useState<DataIntegrityStatus | null>(null);
-  const [propertyChartMetric, setPropertyChartMetric] = useState<'income' | 'gp' | 'ni' | 'expenses'>('income');
+  const [propertyChartMetric, setPropertyChartMetric] = useState<'income' | 'gp' | 'ni'>('income');
   
   // Debug mode state
   const [debugMode, setDebugMode] = useState(DEBUG_CONFIG.isDebugMode);
