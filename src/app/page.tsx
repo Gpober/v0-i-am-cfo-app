@@ -454,15 +454,12 @@ const fetchTimeSeriesData = async (
           break;
           
         case 'Yearly':
-          const currentMonth = selectedDate.getMonth() + 1;
           if (viewMode === 'total') {
-            // Show January 1st through the selected month (Year-to-Date)
             const yearStart = `${year}-01-01`;
-            const lastDay = new Date(parseInt(year), currentMonth, 0).getDate();
-            const yearEnd = `${year}-${currentMonth.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
-            dateRanges = [{ start: yearStart, end: yearEnd, label: `${year} YTD (through ${month})` }];
+            const yearEnd = `${year}-12-31`;
+            dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
           } else {
-            // Show month-by-month breakdown from January through selected month
+            const currentMonth = selectedDate.getMonth() + 1;
             for (let m = 1; m <= currentMonth; m++) {
               const monthStart = `${year}-${m.toString().padStart(2, '0')}-01`;
               const monthEnd = new Date(parseInt(year), m, 0);
@@ -1003,22 +1000,10 @@ export default function MobileResponsiveFinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
-      // ENHANCED: Proper property filtering logic
+      // FIXED: For by-property view, always use 'All Properties' to get all data
       let propertyFilter = 'All Properties';
-      
-      if (viewMode === 'by-property') {
-        // For by-property view, always fetch all properties
-        propertyFilter = 'All Properties';
-      } else {
-        // For total/detailed views, respect property selection
-        if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-          // If specific properties are selected, use the first one for filtering
-          // Note: Multiple property selection would require backend changes
-          propertyFilter = Array.from(selectedProperties)[0];
-        } else {
-          // If "All Properties" is selected or no selection, get all data
-          propertyFilter = 'All Properties';
-        }
+      if (viewMode !== 'by-property' && selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
+        propertyFilter = Array.from(selectedProperties)[0];
       }
       
       smartLog('🔍 LOADING DATA WITH FILTERS:', {
@@ -1027,11 +1012,7 @@ export default function MobileResponsiveFinancialsPage() {
         month: selectedMonth,
         timePeriod,
         viewMode,
-        note: viewMode === 'by-property' 
-          ? 'Using All Properties for by-property view (shows breakdown)' 
-          : selectedProperties.has('All Properties') 
-          ? 'Using All Properties filter'
-          : `Using property filter: ${propertyFilter}`
+        note: viewMode === 'by-property' ? 'FORCING All Properties for by-property view' : 'Using selected property filter'
       });
       
       const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode, updateDataIntegrityStatus);
@@ -1045,12 +1026,12 @@ export default function MobileResponsiveFinancialsPage() {
       }
       
       const propertyText = viewMode === 'by-property' 
-        ? 'all properties (by-property breakdown)' 
+        ? 'all properties (by-property view)' 
         : selectedProperties.has('All Properties') 
         ? 'all property classes' 
-        : `${selectedProperties.size} selected property class(es)`;
+        : `${selectedProperties.size} selected property classes`;
         
-      showNotification(`✅ Loaded data for ${propertyText} - ${timePeriod} ${viewMode} view`, 'success');
+      showNotification(`Loaded data for ${propertyText} - ${timePeriod} ${viewMode} view`, 'success');
       
     } catch (error) {
       console.error('Failed to load financial data:', error);
