@@ -1561,8 +1561,8 @@ export default function FinancialsPage() {
     .filter((item: any) => item.value > 0);
 };
 
-  const generatePropertyChartData = () => {
-  // Only show property data if we have it
+ const generatePropertyChartData = () => {
+  // Only show property data if we have it AND we're in by-property view
   if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
     return timeSeriesData.availableProperties.map((property: string) => {
       const revenue = currentData
@@ -1596,6 +1596,12 @@ export default function FinancialsPage() {
         case 'gp':
           value = grossProfit;
           break;
+        case 'cogs':
+          value = cogs;
+          break;
+        case 'expenses':
+          value = operatingExpenses;
+          break;
         case 'ni':
           value = netIncome;
           break;
@@ -1606,9 +1612,11 @@ export default function FinancialsPage() {
         value: value,
         revenue: revenue,
         grossProfit: grossProfit,
+        cogs: cogs,
+        operatingExpenses: operatingExpenses,
         netIncome: netIncome
       };
-    }).filter(item => item.value > 0); // Only show properties with positive values
+    }).filter(item => item.value > 0);
   }
   
   // Fallback: If not in by-property mode, create property data from current data
@@ -1658,6 +1666,12 @@ export default function FinancialsPage() {
         case 'gp':
           value = grossProfit;
           break;
+        case 'cogs':
+          value = data.cogs;
+          break;
+        case 'expenses':
+          value = data.opex;
+          break;
         case 'ni':
           value = netIncome;
           break;
@@ -1668,6 +1682,8 @@ export default function FinancialsPage() {
         value: value,
         revenue: data.revenue,
         grossProfit: grossProfit,
+        cogs: data.cogs,
+        operatingExpenses: data.opex,
         netIncome: netIncome
       };
     }).filter(item => item.value > 0);
