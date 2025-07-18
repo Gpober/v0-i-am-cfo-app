@@ -361,7 +361,7 @@ const fetchTimeSeriesData = async (
         }];
       } else if (timePeriod === 'Yearly') {
         const yearStart = `${year}-01-01`;
-        const yearEnd = `${year}-12-31`;
+        const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
         dateRanges = [{ start: yearStart, end: yearEnd, label: year }];
       } else { // Trailing 12
         // FIXED: Use month-by-month fetching like other views to avoid row limits
