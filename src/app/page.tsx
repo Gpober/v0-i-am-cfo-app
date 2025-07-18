@@ -1000,10 +1000,22 @@ export default function MobileResponsiveFinancialsPage() {
       setIsLoadingData(true);
       setDataError(null);
       
-      // FIXED: For by-property view, always use 'All Properties' to get all data
+      // ENHANCED: Proper property filtering logic
       let propertyFilter = 'All Properties';
-      if (viewMode !== 'by-property' && selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-        propertyFilter = Array.from(selectedProperties)[0];
+      
+      if (viewMode === 'by-property') {
+        // For by-property view, always fetch all properties
+        propertyFilter = 'All Properties';
+      } else {
+        // For total/detailed views, respect property selection
+        if (selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
+          // If specific properties are selected, use the first one for filtering
+          // Note: Multiple property selection would require backend changes
+          propertyFilter = Array.from(selectedProperties)[0];
+        } else {
+          // If "All Properties" is selected or no selection, get all data
+          propertyFilter = 'All Properties';
+        }
       }
       
       smartLog('🔍 LOADING DATA WITH FILTERS:', {
@@ -1012,7 +1024,11 @@ export default function MobileResponsiveFinancialsPage() {
         month: selectedMonth,
         timePeriod,
         viewMode,
-        note: viewMode === 'by-property' ? 'FORCING All Properties for by-property view' : 'Using selected property filter'
+        note: viewMode === 'by-property' 
+          ? 'Using All Properties for by-property view (shows breakdown)' 
+          : selectedProperties.has('All Properties') 
+          ? 'Using All Properties filter'
+          : `Using property filter: ${propertyFilter}`
       });
       
       const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode, updateDataIntegrityStatus);
@@ -1026,12 +1042,12 @@ export default function MobileResponsiveFinancialsPage() {
       }
       
       const propertyText = viewMode === 'by-property' 
-        ? 'all properties (by-property view)' 
+        ? 'all properties (by-property breakdown)' 
         : selectedProperties.has('All Properties') 
         ? 'all property classes' 
-        : `${selectedProperties.size} selected property classes`;
+        : `${selectedProperties.size} selected property class(es)`;
         
-      showNotification(`Loaded data for ${propertyText} - ${timePeriod} ${viewMode} view`, 'success');
+      showNotification(`✅ Loaded data for ${propertyText} - ${timePeriod} ${viewMode} view`, 'success');
       
     } catch (error) {
       console.error('Failed to load financial data:', error);
