@@ -3265,7 +3265,7 @@ export default function FinancialsPage() {
     <div className="p-4">
       {selectedAccountDetails ? (
         <div className="space-y-4">
-          {/* Summary Stats */}
+          {/* Summary Stats - Removed Account Type and Detail Type */}
           <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg">
             <div>
               <span className="text-xs text-gray-500">Total Transactions</span>
@@ -3282,8 +3282,8 @@ export default function FinancialsPage() {
             <div className="space-y-2">
               {selectedAccountDetails.entries && selectedAccountDetails.entries.length > 0 ? (
                 selectedAccountDetails.entries
-                  .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map((entry: any, index: number) => (
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .map((entry, index) => (
                     <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
