@@ -1,6 +1,6 @@
 export const approvedEmails = [
   'gpober@iamcfo.com',
   'gdeleon@iamcfo.com',
-  'Tom.B@Terra2.com',
-  'Tom.K@Terra2.com',
+  'tom.b@terra2.com',
+  'tom.k@terra2.com',
 ]
