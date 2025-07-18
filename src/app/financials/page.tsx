@@ -2898,19 +2898,17 @@ export default function FinancialsPage() {
     </div>
   </div>
 </div>
-            
+</div>  
+  
             {/* Main Content Grid - P&L and Transaction Details Below */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
               {/* P&L Table - 80% width (4/5) */}
               <div className="lg:col-span-4">
-                {/* Your existing P&L table code goes here */}
               </div>
 
               {/* Transaction Detail Panel - 20% width (1/5) */}
               <div className="lg:col-span-1">
-                {/* Your existing transaction detail code goes here */}
               </div>
-            </div>
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
