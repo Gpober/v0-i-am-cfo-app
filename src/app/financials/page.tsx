@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowUp, ArrowDown, Minus, Download, RefreshCw, TrendingUp, DollarSign, PieChart, BarChart3, ChevronDown, ChevronRight, Menu, X, Eye, EyeOff, Smartphone, Tablet } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie, ComposedChart } from 'recharts';
 
 // IAM CFO Brand Colors
@@ -928,7 +928,24 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
 
 const COLORS = [BRAND_COLORS.primary, BRAND_COLORS.success, BRAND_COLORS.warning, BRAND_COLORS.danger, BRAND_COLORS.secondary, BRAND_COLORS.tertiary];
 
-export default function FinancialsPage() {
+const FinancialsPage = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile ? <MobileFinancialsPage /> : <DesktopFinancialsPage />;
+};
+
+const DesktopFinancialsPage = () => {
   const [activeTab, setActiveTab] = useState<FinancialTab>('p&l');
   const [selectedMonth, setSelectedMonth] = useState<MonthString>('May 2025');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('Trailing 12');
@@ -3503,3 +3520,60 @@ const scrollbarStyles = `
     box-shadow: 2px 0 4px rgba(0,0,0,0.1);
   }
 `;
+
+// Mobile component extracted from page.tsx
+const MobileFinancialsPage = () => {
+  const [activeTab, setActiveTab] = useState('p&l');
+  const [selectedMonth, setSelectedMonth] = useState('May 2025');
+  const [timePeriod, setTimePeriod] = useState('Trailing 12');
+  const [viewMode, setViewMode] = useState('by-property');
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
+  const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false);
+  const [selectedProperties, setSelectedProperties] = useState(new Set(['All Properties']));
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [compactMode, setCompactMode] = useState(false);
+  const [showDetailPanel, setShowDetailPanel] = useState(false);
+  const [columnsToShow, setColumnsToShow] = useState(new Set(['account', 'total', 'percentage']));
+  
+  // Expandable accounts state
+  const [expandedAccounts, setExpandedAccounts] = useState(new Set());
+  
+  // Data integrity state
+  const [dataIntegrityStatus, setDataIntegrityStatus] = useState(null);
+  const [propertyChartMetric, setPropertyChartMetric] = useState('income');
+  
+  // Debug mode state
+  const [debugMode, setDebugMode] = useState(DEBUG_CONFIG.isDebugMode);
+  
+  // Real data state
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [realData, setRealData] = useState(null);
+  const [dataError, setDataError] = useState(null);
+  
+  // Mobile-specific states
+  const [tableMode, setTableMode] = useState('summary');
+  const [activeKPICard, setActiveKPICard] = useState(null);
+  const [selectedPropertyForPL, setSelectedPropertyForPL] = useState(null);
+  const [showPropertyPL, setShowPropertyPL] = useState(false);
+  const [showTransactionDetail, setShowTransactionDetail] = useState(false);
+  const [showCompanyPL, setShowCompanyPL] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [startY, setStartY] = useState(0);
+
+  // Placeholder for mobile implementation
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-md mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">📱 Mobile Financials</h1>
+          <p className="text-gray-600">Mobile version coming soon...</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default FinancialsPage;
