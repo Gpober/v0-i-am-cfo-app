@@ -2712,22 +2712,49 @@ export default function FinancialsPage() {
                           />
                           
                           <Tooltip 
-                            formatter={(value: any, name: string) => {
-                              const label = name === 'netIncome' ? 'Net Income' : 'Revenue';
-                              return [`${formatCurrency(Number(value))}`, label];
-                            }}
-                            contentStyle={{ 
-                              backgroundColor: 'white', 
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                            }}
-                            labelStyle={{
-                              fontWeight: 'bold',
-                              fontSize: '12px',
-                              color: '#1f2937'
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                const revenue = data.revenue || 0;
+                                const grossProfit = data.grossProfit || 0;
+                                const netIncome = data.netIncome || 0;
+                                
+                                const gpMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+                                const niMargin = revenue > 0 ? (netIncome / revenue) * 100 : 0;
+                                
+                                const showGP = Math.abs(revenue - grossProfit) > 0.01;
+                                
+                                return (
+                                  <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg text-xs">
+                                    <div className="font-bold text-gray-800 mb-2">{label}</div>
+                                    
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <div className="w-3 h-3 rounded-full bg-[#B8E0F5]"></div>
+                                      <span className="text-gray-600">Revenue:</span>
+                                      <span className="font-medium text-gray-800">{formatCurrency(revenue)}</span>
+                                    </div>
+                                    
+                                    {showGP && (
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-3 h-3 rounded-full bg-[#7CC4ED]"></div>
+                                        <span className="text-gray-600">Gross Profit:</span>
+                                        <span className="font-medium text-gray-800">{formatCurrency(grossProfit)}</span>
+                                        <span className="text-xs text-gray-500">({gpMargin.toFixed(1)}%)</span>
+                                      </div>
+                                    )}
+                                    
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <div className={`w-3 h-3 rounded-full ${netIncome >= 0 ? 'bg-[#56B6E9]' : 'bg-[#ef4444]'}`}></div>
+                                      <span className="text-gray-600">Net Income:</span>
+                                      <span className={`font-medium ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(netIncome)}
+                                      </span>
+                                      <span className="text-xs text-gray-500">({niMargin.toFixed(1)}%)</span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
                             }}
                           />
                           
@@ -2737,23 +2764,36 @@ export default function FinancialsPage() {
                               fontSize: '11px',
                               fontWeight: 500
                             }}
-                            iconType="plainline"
-                            formatter={(value: string) => 
-                              value === 'netIncome' ? 'Net Income' : 'Revenue'
-                            }
+                            iconType="rect"
+                            formatter={(value: string) => {
+                              if (value === 'revenue') return 'Revenue';
+                              if (value === 'grossProfit') return 'Gross Profit';
+                              if (value === 'netIncome') return 'Net Income';
+                              return value;
+                            }}
                           />
                           
-                          {/* Revenue Bar - Light IAM CFO Blue (background) */}
+                          {/* Revenue Bar - Light blue background layer */}
                           <Bar 
                             dataKey="revenue" 
-                            fill="#7CC4ED"
-                            fillOpacity={0.4}
+                            fill="#B8E0F5"
+                            fillOpacity={1}
                             name="revenue"
                             radius={[4, 4, 0, 0]}
                             stroke="none"
                           />
                           
-                          {/* Net Income Bar - Full IAM CFO Blue (layered on top) */}
+                          {/* Gross Profit Bar - Medium blue middle layer */}
+                          <Bar 
+                            dataKey="grossProfit" 
+                            fill="#7CC4ED"
+                            fillOpacity={1}
+                            name="grossProfit"
+                            radius={[4, 4, 0, 0]}
+                            stroke="none"
+                          />
+                          
+                          {/* Net Income Bar - Dark blue/red top layer */}
                           <Bar 
                             dataKey="netIncome" 
                             fill="#56B6E9"
