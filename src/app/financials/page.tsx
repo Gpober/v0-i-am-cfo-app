@@ -2614,682 +2614,142 @@ export default function FinancialsPage() {
                 </div>
               </div>
 
-              // Add this component to your existing code
-
-// Net Income Revenue Chart Component
-const NetIncomeRevenueChart = ({ 
-  trendData, 
-  timePeriod, 
-  viewMode, 
-  selectedMonth 
-}: {
-  trendData: any[];
-  timePeriod: string;
-  viewMode: string;
-  selectedMonth: string;
-}) => {
-  const [chartMetric, setChartMetric] = useState<'percentage' | 'absolute'>('percentage');
-  const [profitMetric, setProfitMetric] = useState<'netIncome' | 'grossProfit'>('netIncome');
-  
-  // Calculate both net income and gross profit percentages for each period
-  const chartData = trendData.map(item => {
-    const netIncomePercentage = item.revenue > 0 ? (item.netIncome / item.revenue) * 100 : 0;
-    const grossProfitPercentage = item.revenue > 0 ? (item.grossProfit / item.revenue) * 100 : 0;
-    
-    return {
-      ...item,
-      netIncomePercentage: parseFloat(netIncomePercentage.toFixed(1)),
-      grossProfitPercentage: parseFloat(grossProfitPercentage.toFixed(1)),
-      revenueFormatted: item.revenue,
-      netIncomeFormatted: item.netIncome,
-      grossProfitFormatted: item.grossProfit
-    };
-  });
-
-  // Check if gross profit data exists and differs from net income
-  const hasGrossProfitData = chartData.some(item => 
-    Math.abs(item.grossProfitFormatted - item.netIncomeFormatted) > 0.01
-  );
-
-  const formatYAxis = (value: number) => {
-    if (chartMetric === 'percentage') {
-      return `${value.toFixed(1)}%`;
-    } else {
-      return `${(value / 1000).toFixed(0)}k`;
-    }
-  };
-
-  const getChartTitle = () => {
-    const profitType = profitMetric === 'grossProfit' ? 'Gross Profit' : 'Net Income';
-    
-    if (viewMode === 'by-property') {
-      return `${profitType} % by Property (${timePeriod})`;
-    } else if (timePeriod === 'Trailing 12' && viewMode === 'total') {
-      return `${profitType} % - Past 12 Months`;
-    } else {
-      return `${profitType} % Trend - ${timePeriod} ${viewMode}`;
-    }
-  };
-
-  const getChartSubtitle = () => {
-    const profitType = profitMetric === 'grossProfit' ? 'Gross Profit' : 'Net Income';
-    
-    if (chartMetric === 'percentage') {
-      return `${profitType} as percentage of Revenue`;
-    } else {
-      return `${profitType} in absolute dollar amounts`;
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{getChartTitle()}</h3>
-            <div className="text-sm text-gray-600 mt-1">
-              {getChartSubtitle()}
-              {chartData.length > 1 && (
-                <span className="ml-2 text-green-600">• {chartData.length} data points</span>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            {/* Profit Type Toggle (GP vs NI) - Only show if GP data exists */}
-            {hasGrossProfitData && (
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                <button
-                  onClick={() => setProfitMetric('grossProfit')}
-                  className={`px-3 py-1 text-xs transition-colors ${
-                    profitMetric === 'grossProfit'
-                      ? 'text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                  style={{ backgroundColor: profitMetric === 'grossProfit' ? BRAND_COLORS.success : undefined }}
-                >
-                  Gross Profit %
-                </button>
-                <button
-                  onClick={() => setProfitMetric('netIncome')}
-                  className={`px-3 py-1 text-xs transition-colors ${
-                    profitMetric === 'netIncome'
-                      ? 'text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                  style={{ backgroundColor: profitMetric === 'netIncome' ? BRAND_COLORS.secondary : undefined }}
-                >
-                  Net Income %
-                </button>
-              </div>
-            )}
-            
-            {/* Display Type Toggle (% vs $) */}
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-              <button
-                onClick={() => setChartMetric('percentage')}
-                className={`px-3 py-1 text-xs transition-colors ${
-                  chartMetric === 'percentage'
-                    ? 'text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-                style={{ backgroundColor: chartMetric === 'percentage' ? BRAND_COLORS.primary : undefined }}
-              >
-                Percentage %
-              </button>
-              <button
-                onClick={() => setChartMetric('absolute')}
-                className={`px-3 py-1 text-xs transition-colors ${
-                  chartMetric === 'absolute'
-                    ? 'text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-                style={{ backgroundColor: chartMetric === 'absolute' ? BRAND_COLORS.tertiary : undefined }}
-              >
-                Dollar Amount
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-2">
-        {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart 
-              data={chartData}
-              margin={{ 
-                top: 20, 
-                right: 30, 
-                left: 20, 
-                bottom: chartData.length > 4 ? 60 : 40 
-              }}
-            >
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="#f1f5f9" 
-                strokeOpacity={0.8}
-                vertical={false}
-              />
-              
-              <XAxis 
-                dataKey="period" 
-                tick={{ 
-                  fontSize: 11, 
-                  fontWeight: 500,
-                  fill: '#475569'
-                }}
-                tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                angle={chartData.length > 4 ? -45 : 0}
-                textAnchor={chartData.length > 4 ? 'end' : 'middle'}
-                height={chartData.length > 4 ? 60 : 40}
-                interval={0}
-              />
-              
-              <YAxis 
-                tickFormatter={formatYAxis}
-                tick={{ 
-                  fontSize: 11, 
-                  fontWeight: 500,
-                  fill: '#475569'
-                }}
-                tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                width={60}
-                domain={chartMetric === 'percentage' ? [-50, 50] : ['dataMin', 'dataMax']}
-              />
-              
-              <Tooltip 
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length > 0) {
-                    const data = payload[0].payload;
-                    
-                    return (
-                      <div style={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                        padding: '12px',
-                        fontSize: '12px',
-                        fontWeight: 500
-                      }}>
-                        <div style={{
-                          fontWeight: 'bold',
-                          fontSize: '13px',
-                          color: '#1f2937',
-                          marginBottom: '8px',
-                          borderBottom: '1px solid #e5e7eb',
-                          paddingBottom: '4px'
-                        }}>
-                          {data.fullPeriodName || data.fullPropertyName || label}
-                        </div>
-                        
-                        <div style={{ color: '#374151', marginBottom: '4px' }}>
-                          Revenue: {formatCurrency(data.revenueFormatted)}
-                        </div>
-                        
-                        {hasGrossProfitData && (
-                          <div style={{ 
-                            color: data.grossProfitFormatted >= 0 ? '#059669' : '#dc2626',
-                            marginBottom: '4px'
-                          }}>
-                            Gross Profit: {formatCurrency(data.grossProfitFormatted)} ({data.grossProfitPercentage}%)
-                          </div>
-                        )}
-                        
-                        <div style={{ 
-                          color: data.netIncomeFormatted >= 0 ? '#059669' : '#dc2626',
-                          marginBottom: '4px'
-                        }}>
-                          Net Income: {formatCurrency(data.netIncomeFormatted)}
-                        </div>
-                        
-                        <div style={{ 
-                          color: profitMetric === 'grossProfit' 
-                            ? (data.grossProfitFormatted >= 0 ? '#059669' : '#dc2626')
-                            : (data.netIncomeFormatted >= 0 ? '#059669' : '#dc2626'),
-                          fontWeight: 'bold',
-                          fontSize: '13px'
-                        }}>
-                          {profitMetric === 'grossProfit' ? 'Gross' : 'Net'} Margin: {
-                            profitMetric === 'grossProfit' ? data.grossProfitPercentage : data.netIncomePercentage
-                          }%
+              {/* Revenue & Net Income Trend Chart - 50% width */}
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden h-full">
+                  <div className="p-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900">Revenue & Net Income</h3>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {viewMode === 'by-property' ? 
+                        `${timePeriod} comparison • ${trendData.length} properties` :
+                        timePeriod === 'Trailing 12' && viewMode === 'total' ? 
+                          'Past 12 months' :
+                          `${timePeriod} ${viewMode}`
+                      }
+                      {trendData.length > 1 && viewMode !== 'by-property' && (
+                        <span className="ml-1 text-green-600">• {trendData.length} periods</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    {trendData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <ComposedChart 
+                          data={trendData}
+                          margin={{ 
+                            top: 20, 
+                            right: 20, 
+                            left: 20, 
+                            bottom: trendData.length > 4 ? 60 : 40 
+                          }}
+                        >
+                          <CartesianGrid 
+                            strokeDasharray="2 2" 
+                            stroke="#f1f5f9" 
+                            strokeOpacity={0.8}
+                            vertical={false}
+                          />
+                          
+                          <XAxis 
+                            dataKey="period" 
+                            tick={{ 
+                              fontSize: 11, 
+                              fontWeight: 500,
+                              fill: '#475569'
+                            }}
+                            tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                            axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                            angle={trendData.length > 4 ? -45 : 0}
+                            textAnchor={trendData.length > 4 ? 'end' : 'middle'}
+                            height={trendData.length > 4 ? 60 : 40}
+                            interval={0}
+                          />
+                          
+                          <YAxis 
+                            tickFormatter={(value: any) => `${(value / 1000).toFixed(0)}k`}
+                            tick={{ 
+                              fontSize: 11, 
+                              fontWeight: 500,
+                              fill: '#475569'
+                            }}
+                            tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                            axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                            width={50}
+                            domain={[0, 'dataMax']}
+                          />
+                          
+                          <Tooltip 
+                            formatter={(value: any, name: string) => {
+                              const label = name === 'netIncome' ? 'Net Income' : 'Revenue';
+                              return [`${formatCurrency(Number(value))}`, label];
+                            }}
+                            contentStyle={{ 
+                              backgroundColor: 'white', 
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            }}
+                            labelStyle={{
+                              fontWeight: 'bold',
+                              fontSize: '12px',
+                              color: '#1f2937'
+                            }}
+                          />
+                          
+                          <Legend 
+                            wrapperStyle={{ 
+                              paddingTop: '15px',
+                              fontSize: '11px',
+                              fontWeight: 500
+                            }}
+                            iconType="plainline"
+                            formatter={(value: string) => 
+                              value === 'netIncome' ? 'Net Income' : 'Revenue'
+                            }
+                          />
+                          
+                          {/* Revenue Bar - Light IAM CFO Blue (background) */}
+                          <Bar 
+                            dataKey="revenue" 
+                            fill="#7CC4ED"
+                            fillOpacity={0.4}
+                            name="revenue"
+                            radius={[4, 4, 0, 0]}
+                            stroke="none"
+                          />
+                          
+                          {/* Net Income Bar - Full IAM CFO Blue (layered on top) */}
+                          <Bar 
+                            dataKey="netIncome" 
+                            fill="#56B6E9"
+                            fillOpacity={1}
+                            name="netIncome"
+                            radius={[4, 4, 0, 0]}
+                            stroke="none"
+                          >
+                            {trendData.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={entry.netIncome >= 0 ? '#56B6E9' : '#ef4444'}
+                              />
+                            ))}
+                          </Bar>
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-72 text-gray-500">
+                        <div className="text-center">
+                          <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                          <p className="text-sm font-medium text-gray-600">No trend data</p>
                         </div>
                       </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              
-              <Legend 
-                wrapperStyle={{ 
-                  paddingTop: '15px',
-                  fontSize: '11px',
-                  fontWeight: 500
-                }}
-                iconType="rect"
-                formatter={() => {
-                  const profitType = profitMetric === 'grossProfit' ? 'Gross Profit' : 'Net Income';
-                  return chartMetric === 'percentage' ? `${profitType} %` : `${profitType} // Add this component to your existing code
-
-// Net Income Revenue Chart Component
-const NetIncomeRevenueChart = ({ 
-  trendData, 
-  timePeriod, 
-  viewMode, 
-  selectedMonth 
-}: {
-  trendData: any[];
-  timePeriod: string;
-  viewMode: string;
-  selectedMonth: string;
-}) => {
-  const [chartMetric, setChartMetric] = useState<'percentage' | 'absolute'>('percentage');
-  const [profitMetric, setProfitMetric] = useState<'netIncome' | 'grossProfit'>('netIncome');
-  
-  // Calculate both net income and gross profit percentages for each period
-  const chartData = trendData.map(item => {
-    const netIncomePercentage = item.revenue > 0 ? (item.netIncome / item.revenue) * 100 : 0;
-    const grossProfitPercentage = item.revenue > 0 ? (item.grossProfit / item.revenue) * 100 : 0;
-    
-    return {
-      ...item,
-      netIncomePercentage: parseFloat(netIncomePercentage.toFixed(1)),
-      grossProfitPercentage: parseFloat(grossProfitPercentage.toFixed(1)),
-      revenueFormatted: item.revenue,
-      netIncomeFormatted: item.netIncome,
-      grossProfitFormatted: item.grossProfit
-    };
-  });
-
-  // Check if gross profit data exists and differs from net income
-  const hasGrossProfitData = chartData.some(item => 
-    Math.abs(item.grossProfitFormatted - item.netIncomeFormatted) > 0.01
-  );
-
-  const formatYAxis = (value: number) => {
-    if (chartMetric === 'percentage') {
-      return `${value.toFixed(1)}%`;
-    } else {
-      return `${(value / 1000).toFixed(0)}k`;
-    }
-  };
-
-  const getChartTitle = () => {
-    const profitType = profitMetric === 'grossProfit' ? 'Gross Profit' : 'Net Income';
-    
-    if (viewMode === 'by-property') {
-      return `${profitType} % by Property (${timePeriod})`;
-    } else if (timePeriod === 'Trailing 12' && viewMode === 'total') {
-      return `${profitType} % - Past 12 Months`;
-    } else {
-      return `${profitType} % Trend - ${timePeriod} ${viewMode}`;
-    }
-  };
-
-  const getChartSubtitle = () => {
-    const profitType = profitMetric === 'grossProfit' ? 'Gross Profit' : 'Net Income';
-    
-    if (chartMetric === 'percentage') {
-      return `${profitType} as percentage of Revenue`;
-    } else {
-      return `${profitType} in absolute dollar amounts`;
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{getChartTitle()}</h3>
-            <div className="text-sm text-gray-600 mt-1">
-              {getChartSubtitle()}
-              {chartData.length > 1 && (
-                <span className="ml-2 text-green-600">• {chartData.length} data points</span>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            {/* Profit Type Toggle (GP vs NI) - Only show if GP data exists */}
-            {hasGrossProfitData && (
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                <button
-                  onClick={() => setProfitMetric('grossProfit')}
-                  className={`px-3 py-1 text-xs transition-colors ${
-                    profitMetric === 'grossProfit'
-                      ? 'text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                  style={{ backgroundColor: profitMetric === 'grossProfit' ? BRAND_COLORS.success : undefined }}
-                >
-                  Gross Profit %
-                </button>
-                <button
-                  onClick={() => setProfitMetric('netIncome')}
-                  className={`px-3 py-1 text-xs transition-colors ${
-                    profitMetric === 'netIncome'
-                      ? 'text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                  style={{ backgroundColor: profitMetric === 'netIncome' ? BRAND_COLORS.secondary : undefined }}
-                >
-                  Net Income %
-                </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-            
-            {/* Display Type Toggle (% vs $) */}
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-              <button
-                onClick={() => setChartMetric('percentage')}
-                className={`px-3 py-1 text-xs transition-colors ${
-                  chartMetric === 'percentage'
-                    ? 'text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-                style={{ backgroundColor: chartMetric === 'percentage' ? BRAND_COLORS.primary : undefined }}
-              >
-                Percentage %
-              </button>
-              <button
-                onClick={() => setChartMetric('absolute')}
-                className={`px-3 py-1 text-xs transition-colors ${
-                  chartMetric === 'absolute'
-                    ? 'text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-                style={{ backgroundColor: chartMetric === 'absolute' ? BRAND_COLORS.tertiary : undefined }}
-              >
-                Dollar Amount
-              </button>
             </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-2">
-        {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart 
-              data={chartData}
-              margin={{ 
-                top: 20, 
-                right: 30, 
-                left: 20, 
-                bottom: chartData.length > 4 ? 60 : 40 
-              }}
-            >
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="#f1f5f9" 
-                strokeOpacity={0.8}
-                vertical={false}
-              />
-              
-              <XAxis 
-                dataKey="period" 
-                tick={{ 
-                  fontSize: 11, 
-                  fontWeight: 500,
-                  fill: '#475569'
-                }}
-                tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                angle={chartData.length > 4 ? -45 : 0}
-                textAnchor={chartData.length > 4 ? 'end' : 'middle'}
-                height={chartData.length > 4 ? 60 : 40}
-                interval={0}
-              />
-              
-              <YAxis 
-                tickFormatter={formatYAxis}
-                tick={{ 
-                  fontSize: 11, 
-                  fontWeight: 500,
-                  fill: '#475569'
-                }}
-                tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-                width={60}
-                domain={chartMetric === 'percentage' ? [-50, 50] : ['dataMin', 'dataMax']}
-              />
-              
-              <Tooltip 
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length > 0) {
-                    const data = payload[0].payload;
-                    
-                    return (
-                      <div style={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                        padding: '12px',
-                        fontSize: '12px',
-                        fontWeight: 500
-                      }}>
-                        <div style={{
-                          fontWeight: 'bold',
-                          fontSize: '13px',
-                          color: '#1f2937',
-                          marginBottom: '8px',
-                          borderBottom: '1px solid #e5e7eb',
-                          paddingBottom: '4px'
-                        }}>
-                          {data.fullPeriodName || data.fullPropertyName || label}
-                        </div>
-                        
-                        <div style={{ color: '#374151', marginBottom: '4px' }}>
-                          Revenue: {formatCurrency(data.revenueFormatted)}
-                        </div>
-                        
-                        {hasGrossProfitData && (
-                          <div style={{ 
-                            color: data.grossProfitFormatted >= 0 ? '#059669' : '#dc2626',
-                            marginBottom: '4px'
-                          }}>
-                            Gross Profit: {formatCurrency(data.grossProfitFormatted)} ({data.grossProfitPercentage}%)
-                          </div>
-                        )}
-                        
-                        <div style={{ 
-                          color: data.netIncomeFormatted >= 0 ? '#059669' : '#dc2626',
-                          marginBottom: '4px'
-                        }}>
-                          Net Income: {formatCurrency(data.netIncomeFormatted)}
-                        </div>
-                        
-                        <div style={{ 
-                          color: profitMetric === 'grossProfit' 
-                            ? (data.grossProfitFormatted >= 0 ? '#059669' : '#dc2626')
-                            : (data.netIncomeFormatted >= 0 ? '#059669' : '#dc2626'),
-                          fontWeight: 'bold',
-                          fontSize: '13px'
-                        }}>
-                          {profitMetric === 'grossProfit' ? 'Gross' : 'Net'} Margin: {
-                            profitMetric === 'grossProfit' ? data.grossProfitPercentage : data.netIncomePercentage
-                          }%
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              
-;
-                }}
-              />
-
-              {chartMetric === 'percentage' ? (
-                <>
-                  {/* Zero line for percentage chart */}
-                  <Line
-                    type="monotone"
-                    dataKey={() => 0}
-                    stroke="#9ca3af"
-                    strokeWidth={1}
-                    strokeDasharray="2 2"
-                    dot={false}
-                    activeDot={false}
-                  />
-                  
-                  {/* Profit Percentage Line */}
-                  <Line
-                    type="monotone"
-                    dataKey={profitMetric === 'grossProfit' ? 'grossProfitPercentage' : 'netIncomePercentage'}
-                    stroke={profitMetric === 'grossProfit' ? BRAND_COLORS.success : BRAND_COLORS.secondary}
-                    strokeWidth={3}
-                    dot={{
-                      fill: profitMetric === 'grossProfit' ? BRAND_COLORS.success : BRAND_COLORS.secondary,
-                      strokeWidth: 2,
-                      r: 5
-                    }}
-                    activeDot={{
-                      r: 7,
-                      stroke: profitMetric === 'grossProfit' ? BRAND_COLORS.success : BRAND_COLORS.secondary,
-                      strokeWidth: 2,
-                      fill: 'white'
-                    }}
-                  />
-                </>
-              ) : (
-                <>
-                  {/* Revenue bars (background) */}
-                  <Bar 
-                    dataKey="revenueFormatted" 
-                    fill="#e0f2fe"
-                    fillOpacity={0.6}
-                    name="Revenue"
-                    radius={[2, 2, 0, 0]}
-                  />
-                  
-                  {/* Profit bars (foreground) */}
-                  <Bar 
-                    dataKey={profitMetric === 'grossProfit' ? 'grossProfitFormatted' : 'netIncomeFormatted'}
-                    fill={profitMetric === 'grossProfit' ? BRAND_COLORS.success : BRAND_COLORS.secondary}
-                    name={profitMetric === 'grossProfit' ? 'Gross Profit' : 'Net Income'}
-                    radius={[2, 2, 0, 0]}
-                  >
-                    {chartData.map((entry, index) => {
-                      const value = profitMetric === 'grossProfit' ? entry.grossProfitFormatted : entry.netIncomeFormatted;
-                      const color = profitMetric === 'grossProfit' ? BRAND_COLORS.success : BRAND_COLORS.secondary;
-                      
-                      return (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={value >= 0 ? color : '#ef4444'}
-                        />
-                      );
-                    })}
-                  </Bar>
-                </>
-              )}
-            </ComposedChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex items-center justify-center h-72 text-gray-500">
-            <div className="text-center">
-              <TrendingUp className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-              <p className="text-lg font-medium text-gray-600">No net income data available</p>
-              <p className="text-sm mt-2 text-gray-500">
-                Check your data filters or time period selection
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Add this to your existing chart generation function
-const generateNetIncomeRevenueData = () => {
-  if (!timeSeriesData || !timeSeriesData.periods) {
-    return [];
-  }
-
-  // For by-property view
-  if (viewMode === 'by-property' && timeSeriesData.availableProperties && timeSeriesData.availableProperties.length > 0) {
-    const firstPeriodKey = timeSeriesData.periods[0];
-    const periodData = timeSeriesData.data[firstPeriodKey] || {};
-    
-    return timeSeriesData.availableProperties.map((property: string) => {
-      const revenue = Object.values(periodData)
-        .filter((item: any) => item.category === 'Revenue')
-        .reduce((sum: number, item: any) => sum + (item.propertyTotals?.[property] || 0), 0);
-      
-      const cogs = Object.values(periodData)
-        .filter((item: any) => item.category === 'COGS')
-        .reduce((sum: number, item: any) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
-      
-      const operatingExpenses = Object.values(periodData)
-        .filter((item: any) => item.category === 'Operating Expenses')
-        .reduce((sum: number, item: any) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
-      
-      const otherIncome = Object.values(periodData)
-        .filter((item: any) => item.category === 'Other Income')
-        .reduce((sum: number, item: any) => sum + (item.propertyTotals?.[property] || 0), 0);
-      
-      const otherExpenses = Object.values(periodData)
-        .filter((item: any) => item.category === 'Other Expenses')
-        .reduce((sum: number, item: any) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
-
-      const netIncome = revenue - cogs - operatingExpenses + otherIncome - otherExpenses;
-
-      return {
-        period: property.length > 8 ? property.substring(0, 8) + '...' : property,
-        fullPropertyName: property,
-        revenue,
-        netIncome,
-        grossProfit: revenue - cogs,
-        operatingIncome: revenue - cogs - operatingExpenses
-      };
-    }).filter(item => item.revenue > 0 || item.netIncome !== 0);
-  }
-
-  // For time-based trends
-  return timeSeriesData.periods.map((period: string) => {
-    const periodData = timeSeriesData.data[period] || {};
-    
-    const revenue = Object.values(periodData)
-      .filter((item: any) => item.category === 'Revenue')
-      .reduce((sum: number, item: any) => sum + item.total, 0);
-    
-    const cogs = Object.values(periodData)
-      .filter((item: any) => item.category === 'COGS')
-      .reduce((sum: number, item: any) => sum + Math.abs(item.total), 0);
-    
-    const operatingExpenses = Object.values(periodData)
-      .filter((item: any) => item.category === 'Operating Expenses')
-      .reduce((sum: number, item: any) => sum + Math.abs(item.total), 0);
-    
-    const otherIncome = Object.values(periodData)
-      .filter((item: any) => item.category === 'Other Income')
-      .reduce((sum: number, item: any) => sum + item.total, 0);
-    
-    const otherExpenses = Object.values(periodData)
-      .filter((item: any) => item.category === 'Other Expenses')
-      .reduce((sum: number, item: any) => sum + Math.abs(item.total), 0);
-
-    const netIncome = revenue - cogs - operatingExpenses + otherIncome - otherExpenses;
-
-    return {
-      period: period.length > 12 ? period.substring(0, 12) : period,
-      fullPeriodName: period,
-      revenue,
-      netIncome,
-      grossProfit: revenue - cogs,
-      operatingIncome: revenue - cogs - operatingExpenses
-    };
-  }).filter(item => item.revenue > 0 || item.netIncome !== 0);
-};
             
             {/* Main Content Grid - P&L and Transaction Details Below */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
