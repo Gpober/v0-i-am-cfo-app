@@ -1562,8 +1562,8 @@ export default function FinancialsPage() {
 };
 
   const generatePropertyChartData = () => {
-  // First try: Use availableProperties if we have them
-  if (timeSeriesData?.availableProperties) {
+  // Only show property data if we have it AND we're in by-property view
+  if (viewMode === 'by-property' && timeSeriesData?.availableProperties) {
     return timeSeriesData.availableProperties.map((property: string) => {
       const revenue = currentData
         .filter((item: any) => item.category === 'Revenue')
@@ -1584,10 +1584,10 @@ export default function FinancialsPage() {
       const otherExpenses = currentData
         .filter((item: any) => item.category === 'Other Expenses')
         .reduce((sum: number, item: any) => sum + Math.abs(item.propertyTotals?.[property] || 0), 0);
-      
+
       const grossProfit = revenue - cogs;
       const netIncome = revenue - cogs - operatingExpenses + otherIncome - otherExpenses;
-      
+
       let value = 0;
       switch (propertyChartMetric) {
         case 'income':
@@ -1606,7 +1606,7 @@ export default function FinancialsPage() {
           value = netIncome;
           break;
       }
-      
+
       return {
         name: property,
         value: value,
@@ -1616,10 +1616,10 @@ export default function FinancialsPage() {
         operatingExpenses: operatingExpenses,
         netIncome: netIncome
       };
-    }).filter(item => item.value > 0); // Only show properties with positive values
+    }).filter(item => item.value > 0);
   }
   
-  // Fallback: Extract properties from entries in currentData
+  // Fallback: If not in by-property mode, create property data from current data
   if (currentData.length > 0) {
     // Extract properties from entries
     const propertyData: Record<string, { revenue: number; cogs: number; opex: number; otherIncome: number; otherExpenses: number }> = {};
