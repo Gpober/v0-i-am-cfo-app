@@ -2059,22 +2059,23 @@ export default function FinancialsPage() {
             );
           })}
           {viewMode === 'detailed' && (
-          <td className={`px-4 py-4 text-right text-lg font-bold text-gray-900 bg-white`}>
-            {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
-              ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
-              : formatCurrency(getCategoryTotal(category))
-            }
-          </td>
-        )}
-        <td className={`px-4 py-4 text-right text-sm ${textClass}`}>
-          {kpis.revenue ? calculatePercentage(Math.abs(getCategoryTotal(category)), Math.abs(kpis.revenue)) : '0%'}
-        </td>
-      </tr>
-    );
-  };
+            <td className={`px-4 py-4 text-right text-lg font-bold text-gray-900 bg-white`}>
+              {category === 'COGS' || category === 'Operating Expenses' || category === 'Other Expenses'
+                ? `(${formatCurrency(Math.abs(getCategoryTotal(category)))})`
+                : formatCurrency(getCategoryTotal(category))
+              }
+            </td>
+          )}
+        </>
+      ) : null}
+      <td className={`px-4 py-4 text-right text-sm ${textClass}`}>
+        {kpis.revenue ? calculatePercentage(Math.abs(getCategoryTotal(category)), Math.abs(kpis.revenue)) : '0%'}
+      </td>
+    </tr>
+  );
 
-  return (
-    <>
+ return (
+     <>
       <style jsx>{scrollbarStyles}</style>
       <div className="min-h-screen bg-gray-50">
         {/* Page Header with IAM CFO Branding */}
@@ -2096,8 +2097,10 @@ export default function FinancialsPage() {
                 </div>
                 <p className="text-sm text-gray-600 mt-1">
                   Real-time P&L by Property Class • From financial_transactions table
-                  {timeSeriesData && (
-                    <span> • Updated {new Date().toLocaleString()}</span>
+                  {timeSeriesData?.summary && (
+                    <span className="ml-2 text-green-600">
+                      • {timeSeriesData.summary.totalEntriesProcessed} entries loaded • {timeSeriesData.summary.periodsGenerated} periods
+                    </span>
                   )}
                 </p>
               </div>
