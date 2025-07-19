@@ -3388,8 +3388,8 @@ export default function FinancialsPage() {
               {/* Transaction Detail Panel */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold text-gray-900">Transaction Details</h3>
+                  <div className="flex items-center justify-center mb-4">
+                    <h3 className="text-xl font-semibold text-gray-900 text-center">Transaction Details</h3>
                     {selectedAccountDetails && (
                       <button
                         onClick={() => setSelectedAccountDetails(null)}
@@ -3402,12 +3402,12 @@ export default function FinancialsPage() {
                   {selectedAccountDetails && (
                     <div className="space-y-4">
                       {/* Account Name - Larger font, own line */}
-                      <div>
+                      <div className="text-center">
                         <h4 className="text-lg font-medium text-gray-900">{selectedAccountDetails.name}</h4>
                       </div>
                       
                       {/* Total Amount - Prominent and well-spaced */}
-                      <div>
+                      <div className="text-center">
                         <span className="text-sm text-gray-500 block mb-1">Total Amount</span>
                         <p className="text-2xl font-bold" style={{ color: BRAND_COLORS.primary }}>
                           {formatCurrency(selectedAccountDetails.total)}
@@ -3415,7 +3415,7 @@ export default function FinancialsPage() {
                       </div>
                       
                       {/* Category and Type - Separate lines */}
-                      <div className="space-y-2">
+                      <div className="space-y-2 text-center">
                         <div>
                           <span className="text-sm text-gray-500">Category</span>
                           <p className="text-sm font-medium text-blue-700">{selectedAccountDetails.category}</p>
@@ -3434,22 +3434,22 @@ export default function FinancialsPage() {
                       {/* Summary Stats */}
                       <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                         <div className="grid grid-cols-2 gap-6">
-                          <div className="space-y-1">
+                          <div className="space-y-1 text-center">
                             <span className="text-sm text-gray-500">Total Transactions</span>
                             <div className="text-xl font-semibold text-gray-900">{selectedAccountDetails.entries?.length || 0}</div>
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-1 text-center">
                             <span className="text-sm text-gray-500">P&L Category</span>
                             <div className="text-lg font-semibold text-blue-700">{selectedAccountDetails.category}</div>
                           </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-6">
-                          <div className="space-y-1">
+                          <div className="space-y-1 text-center">
                             <span className="text-sm text-gray-500">Account Type</span>
                             <div className="text-base font-medium text-gray-700">{selectedAccountDetails.account_type}</div>
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-1 text-center">
                             <span className="text-sm text-gray-500">Detail Type</span>
                             <div className="text-base font-medium text-gray-700">{selectedAccountDetails.account_detail_type || 'None'}</div>
                           </div>
@@ -3465,11 +3465,11 @@ export default function FinancialsPage() {
                               .map((entry: any, index: number) => (
                                 <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors space-y-3">
                                   {/* Date and Amount Row */}
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">
+                                  <div className="flex justify-between items-center text-center">
+                                    <span className="text-sm text-gray-600 flex-1">
                                       {new Date(entry.date).toLocaleDateString()}
                                     </span>
-                                    <span className={`text-lg font-semibold ${
+                                    <span className={`text-lg font-semibold flex-1 ${
                                       entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
                                     }`}>
                                       {formatCurrency(entry.amount)}
@@ -3482,7 +3482,7 @@ export default function FinancialsPage() {
                                   </div>
                                   
                                   {/* Property Badge Row */}
-                                  <div>
+                                  <div className="text-center">
                                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                                       🏢 {entry.class || 'No Property'}
                                     </span>
