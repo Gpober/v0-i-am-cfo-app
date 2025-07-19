@@ -2751,7 +2751,7 @@ export default function FinancialsPage() {
                                       fontSize: '10px',
                                       color: '#64748B'
                                     }}>
-                                      NI %: {netIncomePercentage}%
+                                      Net Income Margin: {netIncomePercentage}%
                                     </div>
                                   </div>
                                 );
