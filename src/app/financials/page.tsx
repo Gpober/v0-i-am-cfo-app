@@ -2798,9 +2798,9 @@ export default function FinancialsPage() {
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Left Column: Financial Tables */}
-              <div className="lg:col-span-4">
+              <div className="lg:col-span-2">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                   <div className="p-6 border-b border-gray-200">
                     <div className="flex justify-between items-center">
@@ -3240,92 +3240,104 @@ export default function FinancialsPage() {
              
               {/* Transaction Detail Panel */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Transaction Details</h3>
-                  {selectedAccountDetails && (
-                    <div className="mt-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600">{selectedAccountDetails.name}</p>
-                        <p className="text-lg font-semibold" style={{ color: BRAND_COLORS.primary }}>
-                          {formatCurrency(selectedAccountDetails.total)}
-                        </p>
-                        <p className="text-xs text-blue-600 mt-1">
-                          Category: {selectedAccountDetails.category} • Type: {selectedAccountDetails.account_type}
-                        </p>
-                      </div>
+                <div className="p-4 border-b border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold text-gray-900">Transaction Details</h3>
+                    {selectedAccountDetails && (
                       <button
                         onClick={() => setSelectedAccountDetails(null)}
                         className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                       >
                         Close
                       </button>
+                    )}
+                  </div>
+                  {selectedAccountDetails && (
+                    <div className="space-y-4">
+                      {/* Account Name - Larger font, own line */}
+                      <div>
+                        <h4 className="text-lg font-medium text-gray-900">{selectedAccountDetails.name}</h4>
+                      </div>
+                      
+                      {/* Total Amount - Prominent and well-spaced */}
+                      <div>
+                        <span className="text-sm text-gray-500 block mb-1">Total Amount</span>
+                        <p className="text-2xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                          {formatCurrency(selectedAccountDetails.total)}
+                        </p>
+                      </div>
+                      
+                      {/* Category and Type - Separate lines */}
+                      <div className="space-y-2">
+                        <div>
+                          <span className="text-sm text-gray-500">Category</span>
+                          <p className="text-sm font-medium text-blue-700">{selectedAccountDetails.category}</p>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-500">Account Type</span>
+                          <p className="text-sm font-medium text-gray-700">{selectedAccountDetails.account_type}</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
-                <div className="p-6">
+                <div className="p-4">
                   {selectedAccountDetails ? (
                     <div className="space-y-4">
                       {/* Summary Stats */}
-                      <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                        <div>
-                          <span className="text-xs text-gray-500">Total Transactions</span>
-                          <div className="text-lg font-semibold">{selectedAccountDetails.entries?.length || 0}</div>
+                      <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="space-y-1">
+                            <span className="text-sm text-gray-500">Total Transactions</span>
+                            <div className="text-xl font-semibold text-gray-900">{selectedAccountDetails.entries?.length || 0}</div>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-sm text-gray-500">P&L Category</span>
+                            <div className="text-lg font-semibold text-blue-700">{selectedAccountDetails.category}</div>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-xs text-gray-500">P&L Category</span>
-                          <div className="text-lg font-semibold">{selectedAccountDetails.category}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Account Type</span>
-                          <div className="text-sm text-gray-700">{selectedAccountDetails.account_type}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Detail Type</span>
-                          <div className="text-sm text-gray-700">{selectedAccountDetails.account_detail_type || 'None'}</div>
+                        
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="space-y-1">
+                            <span className="text-sm text-gray-500">Account Type</span>
+                            <div className="text-base font-medium text-gray-700">{selectedAccountDetails.account_type}</div>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-sm text-gray-500">Detail Type</span>
+                            <div className="text-base font-medium text-gray-700">{selectedAccountDetails.account_detail_type || 'None'}</div>
+                          </div>
                         </div>
                       </div>
 
                       {/* Transaction List */}
                       <div className="max-h-96 overflow-y-auto">
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {selectedAccountDetails.entries && selectedAccountDetails.entries.length > 0 ? (
                             selectedAccountDetails.entries
                               .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
                               .map((entry: any, index: number) => (
-                                <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                                  <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-center gap-2">
-                                      <div 
-                                        className={`w-2 h-2 rounded-full ${
-                                          entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
-                                        }`}
-                                      />
-                                      <span className="text-xs text-gray-500">ID: {entry.id}</span>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className={`text-sm font-semibold ${
-                                        entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                                      }`}>
-                                        {formatCurrency(entry.amount)}
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        {new Date(entry.date).toLocaleDateString()}
-                                      </div>
-                                    </div>
+                                <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors space-y-3">
+                                  {/* Date and Amount Row */}
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">
+                                      {new Date(entry.date).toLocaleDateString()}
+                                    </span>
+                                    <span className={`text-lg font-semibold ${
+                                      entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {formatCurrency(entry.amount)}
+                                    </span>
                                   </div>
                                   
-                                  {entry.memo && (
-                                    <div className="mb-2 p-2 bg-blue-50 rounded text-xs">
-                                      <span className="text-blue-700">💬 {entry.memo}</span>
-                                    </div>
-                                  )}
+                                  {/* Description Row */}
+                                  <div className="text-sm text-gray-800">
+                                    {entry.memo || `Transaction ID: ${entry.id}`}
+                                  </div>
                                   
-                                  <div className="flex justify-between text-xs text-gray-600">
-                                    <span>
-                                      <strong>Class:</strong> {entry.class || 'No Class'}
-                                    </span>
-                                    <span>
-                                      <strong>Detail:</strong> {entry.account_detail_type || 'None'}
+                                  {/* Property Badge Row */}
+                                  <div>
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                      🏢 {entry.class || 'No Property'}
                                     </span>
                                   </div>
                                 </div>
