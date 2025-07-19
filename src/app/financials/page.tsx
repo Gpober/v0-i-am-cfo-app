@@ -3239,100 +3239,110 @@ export default function FinancialsPage() {
             <div className="lg:col-span-1">
              
               {/* Transaction Detail Panel */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-xl font-semibold text-gray-900">Transaction Details</h3>
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+                <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">Transaction Details</h3>
                   {selectedAccountDetails && (
-                    <div className="mt-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600">{selectedAccountDetails.name}</p>
-                        <p className="text-lg font-semibold" style={{ color: BRAND_COLORS.primary }}>
-                          {formatCurrency(selectedAccountDetails.total)}
-                        </p>
-                        <p className="text-xs text-blue-600 mt-1">
-                          Category: {selectedAccountDetails.category} • Type: {selectedAccountDetails.account_type}
-                        </p>
+                    <div className="mt-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <h4 className="text-lg font-semibold text-gray-800">{selectedAccountDetails.name}</h4>
+                          <p className="text-3xl font-bold" style={{ color: BRAND_COLORS.primary }}>
+                            {formatCurrency(selectedAccountDetails.total)}
+                          </p>
+                          <div className="flex items-center space-x-4">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                              {selectedAccountDetails.category}
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              {selectedAccountDetails.account_type}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSelectedAccountDetails(null)}
+                          className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 shadow-sm"
+                        >
+                          Close
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setSelectedAccountDetails(null)}
-                        className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                      >
-                        Close
-                      </button>
                     </div>
                   )}
                 </div>
-                <div className="p-6">
+                <div className="px-8 py-6">
                   {selectedAccountDetails ? (
-                    <div className="space-y-4">
+                    <div className="space-y-8">
                       {/* Summary Stats */}
-                      <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                        <div>
-                          <span className="text-xs text-gray-500">Total Transactions</span>
-                          <div className="text-lg font-semibold">{selectedAccountDetails.entries?.length || 0}</div>
+                      <div className="grid grid-cols-3 gap-6">
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 text-center">
+                          <div className="text-2xl font-bold text-blue-900 mb-1">
+                            {selectedAccountDetails.entries?.length || 0}
+                          </div>
+                          <div className="text-sm font-medium text-blue-700">Total Transactions</div>
                         </div>
-                        <div>
-                          <span className="text-xs text-gray-500">P&L Category</span>
-                          <div className="text-lg font-semibold">{selectedAccountDetails.category}</div>
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 text-center">
+                          <div className="text-sm font-bold text-green-900 mb-1 truncate" title={selectedAccountDetails.category}>
+                            {selectedAccountDetails.category}
+                          </div>
+                          <div className="text-sm font-medium text-green-700">P&L Category</div>
                         </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Account Type</span>
-                          <div className="text-sm text-gray-700">{selectedAccountDetails.account_type}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Detail Type</span>
-                          <div className="text-sm text-gray-700">{selectedAccountDetails.account_detail_type || 'None'}</div>
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 text-center">
+                          <div className="text-sm font-bold text-purple-900 mb-1 truncate" title={selectedAccountDetails.account_detail_type}>
+                            {selectedAccountDetails.account_detail_type || 'None'}
+                          </div>
+                          <div className="text-sm font-medium text-purple-700">Property Classes</div>
                         </div>
                       </div>
 
                       {/* Transaction List */}
-                      <div className="max-h-96 overflow-y-auto">
-                        <div className="space-y-2">
+                      <div className="space-y-1">
+                        <h5 className="text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h5>
+                        <div className="max-h-96 overflow-y-auto space-y-3">
                           {selectedAccountDetails.entries && selectedAccountDetails.entries.length > 0 ? (
                             selectedAccountDetails.entries
                               .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
                               .map((entry: any, index: number) => (
-                                <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                                  <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-center gap-2">
-                                      <div 
-                                        className={`w-2 h-2 rounded-full ${
-                                          entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
-                                        }`}
-                                      />
-                                      <span className="text-xs text-gray-500">ID: {entry.id}</span>
+                                <div key={`${entry.id}-${index}`} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all duration-200 hover:border-gray-300">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {new Date(entry.date).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: 'numeric'
+                                      })}
                                     </div>
-                                    <div className="text-right">
-                                      <div className={`text-sm font-semibold ${
-                                        entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                                      }`}>
-                                        {formatCurrency(entry.amount)}
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        {new Date(entry.date).toLocaleDateString()}
-                                      </div>
+                                    <div className={`text-lg font-bold ${
+                                      entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {entry.amount >= 0 ? '+' : ''}{formatCurrency(entry.amount)}
                                     </div>
                                   </div>
                                   
-                                  {entry.memo && (
-                                    <div className="mb-2 p-2 bg-blue-50 rounded text-xs">
-                                      <span className="text-blue-700">💬 {entry.memo}</span>
+                                  <div className="mb-3">
+                                    <div className="text-sm font-medium text-gray-800 mb-1">
+                                      {entry.memo || selectedAccountDetails.name}
                                     </div>
-                                  )}
+                                  </div>
                                   
-                                  <div className="flex justify-between text-xs text-gray-600">
-                                    <span>
-                                      <strong>Class:</strong> {entry.class || 'No Class'}
-                                    </span>
-                                    <span>
-                                      <strong>Detail:</strong> {entry.account_detail_type || 'None'}
-                                    </span>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      {entry.class && entry.class !== 'No Class' ? (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                          {entry.class}
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 </div>
                               ))
                           ) : (
-                            <div className="text-center py-8 text-gray-500">
-                              No transaction details available
+                            <div className="text-center py-12">
+                              <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              </div>
+                              <p className="text-gray-500 font-medium">No transaction details available</p>
                             </div>
                           )}
                         </div>
