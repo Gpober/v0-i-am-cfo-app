@@ -2413,7 +2413,11 @@ export default function FinancialsPage() {
                   <div>
                     <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
                     <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(kpis.netIncome)}</div>
-                    <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full inline-block">
+                    <div className={`text-xs px-2 py-1 rounded-full inline-block ${
+                      kpis.netMargin < 0 
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-green-100 text-green-800'
+                    }`}>
                       {kpis.netMargin.toFixed(1)}% Margin
                     </div>
                   </div>
@@ -2600,7 +2604,7 @@ export default function FinancialsPage() {
                       return (
                         <div style={{ 
                           backgroundColor: 'white', 
-                          border: '1px solid #e2e8f0',
+                          border: `2px solid ${BRAND_COLORS.primary}`,
                           borderRadius: '8px',
                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                           padding: '8px 12px',
@@ -2726,22 +2730,22 @@ export default function FinancialsPage() {
                                     backgroundColor: 'rgba(255, 255, 255, 0.98)', 
                                     border: `1px solid ${BRAND_COLORS.primary}`,
                                     borderRadius: '6px',
-                                    fontSize: '11px',
+                                    fontSize: '10px',
                                     fontWeight: 500,
                                     boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.1)',
-                                    padding: '8px',
-                                    minWidth: '140px',
+                                    padding: '6px',
+                                    minWidth: '120px',
                                     position: 'relative',
                                     backdropFilter: 'blur(5px)',
                                     transition: 'all 0.2s ease'
                                   }}>
                                     <div style={{
                                       fontWeight: 'bold',
-                                      fontSize: '12px',
+                                      fontSize: '11px',
                                       color: '#1f2937',
-                                      marginBottom: '6px',
+                                      marginBottom: '5px',
                                       textAlign: 'center',
-                                      paddingBottom: '4px',
+                                      paddingBottom: '3px',
                                       borderBottom: `1px solid ${BRAND_COLORS.primary}20`
                                     }}>
                                       {label}
@@ -2750,17 +2754,17 @@ export default function FinancialsPage() {
                                     <div style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      marginBottom: '4px',
-                                      padding: '3px 4px',
+                                      marginBottom: '3px',
+                                      padding: '2px 3px',
                                       borderRadius: '3px',
                                       backgroundColor: `${BRAND_COLORS.tertiary}10`
                                     }}>
                                       <div style={{
-                                        width: '6px',
-                                        height: '6px',
+                                        width: '5px',
+                                        height: '5px',
                                         borderRadius: '50%',
                                         backgroundColor: BRAND_COLORS.tertiary,
-                                        marginRight: '6px'
+                                        marginRight: '5px'
                                       }}></div>
                                       <span style={{ 
                                         color: '#374151', 
@@ -2770,24 +2774,24 @@ export default function FinancialsPage() {
                                       <span style={{ 
                                         color: BRAND_COLORS.tertiary,
                                         fontWeight: 'bold',
-                                        fontSize: '11px'
+                                        fontSize: '10px'
                                       }}>{formatCurrency(revenue)}</span>
                                     </div>
                                     
                                     <div style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      marginBottom: '4px',
-                                      padding: '3px 4px',
+                                      marginBottom: '3px',
+                                      padding: '2px 3px',
                                       borderRadius: '3px',
                                       backgroundColor: `${isProfit ? BRAND_COLORS.primary : '#ef4444'}10`
                                     }}>
                                       <div style={{
-                                        width: '6px',
-                                        height: '6px',
+                                        width: '5px',
+                                        height: '5px',
                                         borderRadius: '50%',
                                         backgroundColor: isProfit ? BRAND_COLORS.primary : '#ef4444',
-                                        marginRight: '6px'
+                                        marginRight: '5px'
                                       }}></div>
                                       <span style={{ 
                                         color: '#374151', 
@@ -2797,24 +2801,24 @@ export default function FinancialsPage() {
                                       <span style={{ 
                                         color: isProfit ? BRAND_COLORS.primary : '#ef4444',
                                         fontWeight: 'bold',
-                                        fontSize: '11px'
+                                        fontSize: '10px'
                                       }}>{formatCurrency(netIncome)}</span>
                                     </div>
                                     
                                     <div style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      padding: '4px',
-                                      borderRadius: '4px',
-                                      backgroundColor: `${BRAND_COLORS.secondary}10`,
-                                      border: `1px solid ${BRAND_COLORS.secondary}15`,
+                                      padding: '3px',
+                                      borderRadius: '3px',
+                                      backgroundColor: `${netIncome < 0 ? '#fee2e2' : `${BRAND_COLORS.secondary}10`}`,
+                                      border: `1px solid ${netIncome < 0 ? '#fca5a5' : `${BRAND_COLORS.secondary}15`}`,
                                       marginTop: '2px'
                                     }}>
                                       <div style={{
                                         width: '4px',
                                         height: '4px',
                                         borderRadius: '50%',
-                                        backgroundColor: BRAND_COLORS.secondary,
+                                        backgroundColor: netIncome < 0 ? '#ef4444' : BRAND_COLORS.secondary,
                                         marginRight: '4px'
                                       }}></div>
                                       <span style={{ 
@@ -2824,9 +2828,9 @@ export default function FinancialsPage() {
                                         fontSize: '10px'
                                       }}>Margin:</span>
                                       <span style={{ 
-                                        color: BRAND_COLORS.secondary,
+                                        color: netIncome < 0 ? '#ef4444' : BRAND_COLORS.secondary,
                                         fontWeight: 'bold',
-                                        fontSize: '10px'
+                                        fontSize: '9px'
                                       }}>{netIncomePercentage}%</span>
                                     </div>
                                   </div>
