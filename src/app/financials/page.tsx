@@ -2736,23 +2736,20 @@ export default function FinancialsPage() {
                                       marginBottom: '8px'
                                     }}>
                                       {label}
-                                    </div>
-                                    <div style={{ marginBottom: '4px' }}>
-                                      <span style={{ color: '#7CC4ED' }}>● </span>
-                                      Revenue: {formatCurrency(revenue)}
-                                    </div>
-                                    <div style={{ marginBottom: '4px' }}>
-                                      <span style={{ color: netIncome >= 0 ? '#56B6E9' : '#ef4444' }}>● </span>
-                                      Net Income: {formatCurrency(netIncome)}
-                                    </div>
-                                    <div style={{ 
-                                      paddingTop: '4px', 
-                                      borderTop: '1px solid #e2e8f0',
-                                      fontSize: '10px',
-                                      color: '#64748B'
-                                    }}>
-                                      Net Income Margin: {netIncomePercentage}%
-                                    </div>
+</div>
+<div style={{ marginBottom: '4px' }}>
+  <span style={{ color: '#7CC4ED' }}>● </span>
+  <span style={{ color: '#7CC4ED' }}>Revenue:</span> {formatCurrency(revenue)}
+</div>
+<div style={{ marginBottom: '4px' }}>
+  <span style={{ color: '#56B6E9' }}>● </span>
+  <span style={{ color: '#56B6E9' }}>Net Income:</span> {formatCurrency(netIncome)}
+</div>
+<div style={{ marginBottom: '4px' }}>
+  <span style={{ color: '#3A9BD1' }}>● </span>
+  <span style={{ color: '#3A9BD1' }}>Net Income Margin:</span> {netIncomePercentage}%
+</div>
+
                                   </div>
                                 );
                               }
