@@ -2724,25 +2724,25 @@ export default function FinancialsPage() {
                                 return (
                                   <div style={{
                                     backgroundColor: 'rgba(255, 255, 255, 0.98)', 
-                                    border: `2px solid ${BRAND_COLORS.primary}`,
-                                    borderRadius: '12px',
-                                    fontSize: '12px',
+                                    border: `1px solid ${BRAND_COLORS.primary}`,
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
                                     fontWeight: 500,
-                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-                                    padding: '16px',
-                                    minWidth: '200px',
+                                    boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.1)',
+                                    padding: '8px',
+                                    minWidth: '140px',
                                     position: 'relative',
-                                    backdropFilter: 'blur(10px)',
-                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                                    backdropFilter: 'blur(5px)',
+                                    transition: 'all 0.2s ease'
                                   }}>
                                     <div style={{
                                       fontWeight: 'bold',
-                                      fontSize: '14px',
+                                      fontSize: '12px',
                                       color: '#1f2937',
-                                      marginBottom: '12px',
+                                      marginBottom: '6px',
                                       textAlign: 'center',
-                                      paddingBottom: '8px',
-                                      borderBottom: `2px solid ${BRAND_COLORS.primary}20`
+                                      paddingBottom: '4px',
+                                      borderBottom: `1px solid ${BRAND_COLORS.primary}20`
                                     }}>
                                       {label}
                                     </div>
@@ -2750,88 +2750,83 @@ export default function FinancialsPage() {
                                     <div style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      marginBottom: '8px',
-                                      padding: '6px 8px',
-                                      borderRadius: '6px',
-                                      backgroundColor: `${BRAND_COLORS.tertiary}15`,
-                                      transition: 'background-color 0.15s ease'
+                                      marginBottom: '4px',
+                                      padding: '3px 4px',
+                                      borderRadius: '3px',
+                                      backgroundColor: `${BRAND_COLORS.tertiary}10`
                                     }}>
                                       <div style={{
-                                        width: '8px',
-                                        height: '8px',
+                                        width: '6px',
+                                        height: '6px',
                                         borderRadius: '50%',
                                         backgroundColor: BRAND_COLORS.tertiary,
-                                        marginRight: '8px',
-                                        boxShadow: `0 0 0 2px ${BRAND_COLORS.tertiary}30`
+                                        marginRight: '6px'
                                       }}></div>
                                       <span style={{ 
                                         color: '#374151', 
                                         fontWeight: '600',
-                                        marginRight: '8px'
+                                        marginRight: '4px'
                                       }}>Revenue:</span>
                                       <span style={{ 
                                         color: BRAND_COLORS.tertiary,
                                         fontWeight: 'bold',
-                                        fontSize: '13px'
+                                        fontSize: '11px'
                                       }}>{formatCurrency(revenue)}</span>
                                     </div>
                                     
                                     <div style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      marginBottom: '8px',
-                                      padding: '6px 8px',
-                                      borderRadius: '6px',
-                                      backgroundColor: `${isProfit ? BRAND_COLORS.primary : '#ef4444'}15`,
-                                      transition: 'background-color 0.15s ease'
+                                      marginBottom: '4px',
+                                      padding: '3px 4px',
+                                      borderRadius: '3px',
+                                      backgroundColor: `${isProfit ? BRAND_COLORS.primary : '#ef4444'}10`
                                     }}>
                                       <div style={{
-                                        width: '8px',
-                                        height: '8px',
+                                        width: '6px',
+                                        height: '6px',
                                         borderRadius: '50%',
                                         backgroundColor: isProfit ? BRAND_COLORS.primary : '#ef4444',
-                                        marginRight: '8px',
-                                        boxShadow: `0 0 0 2px ${isProfit ? BRAND_COLORS.primary : '#ef4444'}30`
+                                        marginRight: '6px'
                                       }}></div>
                                       <span style={{ 
                                         color: '#374151', 
                                         fontWeight: '600',
-                                        marginRight: '8px'
+                                        marginRight: '4px'
                                       }}>Net Income:</span>
                                       <span style={{ 
                                         color: isProfit ? BRAND_COLORS.primary : '#ef4444',
                                         fontWeight: 'bold',
-                                        fontSize: '13px'
+                                        fontSize: '11px'
                                       }}>{formatCurrency(netIncome)}</span>
                                     </div>
                                     
                                     <div style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      padding: '8px',
-                                      borderRadius: '8px',
+                                      padding: '4px',
+                                      borderRadius: '4px',
                                       backgroundColor: `${BRAND_COLORS.secondary}10`,
-                                      border: `1px solid ${BRAND_COLORS.secondary}20`,
-                                      marginTop: '4px'
+                                      border: `1px solid ${BRAND_COLORS.secondary}15`,
+                                      marginTop: '2px'
                                     }}>
                                       <div style={{
-                                        width: '6px',
-                                        height: '6px',
+                                        width: '4px',
+                                        height: '4px',
                                         borderRadius: '50%',
                                         backgroundColor: BRAND_COLORS.secondary,
-                                        marginRight: '8px',
-                                        boxShadow: `0 0 0 2px ${BRAND_COLORS.secondary}30`
+                                        marginRight: '4px'
                                       }}></div>
                                       <span style={{ 
                                         color: '#374151', 
                                         fontWeight: '600',
-                                        marginRight: '8px',
-                                        fontSize: '11px'
+                                        marginRight: '4px',
+                                        fontSize: '10px'
                                       }}>Margin:</span>
                                       <span style={{ 
                                         color: BRAND_COLORS.secondary,
                                         fontWeight: 'bold',
-                                        fontSize: '12px'
+                                        fontSize: '10px'
                                       }}>{netIncomePercentage}%</span>
                                     </div>
                                   </div>
