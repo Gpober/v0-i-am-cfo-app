@@ -1,3 +1,4 @@
+"use client"
 import React, { useState } from 'react';
 import { 
   Calendar, Download, RefreshCw, Plus, X, ChevronDown, ChevronRight, 
