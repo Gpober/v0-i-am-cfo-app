@@ -2712,8 +2712,14 @@ export default function FinancialsPage() {
                           />
                           
                           <Tooltip 
-                            formatter={(value: any, name: string) => {
+                            formatter={(value: any, name: string, props: any) => {
                               const label = name === 'netIncome' ? 'Net Income' : 'Revenue';
+                              if (name === 'netIncome' && props?.payload) {
+                                const netIncome = Number(value);
+                                const revenue = props.payload.revenue;
+                                const netIncomePercent = revenue > 0 ? ((netIncome / revenue) * 100).toFixed(1) : '0.0';
+                                return [`${formatCurrency(netIncome)} (${netIncomePercent}%)`, label];
+                              }
                               return [`${formatCurrency(Number(value))}`, label];
                             }}
                             contentStyle={{ 
