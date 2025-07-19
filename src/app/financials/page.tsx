@@ -3235,7 +3235,7 @@ export default function FinancialsPage() {
             </div>
 
                          
-          {/* Right Column: Charts */}
+            {/* Right Column: Charts */}
             <div className="lg:col-span-1">
              
               {/* Transaction Detail Panel */}
