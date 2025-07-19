@@ -389,7 +389,7 @@ const fetchProperties = async (): Promise<string[]> => {
 
 // ENHANCED: Time series data fetching with Property Dimension support
 const fetchTimeSeriesData = async (
-  property: string = 'All Properties',
+  properties: string[] | string = 'All Properties',
   monthYear: string,
   timePeriod: TimePeriod,
   viewMode: ViewMode,
@@ -397,7 +397,7 @@ const fetchTimeSeriesData = async (
 ) => {
   try {
     const perfStart = performanceTracker.startTime('fetchTimeSeriesData');
-    smartLog('🔍 FETCHING TIME SERIES DATA:', { property, monthYear, timePeriod, viewMode });
+    smartLog('🔍 FETCHING TIME SERIES DATA:', { properties, monthYear, timePeriod, viewMode });
     
     const [month, year] = monthYear.split(' ');
     const selectedDate = new Date(`${month} 1, ${year}`);
@@ -600,11 +600,30 @@ const fetchTimeSeriesData = async (
       
       // FIXED: For by-property view, NEVER filter by property - we need ALL property data
       // Only filter by property for non-by-property views
-      if (viewMode !== 'by-property' && property !== 'All Properties') {
-        url += `&class=eq.${encodeURIComponent(property)}`;
+      if (viewMode !== 'by-property') {
+        // Handle multiple property filtering
+        const propertyArray = Array.isArray(properties) ? properties : [properties];
+        const hasAllProperties = propertyArray.includes('All Properties');
+        
+        if (!hasAllProperties && propertyArray.length > 0) {
+          if (propertyArray.length === 1) {
+            // Single property filter
+            url += `&class=eq.${encodeURIComponent(propertyArray[0])}`;
+          } else {
+            // Multiple property filter using OR condition
+            const propertyFilters = propertyArray.map(prop => `class.eq.${encodeURIComponent(prop)}`).join(',');
+            url += `&or=(${propertyFilters})`;
+          }
+        }
       }
       
       smartLog(`🔍 FETCHING URL for ${viewMode} view:`, url);
+      smartLog(`🔍 Properties being filtered:`, {
+        inputProperties: properties,
+        isArray: Array.isArray(properties),
+        propertyArray: Array.isArray(properties) ? properties : [properties],
+        hasAllProperties: Array.isArray(properties) ? properties.includes('All Properties') : properties === 'All Properties'
+      });
       
       const response = await fetch(url, {
         headers: {
@@ -623,7 +642,11 @@ const fetchTimeSeriesData = async (
         smartLog(`🔍 Period ${range.label}: ${rawData.length} transactions`);
         smartLog(`🔍 Sample transactions for ${range.label}:`, rawData.slice(0, 3));
         smartLog(`🔍 Date range: ${range.start} to ${range.end}`);
-        smartLog(`🔍 View mode: ${viewMode}, Property filter: ${property}`);
+        smartLog(`🔍 View mode: ${viewMode}, Property filters: ${Array.isArray(properties) ? properties.join(', ') : properties}`);
+        
+        // Debug: Show unique properties in returned data
+        const uniquePropertiesInData = [...new Set(rawData.map((row: any) => row.class).filter(cls => cls))];
+        smartLog(`🔍 Properties found in returned data for ${range.label}:`, uniquePropertiesInData);
         totalEntriesProcessed += rawData.length;
         
         if (viewMode === 'by-property') {
@@ -1036,21 +1059,22 @@ export default function FinancialsPage() {
       setDataError(null);
       
       // FIXED: For by-property view, always use 'All Properties' to get all data
-      let propertyFilter = 'All Properties';
+      // For other views, pass ALL selected properties for proper filtering
+      let propertyFilters: string[] | string = 'All Properties';
       if (viewMode !== 'by-property' && selectedProperties.size > 0 && !selectedProperties.has('All Properties')) {
-        propertyFilter = Array.from(selectedProperties)[0];
+        propertyFilters = Array.from(selectedProperties);
       }
       
       smartLog('🔍 LOADING DATA WITH FILTERS:', {
         selectedProperties: Array.from(selectedProperties),
-        propertyFilter,
+        propertyFilters,
         month: selectedMonth,
         timePeriod,
         viewMode,
-        note: viewMode === 'by-property' ? 'FORCING All Properties for by-property view' : 'Using selected property filter'
+        note: viewMode === 'by-property' ? 'FORCING All Properties for by-property view' : 'Using ALL selected property filters'
       });
       
-      const timeSeriesResult = await fetchTimeSeriesData(propertyFilter, selectedMonth, timePeriod, viewMode, updateDataIntegrityStatus);
+      const timeSeriesResult = await fetchTimeSeriesData(propertyFilters, selectedMonth, timePeriod, viewMode, updateDataIntegrityStatus);
       
       if (timeSeriesResult.success) {
         setTimeSeriesData(timeSeriesResult);
