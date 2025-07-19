@@ -2675,6 +2675,7 @@ export default function FinancialsPage() {
                             left: 20, 
                             bottom: trendData.length > 4 ? 60 : 40 
                           }}
+                          style={{ cursor: 'pointer' }}
                         >
                           <CartesianGrid 
                             strokeDasharray="2 2" 
@@ -2718,42 +2719,140 @@ export default function FinancialsPage() {
                                 const revenue = data.revenue || 0;
                                 const netIncome = data.netIncome || 0;
                                 const netIncomePercentage = revenue !== 0 ? ((netIncome / revenue) * 100).toFixed(1) : '0.0';
+                                const isProfit = netIncome >= 0;
                                 
                                 return (
                                   <div style={{
-                                    backgroundColor: 'white', 
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '8px',
-                                    fontSize: '11px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                                    border: `2px solid ${BRAND_COLORS.primary}`,
+                                    borderRadius: '12px',
+                                    fontSize: '12px',
                                     fontWeight: 500,
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                    padding: '12px'
+                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                                    padding: '16px',
+                                    minWidth: '200px',
+                                    position: 'relative',
+                                    backdropFilter: 'blur(10px)',
+                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                                   }}>
                                     <div style={{
                                       fontWeight: 'bold',
-                                      fontSize: '12px',
+                                      fontSize: '14px',
                                       color: '#1f2937',
-                                      marginBottom: '8px'
+                                      marginBottom: '12px',
+                                      textAlign: 'center',
+                                      paddingBottom: '8px',
+                                      borderBottom: `2px solid ${BRAND_COLORS.primary}20`
                                     }}>
                                       {label}
-</div>
-<div style={{ marginBottom: '4px' }}>
-  <span style={{ color: '#7CC4ED' }}>● </span>
-  <span style={{ color: '#7CC4ED' }}>Revenue:</span> {formatCurrency(revenue)}
-</div>
-<div style={{ marginBottom: '4px' }}>
-  <span style={{ color: '#56B6E9' }}>● </span>
-  <span style={{ color: '#56B6E9' }}>Net Income:</span> {formatCurrency(netIncome)}
-</div>
-<div style={{ marginBottom: '4px' }}>
-  <span style={{ color: '#3A9BD1' }}>● </span>
-  <span style={{ color: '#3A9BD1' }}>Net Income Margin:</span> {netIncomePercentage}%
-</div>
-
+                                    </div>
+                                    
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      marginBottom: '8px',
+                                      padding: '6px 8px',
+                                      borderRadius: '6px',
+                                      backgroundColor: `${BRAND_COLORS.tertiary}15`,
+                                      transition: 'background-color 0.15s ease'
+                                    }}>
+                                      <div style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        backgroundColor: BRAND_COLORS.tertiary,
+                                        marginRight: '8px',
+                                        boxShadow: `0 0 0 2px ${BRAND_COLORS.tertiary}30`
+                                      }}></div>
+                                      <span style={{ 
+                                        color: '#374151', 
+                                        fontWeight: '600',
+                                        marginRight: '8px'
+                                      }}>Revenue:</span>
+                                      <span style={{ 
+                                        color: BRAND_COLORS.tertiary,
+                                        fontWeight: 'bold',
+                                        fontSize: '13px'
+                                      }}>{formatCurrency(revenue)}</span>
+                                    </div>
+                                    
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      marginBottom: '8px',
+                                      padding: '6px 8px',
+                                      borderRadius: '6px',
+                                      backgroundColor: `${isProfit ? BRAND_COLORS.primary : '#ef4444'}15`,
+                                      transition: 'background-color 0.15s ease'
+                                    }}>
+                                      <div style={{
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        backgroundColor: isProfit ? BRAND_COLORS.primary : '#ef4444',
+                                        marginRight: '8px',
+                                        boxShadow: `0 0 0 2px ${isProfit ? BRAND_COLORS.primary : '#ef4444'}30`
+                                      }}></div>
+                                      <span style={{ 
+                                        color: '#374151', 
+                                        fontWeight: '600',
+                                        marginRight: '8px'
+                                      }}>Net Income:</span>
+                                      <span style={{ 
+                                        color: isProfit ? BRAND_COLORS.primary : '#ef4444',
+                                        fontWeight: 'bold',
+                                        fontSize: '13px'
+                                      }}>{formatCurrency(netIncome)}</span>
+                                    </div>
+                                    
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      padding: '8px',
+                                      borderRadius: '8px',
+                                      backgroundColor: `${BRAND_COLORS.secondary}10`,
+                                      border: `1px solid ${BRAND_COLORS.secondary}20`,
+                                      marginTop: '4px'
+                                    }}>
+                                      <div style={{
+                                        width: '6px',
+                                        height: '6px',
+                                        borderRadius: '50%',
+                                        backgroundColor: BRAND_COLORS.secondary,
+                                        marginRight: '8px',
+                                        boxShadow: `0 0 0 2px ${BRAND_COLORS.secondary}30`
+                                      }}></div>
+                                      <span style={{ 
+                                        color: '#374151', 
+                                        fontWeight: '600',
+                                        marginRight: '8px',
+                                        fontSize: '11px'
+                                      }}>Margin:</span>
+                                      <span style={{ 
+                                        color: BRAND_COLORS.secondary,
+                                        fontWeight: 'bold',
+                                        fontSize: '12px'
+                                      }}>{netIncomePercentage}%</span>
+                                    </div>
                                   </div>
                                 );
                               }
                               return null;
+                            }}
+                            animationDuration={200}
+                            animationEasing="ease-out"
+                            offset={10}
+                            allowEscapeViewBox={{ x: false, y: true }}
+                            position={{ x: 'auto', y: 'auto' }}
+                            wrapperStyle={{
+                              zIndex: 1000,
+                              pointerEvents: 'none'
+                            }}
+                            cursor={{ 
+                              fill: 'rgba(86, 182, 233, 0.1)',
+                              stroke: BRAND_COLORS.primary,
+                              strokeWidth: 1,
+                              strokeDasharray: '4 4'
                             }}
                           />
                           
@@ -2773,25 +2872,48 @@ export default function FinancialsPage() {
                           <Bar 
                             dataKey="revenue" 
                             fill="#7CC4ED"
-                            fillOpacity={0.4}
+                            fillOpacity={0.5}
                             name="revenue"
-                            radius={[4, 4, 0, 0]}
-                            stroke="none"
+                            radius={[6, 6, 0, 0]}
+                            stroke={BRAND_COLORS.tertiary}
+                            strokeWidth={0.5}
+                            strokeOpacity={0.7}
+                            animationBegin={0}
+                            animationDuration={800}
+                            style={{
+                              filter: 'drop-shadow(0 2px 4px rgba(124, 196, 237, 0.2))',
+                              transition: 'all 0.3s ease'
+                            }}
                           />
                           
                           {/* Net Income Bar - Full IAM CFO Blue (layered on top) */}
                           <Bar 
                             dataKey="netIncome" 
                             fill="#56B6E9"
-                            fillOpacity={1}
+                            fillOpacity={0.9}
                             name="netIncome"
-                            radius={[4, 4, 0, 0]}
-                            stroke="none"
+                            radius={[6, 6, 0, 0]}
+                            stroke={BRAND_COLORS.primary}
+                            strokeWidth={1}
+                            strokeOpacity={0.3}
+                            animationBegin={300}
+                            animationDuration={800}
+                            style={{
+                              filter: 'drop-shadow(0 4px 8px rgba(86, 182, 233, 0.3))',
+                              transition: 'all 0.3s ease'
+                            }}
                           >
                             {trendData.map((entry, index) => (
                               <Cell 
                                 key={`cell-${index}`} 
                                 fill={entry.netIncome >= 0 ? '#56B6E9' : '#ef4444'}
+                                stroke={entry.netIncome >= 0 ? BRAND_COLORS.primary : '#dc2626'}
+                                strokeWidth={1.5}
+                                strokeOpacity={0.4}
+                                style={{
+                                  filter: `drop-shadow(0 3px 6px ${entry.netIncome >= 0 ? 'rgba(86, 182, 233, 0.25)' : 'rgba(239, 68, 68, 0.25)'})`,
+                                  transition: 'all 0.2s ease-in-out'
+                                }}
                               />
                             ))}
                           </Bar>
