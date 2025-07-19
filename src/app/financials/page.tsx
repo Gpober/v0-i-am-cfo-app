@@ -3235,207 +3235,208 @@ export default function FinancialsPage() {
             </div>
 
                          
-           {/* Right Column: Charts */}
-<div className="lg:col-span-1">
- 
-  {/* Transaction Detail Panel */}
-  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-    <div className="p-4 border-b border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-900">Transaction Details</h3>
-      {selectedAccountDetails && (
-        <div className="mt-2 flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600">{selectedAccountDetails.name}</p>
-            <p className="text-lg font-semibold" style={{ color: BRAND_COLORS.primary }}>
-              {formatCurrency(selectedAccountDetails.total)}
-            </p>
-            <p className="text-xs text-blue-600 mt-1">
-              Category: {selectedAccountDetails.category} • Type: {selectedAccountDetails.account_type}
-            </p>
-          </div>
-          <button
-            onClick={() => setSelectedAccountDetails(null)}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      )}
-    </div>
-    <div className="p-4">
-      {selectedAccountDetails ? (
-        <div className="space-y-4">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg">
-            <div>
-              <span className="text-xs text-gray-500">Total Transactions</span>
-              <div className="text-lg font-semibold">{selectedAccountDetails.entries?.length || 0}</div>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">P&L Category</span>
-              <div className="text-lg font-semibold">{selectedAccountDetails.category}</div>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">Property Classes</span>
-              <div className="text-sm font-semibold text-blue-600">
-                {selectedAccountDetails.entries?.length > 0 
-                  ? [...new Set(selectedAccountDetails.entries.map((e: any) => e.class || 'No Property'))].join(', ')
-                  : 'N/A'
-                }
-              </div>
-            </div>
-          </div>
+          {/* Right Column: Charts */}
+            <div className="lg:col-span-1">
+             
+              {/* Transaction Detail Panel */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Transaction Details</h3>
+                  {selectedAccountDetails && (
+                    <div className="mt-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{selectedAccountDetails.name}</p>
+                        <p className="text-lg font-semibold" style={{ color: BRAND_COLORS.primary }}>
+                          {formatCurrency(selectedAccountDetails.total)}
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Category: {selectedAccountDetails.category} • Type: {selectedAccountDetails.account_type}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedAccountDetails(null)}
+                        className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="p-6">
+                  {selectedAccountDetails ? (
+                    <div className="space-y-4">
+                      {/* Summary Stats */}
+                      <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div>
+                          <span className="text-xs text-gray-500">Total Transactions</span>
+                          <div className="text-lg font-semibold">{selectedAccountDetails.entries?.length || 0}</div>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500">P&L Category</span>
+                          <div className="text-lg font-semibold">{selectedAccountDetails.category}</div>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500">Account Type</span>
+                          <div className="text-sm text-gray-700">{selectedAccountDetails.account_type}</div>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500">Detail Type</span>
+                          <div className="text-sm text-gray-700">{selectedAccountDetails.account_detail_type || 'None'}</div>
+                        </div>
+                      </div>
 
-          {/* Transaction List */}
-          <div className="max-h-80 overflow-y-auto">
-            <div className="space-y-2">
-              {selectedAccountDetails.entries && selectedAccountDetails.entries.length > 0 ? (
-                selectedAccountDetails.entries
-                  .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map((entry: any, index: number) => (
-                    <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-2 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className={`w-2 h-2 rounded-full ${
-                              entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
-                            }`}
-                          />
-                          <span className="text-xs text-gray-500">
-                            {new Date(entry.date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className={`text-sm font-semibold ${
-                          entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {formatCurrency(entry.amount)}
+                      {/* Transaction List */}
+                      <div className="max-h-96 overflow-y-auto">
+                        <div className="space-y-2">
+                          {selectedAccountDetails.entries && selectedAccountDetails.entries.length > 0 ? (
+                            selectedAccountDetails.entries
+                              .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                              .map((entry: any, index: number) => (
+                                <div key={`${entry.id}-${index}`} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                                  <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        className={`w-2 h-2 rounded-full ${
+                                          entry.amount >= 0 ? 'bg-green-500' : 'bg-red-500'
+                                        }`}
+                                      />
+                                      <span className="text-xs text-gray-500">ID: {entry.id}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={`text-sm font-semibold ${
+                                        entry.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                                      }`}>
+                                        {formatCurrency(entry.amount)}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(entry.date).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {entry.memo && (
+                                    <div className="mb-2 p-2 bg-blue-50 rounded text-xs">
+                                      <span className="text-blue-700">💬 {entry.memo}</span>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="flex justify-between text-xs text-gray-600">
+                                    <span>
+                                      <strong>Class:</strong> {entry.class || 'No Class'}
+                                    </span>
+                                    <span>
+                                      <strong>Detail:</strong> {entry.account_detail_type || 'None'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))
+                          ) : (
+                            <div className="text-center py-8 text-gray-500">
+                              No transaction details available
+                            </div>
+                          )}
                         </div>
                       </div>
-                      
-                      {/* Property Class Display */}
-                      {entry.class && (
-                        <div className="mt-1">
-                          <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                            🏢 {entry.class}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {entry.memo && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                          <span className="text-blue-700">💬 {entry.memo}</span>
-                        </div>
-                      )}
                     </div>
-                  ))
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="text-sm">📊 No transactions found</div>
-                  <div className="text-xs mt-1">Select an account to view transaction details</div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Selected Properties:</span>
+                        <span className="text-sm font-medium">{viewMode === 'by-property' ? 'All Properties (Property View)' : getSelectedPropertiesText()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Data Period:</span>
+                        <span className="text-sm font-medium">{selectedMonth}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">View Mode:</span>
+                        <span className="text-sm font-medium">{timePeriod} {viewMode}</span>
+                      </div>
+                      {timeSeriesData?.summary && (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Total Entries Processed:</span>
+                            <span className="text-sm font-medium">{timeSeriesData.summary.totalEntriesProcessed}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Periods Generated:</span>
+                            <span className="text-sm font-medium">{timeSeriesData.summary.periodsGenerated}</span>
+                          </div>
+                          {timePeriod === 'Trailing 12' && viewMode === 'total' && (
+                            <div className="p-3 bg-blue-50 rounded-lg">
+                              <div className="text-sm text-blue-700">
+                                <strong>🕐 Trailing 12 Months Period:</strong>
+                                <div className="mt-1 text-xs">
+                                  From: {timeSeriesData.summary.dateRanges[0]?.start}
+                                </div>
+                                <div className="text-xs">
+                                  To: {timeSeriesData.summary.dateRanges[0]?.end}
+                                </div>
+                                <div className="mt-2 text-xs">
+                                  This represents the total sum of all financial activity across the past 12 months ending with {selectedMonth}.
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {timePeriod === 'Monthly' && viewMode === 'detailed' && (
+                            <div className="p-3 bg-green-50 rounded-lg">
+                              <div className="text-sm text-green-700">
+                                <strong>📅 Monthly Weekly Breakdown:</strong>
+                                <div className="mt-1 text-xs">
+                                  Showing {timeSeriesData.summary.periodsGenerated} weeks within {selectedMonth}
+                                </div>
+                                <div className="mt-2 text-xs">
+                                  Each week column shows financial activity for that specific week range. The Total column aggregates all weeks for the month.
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {viewMode === 'by-property' && (
+                            <div className="p-3 bg-purple-50 rounded-lg">
+                              <div className="text-sm text-purple-700">
+                                <strong>🏢 Property Dimension View:</strong>
+                                <div className="mt-1 text-xs">
+                                  Showing {timeSeriesData?.availableProperties?.length || 0} properties for {timePeriod} period
+                                </div>
+                                <div className="mt-2 text-xs">
+                                  Each property column shows financial performance for that specific property. Compare across properties to identify top performers.
+                                </div>
+                                {timeSeriesData?.availableProperties && (
+                                  <div className="mt-2 text-xs">
+                                    <strong>Properties:</strong> {timeSeriesData.availableProperties.join(', ')}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-700">
+                          💡 <strong>Tip:</strong> Click on any dollar amount in the P&L table to view detailed transaction breakdowns here.
+                        </p>
+                        <p className="text-sm text-blue-700 mt-2">
+                          📊 <strong>Enhanced Classification:</strong> Accounts are automatically categorized based on their account_type and account_detail_type from Supabase.
+                        </p>
+                        <p className="text-sm text-blue-700 mt-2">
+                          🏗️ <strong>Account Grouping:</strong> Accounts with colons (e.g., "Utilities:Water & sewer") are automatically grouped under parent accounts. Click the arrows to expand/collapse.
+                        </p>
+                        {timePeriod === 'Monthly' && viewMode === 'detailed' && (
+                          <p className="text-sm text-blue-700 mt-2">
+                            📅 <strong>Monthly Detail:</strong> Use the weekly columns to analyze financial performance by week within {selectedMonth}.
+                          </p>
+                        )}
+                        {viewMode === 'by-property' && (
+                          <p className="text-sm text-blue-700 mt-2">
+                            🏢 <strong>Property View:</strong> Compare financial performance across property classes side-by-side. Each column represents a different property's P&L.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Selected Properties:</span>
-            <span className="text-sm font-medium">{viewMode === 'by-property' ? 'All Properties (Property View)' : getSelectedPropertiesText()}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Data Period:</span>
-            <span className="text-sm font-medium">{selectedMonth}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">View Mode:</span>
-            <span className="text-sm font-medium">{timePeriod} {viewMode}</span>
-          </div>
-          {timeSeriesData?.summary && (
-            <>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Entries Processed:</span>
-                <span className="text-sm font-medium">{timeSeriesData.summary.totalEntriesProcessed}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Periods Generated:</span>
-                <span className="text-sm font-medium">{timeSeriesData.summary.periodsGenerated}</span>
-              </div>
-              {timePeriod === 'Trailing 12' && viewMode === 'total' && (
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <div className="text-sm text-blue-700">
-                    <strong>🕐 Trailing 12 Months Period:</strong>
-                    <div className="mt-1 text-xs">
-                      From: {timeSeriesData.summary.dateRanges[0]?.start}
-                    </div>
-                    <div className="text-xs">
-                      To: {timeSeriesData.summary.dateRanges[0]?.end}
-                    </div>
-                    <div className="mt-2 text-xs">
-                      This represents the total sum of all financial activity across the past 12 months ending with {selectedMonth}.
-                    </div>
-                  </div>
-                </div>
-              )}
-              {timePeriod === 'Monthly' && viewMode === 'detailed' && (
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <div className="text-sm text-green-700">
-                    <strong>📅 Monthly Weekly Breakdown:</strong>
-                    <div className="mt-1 text-xs">
-                      Showing {timeSeriesData.summary.periodsGenerated} weeks within {selectedMonth}
-                    </div>
-                    <div className="mt-2 text-xs">
-                      Each week column shows financial activity for that specific week range. The Total column aggregates all weeks for the month.
-                    </div>
-                  </div>
-                </div>
-              )}
-              {viewMode === 'by-property' && (
-                <div className="p-3 bg-purple-50 rounded-lg">
-                  <div className="text-sm text-purple-700">
-                    <strong>🏢 Property Dimension View:</strong>
-                    <div className="mt-1 text-xs">
-                      Showing {timeSeriesData?.availableProperties?.length || 0} properties for {timePeriod} period
-                    </div>
-                    <div className="mt-2 text-xs">
-                      Each property column shows financial performance for that specific property. Compare across properties to identify top performers.
-                    </div>
-                    {timeSeriesData?.availableProperties && (
-                      <div className="mt-2 text-xs">
-                        <strong>Properties:</strong> {timeSeriesData.availableProperties.join(', ')}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-700">
-              💡 <strong>Tip:</strong> Click on any dollar amount in the P&L table to view detailed transaction breakdowns here.
-            </p>
-            <p className="text-sm text-blue-700 mt-2">
-              📊 <strong>Enhanced Classification:</strong> Accounts are automatically categorized based on their account_type and account_detail_type from Supabase.
-            </p>
-            <p className="text-sm text-blue-700 mt-2">
-              🏗️ <strong>Account Grouping:</strong> Accounts with colons (e.g., "Utilities:Water & sewer") are automatically grouped under parent accounts. Click the arrows to expand/collapse.
-            </p>
-            {timePeriod === 'Monthly' && viewMode === 'detailed' && (
-              <p className="text-sm text-blue-700 mt-2">
-                📅 <strong>Monthly Detail:</strong> Use the weekly columns to analyze financial performance by week within {selectedMonth}.
-              </p>
-            )}
-            {viewMode === 'by-property' && (
-              <p className="text-sm text-blue-700 mt-2">
-                🏢 <strong>Property View:</strong> Compare financial performance across property classes side-by-side. Each column represents a different property's P&L.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  </div>
-</div>
           </div>
 
          
