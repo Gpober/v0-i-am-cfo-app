@@ -2712,22 +2712,51 @@ export default function FinancialsPage() {
                           />
                           
                           <Tooltip 
-                            formatter={(value: any, name: string) => {
-                              const label = name === 'netIncome' ? 'Net Income' : 'Revenue';
-                              return [`${formatCurrency(Number(value))}`, label];
-                            }}
-                            contentStyle={{ 
-                              backgroundColor: 'white', 
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                            }}
-                            labelStyle={{
-                              fontWeight: 'bold',
-                              fontSize: '12px',
-                              color: '#1f2937'
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length > 0) {
+                                const data = payload[0].payload;
+                                const revenue = data.revenue || 0;
+                                const netIncome = data.netIncome || 0;
+                                const netIncomePercentage = revenue !== 0 ? ((netIncome / revenue) * 100).toFixed(1) : '0.0';
+                                
+                                return (
+                                  <div style={{
+                                    backgroundColor: 'white', 
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '8px',
+                                    fontSize: '11px',
+                                    fontWeight: 500,
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                    padding: '12px'
+                                  }}>
+                                    <div style={{
+                                      fontWeight: 'bold',
+                                      fontSize: '12px',
+                                      color: '#1f2937',
+                                      marginBottom: '8px'
+                                    }}>
+                                      {label}
+                                    </div>
+                                    <div style={{ marginBottom: '4px' }}>
+                                      <span style={{ color: '#7CC4ED' }}>● </span>
+                                      Revenue: {formatCurrency(revenue)}
+                                    </div>
+                                    <div style={{ marginBottom: '4px' }}>
+                                      <span style={{ color: netIncome >= 0 ? '#56B6E9' : '#ef4444' }}>● </span>
+                                      Net Income: {formatCurrency(netIncome)}
+                                    </div>
+                                    <div style={{ 
+                                      paddingTop: '4px', 
+                                      borderTop: '1px solid #e2e8f0',
+                                      fontSize: '10px',
+                                      color: '#64748B'
+                                    }}>
+                                      Net Income %: {netIncomePercentage}%
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
                             }}
                           />
                           
