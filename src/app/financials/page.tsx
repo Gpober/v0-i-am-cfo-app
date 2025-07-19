@@ -2096,7 +2096,7 @@ export default function FinancialsPage() {
       <div className="min-h-screen bg-gray-50">
         {/* Page Header with IAM CFO Branding */}
         <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-none mx-auto px-4 sm:px-6 lg:px-8 py-6 container" style={{ maxWidth: '1600px' }}>
             <div className="flex items-center">
               <IAMCFOLogo className="w-8 h-8 mr-4" />
               <div>
@@ -2124,7 +2124,7 @@ export default function FinancialsPage() {
           </div>
         </div>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-none mx-auto px-4 sm:px-6 lg:px-8 py-8 container" style={{ maxWidth: '1600px' }}>
           <div className="space-y-8">
             {/* Header Controls */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
