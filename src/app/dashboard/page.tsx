@@ -978,6 +978,116 @@ export default function MobileResponsiveFinancialsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [startY, setStartY] = useState(0)
+  const renderMobileFilters = () => {
+  if (deviceType !== "mobile") return null;
+
+  return (
+    <>
+      {/* Toggle button */}
+      <div className="md:hidden mb-3">
+        <button
+          className="w-full flex items-center justify-between rounded-lg border px-3 py-2 bg-white"
+          onClick={() => setMobileFilterOpen((v) => !v)}
+          aria-label="Toggle filters"
+        >
+          <span className="text-sm font-medium">Filters</span>
+          {mobileFilterOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {/* Panel */}
+      {mobileFilterOpen && (
+        <div className="md:hidden space-y-4 rounded-lg border bg-white p-3">
+          {/* Month selector */}
+          <div>
+            <div className="text-xs text-gray-600 mb-1">Month</div>
+            <select
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            >
+              {monthsList.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Time period */}
+          <div>
+            <div className="text-xs text-gray-600 mb-1">Time Period</div>
+            <select
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              value={timePeriod}
+              onChange={(e) => setTimePeriod(e.target.value)}
+            >
+              <option>Monthly</option>
+              <option>Quarterly</option>
+              <option>Yearly</option>
+              <option>Trailing 12</option>
+            </select>
+          </div>
+
+          {/* View mode */}
+          <div>
+            <div className="text-xs text-gray-600 mb-1">View</div>
+            <select
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+            >
+              <option value="by-property">By Property</option>
+              <option value="total">Total</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </div>
+
+          {/* Properties multiselect */}
+          <div>
+            <div className="text-xs text-gray-600 mb-1">Properties</div>
+            <button
+              className="w-full rounded-md border px-3 py-2 text-sm text-left"
+              onClick={() => setPropertyDropdownOpen((v) => !v)}
+            >
+              {getSelectedPropertiesText()}
+            </button>
+
+            {propertyDropdownOpen && (
+              <div className="mt-2 max-h-56 overflow-auto rounded-md border">
+                {availableProperties.map((prop) => (
+                  <label key={prop} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={selectedProperties.has(prop)}
+                      onChange={() => handlePropertyToggle(prop)}
+                    />
+                    <span>{prop}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Apply/Close */}
+          <div className="flex gap-2">
+            <button
+              className="flex-1 rounded-md border px-3 py-2 text-sm"
+              onClick={() => setMobileFilterOpen(false)}
+            >
+              Close
+            </button>
+            <button
+              className="flex-1 rounded-md px-3 py-2 text-sm text-white"
+              style={{ backgroundColor: BRAND_COLORS.primary }}
+              onClick={() => setMobileFilterOpen(false)}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
   // Auto-adjust settings based on device type
   useEffect(() => {
