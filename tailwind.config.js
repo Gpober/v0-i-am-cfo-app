@@ -11,20 +11,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // shadcn-style tokens so classes like border-border/bg-background work
+        // Map Tailwind tokens to your CSS vars (so border-border, bg-background, etc. work)
         border: 'hsl(var(--border))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
-        secondary:{ DEFAULT: 'hsl(var(--secondary))',foreground:'hsl(var(--secondary-foreground))' },
+        secondary:{ DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
         muted:   { DEFAULT: 'hsl(var(--muted))',   foreground:'hsl(var(--muted-foreground))' },
         accent:  { DEFAULT: 'hsl(var(--accent))',  foreground:'hsl(var(--accent-foreground))' },
         popover: { DEFAULT: 'hsl(var(--popover))', foreground:'hsl(var(--popover-foreground))' },
         card:    { DEFAULT: 'hsl(var(--card))',    foreground:'hsl(var(--card-foreground))' },
 
-        // your brand palette (kept)
+        // Your brand palette
         iamcfo: {
           blue: '#3CA9E0',
           dark: '#2B91C0',
