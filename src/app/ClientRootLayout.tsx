@@ -1,23 +1,15 @@
 "use client"
 
 import type React from "react"
+import { Inter } from 'next/font/google'
+import "./globals.css"
+import ClientLayoutWrapper from "@/components/ClientLayoutWrapper"
 import { useState } from "react"
+import { BarChart3, DollarSign, TrendingUp, CreditCard, FileText, Users, Menu, X } from 'lucide-react'
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  LayoutDashboard,
-  BarChart3,
-  Building2,
-  TrendingUp,
-  CreditCard,
-  Users,
-  Settings,
-  Search,
-  Bell,
-  User,
-  Menu,
-  X,
-} from "lucide-react"
+
+const inter = Inter({ subsets: ["latin"] })
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
@@ -78,180 +70,130 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
   </div>
 )
 
-// Navigation items
-const navigationItems = [
-  {
-    name: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    current: false,
-  },
-  {
-    name: "P&L Statement",
-    href: "/financials",
-    icon: BarChart3,
-    current: false,
-  },
-  {
-    name: "Balance Sheet",
-    href: "/balance-sheet",
-    icon: Building2,
-    current: false,
-  },
-  {
-    name: "Cash Flow",
-    href: "/cash-flow",
-    icon: TrendingUp,
-    current: false,
-  },
-  {
-    name: "Accounts Receivable",
-    href: "/accounts-receivable",
-    icon: CreditCard,
-    current: false,
-  },
-  {
-    name: "Accounts Payable",
-    href: "/accounts-payable",
-    icon: Users,
-    current: false,
-  },
+const navigation = [
+  { name: "Overview", href: "/", icon: BarChart3 },
+  { name: "P&L", href: "/financials", icon: TrendingUp },
+  { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
+  { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
+  { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
+  { name: "A/P", href: "/accounts-payable", icon: Users },
 ]
 
-export default function ClientRootLayout({ children }: { children: React.ReactNode }) {
+export default function ClientRootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
   const pathname = usePathname()
 
-  // Update current navigation item based on pathname
-  const updatedNavigationItems = navigationItems.map((item) => ({
-    ...item,
-    current: pathname === item.href,
-  }))
-
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        </div>
-      )}
-
-      {/* Sidebar */}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Logo and brand */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-            <div className="flex items-center">
-              <IAMCFOLogo className="w-8 h-8 mr-3" />
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">IAM CFO</h1>
-                <p className="text-xs text-gray-500">Financial Dashboard</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-            {updatedNavigationItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    item.current
-                      ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon className="w-5 h-5 mr-3" />
-                  {item.name}
-                </Link>
-              )
-            })}
-          </nav>
-
-          {/* User section */}
-          <div className="border-t border-gray-200 p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
+    <html lang="en">
+      <body className={inter.className}>
+        <ClientLayoutWrapper>
+          <div className="min-h-screen bg-gray-50">
+            {/* Mobile sidebar */}
+            <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? "block" : "hidden"}`}>
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
+              <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white">
+                <div className="absolute top-0 right-0 -mr-12 pt-2">
+                  <button
+                    type="button"
+                    className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <X className="h-6 w-6 text-white" />
+                  </button>
+                </div>
+                <div className="flex flex-shrink-0 items-center px-4 py-4">
+                  <IAMCFOLogo className="w-8 h-8 mr-3" />
+                  <span className="text-xl font-bold text-gray-900">IAM CFO</span>
+                </div>
+                <div className="mt-5 h-0 flex-1 overflow-y-auto">
+                  <nav className="space-y-1 px-2">
+                    {navigation.map((item) => {
+                      const isActive = pathname === item.href
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
+                            isActive ? "text-white" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                          }`}
+                          style={{
+                            backgroundColor: isActive ? BRAND_COLORS.primary : undefined,
+                          }}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <item.icon
+                            className={`mr-4 h-6 w-6 flex-shrink-0 ${
+                              isActive ? "text-white" : "text-gray-400 group-hover:text-gray-500"
+                            }`}
+                          />
+                          {item.name}
+                        </Link>
+                      )
+                    })}
+                  </nav>
                 </div>
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">Admin User</p>
-                <p className="text-xs text-gray-500">admin@iamcfo.com</p>
+            </div>
+
+            {/* Desktop sidebar */}
+            <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+              <div className="flex min-h-0 flex-1 flex-col bg-white border-r border-gray-200">
+                <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
+                  <div className="flex flex-shrink-0 items-center px-4">
+                    <IAMCFOLogo className="w-8 h-8 mr-3" />
+                    <span className="text-xl font-bold text-gray-900">IAM CFO</span>
+                  </div>
+                  <nav className="mt-5 flex-1 space-y-1 px-2">
+                    {navigation.map((item) => {
+                      const isActive = pathname === item.href
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                            isActive ? "text-white" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                          }`}
+                          style={{
+                            backgroundColor: isActive ? BRAND_COLORS.primary : undefined,
+                          }}
+                        >
+                          <item.icon
+                            className={`mr-3 h-6 w-6 flex-shrink-0 ${
+                              isActive ? "text-white" : "text-gray-400 group-hover:text-gray-500"
+                            }`}
+                          />
+                          {item.name}
+                        </Link>
+                      )
+                    })}
+                  </nav>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col lg:ml-0">
-        {/* Top navigation */}
-        <div className="bg-white shadow-sm border-b border-gray-200 lg:hidden">
-          <div className="px-4 py-4">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-              >
-                <Menu className="w-6 h-6" />
-              </button>
-
-              <div className="flex items-center">
-                <IAMCFOLogo className="w-6 h-6 mr-2" />
-                <span className="text-lg font-bold text-gray-900">IAM CFO</span>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <button className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
-                  <Bell className="w-5 h-5" />
+            {/* Main content */}
+            <div className="lg:pl-64 flex flex-col flex-1">
+              {/* Mobile header */}
+              <div className="sticky top-0 z-10 bg-white pl-1 pt-1 sm:pl-3 sm:pt-3 lg:hidden">
+                <button
+                  type="button"
+                  className="-ml-0.5 -mt-0.5 inline-flex h-12 w-12 items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset"
+                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <Menu className="h-6 w-6" />
                 </button>
-                <button className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
-                  <Settings className="w-5 h-5" />
-                </button>
               </div>
+
+              <main className="flex-1">{children}</main>
             </div>
           </div>
-        </div>
-
-        {/* Search bar - Desktop only */}
-        <div className="hidden lg:block bg-white border-b border-gray-200">
-          <div className="px-6 py-4">
-            <div className="relative max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto">{children}</main>
-      </div>
-    </div>
+        </ClientLayoutWrapper>
+      </body>
+    </html>
   )
 }
