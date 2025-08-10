@@ -67,7 +67,6 @@ export default function ClientLayoutWrapper({ children }: ClientLayoutWrapperPro
                         <circle cx="35" cy="72" r="2.5" fill="#FFFFFF" />
                         <circle cx="44" cy="67" r="2.5" fill="#FFFFFF" />
                         <circle cx="53" cy="57" r="2.5" fill="#FFFFFF" />
-                        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF" />
                         <circle cx="71" cy="62" r="2.5" fill="#FFFFFF" />
                         <circle cx="80" cy="47" r="2.5" fill="#FFFFFF" />
                       </g>
