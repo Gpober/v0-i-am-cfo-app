@@ -1,13 +1,14 @@
 "use client"
 
 import type React from "react"
-import { Inter } from 'next/font/google'
+import { Inter } from "next/font/google"
 import "./globals.css"
 import ClientLayoutWrapper from "@/components/ClientLayoutWrapper"
 import { useState } from "react"
-import { BarChart3, DollarSign, TrendingUp, CreditCard, FileText, Users, Menu, X } from 'lucide-react'
+import { BarChart3, DollarSign, TrendingUp, CreditCard, FileText, Users, Menu, X } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import Image from "next/image"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -37,36 +38,7 @@ const BRAND_COLORS = {
 // IAM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
   <div className={`${className} flex items-center justify-center relative`}>
-    <svg viewBox="0 0 120 120" className="w-full h-full">
-      <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2" />
-      <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary} />
-      <g fill="white">
-        <rect x="35" y="70" width="6" height="15" rx="1" />
-        <rect x="44" y="65" width="6" height="20" rx="1" />
-        <rect x="53" y="55" width="6" height="30" rx="1" />
-        <rect x="62" y="50" width="6" height="35" rx="1" />
-        <rect x="71" y="60" width="6" height="25" rx="1" />
-        <rect x="80" y="45" width="6" height="40" rx="1" />
-        <path d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47" stroke="#FFFFFF" strokeWidth="2.5" fill="none" />
-        <circle cx="35" cy="72" r="2.5" fill="#FFFFFF" />
-        <circle cx="44" cy="67" r="2.5" fill="#FFFFFF" />
-        <circle cx="53" cy="57" r="2.5" fill="#FFFFFF" />
-        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF" />
-        <circle cx="71" cy="62" r="2.5" fill="#FFFFFF" />
-        <circle cx="80" cy="47" r="2.5" fill="#FFFFFF" />
-      </g>
-      <text
-        x="60"
-        y="95"
-        textAnchor="middle"
-        fill="white"
-        fontSize="11"
-        fontWeight="bold"
-        fontFamily="Arial, sans-serif"
-      >
-        CFO
-      </text>
-    </svg>
+    <Image src="/favicon.png" alt="IAM CFO Logo" width={32} height={32} />
   </div>
 )
 
