@@ -1,10 +1,9 @@
-// components/ui/calendar.tsx
 "use client";
 
 import { DayPicker } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import * as React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
   className?: string;
@@ -27,6 +26,8 @@ export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
     day_today?: string;
     day_outside?: string;
     day_disabled?: string;
+    day_range_start?: string;
+    day_range_end?: string;
     day_range_middle?: string;
     day_hidden?: string;
   };
@@ -67,8 +68,10 @@ function Calendar({
         day_today: "bg-accent text-accent-foreground",
         day_outside: "day-outside text-muted-foreground opacity-50",
         day_disabled: "text-muted-foreground opacity-50",
+        day_range_start: "day-range-start bg-primary text-primary-foreground rounded-l-md",
+        day_range_end: "day-range-end bg-primary text-primary-foreground rounded-r-md",
         day_range_middle:
-          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+          "aria-selected:bg-accent aria-selected:text-accent-foreground day-range-middle bg-accent/50",
         day_hidden: "invisible",
         ...classNames,
       }}

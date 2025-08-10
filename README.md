@@ -41,7 +41,7 @@ A comprehensive financial management platform designed specifically for rental p
 
 ## 🚦 Getting Started
 
-```bash
+\`\`\`bash
 # Clone the repository
 git clone https://github.com/GPober/iam-cfo-app.git
 cd iam-cfo-app

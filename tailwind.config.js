@@ -4,7 +4,8 @@
 module.exports = {
   content: [
     "./src/**/*.{js,ts,jsx,tsx}",  // adjust if needed
-  ],
+        "*.{js,ts,jsx,tsx,mdx}"
+    ],
   theme: {
     extend: {
       colors: {
