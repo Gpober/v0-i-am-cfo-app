@@ -28,29 +28,36 @@ const navigation = [
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const [isHovered, setIsHovered] = useState(false)
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false)
 
   // Don't show navigation on login page
   if (pathname === "/login") {
     return <>{children}</>
   }
 
+  const handleMouseEnterTrigger = () => {
+    setIsSidebarVisible(true)
+  }
+
+  const handleMouseLeaveSidebar = () => {
+    setIsSidebarVisible(false)
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hover trigger area */}
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Hover trigger area - invisible but detects mouse */}
       <div
-        className="fixed left-0 top-0 w-4 h-full z-40"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        className="fixed left-0 top-0 w-6 h-full z-40 bg-transparent"
+        onMouseEnter={handleMouseEnterTrigger}
+        style={{ cursor: "pointer" }}
       />
 
       {/* Sidebar */}
       <div
-        className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg border-r border-gray-200 z-50 transform transition-transform duration-300 ease-in-out ${
-          isHovered ? "translate-x-0" : "-translate-x-full"
+        className={`fixed left-0 top-0 h-full w-64 bg-white shadow-xl border-r border-gray-200 z-50 transform transition-transform duration-300 ease-in-out ${
+          isSidebarVisible ? "translate-x-0" : "-translate-x-full"
         }`}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseLeave={handleMouseLeaveSidebar}
       >
         {/* Logo */}
         <div className="flex items-center p-4 border-b border-gray-200">
