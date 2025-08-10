@@ -978,116 +978,116 @@ export default function MobileResponsiveFinancialsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [startY, setStartY] = useState(0)
+
   const renderMobileFilters = () => {
-  if (deviceType !== "mobile") return null;
+    if (deviceType !== "mobile") return null
 
-  return (
-    <>
-      {/* Toggle button */}
-      <div className="md:hidden mb-3">
-        <button
-          className="w-full flex items-center justify-between rounded-lg border px-3 py-2 bg-white"
-          onClick={() => setMobileFilterOpen((v) => !v)}
-          aria-label="Toggle filters"
-        >
-          <span className="text-sm font-medium">Filters</span>
-          {mobileFilterOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </button>
-      </div>
-
-      {/* Panel */}
-      {mobileFilterOpen && (
-        <div className="md:hidden space-y-4 rounded-lg border bg-white p-3">
-          {/* Month selector */}
-          <div>
-            <div className="text-xs text-gray-600 mb-1">Month</div>
-            <select
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            >
-              {monthsList.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Time period */}
-          <div>
-            <div className="text-xs text-gray-600 mb-1">Time Period</div>
-            <select
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={timePeriod}
-              onChange={(e) => setTimePeriod(e.target.value)}
-            >
-              <option>Monthly</option>
-              <option>Quarterly</option>
-              <option>Yearly</option>
-              <option>Trailing 12</option>
-            </select>
-          </div>
-
-          {/* View mode */}
-          <div>
-            <div className="text-xs text-gray-600 mb-1">View</div>
-            <select
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value)}
-            >
-              <option value="by-property">By Property</option>
-              <option value="total">Total</option>
-              <option value="detailed">Detailed</option>
-            </select>
-          </div>
-
-          {/* Properties multiselect */}
-          <div>
-            <div className="text-xs text-gray-600 mb-1">Properties</div>
-            <button
-              className="w-full rounded-md border px-3 py-2 text-sm text-left"
-              onClick={() => setPropertyDropdownOpen((v) => !v)}
-            >
-              {getSelectedPropertiesText()}
-            </button>
-
-            {propertyDropdownOpen && (
-              <div className="mt-2 max-h-56 overflow-auto rounded-md border">
-                {availableProperties.map((prop) => (
-                  <label key={prop} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={selectedProperties.has(prop)}
-                      onChange={() => handlePropertyToggle(prop)}
-                    />
-                    <span>{prop}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Apply/Close */}
-          <div className="flex gap-2">
-            <button
-              className="flex-1 rounded-md border px-3 py-2 text-sm"
-              onClick={() => setMobileFilterOpen(false)}
-            >
-              Close
-            </button>
-            <button
-              className="flex-1 rounded-md px-3 py-2 text-sm text-white"
-              style={{ backgroundColor: BRAND_COLORS.primary }}
-              onClick={() => setMobileFilterOpen(false)}
-            >
-              Apply
-            </button>
-          </div>
+    return (
+      <>
+        {/* Toggle button */}
+        <div className="md:hidden mb-3">
+          <button
+            className="w-full flex items-center justify-between rounded-lg border px-3 py-2 bg-white"
+            onClick={() => setMobileFilterOpen((v) => !v)}
+            aria-label="Toggle filters"
+          >
+            <span className="text-sm font-medium">Filters</span>
+            {mobileFilterOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
         </div>
-      )}
-    </>
-  );
-};
+
+        {/* Panel */}
+        {mobileFilterOpen && (
+          <div className="md:hidden space-y-4 rounded-lg border bg-white p-3">
+            {/* Month selector */}
+            <div>
+              <div className="text-xs text-gray-600 mb-1">Month</div>
+              <select
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+              >
+                {monthsList.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Time period */}
+            <div>
+              <div className="text-xs text-gray-600 mb-1">Time Period</div>
+              <select
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={timePeriod}
+                onChange={(e) => setTimePeriod(e.target.value)}
+              >
+                <option>Monthly</option>
+                <option>Quarterly</option>
+                <option>Yearly</option>
+                <option>Trailing 12</option>
+              </select>
+            </div>
+
+            {/* View mode */}
+            <div>
+              <div className="text-xs text-gray-600 mb-1">View</div>
+              <select
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value)}
+              >
+                <option value="by-property">By Property</option>
+                <option value="total">Total</option>
+                <option value="detailed">Detailed</option>
+              </select>
+            </div>
+
+            {/* Properties multiselect */}
+            <div>
+              <div className="text-xs text-gray-600 mb-1">Properties</div>
+              <button
+                className="w-full rounded-md border px-3 py-2 text-sm text-left"
+                onClick={() => setPropertyDropdownOpen((v) => !v)}
+              >
+                {getSelectedPropertiesText()}
+              </button>
+
+              {propertyDropdownOpen && (
+                <div className="mt-2 max-h-56 overflow-auto rounded-md border">
+                  {availableProperties.map((prop) => (
+                    <label key={prop} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={selectedProperties.has(prop)}
+                        onChange={() => handlePropertyToggle(prop)}
+                      />
+                      <span>{prop}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Apply/Close */}
+            <div className="flex gap-2">
+              <button className="flex-1 rounded-md border px-3 py-2 text-sm" onClick={() => setMobileFilterOpen(false)}>
+                Close
+              </button>
+              <button
+                className="flex-1 rounded-md px-3 py-2 text-sm text-white"
+                style={{ backgroundColor: BRAND_COLORS.primary }}
+                onClick={() => setMobileFilterOpen(false)}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
 
   // Auto-adjust settings based on device type
   useEffect(() => {
@@ -1122,7 +1122,7 @@ export default function MobileResponsiveFinancialsPage() {
     const currentYear = new Date().getFullYear()
 
     for (let year = 2020; year <= currentYear + 2; year++) {
-      for (let month = 1; month <= currentYear + 2; month++) {
+      for (let month = 1; month <= 12; month++) {
         const monthNames = [
           "January",
           "February",
@@ -2431,6 +2431,17 @@ export default function MobileResponsiveFinancialsPage() {
       </div>
     )
   }
+
+  // Add the missing renderMobileTable function
+  const renderMobileTable = () => {
+    return renderDesktopPLTable()
+  }
+
+  // Add the missing renderSideBySidePropertyCards function
+  const renderSideBySidePropertyCards = () => {
+    return renderMobilePropertyCards()
+  }
+
   const renderCompanyScorecard = () => {
     return (
       <div
@@ -2643,6 +2654,7 @@ export default function MobileResponsiveFinancialsPage() {
       )}
     </div>
   )
+
   const renderMobilePropertyCards = () => {
     if (!timeSeriesData?.availableProperties || timeSeriesData.availableProperties.length === 0) {
       return (
@@ -2980,6 +2992,50 @@ export default function MobileResponsiveFinancialsPage() {
               <div className="text-center py-8 text-gray-500">No transaction details available</div>
             )}
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Company P&L modal - Mobile Only
+  const renderCompanyPLModal = () => {
+    if (!showCompanyPL) return null
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+        <div className="fixed inset-0 bg-white overflow-y-auto">
+          {/* Header */}
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Company P&L Statement</h2>
+                <div className="text-sm text-gray-600">{timePeriod} Portfolio Performance</div>
+              </div>
+              <button
+                onClick={() => setShowCompanyPL(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Summary metrics */}
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <div className="text-sm text-gray-500">Total Revenue</div>
+                <div className="text-2xl font-bold text-green-600">{formatCurrency(kpis.revenue)}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-500">Net Income</div>
+                <div className={`text-2xl font-bold ${kpis.netIncome >= 0 ? "text-blue-600" : "text-red-600"}`}>
+                  {formatCurrency(kpis.netIncome)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Full P&L Table */}
+          <div className="p-4">{renderDesktopPLTable()}</div>
         </div>
       </div>
     )

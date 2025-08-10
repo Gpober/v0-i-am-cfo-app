@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  output: "standalone",
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -8,12 +8,14 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: [
-      'ijeuusvwqcnljctkvjdi.supabase.co',
-      'lh3.googleusercontent.com'
-    ],
-  }
-  // Removed experimental and logging sections
+    domains: ["ijeuusvwqcnljctkvjdi.supabase.co", "lh3.googleusercontent.com"],
+  },
+  // Ensure build outputs go to correct locations
+  distDir: ".next",
+  // Prevent creation of root-level directories
+  experimental: {
+    outputFileTracingRoot: process.cwd(),
+  },
 }
 
 module.exports = nextConfig
