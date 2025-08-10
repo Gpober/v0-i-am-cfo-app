@@ -11,7 +11,7 @@
   "dependencies": {
     "@radix-ui/react-select": "latest",
     "@supabase/supabase-js": "latest",
-    "geist": "latest"
+    "geist": "latest",
     "chart.js": "^4.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
