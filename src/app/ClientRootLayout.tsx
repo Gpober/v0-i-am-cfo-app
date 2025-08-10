@@ -1,82 +1,37 @@
 "use client"
 
 import type React from "react"
-import { Inter } from 'next/font/google'
-import "./globals.css"
-import ClientLayoutWrapper from "@/components/ClientLayoutWrapper"
-import { useState } from "react"
-import { BarChart3, DollarSign, TrendingUp, CreditCard, FileText, Users, Menu, X } from 'lucide-react'
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-
-const inter = Inter({ subsets: ["latin"] })
-
-// IAM CFO Brand Colors
-const BRAND_COLORS = {
-  primary: "#56B6E9",
-  secondary: "#3A9BD1",
-  tertiary: "#7CC4ED",
-  accent: "#2E86C1",
-  success: "#27AE60",
-  warning: "#F39C12",
-  danger: "#E74C3C",
-  gray: {
-    50: "#F8FAFC",
-    100: "#F1F5F9",
-    200: "#E2E8F0",
-    300: "#CBD5E1",
-    400: "#94A3B8",
-    500: "#64748B",
-    600: "#475569",
-    700: "#334155",
-    800: "#1E293B",
-    900: "#0F172A",
-  },
-}
-
-// IAM CFO Logo Component
-const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
-  <div className={`${className} flex items-center justify-center relative`}>
-    <svg viewBox="0 0 120 120" className="w-full h-full">
-      <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2" />
-      <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary} />
-      <g fill="white">
-        <rect x="35" y="70" width="6" height="15" rx="1" />
-        <rect x="44" y="65" width="6" height="20" rx="1" />
-        <rect x="53" y="55" width="6" height="30" rx="1" />
-        <rect x="62" y="50" width="6" height="35" rx="1" />
-        <rect x="71" y="60" width="6" height="25" rx="1" />
-        <rect x="80" y="45" width="6" height="40" rx="1" />
-        <path d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47" stroke="#FFFFFF" strokeWidth="2.5" fill="none" />
-        <circle cx="35" cy="72" r="2.5" fill="#FFFFFF" />
-        <circle cx="44" cy="67" r="2.5" fill="#FFFFFF" />
-        <circle cx="53" cy="57" r="2.5" fill="#FFFFFF" />
-        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF" />
-        <circle cx="71" cy="62" r="2.5" fill="#FFFFFF" />
-        <circle cx="80" cy="47" r="2.5" fill="#FFFFFF" />
-      </g>
-      <text
-        x="60"
-        y="95"
-        textAnchor="middle"
-        fill="white"
-        fontSize="11"
-        fontWeight="bold"
-        fontFamily="Arial, sans-serif"
-      >
-        CFO
-      </text>
-    </svg>
-  </div>
-)
+import {
+  BarChart3,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Users,
+  Calendar,
+  Menu,
+  X,
+  Home,
+  CreditCard,
+  Receipt,
+  Building2,
+  Calculator,
+} from "lucide-react"
+import RequireIAMCFOLogin from "@/components/RequireIAMCFOLogin"
 
 const navigation = [
-  { name: "Overview", href: "/", icon: BarChart3 },
+  { name: "Overview", href: "/overview", icon: Home },
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "P&L", href: "/financials", icon: TrendingUp },
   { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
-  { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
-  { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
-  { name: "A/P", href: "/accounts-payable", icon: Users },
+  { name: "Balance Sheet", href: "/balance-sheet", icon: Calculator },
+  { name: "Accounts Receivable", href: "/accounts-receivable", icon: CreditCard },
+  { name: "Accounts Payable", href: "/accounts-payable", icon: Receipt },
+  { name: "Statements", href: "/statements", icon: FileText },
+  { name: "Payroll", href: "/payroll", icon: Users },
+  { name: "Reservations", href: "/reservations", icon: Calendar },
 ]
 
 export default function ClientRootLayout({
@@ -87,113 +42,114 @@ export default function ClientRootLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 
+  // Close sidebar when route changes
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [pathname])
+
+  // Don't show navigation on login page
+  if (pathname === "/login") {
+    return <>{children}</>
+  }
+
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <ClientLayoutWrapper>
-          <div className="min-h-screen bg-gray-50">
-            {/* Mobile sidebar */}
-            <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? "block" : "hidden"}`}>
-              <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-              <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white">
-                <div className="absolute top-0 right-0 -mr-12 pt-2">
-                  <button
-                    type="button"
-                    className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <X className="h-6 w-6 text-white" />
-                  </button>
-                </div>
-                <div className="flex flex-shrink-0 items-center px-4 py-4">
-                  <IAMCFOLogo className="w-8 h-8 mr-3" />
-                  <span className="text-xl font-bold text-gray-900">IAM CFO</span>
-                </div>
-                <div className="mt-5 h-0 flex-1 overflow-y-auto">
-                  <nav className="space-y-1 px-2">
-                    {navigation.map((item) => {
-                      const isActive = pathname === item.href
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
-                            isActive ? "text-white" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                          }`}
-                          style={{
-                            backgroundColor: isActive ? BRAND_COLORS.primary : undefined,
-                          }}
-                          onClick={() => setSidebarOpen(false)}
-                        >
-                          <item.icon
-                            className={`mr-4 h-6 w-6 flex-shrink-0 ${
-                              isActive ? "text-white" : "text-gray-400 group-hover:text-gray-500"
-                            }`}
-                          />
-                          {item.name}
-                        </Link>
-                      )
-                    })}
-                  </nav>
-                </div>
-              </div>
+    <RequireIAMCFOLogin>
+      <div className="min-h-screen bg-gray-50">
+        {/* Mobile sidebar */}
+        <div className={`fixed inset-0 flex z-40 md:hidden ${sidebarOpen ? "" : "pointer-events-none"}`}>
+          <div
+            className={`fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity ease-linear duration-300 ${sidebarOpen ? "opacity-100" : "opacity-0"}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+
+          <div
+            className={`relative flex-1 flex flex-col max-w-xs w-full bg-white transform transition ease-in-out duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+          >
+            <div className="absolute top-0 right-0 -mr-12 pt-2">
+              <button
+                type="button"
+                className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="h-6 w-6 text-white" />
+              </button>
             </div>
 
-            {/* Desktop sidebar */}
-            <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-              <div className="flex min-h-0 flex-1 flex-col bg-white border-r border-gray-200">
-                <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-                  <div className="flex flex-shrink-0 items-center px-4">
-                    <IAMCFOLogo className="w-8 h-8 mr-3" />
-                    <span className="text-xl font-bold text-gray-900">IAM CFO</span>
-                  </div>
-                  <nav className="mt-5 flex-1 space-y-1 px-2">
-                    {navigation.map((item) => {
-                      const isActive = pathname === item.href
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                            isActive ? "text-white" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                          }`}
-                          style={{
-                            backgroundColor: isActive ? BRAND_COLORS.primary : undefined,
-                          }}
-                        >
-                          <item.icon
-                            className={`mr-3 h-6 w-6 flex-shrink-0 ${
-                              isActive ? "text-white" : "text-gray-400 group-hover:text-gray-500"
-                            }`}
-                          />
-                          {item.name}
-                        </Link>
-                      )
-                    })}
-                  </nav>
-                </div>
+            <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
+              <div className="flex-shrink-0 flex items-center px-4">
+                <Building2 className="h-8 w-8 text-blue-600" />
+                <span className="ml-2 text-xl font-bold text-gray-900">IAM CFO</span>
               </div>
-            </div>
-
-            {/* Main content */}
-            <div className="lg:pl-64 flex flex-col flex-1">
-              {/* Mobile header */}
-              <div className="sticky top-0 z-10 bg-white pl-1 pt-1 sm:pl-3 sm:pt-3 lg:hidden">
-                <button
-                  type="button"
-                  className="-ml-0.5 -mt-0.5 inline-flex h-12 w-12 items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset"
-                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
-                  onClick={() => setSidebarOpen(true)}
-                >
-                  <Menu className="h-6 w-6" />
-                </button>
-              </div>
-
-              <main className="flex-1">{children}</main>
+              <nav className="mt-5 px-2 space-y-1">
+                {navigation.map((item) => {
+                  const Icon = item.icon
+                  const isActive = pathname === item.href
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={`group flex items-center px-2 py-2 text-base font-medium rounded-md transition-colors ${
+                        isActive ? "bg-blue-100 text-blue-900" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      }`}
+                    >
+                      <Icon
+                        className={`mr-4 h-6 w-6 ${isActive ? "text-blue-500" : "text-gray-400 group-hover:text-gray-500"}`}
+                      />
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </nav>
             </div>
           </div>
-        </ClientLayoutWrapper>
-      </body>
-    </html>
+        </div>
+
+        {/* Static sidebar for desktop */}
+        <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+          <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 bg-white">
+            <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
+              <div className="flex items-center flex-shrink-0 px-4">
+                <Building2 className="h-8 w-8 text-blue-600" />
+                <span className="ml-2 text-xl font-bold text-gray-900">IAM CFO</span>
+              </div>
+              <nav className="mt-5 flex-1 px-2 space-y-1">
+                {navigation.map((item) => {
+                  const Icon = item.icon
+                  const isActive = pathname === item.href
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                        isActive ? "bg-blue-100 text-blue-900" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      }`}
+                    >
+                      <Icon
+                        className={`mr-3 h-5 w-5 ${isActive ? "text-blue-500" : "text-gray-400 group-hover:text-gray-500"}`}
+                      />
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </nav>
+            </div>
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div className="md:pl-64 flex flex-col flex-1">
+          <div className="sticky top-0 z-10 md:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-gray-50">
+            <button
+              type="button"
+              className="-ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+          </div>
+          <main className="flex-1">{children}</main>
+        </div>
+      </div>
+    </RequireIAMCFOLogin>
   )
 }
