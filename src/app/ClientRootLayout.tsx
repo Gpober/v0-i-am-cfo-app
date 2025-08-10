@@ -1,20 +1,22 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { useRouter, usePathname } from "next/navigation"
+import { useState } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
+  LayoutDashboard,
   BarChart3,
+  Building2,
   TrendingUp,
-  Calculator,
   CreditCard,
-  Banknote,
+  Users,
+  Settings,
+  Search,
+  Bell,
+  User,
   Menu,
   X,
-  LogOut,
-  User,
-  Settings,
-  Home,
 } from "lucide-react"
 
 // IAM CFO Brand Colors
@@ -41,7 +43,7 @@ const BRAND_COLORS = {
 }
 
 // IAM CFO Logo Component
-const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
+const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
   <div className={`${className} flex items-center justify-center relative`}>
     <svg viewBox="0 0 120 120" className="w-full h-full">
       <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2" />
@@ -76,185 +78,179 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   </div>
 )
 
-interface ClientRootLayoutProps {
-  children: React.ReactNode
-}
+// Navigation items
+const navigationItems = [
+  {
+    name: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    current: false,
+  },
+  {
+    name: "P&L Statement",
+    href: "/financials",
+    icon: BarChart3,
+    current: false,
+  },
+  {
+    name: "Balance Sheet",
+    href: "/balance-sheet",
+    icon: Building2,
+    current: false,
+  },
+  {
+    name: "Cash Flow",
+    href: "/cash-flow",
+    icon: TrendingUp,
+    current: false,
+  },
+  {
+    name: "Accounts Receivable",
+    href: "/accounts-receivable",
+    icon: CreditCard,
+    current: false,
+  },
+  {
+    name: "Accounts Payable",
+    href: "/accounts-payable",
+    icon: Users,
+    current: false,
+  },
+]
 
-export default function ClientRootLayout({ children }: ClientRootLayoutProps) {
-  const router = useRouter()
-  const pathname = usePathname()
+export default function ClientRootLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const pathname = usePathname()
 
-  // Navigation items
-  const navigationItems = [
-    { name: "Dashboard", href: "/dashboard", icon: Home, current: pathname === "/dashboard" },
-    { name: "P&L Statement", href: "/financials", icon: BarChart3, current: pathname === "/financials" },
-    { name: "Balance Sheet", href: "/balance-sheet", icon: Calculator, current: pathname === "/balance-sheet" },
-    { name: "Cash Flow", href: "/cash-flow", icon: TrendingUp, current: pathname === "/cash-flow" },
-    {
-      name: "Accounts Receivable",
-      href: "/accounts-receivable",
-      icon: CreditCard,
-      current: pathname === "/accounts-receivable",
-    },
-    { name: "Accounts Payable", href: "/accounts-payable", icon: Banknote, current: pathname === "/accounts-payable" },
-  ]
-
-  const handleLogout = () => {
-    // Clear any stored authentication data
-    localStorage.removeItem("iamcfo_authenticated")
-    localStorage.removeItem("iamcfo_user_email")
-
-    // Redirect to login page
-    router.push("/login")
-  }
-
-  const handleNavigation = (href: string) => {
-    router.push(href)
-    setSidebarOpen(false) // Close mobile sidebar after navigation
-  }
-
-  // Close user menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuOpen) {
-        setUserMenuOpen(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [userMenuOpen])
+  // Update current navigation item based on pathname
+  const updatedNavigationItems = navigationItems.map((item) => ({
+    ...item,
+    current: pathname === item.href,
+  }))
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile sidebar backdrop */}
+      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
+        </div>
       )}
 
       {/* Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:flex lg:flex-col`}
+        }`}
       >
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-          <div className="flex items-center space-x-3">
-            <IAMCFOLogo className="w-8 h-8" />
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">IAM CFO</h1>
-              <p className="text-xs text-gray-500">Financial Dashboard</p>
+        <div className="flex flex-col h-full">
+          {/* Logo and brand */}
+          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+            <div className="flex items-center">
+              <IAMCFOLogo className="w-8 h-8 mr-3" />
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">IAM CFO</h1>
+                <p className="text-xs text-gray-500">Financial Dashboard</p>
+              </div>
             </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 mt-6 px-3">
-          <div className="space-y-1">
-            {navigationItems.map((item) => {
+          {/* Navigation */}
+          <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+            {updatedNavigationItems.map((item) => {
               const Icon = item.icon
               return (
-                <button
+                <Link
                   key={item.name}
-                  onClick={() => handleNavigation(item.href)}
-                  className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  href={item.href}
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     item.current
                       ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                   }`}
+                  onClick={() => setSidebarOpen(false)}
                 >
-                  <Icon
-                    className={`mr-3 h-5 w-5 ${
-                      item.current ? "text-blue-700" : "text-gray-400 group-hover:text-gray-500"
-                    }`}
-                  />
+                  <Icon className="w-5 h-5 mr-3" />
                   {item.name}
-                </button>
+                </Link>
               )
             })}
-          </div>
-        </nav>
+          </nav>
 
-        {/* User section at bottom of sidebar */}
-        <div className="border-t border-gray-200 p-4">
-          <div className="relative">
-            <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="w-full flex items-center px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
-            >
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3"
-                style={{ backgroundColor: BRAND_COLORS.primary }}
-              >
-                <User className="w-4 h-4" />
+          {/* User section */}
+          <div className="border-t border-gray-200 p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-white" />
+                </div>
               </div>
-              <div className="flex-1 text-left">
-                <div className="text-sm font-medium text-gray-900">Admin User</div>
-                <div className="text-xs text-gray-500">admin@iamcfo.com</div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-700">Admin User</p>
+                <p className="text-xs text-gray-500">admin@iamcfo.com</p>
               </div>
-            </button>
-
-            {/* User dropdown menu */}
-            {userMenuOpen && (
-              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-md shadow-lg border border-gray-200 py-1">
-                <button
-                  onClick={() => {
-                    setUserMenuOpen(false)
-                    // Handle settings navigation
-                  }}
-                  className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <Settings className="w-4 h-4 mr-3" />
-                  Settings
-                </button>
-                <button
-                  onClick={() => {
-                    setUserMenuOpen(false)
-                    handleLogout()
-                  }}
-                  className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <LogOut className="w-4 h-4 mr-3" />
-                  Sign out
-                </button>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col lg:ml-0">
-        {/* Top navigation for mobile */}
-        <div className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-200 lg:hidden">
-          <div className="flex items-center justify-between h-16 px-4">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="flex items-center space-x-3">
-              <IAMCFOLogo className="w-6 h-6" />
-              <span className="text-lg font-bold text-gray-900">IAM CFO</span>
+        {/* Top navigation */}
+        <div className="bg-white shadow-sm border-b border-gray-200 lg:hidden">
+          <div className="px-4 py-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+
+              <div className="flex items-center">
+                <IAMCFOLogo className="w-6 h-6 mr-2" />
+                <span className="text-lg font-bold text-gray-900">IAM CFO</span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
+                  <Bell className="w-5 h-5" />
+                </button>
+                <button className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
+                  <Settings className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            <div className="w-10" /> {/* Spacer for centering */}
+          </div>
+        </div>
+
+        {/* Search bar - Desktop only */}
+        <div className="hidden lg:block bg-white border-b border-gray-200">
+          <div className="px-6 py-4">
+            <div className="relative max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              />
+            </div>
           </div>
         </div>
 
         {/* Page content */}
-        <main className="flex-1 bg-gray-50">{children}</main>
+        <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   )
