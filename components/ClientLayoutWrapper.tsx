@@ -5,29 +5,30 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import {
-  BarChart3,
-  DollarSign,
+  LayoutDashboard,
   FileText,
+  CreditCard,
+  DollarSign,
   TrendingUp,
   Users,
   Calendar,
-  CreditCard,
-  PieChart,
-  Receipt,
-  Building,
+  Settings,
+  LogOut,
 } from "lucide-react"
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
-  { name: "Financials", href: "/financials", icon: DollarSign },
-  { name: "Balance Sheet", href: "/balance-sheet", icon: PieChart },
-  { name: "Cash Flow", href: "/cash-flow", icon: TrendingUp },
+  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Financials", href: "/financials", icon: FileText },
   { name: "Accounts Payable", href: "/accounts-payable", icon: CreditCard },
-  { name: "Accounts Receivable", href: "/accounts-receivable", icon: Receipt },
-  { name: "Statements", href: "/statements", icon: FileText },
+  { name: "Accounts Receivable", href: "/accounts-receivable", icon: DollarSign },
+  { name: "Cash Flow", href: "/cash-flow", icon: TrendingUp },
+  { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
   { name: "Payroll", href: "/payroll", icon: Users },
   { name: "Reservations", href: "/reservations", icon: Calendar },
+  { name: "Statements", href: "/statements", icon: FileText },
 ]
 
 export default function ClientLayoutWrapper({
@@ -39,64 +40,78 @@ export default function ClientLayoutWrapper({
   const [sidebarVisible, setSidebarVisible] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
+    <div className="min-h-screen bg-background">
       {/* Hover trigger area */}
       <div className="fixed left-0 top-0 w-2 h-full z-40 bg-transparent" onMouseEnter={() => setSidebarVisible(true)} />
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
-          sidebarVisible ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={cn(
+          "fixed left-0 top-0 z-50 h-full w-64 bg-card border-r border-border transition-transform duration-300 ease-in-out",
+          sidebarVisible ? "translate-x-0" : "-translate-x-full",
+        )}
         onMouseLeave={() => setSidebarVisible(false)}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex items-center justify-center h-16 px-4 bg-blue-600">
-            <Building className="h-8 w-8 text-white" />
-            <span className="ml-2 text-xl font-bold text-white">I AM CFO</span>
+          <div className="flex h-16 items-center border-b px-4">
+            <Link href="/" className="flex items-center space-x-2">
+              <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-sm">CF</span>
+              </div>
+              <span className="font-bold text-lg">I AM CFO</span>
+            </Link>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
+          <nav className="flex-1 space-y-1 p-4">
             {navigation.map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
+                  className={cn(
+                    "flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  )}
                 >
-                  <item.icon className="mr-3 h-5 w-5" />
-                  {item.name}
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.name}</span>
                 </Link>
               )
             })}
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-gray-300"></div>
+          <div className="border-t p-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                <span className="text-xs font-medium">JD</span>
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">CFO User</p>
-                <p className="text-xs text-gray-500">Administrator</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">John Doe</p>
+                <p className="text-xs text-muted-foreground truncate">CFO</p>
               </div>
+            </div>
+            <div className="space-y-1">
+              <Button variant="ghost" size="sm" className="w-full justify-start">
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </Button>
+              <Button variant="ghost" size="sm" className="w-full justify-start">
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </Button>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="flex-1">
-        <main className="py-6">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{children}</div>
-        </main>
-      </div>
+      <main className="transition-all duration-300 ease-in-out">{children}</main>
     </div>
   )
 }
