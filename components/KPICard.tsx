@@ -1,30 +1,45 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { LucideIcon } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus } from "lucide-react"
 
 interface KPICardProps {
   title: string
   value: string
   change: string
-  icon: LucideIcon
   trend: "up" | "down" | "neutral"
 }
 
-export function KPICard({ title, value, change, icon: Icon, trend }: KPICardProps) {
-  const trendColor = {
-    up: "text-green-600",
-    down: "text-red-600",
-    neutral: "text-gray-600",
-  }[trend]
+export function KPICard({ title, value, change, trend }: KPICardProps) {
+  const getTrendIcon = () => {
+    switch (trend) {
+      case "up":
+        return <TrendingUp className="w-4 h-4 text-green-600" />
+      case "down":
+        return <TrendingDown className="w-4 h-4 text-red-600" />
+      default:
+        return <Minus className="w-4 h-4 text-gray-600" />
+    }
+  }
+
+  const getTrendColor = () => {
+    switch (trend) {
+      case "up":
+        return "text-green-600"
+      case "down":
+        return "text-red-600"
+      default:
+        return "text-gray-600"
+    }
+  }
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <CardTitle className="text-sm font-medium text-gray-600">{title}</CardTitle>
+        {getTrendIcon()}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className={`text-xs ${trendColor}`}>{change}</p>
+        <div className="text-2xl font-bold text-gray-900">{value}</div>
+        <p className={`text-xs ${getTrendColor()} flex items-center mt-1`}>{change} from last month</p>
       </CardContent>
     </Card>
   )
