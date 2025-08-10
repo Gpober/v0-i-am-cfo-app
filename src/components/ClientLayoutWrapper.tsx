@@ -1,6 +1,7 @@
 "use client"
 
-import type { ReactNode } from "react"
+import type React from "react"
+
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { BarChart3, TrendingUp, Building2, CreditCard, Users, Home } from "lucide-react"
@@ -25,11 +26,7 @@ const navigation = [
   { name: "A/P", href: "/accounts-payable", icon: Users },
 ]
 
-interface ClientLayoutWrapperProps {
-  children: ReactNode
-}
-
-export default function ClientLayoutWrapper({ children }: ClientLayoutWrapperProps) {
+export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   // Don't show navigation on login page
@@ -67,6 +64,7 @@ export default function ClientLayoutWrapper({ children }: ClientLayoutWrapperPro
                         <circle cx="35" cy="72" r="2.5" fill="#FFFFFF" />
                         <circle cx="44" cy="67" r="2.5" fill="#FFFFFF" />
                         <circle cx="53" cy="57" r="2.5" fill="#FFFFFF" />
+                        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF" />
                         <circle cx="71" cy="62" r="2.5" fill="#FFFFFF" />
                         <circle cx="80" cy="47" r="2.5" fill="#FFFFFF" />
                       </g>
