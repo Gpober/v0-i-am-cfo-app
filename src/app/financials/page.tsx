@@ -1589,14 +1589,16 @@ export default function FinancialsPage() {
 
               {/* Transaction Totals */}
               {modalTransactionDetails.length > 0 && (
-                <div className="mt-4 grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="mt-4 grid grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
                   <div className="text-center">
                     <div className="text-sm text-gray-600">Total Debits</div>
                     <div className="text-lg font-semibold text-red-600">
                       {formatCurrency(
                         modalTransactionDetails.reduce((sum, t) => {
-                          const debitValue = t.debit ? Number.parseFloat(t.debit.toString()) : 0
-                          return sum + (isNaN(debitValue) ? 0 : debitValue)
+                          const debitValue = t.debit
+                            ? Number.parseFloat(t.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+                            : 0
+                          return sum + debitValue
                         }, 0),
                       )}
                     </div>
@@ -1606,8 +1608,10 @@ export default function FinancialsPage() {
                     <div className="text-lg font-semibold text-green-600">
                       {formatCurrency(
                         modalTransactionDetails.reduce((sum, t) => {
-                          const creditValue = t.credit ? Number.parseFloat(t.credit.toString()) : 0
-                          return sum + (isNaN(creditValue) ? 0 : creditValue)
+                          const creditValue = t.credit
+                            ? Number.parseFloat(t.credit.toString().replace(/[^0-9.-]/g, "")) || 0
+                            : 0
+                          return sum + creditValue
                         }, 0),
                       )}
                     </div>
@@ -1617,22 +1621,36 @@ export default function FinancialsPage() {
                     <div
                       className={`text-lg font-semibold ${
                         modalTransactionDetails.reduce((sum, t) => {
-                          const creditValue = t.credit ? Number.parseFloat(t.credit.toString()) : 0
-                          const debitValue = t.debit ? Number.parseFloat(t.debit.toString()) : 0
-                          return sum + ((isNaN(creditValue) ? 0 : creditValue) - (isNaN(debitValue) ? 0 : debitValue))
+                          const creditValue = t.credit
+                            ? Number.parseFloat(t.credit.toString().replace(/[^0-9.-]/g, "")) || 0
+                            : 0
+                          const debitValue = t.debit
+                            ? Number.parseFloat(t.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+                            : 0
+                          return sum + (creditValue - debitValue)
                         }, 0) >= 0
                           ? "text-green-600"
                           : "text-red-600"
                       }`}
                     >
                       {formatCurrency(
-                        modalTransactionDetails.reduce((sum, t) => {
-                          const creditValue = t.credit ? Number.parseFloat(t.credit.toString()) : 0
-                          const debitValue = t.debit ? Number.parseFloat(t.debit.toString()) : 0
-                          return sum + ((isNaN(creditValue) ? 0 : creditValue) - (isNaN(debitValue) ? 0 : debitValue))
-                        }, 0),
+                        Math.abs(
+                          modalTransactionDetails.reduce((sum, t) => {
+                            const creditValue = t.credit
+                              ? Number.parseFloat(t.credit.toString().replace(/[^0-9.-]/g, "")) || 0
+                              : 0
+                            const debitValue = t.debit
+                              ? Number.parseFloat(t.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+                              : 0
+                            return sum + (creditValue - debitValue)
+                          }, 0),
+                        ),
                       )}
                     </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600">Transactions</div>
+                    <div className="text-lg font-semibold text-blue-600">{modalTransactionDetails.length}</div>
                   </div>
                 </div>
               )}
@@ -1659,6 +1677,9 @@ export default function FinancialsPage() {
                         Account Type
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Debit
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1670,40 +1691,50 @@ export default function FinancialsPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {modalTransactionDetails.map((transaction, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(transaction.date)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {transaction.name || transaction.vendor || transaction.customer || "N/A"}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{transaction.memo || "N/A"}</td>
-                        <td className="px-6 py-4 text-sm text-blue-600">{transaction.entry_number || "N/A"}</td>
-                        <td className="px-6 py-4 text-sm text-purple-600">{transaction.account_type || "N/A"}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                          {(() => {
-                            const debitValue = transaction.debit ? Number.parseFloat(transaction.debit.toString()) : 0
-                            return !isNaN(debitValue) && debitValue > 0 ? formatCurrency(debitValue) : ""
-                          })()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                          {(() => {
-                            const creditValue = transaction.credit
-                              ? Number.parseFloat(transaction.credit.toString())
-                              : 0
-                            return !isNaN(creditValue) && creditValue > 0 ? formatCurrency(creditValue) : ""
-                          })()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {transaction.class && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {transaction.class}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {modalTransactionDetails.map((transaction, index) => {
+                      // Calculate the net amount for this transaction
+                      const debitValue = transaction.debit
+                        ? Number.parseFloat(transaction.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+                        : 0
+                      const creditValue = transaction.credit
+                        ? Number.parseFloat(transaction.credit.toString().replace(/[^0-9.-]/g, "")) || 0
+                        : 0
+                      const netAmount = creditValue - debitValue
+
+                      return (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(transaction.date)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {transaction.name || transaction.vendor || transaction.customer || "N/A"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{transaction.memo || "N/A"}</td>
+                          <td className="px-6 py-4 text-sm text-blue-600">{transaction.entry_number || "N/A"}</td>
+                          <td className="px-6 py-4 text-sm text-purple-600">{transaction.account_type || "N/A"}</td>
+                          <td
+                            className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
+                              netAmount >= 0 ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            {formatCurrency(Math.abs(netAmount))}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                            {debitValue > 0 ? formatCurrency(debitValue) : ""}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                            {creditValue > 0 ? formatCurrency(creditValue) : ""}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            {transaction.class && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {transaction.class}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
