@@ -1,19 +1,18 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  output: 'standalone',
-  eslint: {
-    ignoreDuringBuilds: true,
+import type { NextConfig } from "next"
+
+const nextConfig: NextConfig = {
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
   },
   typescript: {
     ignoreBuildErrors: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
-    domains: [
-      'ijeuusvwqcnljctkvjdi.supabase.co',
-      'lh3.googleusercontent.com'
-    ],
-  }
-  // Removed experimental and logging sections
+    domains: ["placeholder.svg"],
+  },
 }
 
-module.exports = nextConfig
+export default nextConfig
