@@ -270,11 +270,6 @@ export default function CashFlowPage() {
       financing: {},
       investing: {},
     }
-    const accountTypes: Record<string, Record<string, string>> = {
-      operating: {},
-      financing: {},
-      investing: {},
-    }
 
     months.forEach((m) => {
       breakdown[m] = { operating: {}, financing: {}, investing: {} }
