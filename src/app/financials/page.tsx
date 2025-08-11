@@ -639,10 +639,12 @@ export default function FinancialsPage() {
     const totalIncomeRowIdx = currentRow + 1;
     const totalIncomeRow = [
       "Total Income",
-      ...colLetters.map((letter) => ({
-        f: `SUM(${letter}${incomeRange.start}:${letter}${incomeRange.end})`,
-      })),
-      { f: rowTotalFormula(totalIncomeRowIdx) },
+      ...colLetters.map((letter) =>
+        incomeAccounts.length > 0
+          ? { f: `SUM(${letter}${incomeRange.start}:${letter}${incomeRange.end})` }
+          : 0,
+      ),
+      incomeAccounts.length > 0 ? { f: rowTotalFormula(totalIncomeRowIdx) } : 0,
     ];
     sheetData.push(totalIncomeRow);
     currentRow++;
@@ -651,10 +653,12 @@ export default function FinancialsPage() {
     const totalCogsRowIdx = currentRow + 1;
     const totalCogsRow = [
       "Total COGS",
-      ...colLetters.map((letter) => ({
-        f: `SUM(${letter}${cogsRange.start}:${letter}${cogsRange.end})`,
-      })),
-      { f: rowTotalFormula(totalCogsRowIdx) },
+      ...colLetters.map((letter) =>
+        cogsAccounts.length > 0
+          ? { f: `SUM(${letter}${cogsRange.start}:${letter}${cogsRange.end})` }
+          : 0,
+      ),
+      cogsAccounts.length > 0 ? { f: rowTotalFormula(totalCogsRowIdx) } : 0,
     ];
     sheetData.push(totalCogsRow);
     currentRow++;
@@ -674,14 +678,15 @@ export default function FinancialsPage() {
     sheetData.push([]);
     currentRow++;
 
+    const gpPercentRowIdx = currentRow + 1;
     const gpPercentRow = [
       "Gross Profit %",
       ...colLetters.map((letter) => ({
-        f: `${letter}${grossProfitRowIdx}/${letter}${totalIncomeRowIdx}`,
+        f: `IF(${letter}${totalIncomeRowIdx}=0,0,${letter}${grossProfitRowIdx}/${letter}${totalIncomeRowIdx})`,
         z: "0.00%",
       })),
       {
-        f: `${totalCol}${grossProfitRowIdx}/${totalCol}${totalIncomeRowIdx}`,
+        f: `IF(${totalCol}${totalIncomeRowIdx}=0,0,${totalCol}${grossProfitRowIdx}/${totalCol}${totalIncomeRowIdx})`,
         z: "0.00%",
       },
     ];
@@ -692,14 +697,17 @@ export default function FinancialsPage() {
     const totalExpenseRowIdx = currentRow + 1;
     const totalExpenseRow = [
       "Total Expenses",
-      ...colLetters.map((letter) => ({
-        f: `SUM(${letter}${expenseRange.start}:${letter}${expenseRange.end})`,
-      })),
-      { f: rowTotalFormula(totalExpenseRowIdx) },
+      ...colLetters.map((letter) =>
+        expenseAccounts.length > 0
+          ? { f: `SUM(${letter}${expenseRange.start}:${letter}${expenseRange.end})` }
+          : 0,
+      ),
+      expenseAccounts.length > 0 ? { f: rowTotalFormula(totalExpenseRowIdx) } : 0,
     ];
     sheetData.push(totalExpenseRow);
     currentRow++;
 
+    const netIncomeRowIdx = currentRow + 1;
     const netIncomeRow = [
       "Net Income",
       ...colLetters.map((letter) => ({
@@ -708,8 +716,50 @@ export default function FinancialsPage() {
       { f: `${totalCol}${grossProfitRowIdx}-${totalCol}${totalExpenseRowIdx}` },
     ];
     sheetData.push(netIncomeRow);
+    currentRow++;
+
+    const netIncomePercentRowIdx = currentRow + 1;
+    const netIncomePercentRow = [
+      "Net Income %",
+      ...colLetters.map((letter) => ({
+        f: `IF(${letter}${totalIncomeRowIdx}=0,0,${letter}${netIncomeRowIdx}/${letter}${totalIncomeRowIdx})`,
+        z: "0.00%",
+      })),
+      {
+        f: `IF(${totalCol}${totalIncomeRowIdx}=0,0,${totalCol}${netIncomeRowIdx}/${totalCol}${totalIncomeRowIdx})`,
+        z: "0.00%",
+      },
+    ];
+    sheetData.push(netIncomePercentRow);
 
     const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+
+    const applyStyleToRow = (rowIdx: number, style: any) => {
+      const range = XLSX.utils.decode_range(worksheet['!ref'] as string);
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellRef = XLSX.utils.encode_cell({ r: rowIdx - 1, c: C });
+        const cell = worksheet[cellRef];
+        if (cell) {
+          cell.s = {
+            ...((cell as any).s || {}),
+            font: { ...(((cell as any).s || {}).font || {}), ...style.font },
+          };
+        }
+      }
+    };
+
+    [
+      totalIncomeRowIdx,
+      totalCogsRowIdx,
+      grossProfitRowIdx,
+      totalExpenseRowIdx,
+      netIncomeRowIdx,
+    ].forEach((r) => applyStyleToRow(r, { font: { bold: true } }));
+
+    [gpPercentRowIdx, netIncomePercentRowIdx].forEach((r) =>
+      applyStyleToRow(r, { font: { italic: true } })
+    );
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "P&L");
     XLSX.writeFile(workbook, "pl_accounts.xlsx");
