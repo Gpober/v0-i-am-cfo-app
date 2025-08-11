@@ -559,8 +559,17 @@ export default function FinancialsPage() {
     // Add parent accounts with their subs
     for (const [parentName, group] of parentMap.entries()) {
       if (group.parent) {
-        // Calculate combined amount (parent + all subs)
-        const combinedAmount = group.parent.amount + group.subs.reduce((sum, sub) => sum + sub.amount, 0)
+        // Calculate combined amount using all unique transactions to avoid double counting
+        const combinedTransactions = [
+          ...group.parent.transactions,
+          ...group.subs.flatMap((sub) => sub.transactions),
+        ]
+
+        const combinedAmount = combinedTransactions.reduce((sum, tx) => {
+          const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
+          const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+          return group.parent!.category === "INCOME" ? sum + (creditValue - debitValue) : sum + (debitValue - creditValue)
+        }, 0)
 
         result.push({
           account: group.parent,
@@ -569,7 +578,13 @@ export default function FinancialsPage() {
         })
       } else {
         // Orphaned sub-accounts (create virtual parent)
-        const combinedAmount = group.subs.reduce((sum, sub) => sum + sub.amount, 0)
+        const combinedTransactions = group.subs.flatMap((sub) => sub.transactions)
+        const combinedAmount = combinedTransactions.reduce((sum, tx) => {
+          const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
+          const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+          return group.subs[0].category === "INCOME" ? sum + (creditValue - debitValue) : sum + (debitValue - creditValue)
+        }, 0)
+
         const virtualParent: PLAccount = {
           account: parentName,
           parent_account: parentName,
@@ -578,7 +593,7 @@ export default function FinancialsPage() {
           amount: combinedAmount,
           category: group.subs[0].category,
           account_type: group.subs[0].account_type,
-          transactions: group.subs.flatMap((sub) => sub.transactions),
+          transactions: combinedTransactions,
         }
 
         result.push({
