@@ -22,8 +22,7 @@ const BRAND_COLORS = {
 // Cash Flow Data Structures
 interface CashFlowRow {
   property: string
-  month: number
-  monthName: string
+  period: string
   operatingCashFlow: number
   financingCashFlow: number
   investingCashFlow: number
@@ -636,6 +635,26 @@ export default function CashFlowPage() {
     return { startDate, endDate }
   }
 
+  const getPeriodLabel = () => {
+    const { startDate, endDate } = calculateDateRange()
+    if (timePeriod === "Custom") {
+      const startMonth = getMonthName(getMonthFromDate(startDate)).slice(0, 3)
+      const endMonth = getMonthName(getMonthFromDate(endDate)).slice(0, 3)
+      const startYear = getYearFromDate(startDate)
+      const endYear = getYearFromDate(endDate)
+      return startYear === endYear
+        ? `${startMonth}-${endMonth} ${startYear}`
+        : `${startMonth} ${startYear} - ${endMonth} ${endYear}`
+    } else if (timePeriod === "Monthly") {
+      return `${selectedMonth} ${selectedYear}`
+    } else if (timePeriod === "Quarterly") {
+      return `Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
+    } else if (timePeriod === "YTD") {
+      return `YTD ${new Date().getFullYear()}`
+    }
+    return "Trailing 12 Months"
+  }
+
   // ENHANCED: Fetch available properties and bank accounts using new fields
   const fetchFilters = async () => {
     try {
@@ -1040,15 +1059,13 @@ export default function CashFlowPage() {
 
       console.log(`📊 Found ${cashFlowTransactions.length} cash flow transactions for traditional view`)
 
-      // Process cash flows by property-month using the enhanced structure
-      const monthlyTransactions = new Map<string, any[]>()
+      // Process cash flows by property for the selected period
+      const propertyTransactions = new Map<string, any[]>()
 
       cashFlowTransactions.forEach((tx: any) => {
-        const month = getMonthFromDate(tx.date)
-        const key = `${tx.class}-${month}`
-
-        if (!monthlyTransactions.has(key)) {
-          monthlyTransactions.set(key, [])
+        const property = tx.class || "Unclassified"
+        if (!propertyTransactions.has(property)) {
+          propertyTransactions.set(property, [])
         }
 
         // FIXED: Transfer amounts work in reverse - debits are positive, credits are negative
@@ -1057,22 +1074,20 @@ export default function CashFlowPage() {
             ? Number.parseFloat(tx.debit) - Number.parseFloat(tx.credit) // Reverse for transfers
             : tx.normal_balance || Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit) // Normal for others
 
-        monthlyTransactions.get(key)!.push({
+        propertyTransactions.get(property)!.push({
           ...tx,
           cashFlowImpact: cashImpact,
         })
       })
 
       // Store for reuse
-      setTransactionData(monthlyTransactions)
+      setTransactionData(propertyTransactions)
 
       // Calculate cash flows with enhanced classification
       const cashFlowArray: CashFlowRow[] = []
+      const periodLabel = getPeriodLabel()
 
-      for (const [key, transactions] of monthlyTransactions.entries()) {
-        const [property, monthStr] = key.split("-")
-        const month = Number.parseInt(monthStr)
-
+      for (const [property, transactions] of propertyTransactions.entries()) {
         let operatingTotal = 0
         let financingTotal = 0
         let investingTotal = 0
@@ -1088,14 +1103,12 @@ export default function CashFlowPage() {
           } else if (classification === "investing") {
             investingTotal += impact
           }
-          // Note: transfers are not shown separately in traditional view, they're included in the appropriate category
         })
 
         if (operatingTotal !== 0 || financingTotal !== 0 || investingTotal !== 0) {
           cashFlowArray.push({
             property,
-            month,
-            monthName: getMonthName(month),
+            period: periodLabel,
             operatingCashFlow: operatingTotal,
             financingCashFlow: financingTotal,
             investingCashFlow: investingTotal,
@@ -1104,13 +1117,8 @@ export default function CashFlowPage() {
         }
       }
 
-      // Sort by property and month
-      cashFlowArray.sort((a, b) => {
-        if (a.property !== b.property) {
-          return (a.property || "").localeCompare(b.property || "")
-        }
-        return a.month - b.month
-      })
+      // Sort by property
+      cashFlowArray.sort((a, b) => (a.property || "").localeCompare(b.property || ""))
 
       console.log(`✅ Created ${cashFlowArray.length} cash flow rows for traditional view`)
 
@@ -1206,12 +1214,13 @@ export default function CashFlowPage() {
   }
 
   // Fetch detailed breakdown for expanded row
-  const fetchRowBreakdown = async (property: string, month: number) => {
+  const fetchRowBreakdown = async (property: string) => {
     try {
-      const key = `${property}-${month}`
-      const transactions = transactionData.get(key) || []
+      const transactions = transactionData.get(property) || []
 
-      console.log(`Cash flow breakdown for ${property} ${getMonthName(month)}: ${transactions.length} transactions`)
+      console.log(
+        `Cash flow breakdown for ${property} ${getPeriodLabel()}: ${transactions.length} transactions`,
+      )
 
       const breakdown: CashFlowBreakdown = {
         operating: {
@@ -1307,15 +1316,13 @@ export default function CashFlowPage() {
   // Show transaction details for traditional view
   const showTransactionDetails = async (
     property: string,
-    month: number,
     category: "operating" | "financing" | "investing",
   ) => {
     try {
-      const key = `${property}-${month}`
-      const transactions = transactionData.get(key) || []
+      const transactions = transactionData.get(property) || []
 
       console.log(
-        `Cash flow transaction details for ${property} ${getMonthName(month)} ${category}: ${transactions.length} total transactions`,
+        `Cash flow transaction details for ${property} ${getPeriodLabel()} ${category}: ${transactions.length} total transactions`,
       )
 
       const filteredTransactions = transactions.filter((row: any) => {
@@ -1326,7 +1333,7 @@ export default function CashFlowPage() {
       console.log(`Filtered to ${filteredTransactions.length} ${category} cash flow transactions`)
 
       setModalTitle(
-        `${property} - ${getMonthName(month)} ${category.charAt(0).toUpperCase() + category.slice(1)} Cash Flows`,
+        `${property} - ${getPeriodLabel()} ${category.charAt(0).toUpperCase() + category.slice(1)} Cash Flows`,
       )
 
       const transactionDetails: TransactionDetail[] = filteredTransactions.map((row: any) => ({
@@ -1349,14 +1356,13 @@ export default function CashFlowPage() {
   }
 
   // Toggle row expansion
-  const toggleRowExpansion = async (property: string, month: number) => {
-    const key = `${property}-${month}`
-    if (expandedRow === key) {
+  const toggleRowExpansion = async (property: string) => {
+    if (expandedRow === property) {
       setExpandedRow(null)
       setRowBreakdown(null)
     } else {
-      setExpandedRow(key)
-      await fetchRowBreakdown(property, month)
+      setExpandedRow(property)
+      await fetchRowBreakdown(property)
     }
   }
 
@@ -2792,7 +2798,7 @@ export default function CashFlowPage() {
                         Property
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Month
+                        Period
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Operating CF
@@ -2810,14 +2816,14 @@ export default function CashFlowPage() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {cashFlowData.map((row, index) => {
-                      const rowKey = `${row.property}-${row.month}`
+                      const rowKey = row.property
                       const isExpanded = expandedRow === rowKey
 
                       return (
                         <React.Fragment key={rowKey}>
                           <tr
                             className="hover:bg-gray-50 cursor-pointer"
-                            onClick={() => toggleRowExpansion(row.property, row.month)}
+                            onClick={() => toggleRowExpansion(row.property)}
                           >
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               <div className="flex items-center">
@@ -2829,12 +2835,12 @@ export default function CashFlowPage() {
                                 {row.property}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.monthName}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.period}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  showTransactionDetails(row.property, row.month, "operating")
+                                  showTransactionDetails(row.property, "operating")
                                 }}
                                 className={`font-medium hover:underline ${
                                   row.operatingCashFlow >= 0 ? "text-green-600" : "text-red-600"
@@ -2847,7 +2853,7 @@ export default function CashFlowPage() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  showTransactionDetails(row.property, row.month, "financing")
+                                  showTransactionDetails(row.property, "financing")
                                 }}
                                 className={`font-medium hover:underline ${
                                   row.financingCashFlow >= 0 ? "text-green-600" : "text-red-600"
@@ -2860,7 +2866,7 @@ export default function CashFlowPage() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  showTransactionDetails(row.property, row.month, "investing")
+                                  showTransactionDetails(row.property, "investing")
                                 }}
                                 className={`font-medium hover:underline ${
                                   row.investingCashFlow >= 0 ? "text-green-600" : "text-red-600"
