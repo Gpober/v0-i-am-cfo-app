@@ -1395,6 +1395,26 @@ export default function FinancialsPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #94a3b8;
         }
+
+        /* Freeze P&L table header and first column */
+        table.sticky-first-column thead th {
+          position: sticky;
+          top: 0;
+          background: inherit;
+          z-index: 1;
+        }
+        table.sticky-first-column thead th:first-child {
+          left: 0;
+          z-index: 2;
+          box-shadow: 2px 0 0 0 rgba(226, 232, 240, 1);
+        }
+        table.sticky-first-column tbody td:first-child {
+          position: sticky;
+          left: 0;
+          background: inherit;
+          z-index: 1;
+          box-shadow: 2px 0 0 0 rgba(226, 232, 240, 1);
+        }
       `}</style>
 
       {/* Header */}
@@ -1902,7 +1922,7 @@ export default function FinancialsPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto custom-scrollbar">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -2881,7 +2901,7 @@ export default function FinancialsPage() {
 
             <div className="p-6 overflow-auto max-h-[70vh]">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
