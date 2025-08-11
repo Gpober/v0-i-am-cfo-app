@@ -48,7 +48,13 @@ export async function GET(req: Request) {
   const months = Number.parseInt(url.searchParams.get("months") || "12", 10)
   const endMonth = Number.parseInt(url.searchParams.get("endMonth") || "1", 10)
   const endYear = Number.parseInt(url.searchParams.get("endYear") || "2024", 10)
-  const classId = url.searchParams.get("classId")
+  const classParam = url.searchParams.get("classId")
+  const classIds = classParam
+    ? classParam
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean)
+    : []
 
   const monthlyData: {
     monthName: string
@@ -80,8 +86,8 @@ export async function GET(req: Request) {
       .gte("date", startDate)
       .lte("date", endDate)
 
-    if (classId) {
-      query = query.eq("class", classId)
+    if (classIds.length > 0) {
+      query = query.in("class", classIds)
     }
 
     const { data, error } = await query

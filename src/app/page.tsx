@@ -797,8 +797,15 @@ export default function FinancialOverviewPage() {
       setLoadingTrend(true)
       setTrendError(null)
       const endMonth = monthsList.indexOf(selectedMonth) + 1
+      const selectedClassList = Array.from(selectedClasses).filter(
+        (c) => c !== "All Classes",
+      )
+      const classQuery =
+        selectedClassList.length > 0
+          ? `&classId=${encodeURIComponent(selectedClassList.join(","))}`
+          : ""
       const res = await fetch(
-        `/api/organizations/${orgId}/trend-data?months=12&endMonth=${endMonth}&endYear=${selectedYear}`
+        `/api/organizations/${orgId}/trend-data?months=12&endMonth=${endMonth}&endYear=${selectedYear}${classQuery}`,
       )
       if (!res.ok) throw new Error("Failed to fetch trend data")
       const json: { monthlyData: MonthlyPoint[] } = await res.json()
