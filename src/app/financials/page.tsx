@@ -14,6 +14,9 @@ import {
   X,
 } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
+import * as XLSX from "xlsx"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
@@ -148,12 +151,14 @@ export default function FinancialsPage() {
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [transactionModalTitle, setTransactionModalTitle] = useState("")
   const [modalTransactionDetails, setModalTransactionDetails] = useState<FinancialTransaction[]>([])
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
 
   // Refs for click outside functionality
   const propertyDropdownRef = useRef<HTMLDivElement>(null)
   const timePeriodDropdownRef = useRef<HTMLDivElement>(null)
   const monthDropdownRef = useRef<HTMLDivElement>(null)
   const yearDropdownRef = useRef<HTMLDivElement>(null)
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
 
   // Generate months and years lists
   const monthsList = [
@@ -187,6 +192,9 @@ export default function FinancialsPage() {
       }
       if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
         setYearDropdownOpen(false)
+      }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setExportDropdownOpen(false)
       }
     }
 
@@ -368,6 +376,35 @@ export default function FinancialsPage() {
     } finally {
       setIsLoadingData(false)
     }
+  }
+
+  const handleExportExcel = () => {
+    const data = plAccounts.map((acc) => ({
+      Account: acc.account,
+      ParentAccount: acc.parent_account,
+      Amount: acc.amount,
+      Category: acc.category,
+    }))
+    const worksheet = XLSX.utils.json_to_sheet(data)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "P&L")
+    XLSX.writeFile(workbook, "pl_accounts.xlsx")
+  }
+
+  const handleExportPdf = () => {
+    const doc = new jsPDF()
+    const tableColumn = ["Account", "Parent Account", "Amount", "Category"]
+    const tableRows = plAccounts.map((acc) => [
+      acc.account,
+      acc.parent_account,
+      acc.amount,
+      acc.category,
+    ])
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+    })
+    doc.save("pl_accounts.pdf")
   }
 
   // ENHANCED: Process transactions with improved calculation logic
@@ -863,18 +900,38 @@ export default function FinancialsPage() {
                 {isLoadingData ? "Loading..." : "Refresh"}
               </button>
 
-              <button
-                className="inline-flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={
-                  {
-                    backgroundColor: BRAND_COLORS.primary,
-                    "--tw-ring-color": BRAND_COLORS.primary + "33",
-                  } as React.CSSProperties
-                }
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </button>
+              <div className="relative" ref={exportDropdownRef}>
+                <button
+                  onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                  className="inline-flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={
+                    {
+                      backgroundColor: BRAND_COLORS.primary,
+                      "--tw-ring-color": BRAND_COLORS.primary + "33",
+                    } as React.CSSProperties
+                  }
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </button>
+                {exportDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded-lg shadow-lg">
+                    <button
+                      onClick={handleExportExcel}
+                      className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Excel
+                    </button>
+                    <button
+                      onClick={handleExportPdf}
+                      className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      PDF
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
