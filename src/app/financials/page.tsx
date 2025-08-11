@@ -674,10 +674,6 @@ export default function FinancialsPage() {
     sheetData.push(grossProfitRow);
     currentRow++;
 
-    // Blank row
-    sheetData.push([]);
-    currentRow++;
-
     const gpPercentRowIdx = currentRow + 1;
     const gpPercentRow = [
       "Gross Profit %",
@@ -691,6 +687,10 @@ export default function FinancialsPage() {
       },
     ];
     sheetData.push(gpPercentRow);
+    currentRow++;
+
+    // Blank row
+    sheetData.push([]);
     currentRow++;
 
     const expenseRange = addAccountRows(expenseAccounts);
@@ -735,18 +735,23 @@ export default function FinancialsPage() {
     const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
 
     const applyStyleToRow = (rowIdx: number, style: any) => {
-      const range = XLSX.utils.decode_range(worksheet['!ref'] as string);
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cellRef = XLSX.utils.encode_cell({ r: rowIdx - 1, c: C });
-        const cell = worksheet[cellRef];
-        if (cell) {
-          cell.s = {
-            ...((cell as any).s || {}),
-            font: { ...(((cell as any).s || {}).font || {}), ...style.font },
-          };
-        }
+    const range = XLSX.utils.decode_range(worksheet["!ref"] as string);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cellRef = XLSX.utils.encode_cell({ r: rowIdx - 1, c: C });
+      const cell = worksheet[cellRef];
+      if (cell) {
+        cell.s = {
+          ...((cell as any).s || {}),
+          ...(style.font
+            ? { font: { ...(((cell as any).s || {}).font || {}), ...style.font } }
+            : {}),
+          ...(style.border
+            ? { border: { ...(((cell as any).s || {}).border || {}), ...style.border } }
+            : {}),
+        };
       }
-    };
+    }
+  };
 
     [
       totalIncomeRowIdx,
@@ -754,11 +759,32 @@ export default function FinancialsPage() {
       grossProfitRowIdx,
       totalExpenseRowIdx,
       netIncomeRowIdx,
-    ].forEach((r) => applyStyleToRow(r, { font: { bold: true } }));
+    ].forEach((r) =>
+      applyStyleToRow(r, {
+        font: { bold: true },
+        border: { top: { style: "thin" } },
+      }),
+    );
 
     [gpPercentRowIdx, netIncomePercentRowIdx].forEach((r) =>
-      applyStyleToRow(r, { font: { italic: true } })
+      applyStyleToRow(r, {
+        font: { italic: true },
+        border: { top: { style: "thin" } },
+      }),
     );
+
+    const financialFormat = "$#,##0.00;($#,##0.00)";
+    const range = XLSX.utils.decode_range(worksheet["!ref"] as string);
+    for (let R = 1; R <= range.e.r; ++R) {
+      if (R + 1 === gpPercentRowIdx || R + 1 === netIncomePercentRowIdx) continue;
+      for (let C = 1; C <= range.e.c; ++C) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = worksheet[cellRef];
+        if (cell) {
+          cell.z = financialFormat;
+        }
+      }
+    }
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "P&L");
