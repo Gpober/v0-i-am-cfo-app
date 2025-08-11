@@ -1,19 +1,34 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
   DollarSign,
   TrendingUp,
   Building2,
   CreditCard,
-  Users,
   ArrowUpRight,
+  ArrowDownRight,
   RefreshCw,
   BarChart3,
-  PieChart,
   AlertTriangle,
+  Calendar,
+  Target,
+  Activity,
 } from "lucide-react"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Cell,
+  Pie,
+} from "recharts"
+import { supabase } from "@/lib/supabaseClient"
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
@@ -26,10 +41,595 @@ const BRAND_COLORS = {
   danger: "#E74C3C",
 }
 
-export default function OverviewPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedPeriod, setSelectedPeriod] = useState("May 2025")
+// P&L Classification using the same logic as financials page
+const classifyPLAccount = (accountType, reportCategory, accountName) => {
+  const typeLower = accountType?.toLowerCase() || ""
+  const nameLower = accountName?.toLowerCase() || ""
+  const categoryLower = reportCategory?.toLowerCase() || ""
 
+  // Exclude transfers and cash accounts first
+  const isTransfer = categoryLower === "transfer" || nameLower.includes("transfer")
+  const isCashAccount =
+    typeLower.includes("bank") ||
+    typeLower.includes("cash") ||
+    nameLower.includes("checking") ||
+    nameLower.includes("savings") ||
+    nameLower.includes("cash")
+
+  if (isCashAccount || isTransfer) return null
+
+  // INCOME ACCOUNTS - Based on account_type
+  const isIncomeAccount =
+    typeLower === "income" ||
+    typeLower === "other income" ||
+    typeLower.includes("income") ||
+    typeLower.includes("revenue")
+
+  // EXPENSE ACCOUNTS - Based on account_type
+  const isExpenseAccount =
+    typeLower === "expense" ||
+    typeLower === "other expense" ||
+    typeLower === "cost of goods sold" ||
+    typeLower.includes("expense")
+
+  if (isIncomeAccount) return "INCOME"
+  if (isExpenseAccount) return "EXPENSES"
+
+  return null // Not a P&L account (likely Balance Sheet account)
+}
+
+// Cash Flow Classification using the same logic as cash-flow page
+const classifyCashFlowTransaction = (accountType, reportCategory) => {
+  const typeLower = accountType?.toLowerCase() || ""
+
+  // Operating activities - Income and Expenses
+  if (
+    typeLower === "income" ||
+    typeLower === "other income" ||
+    typeLower === "expenses" ||
+    typeLower === "expense" ||
+    typeLower === "cost of goods sold" ||
+    typeLower === "accounts receivable" ||
+    typeLower === "accounts payable"
+  ) {
+    return "operating"
+  }
+
+  // Investing activities - Fixed Assets and Other Assets
+  if (typeLower === "fixed assets" || typeLower === "other assets" || typeLower === "property, plant & equipment") {
+    return "investing"
+  }
+
+  // Financing activities - Liabilities, Equity, Credit Cards
+  if (
+    typeLower === "long term liabilities" ||
+    typeLower === "equity" ||
+    typeLower === "credit card" ||
+    typeLower === "other current liabilities" ||
+    typeLower === "line of credit"
+  ) {
+    return "financing"
+  }
+
+  return "other"
+}
+
+export default function FinancialOverviewPage() {
+  const [isLoading, setIsLoading] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState("June")
+  const [selectedYear, setSelectedYear] = useState("2024")
+  const [financialData, setFinancialData] = useState(null)
+  const [error, setError] = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(null)
+
+  // Generate months and years lists (same as other pages)
+  const monthsList = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ]
+  const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - 5 + i).toString())
+
+  // Date utilities (same as financials page)
+  const getDateParts = (dateString) => {
+    const dateOnly = dateString.split("T")[0]
+    const [year, month, day] = dateOnly.split("-").map(Number)
+    return { year, month, day, dateOnly }
+  }
+
+  const getMonthYear = (dateString) => {
+    const { year, month } = getDateParts(dateString)
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+    return `${monthNames[month - 1]} ${year}`
+  }
+
+  const isDateInRange = (dateString, startDate, endDate) => {
+    const { dateOnly } = getDateParts(dateString)
+    return dateOnly >= startDate && dateOnly <= endDate
+  }
+
+  // Calculate date range (same logic as other pages)
+  const calculateDateRange = () => {
+    const monthIndex = monthsList.indexOf(selectedMonth)
+    const year = Number.parseInt(selectedYear)
+    const startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`
+
+    // Calculate last day of month
+    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    let lastDay = daysInMonth[monthIndex]
+
+    // Handle leap year for February
+    if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+      lastDay = 29
+    }
+
+    const endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+    return { startDate, endDate }
+  }
+
+  // Fetch financial data from Supabase (same connection as other pages)
+  const fetchFinancialData = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const { startDate, endDate } = calculateDateRange()
+      const monthIndex = monthsList.indexOf(selectedMonth)
+      const year = Number.parseInt(selectedYear)
+
+      console.log(`🔍 FINANCIAL OVERVIEW - Fetching data for ${selectedMonth} ${selectedYear}`)
+      console.log(`📅 Date range: ${startDate} to ${endDate}`)
+
+      // Fetch current period data using same query structure as other pages
+      const { data: currentTransactions, error: currentError } = await supabase
+        .from("journal_entry_lines")
+        .select(`
+          entry_number, 
+          class, 
+          date, 
+          account, 
+          account_type, 
+          debit, 
+          credit, 
+          memo, 
+          customer, 
+          vendor, 
+          name, 
+          entry_bank_account, 
+          normal_balance, 
+          report_category,
+          is_cash_account,
+          detail_type,
+          account_behavior
+        `)
+        .gte("date", startDate)
+        .lte("date", endDate)
+        .order("date", { ascending: true })
+
+      if (currentError) throw currentError
+
+      // Filter transactions using timezone-independent date comparison
+      const filteredCurrentTransactions = currentTransactions.filter((tx) => {
+        return isDateInRange(tx.date, startDate, endDate)
+      })
+
+      console.log(`📊 Current period: ${filteredCurrentTransactions.length} transactions`)
+
+      // Fetch previous period for comparison
+      const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1
+      const prevYear = monthIndex === 0 ? year - 1 : year
+      const prevStartDate = `${prevYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-01`
+
+      const prevDaysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let prevLastDay = prevDaysInMonth[prevMonthIndex]
+      if (prevMonthIndex === 1 && ((prevYear % 4 === 0 && prevYear % 100 !== 0) || prevYear % 400 === 0)) {
+        prevLastDay = 29
+      }
+      const prevEndDate = `${prevYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-${String(prevLastDay).padStart(2, "0")}`
+
+      const { data: prevTransactions, error: prevError } = await supabase
+        .from("journal_entry_lines")
+        .select(`
+          entry_number, 
+          class, 
+          date, 
+          account, 
+          account_type, 
+          debit, 
+          credit, 
+          memo, 
+          customer, 
+          vendor, 
+          name, 
+          entry_bank_account, 
+          normal_balance, 
+          report_category,
+          is_cash_account,
+          detail_type,
+          account_behavior
+        `)
+        .gte("date", prevStartDate)
+        .lte("date", prevEndDate)
+        .order("date", { ascending: true })
+
+      const filteredPrevTransactions =
+        prevTransactions && !prevError
+          ? prevTransactions.filter((tx) => isDateInRange(tx.date, prevStartDate, prevEndDate))
+          : []
+
+      console.log(`📊 Previous period: ${filteredPrevTransactions.length} transactions`)
+
+      // Fetch last 12 months for trend analysis
+      const trendData = []
+      for (let i = 11; i >= 0; i--) {
+        const trendMonthIndex = (monthIndex - i + 12) % 12
+        const trendYear = monthIndex - i < 0 ? year - 1 : year
+        const trendStartDate = `${trendYear}-${String(trendMonthIndex + 1).padStart(2, "0")}-01`
+
+        const trendDaysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        let trendLastDay = trendDaysInMonth[trendMonthIndex]
+        if (trendMonthIndex === 1 && ((trendYear % 4 === 0 && trendYear % 100 !== 0) || trendYear % 400 === 0)) {
+          trendLastDay = 29
+        }
+        const trendEndDate = `${trendYear}-${String(trendMonthIndex + 1).padStart(2, "0")}-${String(trendLastDay).padStart(2, "0")}`
+
+        const { data: monthData } = await supabase
+          .from("journal_entry_lines")
+          .select(`
+            entry_number, 
+            class, 
+            date, 
+            account, 
+            account_type, 
+            debit, 
+            credit, 
+            memo, 
+            customer, 
+            vendor, 
+            name, 
+            entry_bank_account, 
+            normal_balance, 
+            report_category,
+            is_cash_account,
+            detail_type,
+            account_behavior
+          `)
+          .gte("date", trendStartDate)
+          .lte("date", trendEndDate)
+          .order("date", { ascending: true })
+
+        const filteredMonthData = monthData
+          ? monthData.filter((tx) => isDateInRange(tx.date, trendStartDate, trendEndDate))
+          : []
+
+        const monthName = monthsList[trendMonthIndex]
+        trendData.push({
+          month: `${monthName.substring(0, 3)} ${trendYear}`,
+          data: filteredMonthData,
+        })
+      }
+
+      console.log(`📈 Trend data: ${trendData.length} months`)
+
+      // Process the data using same logic as other pages
+      const processedData = processFinancialData(filteredCurrentTransactions, filteredPrevTransactions, trendData)
+      setFinancialData(processedData)
+      setLastUpdated(new Date())
+    } catch (err) {
+      console.error("❌ Error fetching financial data:", err)
+      setError(err.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Process financial data using same logic as P&L and Cash Flow pages
+  const processFinancialData = (currentData, prevData, trendData) => {
+    // Process P&L data (same as financials page)
+    const current = processPLTransactions(currentData)
+    const previous = processPLTransactions(prevData)
+
+    // Process cash flow data (same as cash-flow page)
+    const currentCashFlow = processCashFlowTransactions(currentData)
+    const previousCashFlow = processCashFlowTransactions(prevData)
+
+    // Process trend data
+    const trends = trendData.map(({ month, data }) => ({
+      month,
+      ...processPLTransactions(data),
+      ...processCashFlowTransactions(data),
+    }))
+
+    // Calculate growth rates
+    const calculateGrowth = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0
+      return ((current - previous) / Math.abs(previous)) * 100
+    }
+
+    // Get property breakdown
+    const propertyBreakdown = getPropertyBreakdown(currentData)
+
+    // Generate alerts
+    const alerts = generateAlerts(current, previous, currentCashFlow, propertyBreakdown)
+
+    return {
+      current: { ...current, ...currentCashFlow },
+      previous: { ...previous, ...previousCashFlow },
+      trends,
+      growth: {
+        revenue: calculateGrowth(current.totalIncome, previous.totalIncome),
+        netIncome: calculateGrowth(current.netIncome, previous.netIncome),
+        expenses: calculateGrowth(current.totalExpenses, previous.totalExpenses),
+        cashFlow: calculateGrowth(currentCashFlow.netCashFlow, previousCashFlow.netCashFlow),
+      },
+      propertyBreakdown,
+      alerts,
+      summary: {
+        totalTransactions: currentData.length,
+        activeProperties: [...new Set(currentData.map((t) => t.class).filter(Boolean))].length,
+        profitMargin: current.totalIncome ? (current.netIncome / current.totalIncome) * 100 : 0,
+      },
+    }
+  }
+
+  // Process P&L transactions (same logic as financials page)
+  const processPLTransactions = (transactions) => {
+    const accountMap = new Map()
+
+    transactions.forEach((tx) => {
+      const classification = classifyPLAccount(tx.account_type, tx.report_category, tx.account)
+      if (!classification) return // Skip non-P&L accounts
+
+      const account = tx.account
+      if (!accountMap.has(account)) {
+        accountMap.set(account, {
+          account,
+          category: classification,
+          account_type: tx.account_type,
+          transactions: [],
+          totalCredits: 0,
+          totalDebits: 0,
+        })
+      }
+
+      const accountData = accountMap.get(account)
+      accountData.transactions.push(tx)
+
+      const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
+      const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+
+      if (!isNaN(debitValue) && debitValue > 0) {
+        accountData.totalDebits += debitValue
+      }
+      if (!isNaN(creditValue) && creditValue > 0) {
+        accountData.totalCredits += creditValue
+      }
+    })
+
+    // Calculate totals
+    let totalIncome = 0
+    let totalCogs = 0
+    let totalExpenses = 0
+
+    for (const [account, data] of accountMap.entries()) {
+      let amount
+      if (data.category === "INCOME") {
+        amount = data.totalCredits - data.totalDebits
+        totalIncome += amount
+      } else {
+        amount = data.totalDebits - data.totalCredits
+        if (data.account_type?.toLowerCase().includes("cost of goods sold")) {
+          totalCogs += amount
+        } else {
+          totalExpenses += amount
+        }
+      }
+    }
+
+    const grossProfit = totalIncome - totalCogs
+    const netIncome = grossProfit - totalExpenses
+
+    return {
+      totalIncome,
+      totalCogs,
+      totalExpenses,
+      grossProfit,
+      netIncome,
+      accounts: Array.from(accountMap.values()),
+    }
+  }
+
+  // Process cash flow transactions (same logic as cash-flow page)
+  const processCashFlowTransactions = (transactions) => {
+    let operatingCashFlow = 0
+    let financingCashFlow = 0
+    let investingCashFlow = 0
+
+    transactions.forEach((tx) => {
+      if (!tx.entry_bank_account) return // Must have bank account source
+
+      const classification = classifyCashFlowTransaction(tx.account_type, tx.report_category)
+      const cashImpact =
+        tx.report_category === "transfer"
+          ? Number.parseFloat(tx.debit) - Number.parseFloat(tx.credit) // Reverse for transfers
+          : tx.normal_balance || Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit) // Normal for others
+
+      if (classification === "operating") {
+        operatingCashFlow += cashImpact
+      } else if (classification === "financing") {
+        financingCashFlow += cashImpact
+      } else if (classification === "investing") {
+        investingCashFlow += cashImpact
+      }
+    })
+
+    const netCashFlow = operatingCashFlow + financingCashFlow + investingCashFlow
+
+    return {
+      operatingCashFlow,
+      financingCashFlow,
+      investingCashFlow,
+      netCashFlow,
+    }
+  }
+
+  // Get property performance breakdown
+  const getPropertyBreakdown = (transactions) => {
+    const properties = {}
+
+    transactions.forEach((transaction) => {
+      const property = transaction.class || "Unassigned"
+      const category = classifyPLAccount(transaction.account_type, transaction.report_category, transaction.account)
+
+      if (!category) return
+
+      if (!properties[property]) {
+        properties[property] = {
+          revenue: 0,
+          expenses: 0,
+          netIncome: 0,
+          transactionCount: 0,
+        }
+      }
+
+      const debitValue = transaction.debit ? Number.parseFloat(transaction.debit.toString()) : 0
+      const creditValue = transaction.credit ? Number.parseFloat(transaction.credit.toString()) : 0
+      properties[property].transactionCount++
+
+      if (category === "INCOME") {
+        const amount = creditValue - debitValue
+        properties[property].revenue += amount
+      } else {
+        const amount = debitValue - creditValue
+        properties[property].expenses += amount
+      }
+
+      properties[property].netIncome = properties[property].revenue - properties[property].expenses
+    })
+
+    return Object.entries(properties)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.netIncome - a.netIncome)
+  }
+
+  // Generate financial alerts
+  const generateAlerts = (current, previous, currentCashFlow, properties) => {
+    const alerts = []
+
+    // Revenue decline alert
+    if (previous.totalIncome > 0 && current.totalIncome < previous.totalIncome * 0.9) {
+      alerts.push({
+        id: "revenue-decline",
+        type: "warning",
+        title: "Revenue Decline",
+        message: `Revenue decreased by ${(((previous.totalIncome - current.totalIncome) / previous.totalIncome) * 100).toFixed(1)}% from last month`,
+        action: "View P&L Details",
+        href: "/financials",
+      })
+    }
+
+    // High expense growth alert
+    if (previous.totalExpenses > 0 && current.totalExpenses > previous.totalExpenses * 1.15) {
+      alerts.push({
+        id: "expense-growth",
+        type: "warning",
+        title: "Rising Expenses",
+        message: `Expenses increased by ${(((current.totalExpenses - previous.totalExpenses) / previous.totalExpenses) * 100).toFixed(1)}% from last month`,
+        action: "Review Expenses",
+        href: "/financials",
+      })
+    }
+
+    // Cash flow alert
+    if (currentCashFlow.netCashFlow < 0) {
+      alerts.push({
+        id: "negative-cash-flow",
+        type: "warning",
+        title: "Negative Cash Flow",
+        message: `Net cash flow is ${formatCurrency(currentCashFlow.netCashFlow)} this month`,
+        action: "View Cash Flow",
+        href: "/cash-flow",
+      })
+    } else if (currentCashFlow.netCashFlow > 0) {
+      alerts.push({
+        id: "positive-cash-flow",
+        type: "success",
+        title: "Positive Cash Flow",
+        message: `Strong ${formatCurrency(currentCashFlow.netCashFlow)} net cash flow this month`,
+        action: "View Cash Flow",
+        href: "/cash-flow",
+      })
+    }
+
+    // Profitable properties
+    const profitableProperties = properties.filter((p) => p.netIncome > 0)
+    if (profitableProperties.length > 0) {
+      alerts.push({
+        id: "profitable-properties",
+        type: "success",
+        title: "Strong Property Performance",
+        message: `${profitableProperties.length} of ${properties.length} properties are profitable`,
+        action: "View Properties",
+        href: "/financials",
+      })
+    }
+
+    // Low margin alert
+    const margin = current.totalIncome ? (current.netIncome / current.totalIncome) * 100 : 0
+    if (margin < 10 && margin > -100) {
+      alerts.push({
+        id: "low-margin",
+        type: "warning",
+        title: "Low Profit Margin",
+        message: `Current profit margin is ${margin.toFixed(1)}% - consider cost optimization`,
+        action: "Analyze Costs",
+        href: "/financials",
+      })
+    }
+
+    // Strong performance alert
+    if (margin > 20) {
+      alerts.push({
+        id: "strong-performance",
+        type: "success",
+        title: "Excellent Margins",
+        message: `Strong ${margin.toFixed(1)}% profit margin indicates healthy operations`,
+        action: "View Details",
+        href: "/financials",
+      })
+    }
+
+    return alerts
+  }
+
+  // Load data on component mount and when filters change
+  useEffect(() => {
+    fetchFinancialData()
+  }, [selectedMonth, selectedYear])
+
+  // Helper functions
   const formatCurrency = (value) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -47,86 +647,60 @@ export default function OverviewPage() {
     return formatCurrency(value)
   }
 
-  // Mock overview data - this would come from Supabase in a real implementation
-  const overviewData = {
-    kpis: {
-      revenue: 2450000,
-      netIncome: 635000,
-      totalAssets: 11515000,
-      totalLiabilities: 4255000,
-      cashFlow: 420000,
-      arBalance: 285000,
-      apBalance: 195000,
-    },
-    trends: {
-      revenueGrowth: 8.5,
-      profitMargin: 25.9,
-      assetGrowth: 3.2,
-      cashFlowTrend: 12.1,
-    },
-    alerts: [
-      {
-        id: 1,
-        type: "warning",
-        title: "High A/R Aging",
-        message: "32% of receivables are past due",
-        action: "Review A/R",
-        href: "/accounts-receivable",
-      },
-      {
-        id: 2,
-        type: "info",
-        title: "Strong Cash Flow",
-        message: "Operating cash flow up 12.1% this month",
-        action: "View Cash Flow",
-        href: "/cash-flow",
-      },
-      {
-        id: 3,
-        type: "success",
-        title: "Profitable Properties",
-        message: "8 of 10 properties showing positive margins",
-        action: "View P&L",
-        href: "/financials",
-      },
-    ],
-    quickActions: [
-      {
-        title: "View P&L Statement",
-        description: "Detailed profit and loss analysis",
-        href: "/financials",
-        icon: BarChart3,
-        color: BRAND_COLORS.primary,
-      },
-      {
-        title: "Cash Flow Analysis",
-        description: "Track cash inflows and outflows",
-        href: "/cash-flow",
-        icon: TrendingUp,
-        color: BRAND_COLORS.success,
-      },
-      {
-        title: "Balance Sheet",
-        description: "Assets, liabilities, and equity",
-        href: "/balance-sheet",
-        icon: Building2,
-        color: BRAND_COLORS.secondary,
-      },
-      {
-        title: "Accounts Receivable",
-        description: "Customer payments and aging",
-        href: "/accounts-receivable",
-        icon: CreditCard,
-        color: BRAND_COLORS.warning,
-      },
-    ],
+  const formatPercentage = (value) => {
+    return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
   }
 
-  const refreshData = async () => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
+  // Quick actions configuration
+  const quickActions = [
+    {
+      title: "P&L Statement",
+      description: "Detailed profit and loss analysis",
+      href: "/financials",
+      icon: BarChart3,
+      color: BRAND_COLORS.primary,
+    },
+    {
+      title: "Cash Flow Analysis",
+      description: "Track cash inflows and outflows",
+      href: "/cash-flow",
+      icon: TrendingUp,
+      color: BRAND_COLORS.success,
+    },
+    {
+      title: "Balance Sheet",
+      description: "Assets, liabilities, and equity",
+      href: "/balance-sheet",
+      icon: Building2,
+      color: BRAND_COLORS.secondary,
+    },
+    {
+      title: "Accounts Receivable",
+      description: "Customer payments and aging",
+      href: "/accounts-receivable",
+      icon: CreditCard,
+      color: BRAND_COLORS.warning,
+    },
+  ]
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-sm max-w-md w-full">
+          <div className="text-center">
+            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Data</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button
+              onClick={fetchFinancialData}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -138,29 +712,49 @@ export default function OverviewPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Financial Overview</h1>
               <p className="text-sm text-gray-600 mt-1">
-                Comprehensive view of your financial performance and key metrics
+                Comprehensive financial performance using the same data as P&L and Cash Flow reports
               </p>
+              {lastUpdated && (
+                <p className="text-xs text-gray-500 mt-1">Last updated: {lastUpdated.toLocaleString()}</p>
+              )}
             </div>
 
             <div className="flex items-center space-x-4">
+              {/* Month Dropdown */}
               <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
                 className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
                 style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" }}
               >
-                <option value="May 2025">May 2025</option>
-                <option value="April 2025">April 2025</option>
-                <option value="March 2025">March 2025</option>
+                {monthsList.map((month) => (
+                  <option key={month} value={month}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+
+              {/* Year Dropdown */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" }}
+              >
+                {yearsList.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
               </select>
 
               <button
-                onClick={refreshData}
+                onClick={fetchFinancialData}
                 disabled={isLoading}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-                Refresh
+                {isLoading ? "Loading..." : "Refresh"}
               </button>
             </div>
           </div>
@@ -169,202 +763,408 @@ export default function OverviewPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Key Performance Indicators */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div
-              className="bg-white p-6 rounded-lg shadow-sm border-l-4"
-              style={{ borderLeftColor: BRAND_COLORS.primary }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Total Revenue</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {formatCompactCurrency(overviewData.kpis.revenue)}
-                  </div>
-                  <div className="flex items-center text-xs text-green-600 font-medium mt-1">
-                    <ArrowUpRight className="w-3 h-3 mr-1" />+{overviewData.trends.revenueGrowth}% vs last month
-                  </div>
-                </div>
-                <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
-              </div>
-            </div>
-
-            <div
-              className="bg-white p-6 rounded-lg shadow-sm border-l-4"
-              style={{ borderLeftColor: BRAND_COLORS.success }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {formatCompactCurrency(overviewData.kpis.netIncome)}
-                  </div>
-                  <div className="text-xs text-green-600 font-medium mt-1">
-                    {overviewData.trends.profitMargin}% profit margin
-                  </div>
-                </div>
-                <TrendingUp className="w-8 h-8 text-green-500" />
-              </div>
-            </div>
-
-            <div
-              className="bg-white p-6 rounded-lg shadow-sm border-l-4"
-              style={{ borderLeftColor: BRAND_COLORS.secondary }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Total Assets</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {formatCompactCurrency(overviewData.kpis.totalAssets)}
-                  </div>
-                  <div className="flex items-center text-xs text-green-600 font-medium mt-1">
-                    <ArrowUpRight className="w-3 h-3 mr-1" />+{overviewData.trends.assetGrowth}% growth
-                  </div>
-                </div>
-                <Building2 className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
-              </div>
-            </div>
-
-            <div
-              className="bg-white p-6 rounded-lg shadow-sm border-l-4"
-              style={{ borderLeftColor: BRAND_COLORS.warning }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-gray-600 text-sm font-medium mb-2">Cash Flow</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {formatCompactCurrency(overviewData.kpis.cashFlow)}
-                  </div>
-                  <div className="flex items-center text-xs text-green-600 font-medium mt-1">
-                    <ArrowUpRight className="w-3 h-3 mr-1" />+{overviewData.trends.cashFlowTrend}% this month
-                  </div>
-                </div>
-                <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
-              </div>
-            </div>
+        {isLoading && !financialData ? (
+          <div className="flex items-center justify-center py-12">
+            <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mr-3" />
+            <span className="text-lg text-gray-600">Loading financial data from Supabase...</span>
           </div>
-
-          {/* Financial Health Summary */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
-                <div className="text-sm text-gray-600 mt-1">Access key financial reports and analysis</div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {overviewData.quickActions.map((action) => (
-                    <Link
-                      key={action.title}
-                      href={action.href}
-                      className="group p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all"
-                    >
-                      <div className="flex items-center mb-3">
-                        <action.icon className="w-6 h-6 mr-3" style={{ color: action.color }} />
-                        <h4 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                          {action.title}
-                        </h4>
-                      </div>
-                      <p className="text-sm text-gray-600">{action.description}</p>
-                      <div className="mt-2 text-xs text-blue-600 font-medium">View Details →</div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Alerts & Notifications */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Alerts & Insights</h3>
-                <div className="text-sm text-gray-600 mt-1">Important financial notifications and trends</div>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {overviewData.alerts.map((alert) => (
+        ) : financialData ? (
+          <div className="space-y-8">
+            {/* Key Performance Indicators */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div
+                className="bg-white p-6 rounded-lg shadow-sm border-l-4"
+                style={{ borderLeftColor: BRAND_COLORS.primary }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Total Revenue</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {formatCompactCurrency(financialData.current.totalIncome)}
+                    </div>
                     <div
-                      key={alert.id}
-                      className={`p-4 rounded-lg border-l-4 ${
-                        alert.type === "warning"
-                          ? "bg-yellow-50 border-yellow-400"
-                          : alert.type === "success"
-                            ? "bg-green-50 border-green-400"
-                            : "bg-blue-50 border-blue-400"
+                      className={`flex items-center text-xs font-medium mt-1 ${
+                        financialData.growth.revenue >= 0 ? "text-green-600" : "text-red-600"
                       }`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-1">
-                            {alert.type === "warning" && <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2" />}
-                            {alert.type === "success" && <TrendingUp className="w-4 h-4 text-green-600 mr-2" />}
-                            {alert.type === "info" && <BarChart3 className="w-4 h-4 text-blue-600 mr-2" />}
-                            <h4 className="font-semibold text-gray-900">{alert.title}</h4>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-2">{alert.message}</p>
-                          <Link
-                            href={alert.href}
-                            className={`text-xs font-medium hover:underline ${
-                              alert.type === "warning"
-                                ? "text-yellow-700"
-                                : alert.type === "success"
-                                  ? "text-green-700"
-                                  : "text-blue-700"
-                            }`}
-                          >
-                            {alert.action} →
-                          </Link>
-                        </div>
-                      </div>
+                      {financialData.growth.revenue >= 0 ? (
+                        <ArrowUpRight className="w-3 h-3 mr-1" />
+                      ) : (
+                        <ArrowDownRight className="w-3 h-3 mr-1" />
+                      )}
+                      {formatPercentage(financialData.growth.revenue)} vs last month
                     </div>
-                  ))}
+                  </div>
+                  <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
+                </div>
+              </div>
+
+              <div
+                className="bg-white p-6 rounded-lg shadow-sm border-l-4"
+                style={{ borderLeftColor: BRAND_COLORS.success }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {formatCompactCurrency(financialData.current.netIncome)}
+                    </div>
+                    <div
+                      className={`flex items-center text-xs font-medium mt-1 ${
+                        financialData.growth.netIncome >= 0 ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {financialData.growth.netIncome >= 0 ? (
+                        <ArrowUpRight className="w-3 h-3 mr-1" />
+                      ) : (
+                        <ArrowDownRight className="w-3 h-3 mr-1" />
+                      )}
+                      {formatPercentage(financialData.growth.netIncome)} vs last month
+                    </div>
+                  </div>
+                  <TrendingUp className="w-8 h-8 text-green-500" />
+                </div>
+              </div>
+
+              <div
+                className="bg-white p-6 rounded-lg shadow-sm border-l-4"
+                style={{ borderLeftColor: BRAND_COLORS.warning }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Net Cash Flow</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {formatCompactCurrency(financialData.current.netCashFlow)}
+                    </div>
+                    <div
+                      className={`flex items-center text-xs font-medium mt-1 ${
+                        financialData.growth.cashFlow >= 0 ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {financialData.growth.cashFlow >= 0 ? (
+                        <ArrowUpRight className="w-3 h-3 mr-1" />
+                      ) : (
+                        <ArrowDownRight className="w-3 h-3 mr-1" />
+                      )}
+                      {formatPercentage(financialData.growth.cashFlow)} vs last month
+                    </div>
+                  </div>
+                  <Activity className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
+                </div>
+              </div>
+
+              <div
+                className="bg-white p-6 rounded-lg shadow-sm border-l-4"
+                style={{ borderLeftColor: BRAND_COLORS.secondary }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">Profit Margin</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {financialData.summary.profitMargin.toFixed(1)}%
+                    </div>
+                    <div className="text-xs text-gray-600 font-medium mt-1">
+                      {financialData.summary.activeProperties} active properties
+                    </div>
+                  </div>
+                  <Target className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Revenue Trend Chart */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Revenue Trend</h3>
+                  <div className="text-sm text-gray-600 mt-1">Last 12 months performance</div>
+                </div>
+                <div className="p-6">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={financialData.trends}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="month" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={60} />
+                      <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value) => [formatCurrency(value), "Revenue"]}
+                        labelStyle={{ color: "#374151" }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="totalIncome"
+                        stroke={BRAND_COLORS.primary}
+                        strokeWidth={3}
+                        dot={{ fill: BRAND_COLORS.primary, strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: BRAND_COLORS.primary, strokeWidth: 2 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Property Performance Chart */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Property Performance</h3>
+                  <div className="text-sm text-gray-600 mt-1">Net income by property</div>
+                </div>
+                <div className="p-6">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={financialData.propertyBreakdown.filter((p) => p.netIncome > 0).slice(0, 8)}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        dataKey="netIncome"
+                        label={({ name, percent }) =>
+                          percent > 0.05 ? `${name.substring(0, 8)}${name.length > 8 ? "..." : ""}` : ""
+                        }
+                        labelLine={false}
+                      >
+                        {financialData.propertyBreakdown.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={
+                              [
+                                BRAND_COLORS.primary,
+                                BRAND_COLORS.success,
+                                BRAND_COLORS.warning,
+                                BRAND_COLORS.secondary,
+                                BRAND_COLORS.tertiary,
+                                BRAND_COLORS.accent,
+                                "#8884d8",
+                                "#82ca9d",
+                              ][index % 8]
+                            }
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value, name) => [formatCurrency(value), "Net Income"]} />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Health Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Quick Actions */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+                  <div className="text-sm text-gray-600 mt-1">Access detailed financial reports</div>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {quickActions.map((action) => (
+                      <Link
+                        key={action.title}
+                        href={action.href}
+                        className="group p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-center mb-3">
+                          <action.icon className="w-6 h-6 mr-3" style={{ color: action.color }} />
+                          <h4 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                            {action.title}
+                          </h4>
+                        </div>
+                        <p className="text-sm text-gray-600">{action.description}</p>
+                        <div className="mt-2 text-xs text-blue-600 font-medium">View Details →</div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Alerts & Notifications */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Financial Alerts</h3>
+                  <div className="text-sm text-gray-600 mt-1">Important insights and notifications</div>
+                </div>
+                <div className="p-6">
+                  {financialData.alerts.length > 0 ? (
+                    <div className="space-y-4">
+                      {financialData.alerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          className={`p-4 rounded-lg border-l-4 ${
+                            alert.type === "warning"
+                              ? "bg-yellow-50 border-yellow-400"
+                              : alert.type === "success"
+                                ? "bg-green-50 border-green-400"
+                                : "bg-blue-50 border-blue-400"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center mb-1">
+                                {alert.type === "warning" && <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2" />}
+                                {alert.type === "success" && <TrendingUp className="w-4 h-4 text-green-600 mr-2" />}
+                                {alert.type === "info" && <BarChart3 className="w-4 h-4 text-blue-600 mr-2" />}
+                                <h4 className="font-semibold text-gray-900">{alert.title}</h4>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-2">{alert.message}</p>
+                              <Link
+                                href={alert.href}
+                                className={`text-xs font-medium hover:underline ${
+                                  alert.type === "warning"
+                                    ? "text-yellow-700"
+                                    : alert.type === "success"
+                                      ? "text-green-700"
+                                      : "text-blue-700"
+                                }`}
+                              >
+                                {alert.action} →
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Activity className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                      <p>No alerts at this time</p>
+                      <p className="text-sm mt-1">Your finances look stable</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Top Properties Performance */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Top Performing Properties</h3>
+                <div className="text-sm text-gray-600 mt-1">
+                  Ranked by net income for {selectedMonth} {selectedYear}
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Property
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Revenue
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Expenses
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Net Income
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Margin
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Transactions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {financialData.propertyBreakdown.slice(0, 10).map((property, index) => {
+                      const margin = property.revenue ? (property.netIncome / property.revenue) * 100 : 0
+                      return (
+                        <tr key={property.name} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div
+                                className={`w-3 h-3 rounded-full mr-3 ${
+                                  index === 0
+                                    ? "bg-yellow-400"
+                                    : index === 1
+                                      ? "bg-gray-400"
+                                      : index === 2
+                                        ? "bg-yellow-600"
+                                        : "bg-gray-300"
+                                }`}
+                              ></div>
+                              <div className="text-sm font-medium text-gray-900">{property.name}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(property.revenue)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(property.expenses)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`text-sm font-medium ${
+                                property.netIncome >= 0 ? "text-green-600" : "text-red-600"
+                              }`}
+                            >
+                              {formatCurrency(property.netIncome)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`text-sm ${
+                                margin >= 20 ? "text-green-600" : margin >= 10 ? "text-yellow-600" : "text-red-600"
+                              }`}
+                            >
+                              {margin.toFixed(1)}%
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {property.transactionCount}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {financialData.summary.totalTransactions.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">Total Transactions</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{financialData.summary.activeProperties}</div>
+                  <div className="text-sm text-gray-600 mt-1">Active Properties</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {formatCurrency(financialData.current.grossProfit)}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">Gross Profit</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {financialData.current.totalIncome > 0
+                      ? ((financialData.current.grossProfit / financialData.current.totalIncome) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">Gross Margin</div>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Financial Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">A/R Balance</h3>
-                <CreditCard className="w-6 h-6" style={{ color: BRAND_COLORS.warning }} />
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(overviewData.kpis.arBalance)}</div>
-              <div className="text-sm text-gray-600 mb-3">Outstanding receivables</div>
-              <Link href="/accounts-receivable" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                View Details →
-              </Link>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">A/P Balance</h3>
-                <Users className="w-6 h-6" style={{ color: BRAND_COLORS.danger }} />
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(overviewData.kpis.apBalance)}</div>
-              <div className="text-sm text-gray-600 mb-3">Outstanding payables</div>
-              <Link href="/accounts-payable" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                View Details →
-              </Link>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Net Worth</h3>
-                <PieChart className="w-6 h-6" style={{ color: BRAND_COLORS.success }} />
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">
-                {formatCurrency(overviewData.kpis.totalAssets - overviewData.kpis.totalLiabilities)}
-              </div>
-              <div className="text-sm text-gray-600 mb-3">Assets minus liabilities</div>
-              <Link href="/balance-sheet" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                View Balance Sheet →
-              </Link>
-            </div>
+        ) : (
+          <div className="text-center py-12">
+            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Available</h3>
+            <p className="text-gray-600">
+              No financial data found for {selectedMonth} {selectedYear}.
+            </p>
           </div>
-        </div>
+        )}
       </main>
     </div>
   )
