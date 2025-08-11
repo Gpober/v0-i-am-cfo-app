@@ -540,8 +540,6 @@ export default function FinancialsPage() {
       // Process transactions using ENHANCED logic
       const processedAccounts = await processPLTransactionsEnhanced(
         plTransactions,
-        startDate,
-        endDate,
       );
       setPlAccounts(processedAccounts);
 
@@ -881,8 +879,6 @@ export default function FinancialsPage() {
   // ENHANCED: Process transactions with improved calculation logic
   const processPLTransactionsEnhanced = async (
     transactions: any[],
-    startDate: string,
-    endDate: string,
   ): Promise<PLAccount[]> => {
     const accountMap = new Map<string, PLAccount>();
 
@@ -1377,6 +1373,10 @@ export default function FinancialsPage() {
   const netIncome = grossProfit - totalExpenses;
   const grossProfitPercent = totalIncome !== 0 ? grossProfit / totalIncome : 0;
 
+  // Get current date range for header display
+  const { startDate: currentStartDate, endDate: currentEndDate } =
+    calculateDateRange();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <style jsx>{`
@@ -1412,7 +1412,7 @@ export default function FinancialsPage() {
                 </h1>
                 <p className="text-sm text-gray-600">
                   {timePeriod === "Custom"
-                    ? `${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}`
+                    ? `${formatDateDisplay(currentStartDate)} - ${formatDateDisplay(currentEndDate)}`
                     : timePeriod === "Monthly"
                       ? `${selectedMonth} ${selectedYear}`
                       : timePeriod === "Quarterly"
