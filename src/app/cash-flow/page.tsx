@@ -352,12 +352,14 @@ export default function CashFlowPage() {
       )
     })
     const opEnd = sheetData.length
-    pushRow(
-      "Total Operating Activities",
-      months.map((_, idx) => ({
-        f: `SUM(${columnLetter(idx + 2)}${opStart}:${columnLetter(idx + 2)}${opEnd})`,
-      })),
+    const opTotals = months.map((_, idx) =>
+      opEnd >= opStart
+        ? {
+            f: `SUM(${columnLetter(idx + 2)}${opStart}:${columnLetter(idx + 2)}${opEnd})`,
+          }
+        : 0,
     )
+    pushRow("Total Operating Activities", opTotals)
     const opTotalRow = sheetData.length
     pushRow("", [...emptyRow], false)
 
@@ -373,12 +375,14 @@ export default function CashFlowPage() {
         )
       })
     const finEnd = sheetData.length
-    pushRow(
-      "Total Financing Activities",
-      months.map((_, idx) => ({
-        f: `SUM(${columnLetter(idx + 2)}${finStart}:${columnLetter(idx + 2)}${finEnd})`,
-      })),
+    const finTotals = months.map((_, idx) =>
+      finEnd >= finStart
+        ? {
+            f: `SUM(${columnLetter(idx + 2)}${finStart}:${columnLetter(idx + 2)}${finEnd})`,
+          }
+        : 0,
     )
+    pushRow("Total Financing Activities", finTotals)
     const finTotalRow = sheetData.length
     pushRow("", [...emptyRow], false)
 
@@ -394,12 +398,14 @@ export default function CashFlowPage() {
         )
       })
     const invEnd = sheetData.length
-    pushRow(
-      "Total Investing Activities",
-      months.map((_, idx) => ({
-        f: `SUM(${columnLetter(idx + 2)}${invStart}:${columnLetter(idx + 2)}${invEnd})`,
-      })),
+    const invTotals = months.map((_, idx) =>
+      invEnd >= invStart
+        ? {
+            f: `SUM(${columnLetter(idx + 2)}${invStart}:${columnLetter(idx + 2)}${invEnd})`,
+          }
+        : 0,
     )
+    pushRow("Total Investing Activities", invTotals)
     const invTotalRow = sheetData.length
     pushRow("", [...emptyRow], false)
 
