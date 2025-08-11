@@ -2,8 +2,12 @@
 
 import React from "react"
 import { useState, useEffect } from "react"
-import { RefreshCw, ChevronDown, ChevronRight, X } from "lucide-react"
+import { RefreshCw, ChevronDown, ChevronRight, X, Download } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
+import * as XLSX from "xlsx"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
+import { formatCurrency as formatCurrencyUtil } from "@/lib/utils"
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
@@ -129,6 +133,7 @@ export default function CashFlowPage() {
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
 
   // Collapsible sections state
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
@@ -1119,6 +1124,58 @@ export default function CashFlowPage() {
     includeTransfers, // NEW: Added to dependency array
   ])
 
+  const handleExportExcel = () => {
+    try {
+      const data = cashFlowData.map((row) => ({
+        Property: row.property,
+        Month: row.monthName,
+        "Operating Cash Flow": formatCurrencyUtil(row.operatingCashFlow),
+        "Financing Cash Flow": formatCurrencyUtil(row.financingCashFlow),
+        "Investing Cash Flow": formatCurrencyUtil(row.investingCashFlow),
+        "Net Change in Cash": formatCurrencyUtil(row.netChangeInCash),
+      }))
+      const worksheet = XLSX.utils.json_to_sheet(data)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Cash Flow")
+      XLSX.writeFile(workbook, "cash-flow.xlsx")
+    } catch (err) {
+      console.error("Error exporting Excel:", err)
+    } finally {
+      setExportMenuOpen(false)
+    }
+  }
+
+  const handleExportPdf = () => {
+    try {
+      const doc = new jsPDF()
+      const tableColumn = [
+        "Property",
+        "Month",
+        "Operating",
+        "Financing",
+        "Investing",
+        "Net Change",
+      ]
+      const tableRows = cashFlowData.map((row) => [
+        row.property,
+        row.monthName,
+        formatCurrencyUtil(row.operatingCashFlow),
+        formatCurrencyUtil(row.financingCashFlow),
+        formatCurrencyUtil(row.investingCashFlow),
+        formatCurrencyUtil(row.netChangeInCash),
+      ])
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+      })
+      doc.save("cash-flow.pdf")
+    } catch (err) {
+      console.error("Error exporting PDF:", err)
+    } finally {
+      setExportMenuOpen(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -1199,6 +1256,34 @@ export default function CashFlowPage() {
                   </button>
                 </div>
               )}
+
+              <div className="relative">
+                <button
+                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                  className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors shadow-sm"
+                  style={{ backgroundColor: BRAND_COLORS.primary }}
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                {exportMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                    <button
+                      onClick={handleExportExcel}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                    >
+                      Excel
+                    </button>
+                    <button
+                      onClick={handleExportPdf}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                    >
+                      PDF
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <button
                 onClick={() => {
