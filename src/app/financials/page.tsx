@@ -219,6 +219,19 @@ export default function FinancialsPage() {
 
   const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - 5 + i).toString())
 
+  const calculateMonthlyValue = (acc: PLAccount, monthYear: string) => {
+    const txs = acc.transactions.filter((tx) => getMonthYear(tx.date) === monthYear)
+    const credits = txs.reduce((sum, tx) => {
+      const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+      return sum + (isNaN(val) ? 0 : val)
+    }, 0)
+    const debits = txs.reduce((sum, tx) => {
+      const val = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
+      return sum + (isNaN(val) ? 0 : val)
+    }, 0)
+    return acc.category === "INCOME" ? credits - debits : debits - credits
+  }
+
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -471,32 +484,63 @@ export default function FinancialsPage() {
   }
 
   const handleExportExcel = () => {
+    const months = Array.from(
+      new Set(plAccounts.flatMap((acc) => acc.transactions.map((tx) => getMonthYear(tx.date)))),
+    ).sort((a, b) => {
+      const [monthA, yearA] = a.split(" ")
+      const [monthB, yearB] = b.split(" ")
+      const monthIndexA = monthsList.indexOf(monthA)
+      const monthIndexB = monthsList.indexOf(monthB)
+      return Number(yearA) - Number(yearB) || monthIndexA - monthIndexB
+    })
+
     const data = plAccounts.map((acc) => {
       const row: Record<string, any> = { Account: acc.account }
-
-      // Get unique months from transactions using timezone-independent method
-      const months = Array.from(new Set(acc.transactions.map((tx) => getMonthYear(tx.date)))).sort((a, b) => {
-        const [monthA, yearA] = a.split(" ")
-        const [monthB, yearB] = b.split(" ")
-        const monthIndexA = monthsList.indexOf(monthA)
-        const monthIndexB = monthsList.indexOf(monthB)
-        return Number(yearA) - Number(yearB) || monthIndexA - monthIndexB
-      })
-
       months.forEach((monthYear) => {
-        const txs = acc.transactions.filter((tx) => getMonthYear(tx.date) === monthYear)
-        const credits = txs.reduce((sum, tx) => {
-          const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
-          return sum + (isNaN(val) ? 0 : val)
-        }, 0)
-        const debits = txs.reduce((sum, tx) => {
-          const val = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-          return sum + (isNaN(val) ? 0 : val)
-        }, 0)
-        row[monthYear] = acc.category === "INCOME" ? credits - debits : debits - credits
+        row[monthYear] = calculateMonthlyValue(acc, monthYear)
       })
       return row
     })
+
+    const incomeAccounts = plAccounts.filter((acc) => acc.category === "INCOME")
+    const cogsAccounts = plAccounts.filter(
+      (acc) =>
+        acc.category === "EXPENSES" && acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    )
+    const expenseAccounts = plAccounts.filter(
+      (acc) =>
+        acc.category === "EXPENSES" && !acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    )
+
+    const totalRevenueRow: Record<string, any> = { Account: "Total Revenue" }
+    const cogsRow: Record<string, any> = { Account: "COGS" }
+    const grossProfitRow: Record<string, any> = { Account: "Gross Profit" }
+    const expensesRow: Record<string, any> = { Account: "Expenses" }
+    const totalIncomeRow: Record<string, any> = { Account: "Total Income" }
+
+    months.forEach((monthYear) => {
+      const income = incomeAccounts.reduce(
+        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
+        0,
+      )
+      const cogs = cogsAccounts.reduce(
+        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
+        0,
+      )
+      const expenses = expenseAccounts.reduce(
+        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
+        0,
+      )
+      const grossProfit = income - cogs
+      const totalIncome = grossProfit - expenses
+      totalRevenueRow[monthYear] = income
+      cogsRow[monthYear] = cogs
+      grossProfitRow[monthYear] = grossProfit
+      expensesRow[monthYear] = expenses
+      totalIncomeRow[monthYear] = totalIncome
+    })
+
+    data.push({}, totalRevenueRow, cogsRow, grossProfitRow, expensesRow, totalIncomeRow)
 
     const worksheet = XLSX.utils.json_to_sheet(data)
     const workbook = XLSX.utils.book_new()
@@ -505,7 +549,6 @@ export default function FinancialsPage() {
   }
 
   const handleExportPdf = () => {
-    // Get unique months from all transactions using timezone-independent method
     const months = Array.from(
       new Set(plAccounts.flatMap((acc) => acc.transactions.map((tx) => getMonthYear(tx.date)))),
     ).sort((a, b) => {
@@ -519,20 +562,55 @@ export default function FinancialsPage() {
     const doc = new jsPDF()
     const tableColumn = ["Account", ...months]
     const tableRows = plAccounts.map((acc) => {
-      const row = months.map((monthYear) => {
-        const txs = acc.transactions.filter((tx) => getMonthYear(tx.date) === monthYear)
-        const credits = txs.reduce((sum, tx) => {
-          const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
-          return sum + (isNaN(val) ? 0 : val)
-        }, 0)
-        const debits = txs.reduce((sum, tx) => {
-          const val = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-          return sum + (isNaN(val) ? 0 : val)
-        }, 0)
-        return acc.category === "INCOME" ? credits - debits : debits - credits
-      })
+      const row = months.map((monthYear) => calculateMonthlyValue(acc, monthYear))
       return [acc.account, ...row]
     })
+
+    const incomeAccounts = plAccounts.filter((acc) => acc.category === "INCOME")
+    const cogsAccounts = plAccounts.filter(
+      (acc) =>
+        acc.category === "EXPENSES" && acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    )
+    const expenseAccounts = plAccounts.filter(
+      (acc) =>
+        acc.category === "EXPENSES" && !acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    )
+
+    const totalRevenue: number[] = []
+    const totalCogs: number[] = []
+    const grossProfit: number[] = []
+    const totalExpenses: number[] = []
+    const totalIncome: number[] = []
+
+    months.forEach((monthYear) => {
+      const income = incomeAccounts.reduce(
+        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
+        0,
+      )
+      const cogs = cogsAccounts.reduce(
+        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
+        0,
+      )
+      const expenses = expenseAccounts.reduce(
+        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
+        0,
+      )
+      const gp = income - cogs
+      const net = gp - expenses
+      totalRevenue.push(income)
+      totalCogs.push(cogs)
+      grossProfit.push(gp)
+      totalExpenses.push(expenses)
+      totalIncome.push(net)
+    })
+
+    tableRows.push(
+      ["Total Revenue", ...totalRevenue],
+      ["COGS", ...totalCogs],
+      ["Gross Profit", ...grossProfit],
+      ["Expenses", ...totalExpenses],
+      ["Total Income", ...totalIncome],
+    )
 
     autoTable(doc, {
       head: [tableColumn],
