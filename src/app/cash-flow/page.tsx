@@ -1441,6 +1441,27 @@ export default function CashFlowPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <style jsx>{`
+        table.sticky-first-column thead th {
+          position: sticky;
+          top: 0;
+          background: inherit;
+          z-index: 10;
+        }
+        table.sticky-first-column thead th:first-child {
+          left: 0;
+          z-index: 30;
+          box-shadow: 2px 0 0 0 rgba(226, 232, 240, 1);
+        }
+        table.sticky-first-column tbody td:first-child {
+          position: sticky;
+          left: 0;
+          background: inherit;
+          z-index: 20;
+          box-shadow: 2px 0 0 0 rgba(226, 232, 240, 1);
+        }
+      `}</style>
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -1740,7 +1761,7 @@ export default function CashFlowPage() {
 
               {bankAccountData.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
@@ -1958,7 +1979,7 @@ export default function CashFlowPage() {
 
                         {!isCollapsed && (
                           <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
@@ -2085,7 +2106,7 @@ export default function CashFlowPage() {
 
                         {!isCollapsed && (
                           <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
@@ -2213,7 +2234,7 @@ export default function CashFlowPage() {
                         </div>
                         <div className="overflow-x-auto">
                           {!isCollapsed && (
-                            <table className="min-w-full divide-y divide-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
@@ -2342,7 +2363,7 @@ export default function CashFlowPage() {
                           </div>
                           <div className="overflow-x-auto">
                             {!isCollapsed && (
-                              <table className="min-w-full divide-y divide-gray-200">
+                              <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                                 <thead className="bg-gray-50">
                                   <tr>
                                     <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
@@ -2471,7 +2492,7 @@ export default function CashFlowPage() {
                         </div>
                         <div className="overflow-x-auto">
                           {!isCollapsed && (
-                            <table className="min-w-full divide-y divide-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
@@ -2612,7 +2633,7 @@ export default function CashFlowPage() {
 
                         {!isCollapsed && (
                           <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
@@ -2791,7 +2812,7 @@ export default function CashFlowPage() {
                 })()}
 
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -3079,7 +3100,7 @@ export default function CashFlowPage() {
 
             <div className="p-6 overflow-auto max-h-[70vh]">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 sticky-first-column">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">

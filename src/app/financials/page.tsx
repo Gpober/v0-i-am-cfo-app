@@ -1401,18 +1401,18 @@ export default function FinancialsPage() {
           position: sticky;
           top: 0;
           background: inherit;
-          z-index: 1;
+          z-index: 10;
         }
         table.sticky-first-column thead th:first-child {
           left: 0;
-          z-index: 2;
+          z-index: 30;
           box-shadow: 2px 0 0 0 rgba(226, 232, 240, 1);
         }
         table.sticky-first-column tbody td:first-child {
           position: sticky;
           left: 0;
           background: inherit;
-          z-index: 1;
+          z-index: 20;
           box-shadow: 2px 0 0 0 rgba(226, 232, 240, 1);
         }
       `}</style>
