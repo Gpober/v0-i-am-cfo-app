@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import React from "react"
-import { useState, useEffect, useRef } from "react"
+import React from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Download,
   RefreshCw,
@@ -12,11 +12,11 @@ import {
   ChevronRight,
   Calendar,
   X,
-} from "lucide-react"
-import { supabase } from "@/lib/supabaseClient"
-import * as XLSX from "xlsx"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
+} from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
@@ -39,66 +39,70 @@ const BRAND_COLORS = {
     800: "#1E293B",
     900: "#0F172A",
   },
-}
+};
 
 // Types
 type FinancialTransaction = {
-  idx: number
-  id: string
-  entry_number: string
-  line_sequence: number
-  date: string
-  type: string
-  number: string
-  due_date: string | null
-  open_balance: number | null
-  payment_date: string | null
-  payment_method: string | null
-  adj: string | null
-  created: string
-  created_by: string
-  name: string
-  customer: string | null
-  vendor: string | null
-  employee: string | null
-  class: string | null
-  product_service: string | null
-  memo: string | null
-  qty: number | null
-  rate: number | null
-  account: string
-  ar_paid: number | null
-  ap_paid: number | null
-  clr: string | null
-  check_printed: string | null
-  debit: string | null
-  credit: string | null
-  online_banking: string | null
-  account_type: string
-  detail_type: string | null
-  account_behavior: string | null
-  report_category: string | null
-  normal_balance: string | null
-  property: string | null
-  is_cash_account: boolean | null
-  created_at: string
-  entry_bank_account: string | null
-}
+  idx: number;
+  id: string;
+  entry_number: string;
+  line_sequence: number;
+  date: string;
+  type: string;
+  number: string;
+  due_date: string | null;
+  open_balance: number | null;
+  payment_date: string | null;
+  payment_method: string | null;
+  adj: string | null;
+  created: string;
+  created_by: string;
+  name: string;
+  customer: string | null;
+  vendor: string | null;
+  employee: string | null;
+  class: string | null;
+  product_service: string | null;
+  memo: string | null;
+  qty: number | null;
+  rate: number | null;
+  account: string;
+  ar_paid: number | null;
+  ap_paid: number | null;
+  clr: string | null;
+  check_printed: string | null;
+  debit: string | null;
+  credit: string | null;
+  online_banking: string | null;
+  account_type: string;
+  detail_type: string | null;
+  account_behavior: string | null;
+  report_category: string | null;
+  normal_balance: string | null;
+  property: string | null;
+  is_cash_account: boolean | null;
+  created_at: string;
+  entry_bank_account: string | null;
+};
 
-type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
-type ViewMode = "Total" | "Detail" | "Class"
-type NotificationState = { show: boolean; message: string; type: "info" | "success" | "error" }
+type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom";
+type ViewMode = "Total" | "Detail" | "Class";
+type NotificationState = {
+  show: boolean;
+  message: string;
+  type: "info" | "success" | "error";
+};
 
 // P&L Account Structure
 interface PLAccount {
-  account: string
-  parent_account: string
-  sub_account: string | null
-  is_sub_account: boolean
-  amount: number
-  category: "INCOME" | "EXPENSES"
-  account_type: string
-  transactions: FinancialTransaction[]
+  account: string;
+  parent_account: string;
+  sub_account: string | null;
+  is_sub_account: boolean;
+  amount: number;
+  category: "INCOME" | "EXPENSES";
+  account_type: string;
+  transactions: FinancialTransaction[];
 }
 
 // Smart debugging configuration
@@ -106,41 +110,46 @@ const DEBUG_CONFIG = {
   isDevelopment: process.env.NODE_ENV === "development",
   isDebugMode:
     typeof window !== "undefined" &&
-    (localStorage.getItem("iam-cfo-debug") === "true" || process.env.NEXT_PUBLIC_DEBUG === "true"),
+    (localStorage.getItem("iam-cfo-debug") === "true" ||
+      process.env.NEXT_PUBLIC_DEBUG === "true"),
   enableDataValidation: true,
   enablePerformanceTracking: true,
-}
+};
 
 // Smart console logging
-const smartLog = (message: string, data?: any, level: "info" | "warn" | "error" = "info") => {
+const smartLog = (
+  message: string,
+  data?: any,
+  level: "info" | "warn" | "error" = "info",
+) => {
   if (DEBUG_CONFIG.isDevelopment || DEBUG_CONFIG.isDebugMode) {
-    const timestamp = new Date().toISOString()
-    const prefix = `[${timestamp}] [${level.toUpperCase()}]`
+    const timestamp = new Date().toISOString();
+    const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
 
     switch (level) {
       case "warn":
-        console.warn(prefix, message, data)
-        break
+        console.warn(prefix, message, data);
+        break;
       case "error":
-        console.error(prefix, message, data)
-        break
+        console.error(prefix, message, data);
+        break;
       default:
-        console.log(prefix, message, data)
+        console.log(prefix, message, data);
     }
   }
-}
+};
 
 // TIMEZONE-INDEPENDENT DATE UTILITIES
 // Extract date parts directly from string without timezone conversion
 const getDateParts = (dateString: string) => {
-  const dateOnly = dateString.split("T")[0] // Get YYYY-MM-DD part only
-  const [year, month, day] = dateOnly.split("-").map(Number)
-  return { year, month, day, dateOnly }
-}
+  const dateOnly = dateString.split("T")[0]; // Get YYYY-MM-DD part only
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  return { year, month, day, dateOnly };
+};
 
 // Get month name from date string without timezone issues
 const getMonthYear = (dateString: string) => {
-  const { year, month } = getDateParts(dateString)
+  const { year, month } = getDateParts(dateString);
   const monthNames = [
     "January",
     "February",
@@ -154,52 +163,81 @@ const getMonthYear = (dateString: string) => {
     "October",
     "November",
     "December",
-  ]
-  return `${monthNames[month - 1]} ${year}`
-}
+  ];
+  return `${monthNames[month - 1]} ${year}`;
+};
 
 // Compare dates as strings (YYYY-MM-DD format)
-const isDateInRange = (dateString: string, startDate: string, endDate: string): boolean => {
-  const { dateOnly } = getDateParts(dateString)
-  return dateOnly >= startDate && dateOnly <= endDate
-}
+const isDateInRange = (
+  dateString: string,
+  startDate: string,
+  endDate: string,
+): boolean => {
+  const { dateOnly } = getDateParts(dateString);
+  return dateOnly >= startDate && dateOnly <= endDate;
+};
 
 // Format date for display without timezone conversion
 const formatDateDisplay = (dateString: string) => {
-  const { year, month, day } = getDateParts(dateString)
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-  return `${monthNames[month - 1]} ${day}, ${year}`
-}
+  const { year, month, day } = getDateParts(dateString);
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  return `${monthNames[month - 1]} ${day}, ${year}`;
+};
 
 export default function FinancialsPage() {
-  const [selectedMonth, setSelectedMonth] = useState<string>("June")
-  const [selectedYear, setSelectedYear] = useState<string>("2025")
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("YTD")
-  const [viewMode, setViewMode] = useState<ViewMode>("Total")
-  const [notification, setNotification] = useState<NotificationState>({ show: false, message: "", type: "info" })
-  const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false)
-  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false)
-  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false)
-  const [yearDropdownOpen, setYearDropdownOpen] = useState(false)
-  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(["All Properties"]))
-  const [customStartDate, setCustomStartDate] = useState("")
-  const [customEndDate, setCustomEndDate] = useState("")
-  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
-  const [isLoadingData, setIsLoadingData] = useState(false)
-  const [plAccounts, setPlAccounts] = useState<PLAccount[]>([])
-  const [dataError, setDataError] = useState<string | null>(null)
-  const [availableProperties, setAvailableProperties] = useState<string[]>(["All Properties"])
-  const [showTransactionModal, setShowTransactionModal] = useState(false)
-  const [transactionModalTitle, setTransactionModalTitle] = useState("")
-  const [modalTransactionDetails, setModalTransactionDetails] = useState<FinancialTransaction[]>([])
-  const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState<string>("June");
+  const [selectedYear, setSelectedYear] = useState<string>("2025");
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("YTD");
+  const [viewMode, setViewMode] = useState<ViewMode>("Total");
+  const [notification, setNotification] = useState<NotificationState>({
+    show: false,
+    message: "",
+    type: "info",
+  });
+  const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false);
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false);
+  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
+  const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
+  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(
+    new Set(["All Properties"]),
+  );
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [plAccounts, setPlAccounts] = useState<PLAccount[]>([]);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [availableProperties, setAvailableProperties] = useState<string[]>([
+    "All Properties",
+  ]);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [transactionModalTitle, setTransactionModalTitle] = useState("");
+  const [modalTransactionDetails, setModalTransactionDetails] = useState<
+    FinancialTransaction[]
+  >([]);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
 
   // Refs for click outside functionality
-  const propertyDropdownRef = useRef<HTMLDivElement>(null)
-  const timePeriodDropdownRef = useRef<HTMLDivElement>(null)
-  const monthDropdownRef = useRef<HTMLDivElement>(null)
-  const yearDropdownRef = useRef<HTMLDivElement>(null)
-  const exportDropdownRef = useRef<HTMLDivElement>(null)
+  const propertyDropdownRef = useRef<HTMLDivElement>(null);
+  const timePeriodDropdownRef = useRef<HTMLDivElement>(null);
+  const monthDropdownRef = useRef<HTMLDivElement>(null);
+  const yearDropdownRef = useRef<HTMLDivElement>(null);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
 
   // Generate months and years lists
   const monthsList = [
@@ -215,176 +253,212 @@ export default function FinancialsPage() {
     "October",
     "November",
     "December",
-  ]
+  ];
 
-  const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - 5 + i).toString())
+  const yearsList = Array.from({ length: 10 }, (_, i) =>
+    (new Date().getFullYear() - 5 + i).toString(),
+  );
 
   const calculateMonthlyValue = (acc: PLAccount, monthYear: string) => {
-    const txs = acc.transactions.filter((tx) => getMonthYear(tx.date) === monthYear)
+    const txs = acc.transactions.filter(
+      (tx) => getMonthYear(tx.date) === monthYear,
+    );
     const credits = txs.reduce((sum, tx) => {
-      const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
-      return sum + (isNaN(val) ? 0 : val)
-    }, 0)
+      const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0;
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
     const debits = txs.reduce((sum, tx) => {
-      const val = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-      return sum + (isNaN(val) ? 0 : val)
-    }, 0)
-    return acc.category === "INCOME" ? credits - debits : debits - credits
-  }
+      const val = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0;
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
+    return acc.category === "INCOME" ? credits - debits : debits - credits;
+  };
 
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (propertyDropdownRef.current && !propertyDropdownRef.current.contains(event.target as Node)) {
-        setPropertyDropdownOpen(false)
+      if (
+        propertyDropdownRef.current &&
+        !propertyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setPropertyDropdownOpen(false);
       }
-      if (timePeriodDropdownRef.current && !timePeriodDropdownRef.current.contains(event.target as Node)) {
-        setTimePeriodDropdownOpen(false)
+      if (
+        timePeriodDropdownRef.current &&
+        !timePeriodDropdownRef.current.contains(event.target as Node)
+      ) {
+        setTimePeriodDropdownOpen(false);
       }
-      if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target as Node)) {
-        setMonthDropdownOpen(false)
+      if (
+        monthDropdownRef.current &&
+        !monthDropdownRef.current.contains(event.target as Node)
+      ) {
+        setMonthDropdownOpen(false);
       }
-      if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
-        setYearDropdownOpen(false)
+      if (
+        yearDropdownRef.current &&
+        !yearDropdownRef.current.contains(event.target as Node)
+      ) {
+        setYearDropdownOpen(false);
       }
-      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
-        setExportDropdownOpen(false)
+      if (
+        exportDropdownRef.current &&
+        !exportDropdownRef.current.contains(event.target as Node)
+      ) {
+        setExportDropdownOpen(false);
       }
-    }
+    };
 
-    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Calculate date range based on selected period - COMPLETELY TIMEZONE INDEPENDENT
   const calculateDateRange = () => {
-    let startDate: string
-    let endDate: string
+    let startDate: string;
+    let endDate: string;
 
     if (timePeriod === "Custom") {
-      startDate = customStartDate || "2025-01-01"
-      endDate = customEndDate || "2025-06-30"
+      startDate = customStartDate || "2025-01-01";
+      endDate = customEndDate || "2025-06-30";
     } else if (timePeriod === "YTD") {
-      const year = Number.parseInt(selectedYear)
-      startDate = `${year}-01-01`
-      endDate = `${year}-06-30`
+      const year = Number.parseInt(selectedYear);
+      startDate = `${year}-01-01`;
+      endDate = `${year}-06-30`;
     } else if (timePeriod === "Monthly") {
-      const monthIndex = monthsList.indexOf(selectedMonth)
-      const year = Number.parseInt(selectedYear)
-      startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
+      startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`;
 
       // Calculate last day of month without Date object to avoid timezone issues
-      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let lastDay = daysInMonth[monthIndex]
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
 
       // Handle leap year for February
-      if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
-        lastDay = 29
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
       }
 
-      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else if (timePeriod === "Quarterly") {
-      const monthIndex = monthsList.indexOf(selectedMonth)
-      const year = Number.parseInt(selectedYear)
-      const quarter = Math.floor(monthIndex / 3)
-      const quarterStartMonth = quarter * 3
-      startDate = `${year}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
+      const quarter = Math.floor(monthIndex / 3);
+      const quarterStartMonth = quarter * 3;
+      startDate = `${year}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`;
 
-      const quarterEndMonth = quarterStartMonth + 2
-      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let lastDay = daysInMonth[quarterEndMonth]
+      const quarterEndMonth = quarterStartMonth + 2;
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[quarterEndMonth];
 
       // Handle leap year for February
-      if (quarterEndMonth === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
-        lastDay = 29
+      if (
+        quarterEndMonth === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
       }
 
-      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else {
       // Trailing 12 - calculate 12 months back from current date
-      const now = new Date()
-      const currentYear = now.getFullYear()
-      const currentMonth = now.getMonth() + 1
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
 
-      let startYear = currentYear
-      let startMonth = currentMonth - 12
+      let startYear = currentYear;
+      let startMonth = currentMonth - 12;
       if (startMonth <= 0) {
-        startMonth += 12
-        startYear -= 1
+        startMonth += 12;
+        startYear -= 1;
       }
 
-      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
 
-      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let lastDay = daysInMonth[currentMonth - 1]
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[currentMonth - 1];
 
       // Handle leap year for February
-      if (currentMonth === 2 && ((currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0)) {
-        lastDay = 29
+      if (
+        currentMonth === 2 &&
+        ((currentYear % 4 === 0 && currentYear % 100 !== 0) ||
+          currentYear % 400 === 0)
+      ) {
+        lastDay = 29;
       }
 
-      endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     }
 
-    return { startDate, endDate }
-  }
+    return { startDate, endDate };
+  };
 
   // CORRECTED: P&L Classification using account_type field
-  const classifyPLAccount = (accountType: string, accountName: string, reportCategory: string) => {
-    const typeLower = accountType?.toLowerCase() || ""
-    const nameLower = accountName?.toLowerCase() || ""
-    const categoryLower = reportCategory?.toLowerCase() || ""
+  const classifyPLAccount = (
+    accountType: string,
+    accountName: string,
+    reportCategory: string,
+  ) => {
+    const typeLower = accountType?.toLowerCase() || "";
+    const nameLower = accountName?.toLowerCase() || "";
+    const categoryLower = reportCategory?.toLowerCase() || "";
 
     // Exclude transfers and cash accounts first
-    const isTransfer = categoryLower === "transfer" || nameLower.includes("transfer")
+    const isTransfer =
+      categoryLower === "transfer" || nameLower.includes("transfer");
     const isCashAccount =
       typeLower.includes("bank") ||
       typeLower.includes("cash") ||
       nameLower.includes("checking") ||
       nameLower.includes("savings") ||
-      nameLower.includes("cash")
+      nameLower.includes("cash");
 
-    if (isCashAccount || isTransfer) return null
+    if (isCashAccount || isTransfer) return null;
 
     // INCOME ACCOUNTS - Based on account_type
     const isIncomeAccount =
       typeLower === "income" ||
       typeLower === "other income" ||
       typeLower.includes("income") ||
-      typeLower.includes("revenue")
+      typeLower.includes("revenue");
 
     // EXPENSE ACCOUNTS - Based on account_type
     const isExpenseAccount =
       typeLower === "expense" ||
       typeLower === "other expense" ||
       typeLower === "cost of goods sold" ||
-      typeLower.includes("expense")
+      typeLower.includes("expense");
 
-    if (isIncomeAccount) return "INCOME"
-    if (isExpenseAccount) return "EXPENSES"
+    if (isIncomeAccount) return "INCOME";
+    if (isExpenseAccount) return "EXPENSES";
 
-    return null // Not a P&L account (likely Balance Sheet account)
-  }
+    return null; // Not a P&L account (likely Balance Sheet account)
+  };
 
   // Fetch P&L data using ENHANCED database strategy with TIMEZONE-INDEPENDENT dates
   const fetchPLData = async () => {
-    setIsLoadingData(true)
-    setDataError(null)
+    setIsLoadingData(true);
+    setDataError(null);
 
     try {
-      const { startDate, endDate } = calculateDateRange()
-      const selectedProperty = Array.from(selectedProperties)[0] || "All Properties"
+      const { startDate, endDate } = calculateDateRange();
+      const selectedProperty =
+        Array.from(selectedProperties)[0] || "All Properties";
 
-      smartLog(`🔍 TIMEZONE-INDEPENDENT P&L DATA FETCH`)
-      smartLog(`📅 Period: ${startDate} to ${endDate}`)
-      smartLog(`🏢 Property Filter: "${selectedProperty}"`)
+      smartLog(`🔍 TIMEZONE-INDEPENDENT P&L DATA FETCH`);
+      smartLog(`📅 Period: ${startDate} to ${endDate}`);
+      smartLog(`🏢 Property Filter: "${selectedProperty}"`);
 
       // ENHANCED QUERY: Use the new database structure with better field selection
       let query = supabase
         .from("journal_entry_lines")
-        .select(`
+        .select(
+          `
          entry_number, 
          class, 
          date, 
@@ -402,29 +476,32 @@ export default function FinancialsPage() {
          is_cash_account,
          detail_type,
          account_behavior
-       `)
+       `,
+        )
         .gte("date", startDate)
         .lte("date", endDate)
-        .order("date", { ascending: true })
+        .order("date", { ascending: true });
 
       // Apply property filter
       if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
+        query = query.eq("class", selectedProperty);
       }
 
-      const { data: allTransactions, error } = await query
+      const { data: allTransactions, error } = await query;
 
-      if (error) throw error
+      if (error) throw error;
 
-      smartLog(`📊 Fetched ${allTransactions.length} total transactions`)
+      smartLog(`📊 Fetched ${allTransactions.length} total transactions`);
 
       // Filter transactions using TIMEZONE-INDEPENDENT date comparison
       const filteredTransactions = allTransactions.filter((tx) => {
-        return isDateInRange(tx.date, startDate, endDate)
-      })
+        return isDateInRange(tx.date, startDate, endDate);
+      });
 
-      smartLog(`📅 After timezone-independent date filtering: ${filteredTransactions.length} transactions`)
-      smartLog(`📅 Date range check: ${startDate} to ${endDate}`)
+      smartLog(
+        `📅 After timezone-independent date filtering: ${filteredTransactions.length} transactions`,
+      );
+      smartLog(`📅 Date range check: ${startDate} to ${endDate}`);
       smartLog(
         `📅 Sample dates:`,
         filteredTransactions.slice(0, 5).map((tx) => ({
@@ -433,191 +510,297 @@ export default function FinancialsPage() {
           monthYear: getMonthYear(tx.date),
           formatted: formatDateDisplay(tx.date),
         })),
-      )
+      );
 
       // Filter for P&L accounts using enhanced classification
       const plTransactions = filteredTransactions.filter((tx) => {
-        const classification = classifyPLAccount(tx.account_type, tx.account, tx.report_category)
-        return classification !== null
-      })
+        const classification = classifyPLAccount(
+          tx.account_type,
+          tx.account,
+          tx.report_category,
+        );
+        return classification !== null;
+      });
 
-      smartLog(`📈 Filtered to ${plTransactions.length} P&L transactions`)
-      smartLog(`🔍 Sample P&L transactions:`, plTransactions.slice(0, 5))
+      smartLog(`📈 Filtered to ${plTransactions.length} P&L transactions`);
+      smartLog(`🔍 Sample P&L transactions:`, plTransactions.slice(0, 5));
 
       // Get unique properties for filter dropdown using 'class' field
-      const properties = new Set<string>()
+      const properties = new Set<string>();
       plTransactions.forEach((tx) => {
         if (tx.class && tx.class.trim()) {
-          properties.add(tx.class.trim())
+          properties.add(tx.class.trim());
         }
-      })
-      setAvailableProperties(["All Properties", ...Array.from(properties).sort()])
+      });
+      setAvailableProperties([
+        "All Properties",
+        ...Array.from(properties).sort(),
+      ]);
 
       // Process transactions using ENHANCED logic
-      const processedAccounts = await processPLTransactionsEnhanced(plTransactions, startDate, endDate)
-      setPlAccounts(processedAccounts)
+      const processedAccounts = await processPLTransactionsEnhanced(
+        plTransactions,
+        startDate,
+        endDate,
+      );
+      setPlAccounts(processedAccounts);
 
-      smartLog(`✅ Processed ${processedAccounts.length} P&L accounts using timezone-independent strategy`)
+      smartLog(
+        `✅ Processed ${processedAccounts.length} P&L accounts using timezone-independent strategy`,
+      );
 
       setNotification({
         show: true,
         message: `Loaded ${plTransactions.length} P&L transactions successfully using timezone-independent date handling`,
         type: "success",
-      })
+      });
 
       // Hide notification after 3 seconds
       setTimeout(() => {
-        setNotification({ show: false, message: "", type: "info" })
-      }, 3000)
+        setNotification({ show: false, message: "", type: "info" });
+      }, 3000);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred"
-      setDataError(errorMessage)
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown error occurred";
+      setDataError(errorMessage);
       setNotification({
         show: true,
         message: `Error loading data: ${errorMessage}`,
         type: "error",
-      })
-      smartLog("❌ Error fetching timezone-independent P&L data:", err, "error")
+      });
+      smartLog(
+        "❌ Error fetching timezone-independent P&L data:",
+        err,
+        "error",
+      );
     } finally {
-      setIsLoadingData(false)
+      setIsLoadingData(false);
     }
-  }
+  };
 
   const handleExportExcel = () => {
     const months = Array.from(
-      new Set(plAccounts.flatMap((acc) => acc.transactions.map((tx) => getMonthYear(tx.date)))),
+      new Set(
+        plAccounts.flatMap((acc) =>
+          acc.transactions.map((tx) => getMonthYear(tx.date)),
+        ),
+      ),
     ).sort((a, b) => {
-      const [monthA, yearA] = a.split(" ")
-      const [monthB, yearB] = b.split(" ")
-      const monthIndexA = monthsList.indexOf(monthA)
-      const monthIndexB = monthsList.indexOf(monthB)
-      return Number(yearA) - Number(yearB) || monthIndexA - monthIndexB
-    })
+      const [monthA, yearA] = a.split(" ");
+      const [monthB, yearB] = b.split(" ");
+      const monthIndexA = monthsList.indexOf(monthA);
+      const monthIndexB = monthsList.indexOf(monthB);
+      return Number(yearA) - Number(yearB) || monthIndexA - monthIndexB;
+    });
 
-    const data = plAccounts.map((acc) => {
-      const row: Record<string, any> = { Account: acc.account }
-      months.forEach((monthYear) => {
-        row[monthYear] = calculateMonthlyValue(acc, monthYear)
-      })
-      return row
-    })
-
-    const incomeAccounts = plAccounts.filter((acc) => acc.category === "INCOME")
+    const incomeAccounts = plAccounts.filter(
+      (acc) => acc.category === "INCOME",
+    );
     const cogsAccounts = plAccounts.filter(
       (acc) =>
-        acc.category === "EXPENSES" && acc.account_type?.toLowerCase().includes("cost of goods sold"),
-    )
+        acc.category === "EXPENSES" &&
+        acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    );
     const expenseAccounts = plAccounts.filter(
       (acc) =>
-        acc.category === "EXPENSES" && !acc.account_type?.toLowerCase().includes("cost of goods sold"),
-    )
+        acc.category === "EXPENSES" &&
+        !acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    );
 
-    const totalRevenueRow: Record<string, any> = { Account: "Total Revenue" }
-    const cogsRow: Record<string, any> = { Account: "COGS" }
-    const grossProfitRow: Record<string, any> = { Account: "Gross Profit" }
-    const expensesRow: Record<string, any> = { Account: "Expenses" }
-    const totalIncomeRow: Record<string, any> = { Account: "Total Income" }
+    const header = ["Account", ...months, "Total"];
+    const sheetData: (string | number | { f: string; z?: string })[][] = [
+      header,
+    ];
+    const colLetters = months.map((_, i) => XLSX.utils.encode_col(i + 1));
+    const totalCol = XLSX.utils.encode_col(months.length + 1);
+    let currentRow = 1;
 
-    months.forEach((monthYear) => {
-      const income = incomeAccounts.reduce(
-        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
-        0,
-      )
-      const cogs = cogsAccounts.reduce(
-        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
-        0,
-      )
-      const expenses = expenseAccounts.reduce(
-        (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
-        0,
-      )
-      const grossProfit = income - cogs
-      const totalIncome = grossProfit - expenses
-      totalRevenueRow[monthYear] = income
-      cogsRow[monthYear] = cogs
-      grossProfitRow[monthYear] = grossProfit
-      expensesRow[monthYear] = expenses
-      totalIncomeRow[monthYear] = totalIncome
-    })
+    const rowTotalFormula = (rowNum: number) =>
+      `SUM(${colLetters[0]}${rowNum}:${colLetters[colLetters.length - 1]}${rowNum})`;
 
-    data.push({}, totalRevenueRow, cogsRow, grossProfitRow, expensesRow, totalIncomeRow)
+    const addAccountRows = (accounts: PLAccount[]) => {
+      const start = currentRow + 1;
+      accounts.forEach((acc) => {
+        const excelRow = currentRow + 1;
+        const values = months.map((m) => calculateMonthlyValue(acc, m));
+        const row: (string | number | { f: string })[] = [
+          acc.account,
+          ...values,
+        ];
+        row.push({ f: rowTotalFormula(excelRow) });
+        sheetData.push(row);
+        currentRow++;
+      });
+      const end = currentRow;
+      return { start, end };
+    };
 
-    const worksheet = XLSX.utils.json_to_sheet(data)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "P&L")
-    XLSX.writeFile(workbook, "pl_accounts.xlsx")
-  }
+    const incomeRange = addAccountRows(incomeAccounts);
+    const totalIncomeRowIdx = currentRow + 1;
+    const totalIncomeRow = [
+      "Total Income",
+      ...colLetters.map((letter) => ({
+        f: `SUM(${letter}${incomeRange.start}:${letter}${incomeRange.end})`,
+      })),
+      { f: rowTotalFormula(totalIncomeRowIdx) },
+    ];
+    sheetData.push(totalIncomeRow);
+    currentRow++;
+
+    const cogsRange = addAccountRows(cogsAccounts);
+    const totalCogsRowIdx = currentRow + 1;
+    const totalCogsRow = [
+      "Total COGS",
+      ...colLetters.map((letter) => ({
+        f: `SUM(${letter}${cogsRange.start}:${letter}${cogsRange.end})`,
+      })),
+      { f: rowTotalFormula(totalCogsRowIdx) },
+    ];
+    sheetData.push(totalCogsRow);
+    currentRow++;
+
+    const grossProfitRowIdx = currentRow + 1;
+    const grossProfitRow = [
+      "Gross Profit",
+      ...colLetters.map((letter) => ({
+        f: `${letter}${totalIncomeRowIdx}-${letter}${totalCogsRowIdx}`,
+      })),
+      { f: `${totalCol}${totalIncomeRowIdx}-${totalCol}${totalCogsRowIdx}` },
+    ];
+    sheetData.push(grossProfitRow);
+    currentRow++;
+
+    // Blank row
+    sheetData.push([]);
+    currentRow++;
+
+    const gpPercentRow = [
+      "Gross Profit %",
+      ...colLetters.map((letter) => ({
+        f: `${letter}${grossProfitRowIdx}/${letter}${totalIncomeRowIdx}`,
+        z: "0.00%",
+      })),
+      {
+        f: `${totalCol}${grossProfitRowIdx}/${totalCol}${totalIncomeRowIdx}`,
+        z: "0.00%",
+      },
+    ];
+    sheetData.push(gpPercentRow);
+    currentRow++;
+
+    const expenseRange = addAccountRows(expenseAccounts);
+    const totalExpenseRowIdx = currentRow + 1;
+    const totalExpenseRow = [
+      "Total Expenses",
+      ...colLetters.map((letter) => ({
+        f: `SUM(${letter}${expenseRange.start}:${letter}${expenseRange.end})`,
+      })),
+      { f: rowTotalFormula(totalExpenseRowIdx) },
+    ];
+    sheetData.push(totalExpenseRow);
+    currentRow++;
+
+    const netIncomeRow = [
+      "Net Income",
+      ...colLetters.map((letter) => ({
+        f: `${letter}${grossProfitRowIdx}-${letter}${totalExpenseRowIdx}`,
+      })),
+      { f: `${totalCol}${grossProfitRowIdx}-${totalCol}${totalExpenseRowIdx}` },
+    ];
+    sheetData.push(netIncomeRow);
+
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "P&L");
+    XLSX.writeFile(workbook, "pl_accounts.xlsx");
+  };
 
   const handleExportPdf = () => {
     const months = Array.from(
-      new Set(plAccounts.flatMap((acc) => acc.transactions.map((tx) => getMonthYear(tx.date)))),
+      new Set(
+        plAccounts.flatMap((acc) =>
+          acc.transactions.map((tx) => getMonthYear(tx.date)),
+        ),
+      ),
     ).sort((a, b) => {
-      const [monthA, yearA] = a.split(" ")
-      const [monthB, yearB] = b.split(" ")
-      const monthIndexA = monthsList.indexOf(monthA)
-      const monthIndexB = monthsList.indexOf(monthB)
-      return Number(yearA) - Number(yearB) || monthIndexA - monthIndexB
-    })
+      const [monthA, yearA] = a.split(" ");
+      const [monthB, yearB] = b.split(" ");
+      const monthIndexA = monthsList.indexOf(monthA);
+      const monthIndexB = monthsList.indexOf(monthB);
+      return Number(yearA) - Number(yearB) || monthIndexA - monthIndexB;
+    });
 
-    const doc = new jsPDF()
-    const tableColumn = ["Account", ...months]
+    const doc = new jsPDF();
+    const tableColumn = ["Account", ...months];
     const tableRows = plAccounts.map((acc) => {
-      const row = months.map((monthYear) => calculateMonthlyValue(acc, monthYear))
-      return [acc.account, ...row]
-    })
+      const row = months.map((monthYear) =>
+        calculateMonthlyValue(acc, monthYear),
+      );
+      return [acc.account, ...row];
+    });
 
-    const incomeAccounts = plAccounts.filter((acc) => acc.category === "INCOME")
+    const incomeAccounts = plAccounts.filter(
+      (acc) => acc.category === "INCOME",
+    );
     const cogsAccounts = plAccounts.filter(
       (acc) =>
-        acc.category === "EXPENSES" && acc.account_type?.toLowerCase().includes("cost of goods sold"),
-    )
+        acc.category === "EXPENSES" &&
+        acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    );
     const expenseAccounts = plAccounts.filter(
       (acc) =>
-        acc.category === "EXPENSES" && !acc.account_type?.toLowerCase().includes("cost of goods sold"),
-    )
+        acc.category === "EXPENSES" &&
+        !acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    );
 
-    const totalRevenue: number[] = []
-    const totalCogs: number[] = []
-    const grossProfit: number[] = []
-    const totalExpenses: number[] = []
-    const totalIncome: number[] = []
+    const totalIncomeArr: number[] = [];
+    const totalCogs: number[] = [];
+    const grossProfit: number[] = [];
+    const grossProfitPct: number[] = [];
+    const totalExpenses: number[] = [];
+    const netIncome: number[] = [];
 
     months.forEach((monthYear) => {
       const income = incomeAccounts.reduce(
         (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
         0,
-      )
+      );
       const cogs = cogsAccounts.reduce(
         (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
         0,
-      )
+      );
       const expenses = expenseAccounts.reduce(
         (sum, acc) => sum + calculateMonthlyValue(acc, monthYear),
         0,
-      )
-      const gp = income - cogs
-      const net = gp - expenses
-      totalRevenue.push(income)
-      totalCogs.push(cogs)
-      grossProfit.push(gp)
-      totalExpenses.push(expenses)
-      totalIncome.push(net)
-    })
+      );
+      const gp = income - cogs;
+      const net = gp - expenses;
+      totalIncomeArr.push(income);
+      totalCogs.push(cogs);
+      grossProfit.push(gp);
+      grossProfitPct.push(income !== 0 ? gp / income : 0);
+      totalExpenses.push(expenses);
+      netIncome.push(net);
+    });
 
     tableRows.push(
-      ["Total Revenue", ...totalRevenue],
-      ["COGS", ...totalCogs],
+      ["Total Income", ...totalIncomeArr],
+      ["Total COGS", ...totalCogs],
       ["Gross Profit", ...grossProfit],
-      ["Expenses", ...totalExpenses],
-      ["Total Income", ...totalIncome],
-    )
+      [
+        "Gross Profit %",
+        ...grossProfitPct.map((p) => `${(p * 100).toFixed(2)}%`),
+      ],
+      ["Total Expenses", ...totalExpenses],
+      ["Net Income", ...netIncome],
+    );
 
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-    })
-    doc.save("pl_accounts.pdf")
-  }
+    });
+    doc.save("pl_accounts.pdf");
+  };
 
   // ENHANCED: Process transactions with improved calculation logic
   const processPLTransactionsEnhanced = async (
@@ -625,82 +808,92 @@ export default function FinancialsPage() {
     startDate: string,
     endDate: string,
   ): Promise<PLAccount[]> => {
-    const accountMap = new Map<string, PLAccount>()
+    const accountMap = new Map<string, PLAccount>();
 
-    smartLog(`🔄 Processing ${transactions.length} P&L transactions with timezone-independent strategy`)
+    smartLog(
+      `🔄 Processing ${transactions.length} P&L transactions with timezone-independent strategy`,
+    );
 
     // Group transactions by account (EXACTLY like SQL GROUP BY)
-    const accountGroups = new Map<string, any[]>()
+    const accountGroups = new Map<string, any[]>();
 
     transactions.forEach((tx) => {
-      const account = tx.account
+      const account = tx.account;
       if (!accountGroups.has(account)) {
-        accountGroups.set(account, [])
+        accountGroups.set(account, []);
       }
-      accountGroups.get(account)!.push(tx)
-    })
+      accountGroups.get(account)!.push(tx);
+    });
 
-    smartLog(`📊 Grouped into ${accountGroups.size} unique accounts`)
+    smartLog(`📊 Grouped into ${accountGroups.size} unique accounts`);
 
     // Process each account group using ENHANCED calculation
     for (const [account, txList] of accountGroups.entries()) {
-      const sampleTx = txList[0]
-      const accountType = sampleTx.account_type
-      const reportCategory = sampleTx.report_category
+      const sampleTx = txList[0];
+      const accountType = sampleTx.account_type;
+      const reportCategory = sampleTx.report_category;
 
       // Calculate totals using ENHANCED logic with proper null handling
-      let totalCredits = 0
-      let totalDebits = 0
+      let totalCredits = 0;
+      let totalDebits = 0;
 
       txList.forEach((tx) => {
         // Parse debit and credit values more carefully
-        const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-        const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+        const debitValue = tx.debit
+          ? Number.parseFloat(tx.debit.toString())
+          : 0;
+        const creditValue = tx.credit
+          ? Number.parseFloat(tx.credit.toString())
+          : 0;
 
         // Only add if values are valid numbers
         if (!isNaN(debitValue) && debitValue > 0) {
-          totalDebits += debitValue
+          totalDebits += debitValue;
         }
         if (!isNaN(creditValue) && creditValue > 0) {
-          totalCredits += creditValue
+          totalCredits += creditValue;
         }
-      })
+      });
 
       // Determine category and amount using ENHANCED classification
-      const classification = classifyPLAccount(accountType, account, reportCategory)
-      if (!classification) continue // Skip non-P&L accounts
+      const classification = classifyPLAccount(
+        accountType,
+        account,
+        reportCategory,
+      );
+      if (!classification) continue; // Skip non-P&L accounts
 
-      let amount: number
+      let amount: number;
       if (classification === "INCOME") {
         // For income accounts: Credits increase income, debits decrease income
-        amount = totalCredits - totalDebits
+        amount = totalCredits - totalDebits;
       } else {
         // For expense accounts: Debits increase expenses, credits decrease expenses
-        amount = totalDebits - totalCredits
+        amount = totalDebits - totalCredits;
       }
 
       // Skip if no activity (HAVING clause equivalent) - but allow small negative adjustments
-      if (Math.abs(amount) <= 0.01) continue
+      if (Math.abs(amount) <= 0.01) continue;
 
       // Parse parent/sub structure EXACTLY like before
-      let parentAccount: string
-      let subAccount: string | null
-      let isSubAccount: boolean
+      let parentAccount: string;
+      let subAccount: string | null;
+      let isSubAccount: boolean;
 
       if (account.includes(":")) {
-        const parts = account.split(":")
-        parentAccount = parts[0].trim()
-        subAccount = parts[1]?.trim() || null
-        isSubAccount = true
+        const parts = account.split(":");
+        parentAccount = parts[0].trim();
+        subAccount = parts[1]?.trim() || null;
+        isSubAccount = true;
       } else {
-        parentAccount = account
-        subAccount = null
-        isSubAccount = false
+        parentAccount = account;
+        subAccount = null;
+        isSubAccount = false;
       }
 
       smartLog(
         `💰 Account: ${account}, Classification: ${classification}, Amount: ${amount}, Credits: ${totalCredits}, Debits: ${totalDebits}`,
-      )
+      );
 
       accountMap.set(account, {
         account,
@@ -711,32 +904,45 @@ export default function FinancialsPage() {
         category: classification,
         account_type: accountType,
         transactions: txList,
-      })
+      });
     }
 
     // Convert to array and sort by alphabetical order instead of amount
-    const accounts = Array.from(accountMap.values())
+    const accounts = Array.from(accountMap.values());
 
     // Sort: INCOME first (alphabetically), then EXPENSES (alphabetically)
     accounts.sort((a, b) => {
       if (a.category !== b.category) {
-        return a.category === "INCOME" ? -1 : 1
+        return a.category === "INCOME" ? -1 : 1;
       }
       // Sort alphabetically by account name within each category
-      return a.account.localeCompare(b.account)
-    })
+      return a.account.localeCompare(b.account);
+    });
 
-    smartLog(`✅ Final result: ${accounts.length} P&L accounts processed with timezone-independent strategy`)
-    smartLog(`📊 Income accounts: ${accounts.filter((a) => a.category === "INCOME").length}`)
-    smartLog(`📊 Expense accounts: ${accounts.filter((a) => a.category === "EXPENSES").length}`)
+    smartLog(
+      `✅ Final result: ${accounts.length} P&L accounts processed with timezone-independent strategy`,
+    );
+    smartLog(
+      `📊 Income accounts: ${accounts.filter((a) => a.category === "INCOME").length}`,
+    );
+    smartLog(
+      `📊 Expense accounts: ${accounts.filter((a) => a.category === "EXPENSES").length}`,
+    );
 
-    return accounts
-  }
+    return accounts;
+  };
 
   // Load data when filters change
   useEffect(() => {
-    fetchPLData()
-  }, [timePeriod, selectedMonth, selectedYear, customStartDate, customEndDate, selectedProperties])
+    fetchPLData();
+  }, [
+    timePeriod,
+    selectedMonth,
+    selectedYear,
+    customStartDate,
+    customEndDate,
+    selectedProperties,
+  ]);
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -745,80 +951,124 @@ export default function FinancialsPage() {
       currency: "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount)
-  }
+    }).format(amount);
+  };
+
+  // Format percentage
+  const formatPercentage = (value: number) => {
+    return `${(value * 100).toFixed(2)}%`;
+  };
 
   // Group accounts for display
   const getGroupedAccounts = () => {
-    const income = plAccounts.filter((acc) => acc.category === "INCOME")
-    const expenses = plAccounts.filter((acc) => acc.category === "EXPENSES")
+    const income = plAccounts.filter((acc) => acc.category === "INCOME");
+    const cogs = plAccounts.filter(
+      (acc) =>
+        acc.category === "EXPENSES" &&
+        acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    );
+    const expenses = plAccounts.filter(
+      (acc) =>
+        acc.category === "EXPENSES" &&
+        !acc.account_type?.toLowerCase().includes("cost of goods sold"),
+    );
 
     // Group parent/sub accounts
-    const groupedIncome = groupParentSubAccounts(income)
-    const groupedExpenses = groupParentSubAccounts(expenses)
+    const groupedIncome = groupParentSubAccounts(income);
+    const groupedCogs = groupParentSubAccounts(cogs);
+    const groupedExpenses = groupParentSubAccounts(expenses);
 
-    return { income: groupedIncome, expenses: groupedExpenses }
-  }
+    return {
+      income: groupedIncome,
+      cogs: groupedCogs,
+      expenses: groupedExpenses,
+    };
+  };
 
   // Group parent and sub accounts together - MODIFIED to show combined totals when collapsed
   const groupParentSubAccounts = (accounts: PLAccount[]) => {
-    const parentMap = new Map<string, { parent: PLAccount | null; subs: PLAccount[] }>()
-    const regularAccounts: PLAccount[] = []
+    const parentMap = new Map<
+      string,
+      { parent: PLAccount | null; subs: PLAccount[] }
+    >();
+    const regularAccounts: PLAccount[] = [];
 
     // First pass: identify parents and subs
     accounts.forEach((acc) => {
       if (acc.is_sub_account) {
         if (!parentMap.has(acc.parent_account)) {
-          parentMap.set(acc.parent_account, { parent: null, subs: [] })
+          parentMap.set(acc.parent_account, { parent: null, subs: [] });
         }
-        parentMap.get(acc.parent_account)!.subs.push(acc)
+        parentMap.get(acc.parent_account)!.subs.push(acc);
       } else {
         // Check if this account has sub-accounts
-        const hasSubs = accounts.some((other) => other.is_sub_account && other.parent_account === acc.account)
+        const hasSubs = accounts.some(
+          (other) =>
+            other.is_sub_account && other.parent_account === acc.account,
+        );
 
         if (hasSubs) {
           if (!parentMap.has(acc.account)) {
-            parentMap.set(acc.account, { parent: null, subs: [] })
+            parentMap.set(acc.account, { parent: null, subs: [] });
           }
-          parentMap.get(acc.account)!.parent = acc
+          parentMap.get(acc.account)!.parent = acc;
         } else {
-          regularAccounts.push(acc)
+          regularAccounts.push(acc);
         }
       }
-    })
+    });
 
     // Create final grouped structure
-    const result: Array<{ account: PLAccount; subAccounts?: PLAccount[]; combinedAmount: number }> = []
+    const result: Array<{
+      account: PLAccount;
+      subAccounts?: PLAccount[];
+      combinedAmount: number;
+    }> = [];
 
     // Add parent accounts with their subs
     for (const [parentName, group] of parentMap.entries()) {
       if (group.parent) {
         // Calculate combined amount using all unique transactions to avoid double counting
-        const combinedTransactions = [...group.parent.transactions, ...group.subs.flatMap((sub) => sub.transactions)]
+        const combinedTransactions = [
+          ...group.parent.transactions,
+          ...group.subs.flatMap((sub) => sub.transactions),
+        ];
 
         const combinedAmount = combinedTransactions.reduce((sum, tx) => {
-          const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-          const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+          const debitValue = tx.debit
+            ? Number.parseFloat(tx.debit.toString())
+            : 0;
+          const creditValue = tx.credit
+            ? Number.parseFloat(tx.credit.toString())
+            : 0;
           return group.parent!.category === "INCOME"
             ? sum + (creditValue - debitValue)
-            : sum + (debitValue - creditValue)
-        }, 0)
+            : sum + (debitValue - creditValue);
+        }, 0);
 
         result.push({
           account: group.parent,
-          subAccounts: group.subs.sort((a, b) => a.account.localeCompare(b.account)),
+          subAccounts: group.subs.sort((a, b) =>
+            a.account.localeCompare(b.account),
+          ),
           combinedAmount,
-        })
+        });
       } else {
         // Orphaned sub-accounts (create virtual parent)
-        const combinedTransactions = group.subs.flatMap((sub) => sub.transactions)
+        const combinedTransactions = group.subs.flatMap(
+          (sub) => sub.transactions,
+        );
         const combinedAmount = combinedTransactions.reduce((sum, tx) => {
-          const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-          const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+          const debitValue = tx.debit
+            ? Number.parseFloat(tx.debit.toString())
+            : 0;
+          const creditValue = tx.credit
+            ? Number.parseFloat(tx.credit.toString())
+            : 0;
           return group.subs[0].category === "INCOME"
             ? sum + (creditValue - debitValue)
-            : sum + (debitValue - creditValue)
-        }, 0)
+            : sum + (debitValue - creditValue);
+        }, 0);
 
         const virtualParent: PLAccount = {
           account: parentName,
@@ -829,13 +1079,15 @@ export default function FinancialsPage() {
           category: group.subs[0].category,
           account_type: group.subs[0].account_type,
           transactions: combinedTransactions,
-        }
+        };
 
         result.push({
           account: virtualParent,
-          subAccounts: group.subs.sort((a, b) => a.account.localeCompare(b.account)),
+          subAccounts: group.subs.sort((a, b) =>
+            a.account.localeCompare(b.account),
+          ),
           combinedAmount,
-        })
+        });
       }
     }
 
@@ -844,107 +1096,130 @@ export default function FinancialsPage() {
       result.push({
         account: acc,
         combinedAmount: acc.amount,
-      })
-    })
+      });
+    });
 
     // Sort by alphabetical order instead of amount (descending by absolute value)
-    return result.sort((a, b) => a.account.account.localeCompare(b.account.account))
-  }
+    return result.sort((a, b) =>
+      a.account.account.localeCompare(b.account.account),
+    );
+  };
 
   // Get column headers based on view mode - TIMEZONE INDEPENDENT
   const getColumnHeaders = () => {
     if (viewMode === "Total") {
-      return []
+      return [];
     } else if (viewMode === "Class") {
-      return availableProperties.filter((p) => p !== "All Properties")
+      return availableProperties.filter((p) => p !== "All Properties");
     } else if (viewMode === "Detail") {
       // For Detail view, show months in the date range using timezone-independent method
-      const { startDate, endDate } = calculateDateRange()
-      const months = []
+      const { startDate, endDate } = calculateDateRange();
+      const months = [];
 
       // Parse start and end dates
-      const startParts = getDateParts(startDate)
-      const endParts = getDateParts(endDate)
+      const startParts = getDateParts(startDate);
+      const endParts = getDateParts(endDate);
 
-      let currentYear = startParts.year
-      let currentMonth = startParts.month
+      let currentYear = startParts.year;
+      let currentMonth = startParts.month;
 
-      while (currentYear < endParts.year || (currentYear === endParts.year && currentMonth <= endParts.month)) {
-        const monthKey = `${monthsList[currentMonth - 1]} ${currentYear}`
-        months.push(monthKey)
+      while (
+        currentYear < endParts.year ||
+        (currentYear === endParts.year && currentMonth <= endParts.month)
+      ) {
+        const monthKey = `${monthsList[currentMonth - 1]} ${currentYear}`;
+        months.push(monthKey);
 
-        currentMonth++
+        currentMonth++;
         if (currentMonth > 12) {
-          currentMonth = 1
-          currentYear++
+          currentMonth = 1;
+          currentYear++;
         }
       }
 
-      return months
+      return months;
     }
-    return []
-  }
+    return [];
+  };
 
   // Get cell value based on view mode - TIMEZONE INDEPENDENT
-  const getCellValue = (account: PLAccount, header: string, isParentCombined = false, subAccounts?: PLAccount[]) => {
-    let transactions = account.transactions
+  const getCellValue = (
+    account: PLAccount,
+    header: string,
+    isParentCombined = false,
+    subAccounts?: PLAccount[],
+  ) => {
+    let transactions = account.transactions;
 
     // If this is a combined parent view, include sub-account transactions
     if (isParentCombined && subAccounts) {
-      transactions = [...account.transactions, ...subAccounts.flatMap((sub) => sub.transactions)]
+      transactions = [
+        ...account.transactions,
+        ...subAccounts.flatMap((sub) => sub.transactions),
+      ];
     }
 
     if (viewMode === "Class") {
       // Filter transactions by property and calculate total
-      const filteredTransactions = transactions.filter((tx) => tx.class === header)
+      const filteredTransactions = transactions.filter(
+        (tx) => tx.class === header,
+      );
       const credits = filteredTransactions.reduce((sum, tx) => {
-        const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
-        return sum + (isNaN(creditValue) ? 0 : creditValue)
-      }, 0)
+        const creditValue = tx.credit
+          ? Number.parseFloat(tx.credit.toString())
+          : 0;
+        return sum + (isNaN(creditValue) ? 0 : creditValue);
+      }, 0);
       const debits = filteredTransactions.reduce((sum, tx) => {
-        const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-        return sum + (isNaN(debitValue) ? 0 : debitValue)
-      }, 0)
+        const debitValue = tx.debit
+          ? Number.parseFloat(tx.debit.toString())
+          : 0;
+        return sum + (isNaN(debitValue) ? 0 : debitValue);
+      }, 0);
 
       if (account.category === "INCOME") {
-        return credits - debits // Income: Credit minus Debit
+        return credits - debits; // Income: Credit minus Debit
       } else {
-        return debits - credits // Expenses: Debit minus Credit
+        return debits - credits; // Expenses: Debit minus Credit
       }
     } else if (viewMode === "Detail") {
       // Filter transactions by month using timezone-independent method
       const filteredTransactions = transactions.filter((tx) => {
-        return getMonthYear(tx.date) === header
-      })
+        return getMonthYear(tx.date) === header;
+      });
 
       const credits = filteredTransactions.reduce((sum, tx) => {
-        const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
-        return sum + (isNaN(creditValue) ? 0 : creditValue)
-      }, 0)
+        const creditValue = tx.credit
+          ? Number.parseFloat(tx.credit.toString())
+          : 0;
+        return sum + (isNaN(creditValue) ? 0 : creditValue);
+      }, 0);
       const debits = filteredTransactions.reduce((sum, tx) => {
-        const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-        return sum + (isNaN(debitValue) ? 0 : debitValue)
-      }, 0)
+        const debitValue = tx.debit
+          ? Number.parseFloat(tx.debit.toString())
+          : 0;
+        return sum + (isNaN(debitValue) ? 0 : debitValue);
+      }, 0);
 
       if (account.category === "INCOME") {
-        return credits - debits // Income: Credit minus Debit
+        return credits - debits; // Income: Credit minus Debit
       } else {
-        return debits - credits // Expenses: Debit minus Credit
+        return debits - credits; // Expenses: Debit minus Credit
       }
     }
-    return 0
-  }
+    return 0;
+  };
 
   // Handle account expansion
   const toggleAccountExpansion = (accountName: string) => {
-    const newExpanded = new Set(expandedAccounts)
+    const newExpanded = new Set(expandedAccounts);
     if (newExpanded.has(accountName)) {
-      newExpanded.delete(accountName)
+      newExpanded.delete(accountName);
     } else {
-      newExpanded.add(accountName)
+      newExpanded.add(accountName);
     }
-    setExpandedAccounts(newExpanded)
-  }
+    setExpandedAccounts(newExpanded);
+  };
 
   // Show transaction details - TIMEZONE INDEPENDENT
   const showTransactionDetails = (
@@ -955,87 +1230,110 @@ export default function FinancialsPage() {
     isParentCombined = false,
     subAccounts?: PLAccount[],
   ) => {
-    const targetAccount = subAccount || account
-    let transactions = targetAccount.transactions || []
+    const targetAccount = subAccount || account;
+    let transactions = targetAccount.transactions || [];
 
     // If this is a combined parent view, include sub-account transactions
     if (isParentCombined && subAccounts && !subAccount) {
-      transactions = [...account.transactions, ...subAccounts.flatMap((sub) => sub.transactions)]
+      transactions = [
+        ...account.transactions,
+        ...subAccounts.flatMap((sub) => sub.transactions),
+      ];
     }
 
     // If this is a parent account being clicked (not a sub-account), show only its own transactions when expanded
     if (!subAccount && !isParentCombined && account.transactions) {
-      transactions = account.transactions.filter((tx) => tx.account === account.account)
+      transactions = account.transactions.filter(
+        (tx) => tx.account === account.account,
+      );
     }
 
     // Filter by period if specified (Detail view) - TIMEZONE INDEPENDENT
     if (period && viewMode === "Detail") {
       transactions = transactions.filter((tx) => {
-        return getMonthYear(tx.date) === period
-      })
+        return getMonthYear(tx.date) === period;
+      });
     }
 
     // Filter by property if specified (Class view)
     if (property && viewMode === "Class") {
-      transactions = transactions.filter((tx) => tx.class === property)
+      transactions = transactions.filter((tx) => tx.class === property);
     }
 
-    let title = subAccount ? `${account.parent_account}: ${subAccount.sub_account}` : account.account
+    let title = subAccount
+      ? `${account.parent_account}: ${subAccount.sub_account}`
+      : account.account;
 
     if (isParentCombined) {
-      title += " (Combined)"
+      title += " (Combined)";
     }
 
     if (period) {
-      title += ` - ${period}`
+      title += ` - ${period}`;
     }
 
     if (property) {
-      title += ` - ${property}`
+      title += ` - ${property}`;
     }
 
-    setTransactionModalTitle(title)
-    setModalTransactionDetails(transactions)
-    setShowTransactionModal(true)
-  }
+    setTransactionModalTitle(title);
+    setModalTransactionDetails(transactions);
+    setShowTransactionModal(true);
+  };
 
-  const columnHeaders = getColumnHeaders()
-  const { startDate, endDate } = calculateDateRange()
-  const groupedAccounts = getGroupedAccounts()
+  const columnHeaders = getColumnHeaders();
+  const groupedAccounts = getGroupedAccounts();
 
   // Calculate totals using combined amounts
-  const totalIncome = groupedAccounts.income.reduce((sum, group) => sum + group.combinedAmount, 0)
-  const totalExpenses = groupedAccounts.expenses.reduce((sum, group) => sum + group.combinedAmount, 0)
-  const netIncome = totalIncome - totalExpenses
+  const totalIncome = groupedAccounts.income.reduce(
+    (sum, group) => sum + group.combinedAmount,
+    0,
+  );
+  const totalCogs = groupedAccounts.cogs.reduce(
+    (sum, group) => sum + group.combinedAmount,
+    0,
+  );
+  const grossProfit = totalIncome - totalCogs;
+  const totalExpenses = groupedAccounts.expenses.reduce(
+    (sum, group) => sum + group.combinedAmount,
+    0,
+  );
+  const netIncome = grossProfit - totalExpenses;
+  const grossProfitPercent = totalIncome !== 0 ? grossProfit / totalIncome : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <style jsx>{`
-       .custom-scrollbar::-webkit-scrollbar {
-         width: 8px;
-         height: 8px;
-       }
-       .custom-scrollbar::-webkit-scrollbar-track {
-         background: #f1f5f9;
-         border-radius: 4px;
-       }
-       .custom-scrollbar::-webkit-scrollbar-thumb {
-         background: #cbd5e1;
-         border-radius: 4px;
-       }
-       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-         background: #94a3b8;
-       }
-     `}</style>
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+      `}</style>
 
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <TrendingUp className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
+              <TrendingUp
+                className="w-8 h-8"
+                style={{ color: BRAND_COLORS.primary }}
+              />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Profit & Loss Statement</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Profit & Loss Statement
+                </h1>
                 <p className="text-sm text-gray-600">
                   {timePeriod === "Custom"
                     ? `${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}`
@@ -1048,7 +1346,8 @@ export default function FinancialsPage() {
                           : `${timePeriod} Period`}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
-                  💰 Using timezone-independent date handling for precise P&L classification
+                  💰 Using timezone-independent date handling for precise P&L
+                  classification
                 </p>
               </div>
             </div>
@@ -1058,9 +1357,15 @@ export default function FinancialsPage() {
                 onClick={fetchPLData}
                 disabled={isLoadingData}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
-                style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                style={
+                  {
+                    "--tw-ring-color": BRAND_COLORS.primary + "33",
+                  } as React.CSSProperties
+                }
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingData ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-4 h-4 mr-2 ${isLoadingData ? "animate-spin" : ""}`}
+                />
                 {isLoadingData ? "Loading..." : "Refresh"}
               </button>
 
@@ -1108,9 +1413,15 @@ export default function FinancialsPage() {
             {/* Time Period Dropdown */}
             <div className="relative" ref={timePeriodDropdownRef}>
               <button
-                onClick={() => setTimePeriodDropdownOpen(!timePeriodDropdownOpen)}
+                onClick={() =>
+                  setTimePeriodDropdownOpen(!timePeriodDropdownOpen)
+                }
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                style={
+                  {
+                    "--tw-ring-color": BRAND_COLORS.primary + "33",
+                  } as React.CSSProperties
+                }
               >
                 <Calendar className="w-4 h-4 mr-2" />
                 {timePeriod}
@@ -1119,12 +1430,20 @@ export default function FinancialsPage() {
 
               {timePeriodDropdownOpen && (
                 <div className="absolute z-10 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg">
-                  {(["Monthly", "Quarterly", "YTD", "Trailing 12", "Custom"] as TimePeriod[]).map((period) => (
+                  {(
+                    [
+                      "Monthly",
+                      "Quarterly",
+                      "YTD",
+                      "Trailing 12",
+                      "Custom",
+                    ] as TimePeriod[]
+                  ).map((period) => (
                     <button
                       key={period}
                       onClick={() => {
-                        setTimePeriod(period)
-                        setTimePeriodDropdownOpen(false)
+                        setTimePeriod(period);
+                        setTimePeriodDropdownOpen(false);
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                     >
@@ -1142,7 +1461,11 @@ export default function FinancialsPage() {
                   <button
                     onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
                     className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                    style={
+                      {
+                        "--tw-ring-color": BRAND_COLORS.primary + "33",
+                      } as React.CSSProperties
+                    }
                   >
                     {selectedMonth}
                     <ChevronDown className="w-4 h-4 ml-2" />
@@ -1154,8 +1477,8 @@ export default function FinancialsPage() {
                         <button
                           key={month}
                           onClick={() => {
-                            setSelectedMonth(month)
-                            setMonthDropdownOpen(false)
+                            setSelectedMonth(month);
+                            setMonthDropdownOpen(false);
                           }}
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                         >
@@ -1170,7 +1493,11 @@ export default function FinancialsPage() {
                   <button
                     onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
                     className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                    style={
+                      {
+                        "--tw-ring-color": BRAND_COLORS.primary + "33",
+                      } as React.CSSProperties
+                    }
                   >
                     {selectedYear}
                     <ChevronDown className="w-4 h-4 ml-2" />
@@ -1182,8 +1509,8 @@ export default function FinancialsPage() {
                         <button
                           key={year}
                           onClick={() => {
-                            setSelectedYear(year)
-                            setYearDropdownOpen(false)
+                            setSelectedYear(year);
+                            setYearDropdownOpen(false);
                           }}
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                         >
@@ -1202,7 +1529,11 @@ export default function FinancialsPage() {
                 <button
                   onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                  style={
+                    {
+                      "--tw-ring-color": BRAND_COLORS.primary + "33",
+                    } as React.CSSProperties
+                  }
                 >
                   {selectedYear}
                   <ChevronDown className="w-4 h-4 ml-2" />
@@ -1214,8 +1545,8 @@ export default function FinancialsPage() {
                       <button
                         key={year}
                         onClick={() => {
-                          setSelectedYear(year)
-                          setYearDropdownOpen(false)
+                          setSelectedYear(year);
+                          setYearDropdownOpen(false);
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                       >
@@ -1232,7 +1563,11 @@ export default function FinancialsPage() {
               <button
                 onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                style={
+                  {
+                    "--tw-ring-color": BRAND_COLORS.primary + "33",
+                  } as React.CSSProperties
+                }
               >
                 Properties: {Array.from(selectedProperties).join(", ")}
                 <ChevronDown className="w-4 h-4 ml-2" />
@@ -1249,22 +1584,22 @@ export default function FinancialsPage() {
                         type="checkbox"
                         checked={selectedProperties.has(property)}
                         onChange={(e) => {
-                          const newSelected = new Set(selectedProperties)
+                          const newSelected = new Set(selectedProperties);
                           if (e.target.checked) {
                             if (property === "All Properties") {
-                              newSelected.clear()
-                              newSelected.add("All Properties")
+                              newSelected.clear();
+                              newSelected.add("All Properties");
                             } else {
-                              newSelected.delete("All Properties")
-                              newSelected.add(property)
+                              newSelected.delete("All Properties");
+                              newSelected.add(property);
                             }
                           } else {
-                            newSelected.delete(property)
+                            newSelected.delete(property);
                             if (newSelected.size === 0) {
-                              newSelected.add("All Properties")
+                              newSelected.add("All Properties");
                             }
                           }
-                          setSelectedProperties(newSelected)
+                          setSelectedProperties(newSelected);
                         }}
                         className="mr-3 rounded"
                         style={{ accentColor: BRAND_COLORS.primary }}
@@ -1281,10 +1616,13 @@ export default function FinancialsPage() {
               <button
                 onClick={() => setViewMode("Total")}
                 className={`px-4 py-2 text-sm font-medium rounded-l-lg ${
-                  viewMode === "Total" ? "text-white" : "text-gray-700 hover:bg-gray-50"
+                  viewMode === "Total"
+                    ? "text-white"
+                    : "text-gray-700 hover:bg-gray-50"
                 }`}
                 style={{
-                  backgroundColor: viewMode === "Total" ? BRAND_COLORS.primary : undefined,
+                  backgroundColor:
+                    viewMode === "Total" ? BRAND_COLORS.primary : undefined,
                 }}
               >
                 Total
@@ -1292,10 +1630,13 @@ export default function FinancialsPage() {
               <button
                 onClick={() => setViewMode("Detail")}
                 className={`px-4 py-2 text-sm font-medium border-l border-gray-300 ${
-                  viewMode === "Detail" ? "text-white" : "text-gray-700 hover:bg-gray-50"
+                  viewMode === "Detail"
+                    ? "text-white"
+                    : "text-gray-700 hover:bg-gray-50"
                 }`}
                 style={{
-                  backgroundColor: viewMode === "Detail" ? BRAND_COLORS.primary : undefined,
+                  backgroundColor:
+                    viewMode === "Detail" ? BRAND_COLORS.primary : undefined,
                 }}
               >
                 Detail
@@ -1303,10 +1644,13 @@ export default function FinancialsPage() {
               <button
                 onClick={() => setViewMode("Class")}
                 className={`px-4 py-2 text-sm font-medium rounded-r-lg border-l border-gray-300 ${
-                  viewMode === "Class" ? "text-white" : "text-gray-700 hover:bg-gray-50"
+                  viewMode === "Class"
+                    ? "text-white"
+                    : "text-gray-700 hover:bg-gray-50"
                 }`}
                 style={{
-                  backgroundColor: viewMode === "Class" ? BRAND_COLORS.primary : undefined,
+                  backgroundColor:
+                    viewMode === "Class" ? BRAND_COLORS.primary : undefined,
                 }}
               >
                 Class
@@ -1321,7 +1665,11 @@ export default function FinancialsPage() {
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                  style={
+                    {
+                      "--tw-ring-color": BRAND_COLORS.primary + "33",
+                    } as React.CSSProperties
+                  }
                 />
                 <span className="text-gray-500">to</span>
                 <input
@@ -1329,7 +1677,11 @@ export default function FinancialsPage() {
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                  style={
+                    {
+                      "--tw-ring-color": BRAND_COLORS.primary + "33",
+                    } as React.CSSProperties
+                  }
                 />
               </div>
             )}
@@ -1358,7 +1710,9 @@ export default function FinancialsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {dataError ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Data</h3>
+            <h3 className="text-lg font-medium text-red-800 mb-2">
+              Error Loading Data
+            </h3>
             <p className="text-red-700">{dataError}</p>
             <button
               onClick={fetchPLData}
@@ -1375,23 +1729,21 @@ export default function FinancialsPage() {
               <div className="bg-white p-6 rounded-xl shadow-sm border">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Income</p>
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Total Income
+                    </p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {formatCurrency(totalIncome)}
+                    </p>
                   </div>
-                  <div className="p-3 rounded-full" style={{ backgroundColor: BRAND_COLORS.success + "20" }}>
-                    <TrendingUp className="w-6 h-6" style={{ color: BRAND_COLORS.success }} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl shadow-sm border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-                    <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
-                  </div>
-                  <div className="p-3 rounded-full" style={{ backgroundColor: BRAND_COLORS.danger + "20" }}>
-                    <BarChart3 className="w-6 h-6" style={{ color: BRAND_COLORS.danger }} />
+                  <div
+                    className="p-3 rounded-full"
+                    style={{ backgroundColor: BRAND_COLORS.success + "20" }}
+                  >
+                    <TrendingUp
+                      className="w-6 h-6"
+                      style={{ color: BRAND_COLORS.success }}
+                    />
                   </div>
                 </div>
               </div>
@@ -1399,21 +1751,53 @@ export default function FinancialsPage() {
               <div className="bg-white p-6 rounded-xl shadow-sm border">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Net Income</p>
-                    <p className={`text-2xl font-bold ${netIncome >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <p className="text-sm font-medium text-gray-600">
+                      Total Expenses
+                    </p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {formatCurrency(totalExpenses)}
+                    </p>
+                  </div>
+                  <div
+                    className="p-3 rounded-full"
+                    style={{ backgroundColor: BRAND_COLORS.danger + "20" }}
+                  >
+                    <BarChart3
+                      className="w-6 h-6"
+                      style={{ color: BRAND_COLORS.danger }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-sm border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">
+                      Net Income
+                    </p>
+                    <p
+                      className={`text-2xl font-bold ${netIncome >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
                       {formatCurrency(netIncome)}
                     </p>
                   </div>
                   <div
                     className="p-3 rounded-full"
                     style={{
-                      backgroundColor: (netIncome >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger) + "20",
+                      backgroundColor:
+                        (netIncome >= 0
+                          ? BRAND_COLORS.success
+                          : BRAND_COLORS.danger) + "20",
                     }}
                   >
                     <LucidePieChart
                       className="w-6 h-6"
                       style={{
-                        color: netIncome >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+                        color:
+                          netIncome >= 0
+                            ? BRAND_COLORS.success
+                            : BRAND_COLORS.danger,
                       }}
                     />
                   </div>
@@ -1424,10 +1808,12 @@ export default function FinancialsPage() {
             {/* P&L Statement Table */}
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Profit & Loss Statement - {viewMode} View</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Profit & Loss Statement - {viewMode} View
+                </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  {plAccounts.length} accounts • Timezone-independent date handling • Using account_type for P&L
-                  classification
+                  {plAccounts.length} accounts • Timezone-independent date
+                  handling • Using account_type for P&L classification
                   {viewMode === "Detail" && " • Monthly breakdown"}
                   {viewMode === "Class" && " • By property"}
                 </p>
@@ -1451,7 +1837,9 @@ export default function FinancialsPage() {
                             key={header}
                             className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                           >
-                            {viewMode === "Detail" ? header.substring(0, 3) : header}
+                            {viewMode === "Detail"
+                              ? header.substring(0, 3)
+                              : header}
                           </th>
                         ))}
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1462,7 +1850,9 @@ export default function FinancialsPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {/* INCOME Section */}
                       <tr className="bg-green-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-800">INCOME</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-800">
+                          INCOME
+                        </td>
                         {columnHeaders.map((header) => (
                           <td
                             key={header}
@@ -1470,7 +1860,15 @@ export default function FinancialsPage() {
                           >
                             {formatCurrency(
                               groupedAccounts.income.reduce((sum, group) => {
-                                return sum + getCellValue(group.account, header, true, group.subAccounts)
+                                return (
+                                  sum +
+                                  getCellValue(
+                                    group.account,
+                                    header,
+                                    true,
+                                    group.subAccounts,
+                                  )
+                                );
                               }, 0),
                             )}
                           </td>
@@ -1486,19 +1884,32 @@ export default function FinancialsPage() {
                           <tr className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 pl-12">
                               <div className="flex items-center">
-                                {group.subAccounts && group.subAccounts.length > 0 && (
-                                  <button
-                                    onClick={() => toggleAccountExpansion(group.account.account)}
-                                    className="mr-2 p-1 hover:bg-gray-200 rounded"
-                                  >
-                                    <ChevronRight
-                                      className={`w-4 h-4 transition-transform ${
-                                        expandedAccounts.has(group.account.account) ? "rotate-90" : ""
-                                      }`}
-                                    />
-                                  </button>
-                                )}
-                                <span className={group.subAccounts ? "font-semibold" : ""}>
+                                {group.subAccounts &&
+                                  group.subAccounts.length > 0 && (
+                                    <button
+                                      onClick={() =>
+                                        toggleAccountExpansion(
+                                          group.account.account,
+                                        )
+                                      }
+                                      className="mr-2 p-1 hover:bg-gray-200 rounded"
+                                    >
+                                      <ChevronRight
+                                        className={`w-4 h-4 transition-transform ${
+                                          expandedAccounts.has(
+                                            group.account.account,
+                                          )
+                                            ? "rotate-90"
+                                            : ""
+                                        }`}
+                                      />
+                                    </button>
+                                  )}
+                                <span
+                                  className={
+                                    group.subAccounts ? "font-semibold" : ""
+                                  }
+                                >
                                   {group.account.account}
                                 </span>
                               </div>
@@ -1513,9 +1924,13 @@ export default function FinancialsPage() {
                                     showTransactionDetails(
                                       group.account,
                                       undefined,
-                                      viewMode === "Detail" ? header : undefined,
+                                      viewMode === "Detail"
+                                        ? header
+                                        : undefined,
                                       viewMode === "Class" ? header : undefined,
-                                      !expandedAccounts.has(group.account.account), // Show combined if collapsed
+                                      !expandedAccounts.has(
+                                        group.account.account,
+                                      ), // Show combined if collapsed
                                       group.subAccounts,
                                     )
                                   }
@@ -1525,7 +1940,9 @@ export default function FinancialsPage() {
                                     getCellValue(
                                       group.account,
                                       header,
-                                      !expandedAccounts.has(group.account.account), // Combined if collapsed
+                                      !expandedAccounts.has(
+                                        group.account.account,
+                                      ), // Combined if collapsed
                                       group.subAccounts,
                                     ),
                                   )}
@@ -1540,7 +1957,9 @@ export default function FinancialsPage() {
                                     undefined,
                                     undefined,
                                     undefined,
-                                    !expandedAccounts.has(group.account.account), // Show combined if collapsed
+                                    !expandedAccounts.has(
+                                      group.account.account,
+                                    ), // Show combined if collapsed
                                     group.subAccounts,
                                   )
                                 }
@@ -1559,10 +1978,15 @@ export default function FinancialsPage() {
                           {group.subAccounts &&
                             expandedAccounts.has(group.account.account) &&
                             group.subAccounts.map((subAccount) => (
-                              <tr key={subAccount.account} className="hover:bg-gray-50 bg-gray-25">
+                              <tr
+                                key={subAccount.account}
+                                className="hover:bg-gray-50 bg-gray-25"
+                              >
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 pl-20">
                                   <div className="flex items-center">
-                                    <span className="text-gray-400 mr-2">└</span>
+                                    <span className="text-gray-400 mr-2">
+                                      └
+                                    </span>
                                     {subAccount.sub_account}
                                   </div>
                                 </td>
@@ -1576,19 +2000,30 @@ export default function FinancialsPage() {
                                         showTransactionDetails(
                                           group.account,
                                           subAccount,
-                                          viewMode === "Detail" ? header : undefined,
-                                          viewMode === "Class" ? header : undefined,
+                                          viewMode === "Detail"
+                                            ? header
+                                            : undefined,
+                                          viewMode === "Class"
+                                            ? header
+                                            : undefined,
                                         )
                                       }
                                       className="hover:underline"
                                     >
-                                      {formatCurrency(getCellValue(subAccount, header))}
+                                      {formatCurrency(
+                                        getCellValue(subAccount, header),
+                                      )}
                                     </button>
                                   </td>
                                 ))}
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right">
                                   <button
-                                    onClick={() => showTransactionDetails(group.account, subAccount)}
+                                    onClick={() =>
+                                      showTransactionDetails(
+                                        group.account,
+                                        subAccount,
+                                      )
+                                    }
                                     className="hover:underline"
                                   >
                                     {formatCurrency(subAccount.amount)}
@@ -1601,7 +2036,9 @@ export default function FinancialsPage() {
 
                       {/* Total Income */}
                       <tr className="bg-green-100 font-semibold">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-800">TOTAL INCOME</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-800">
+                          TOTAL INCOME
+                        </td>
                         {columnHeaders.map((header) => (
                           <td
                             key={header}
@@ -1609,7 +2046,15 @@ export default function FinancialsPage() {
                           >
                             {formatCurrency(
                               groupedAccounts.income.reduce((sum, group) => {
-                                return sum + getCellValue(group.account, header, true, group.subAccounts)
+                                return (
+                                  sum +
+                                  getCellValue(
+                                    group.account,
+                                    header,
+                                    true,
+                                    group.subAccounts,
+                                  )
+                                );
                               }, 0),
                             )}
                           </td>
@@ -1619,9 +2064,343 @@ export default function FinancialsPage() {
                         </td>
                       </tr>
 
+                      {/* COGS Section */}
+                      <tr className="bg-yellow-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-800">
+                          COGS
+                        </td>
+                        {columnHeaders.map((header) => (
+                          <td
+                            key={header}
+                            className="px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-800 text-right"
+                          >
+                            {formatCurrency(
+                              groupedAccounts.cogs.reduce((sum, group) => {
+                                return (
+                                  sum +
+                                  getCellValue(
+                                    group.account,
+                                    header,
+                                    true,
+                                    group.subAccounts,
+                                  )
+                                );
+                              }, 0),
+                            )}
+                          </td>
+                        ))}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-800 text-right">
+                          {formatCurrency(totalCogs)}
+                        </td>
+                      </tr>
+
+                      {groupedAccounts.cogs.map((group) => (
+                        <React.Fragment key={group.account.account}>
+                          {/* Parent Account - Show combined total when collapsed, individual when expanded */}
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 pl-12">
+                              <div className="flex items-center">
+                                {group.subAccounts &&
+                                  group.subAccounts.length > 0 && (
+                                    <button
+                                      onClick={() =>
+                                        toggleAccountExpansion(
+                                          group.account.account,
+                                        )
+                                      }
+                                      className="mr-2 p-1 hover:bg-gray-200 rounded"
+                                    >
+                                      <ChevronRight
+                                        className={`w-4 h-4 transition-transform ${
+                                          expandedAccounts.has(
+                                            group.account.account,
+                                          )
+                                            ? "rotate-90"
+                                            : ""
+                                        }`}
+                                      />
+                                    </button>
+                                  )}
+                                <span
+                                  className={
+                                    group.subAccounts ? "font-semibold" : ""
+                                  }
+                                >
+                                  {group.account.account}
+                                </span>
+                              </div>
+                            </td>
+                            {columnHeaders.map((header) => (
+                              <td
+                                key={header}
+                                className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right"
+                              >
+                                <button
+                                  onClick={() =>
+                                    showTransactionDetails(
+                                      group.account,
+                                      undefined,
+                                      viewMode === "Detail"
+                                        ? header
+                                        : undefined,
+                                      viewMode === "Class" ? header : undefined,
+                                      !expandedAccounts.has(
+                                        group.account.account,
+                                      ), // Show combined if collapsed
+                                      group.subAccounts,
+                                    )
+                                  }
+                                  className="font-medium hover:underline"
+                                >
+                                  {formatCurrency(
+                                    getCellValue(
+                                      group.account,
+                                      header,
+                                      !expandedAccounts.has(
+                                        group.account.account,
+                                      ), // Combined if collapsed
+                                      group.subAccounts,
+                                    ),
+                                  )}
+                                </button>
+                              </td>
+                            ))}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right">
+                              <button
+                                onClick={() =>
+                                  showTransactionDetails(
+                                    group.account,
+                                    undefined,
+                                    undefined,
+                                    undefined,
+                                    !expandedAccounts.has(
+                                      group.account.account,
+                                    ), // Show combined if collapsed
+                                    group.subAccounts,
+                                  )
+                                }
+                                className="font-medium hover:underline"
+                              >
+                                {formatCurrency(
+                                  expandedAccounts.has(group.account.account)
+                                    ? group.account.amount // Individual amount when expanded
+                                    : group.combinedAmount, // Combined amount when collapsed
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+
+                          {/* Sub Accounts (if expanded) */}
+                          {group.subAccounts &&
+                            expandedAccounts.has(group.account.account) &&
+                            group.subAccounts.map((subAccount) => (
+                              <tr
+                                key={subAccount.account}
+                                className="hover:bg-gray-50 bg-gray-25"
+                              >
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 pl-20">
+                                  <div className="flex items-center">
+                                    <span className="text-gray-400 mr-2">
+                                      └
+                                    </span>
+                                    {subAccount.sub_account}
+                                  </div>
+                                </td>
+                                {columnHeaders.map((header) => (
+                                  <td
+                                    key={header}
+                                    className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right"
+                                  >
+                                    <button
+                                      onClick={() =>
+                                        showTransactionDetails(
+                                          group.account,
+                                          subAccount,
+                                          viewMode === "Detail"
+                                            ? header
+                                            : undefined,
+                                          viewMode === "Class"
+                                            ? header
+                                            : undefined,
+                                        )
+                                      }
+                                      className="hover:underline"
+                                    >
+                                      {formatCurrency(
+                                        getCellValue(subAccount, header),
+                                      )}
+                                    </button>
+                                  </td>
+                                ))}
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right">
+                                  <button
+                                    onClick={() =>
+                                      showTransactionDetails(
+                                        group.account,
+                                        subAccount,
+                                      )
+                                    }
+                                    className="hover:underline"
+                                  >
+                                    {formatCurrency(subAccount.amount)}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                        </React.Fragment>
+                      ))}
+
+                      {/* Total COGS */}
+                      <tr className="bg-yellow-100 font-semibold">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-800">
+                          TOTAL COGS
+                        </td>
+                        {columnHeaders.map((header) => (
+                          <td
+                            key={header}
+                            className="px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-800 text-right"
+                          >
+                            {formatCurrency(
+                              groupedAccounts.cogs.reduce((sum, group) => {
+                                return (
+                                  sum +
+                                  getCellValue(
+                                    group.account,
+                                    header,
+                                    true,
+                                    group.subAccounts,
+                                  )
+                                );
+                              }, 0),
+                            )}
+                          </td>
+                        ))}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-800 text-right">
+                          {formatCurrency(totalCogs)}
+                        </td>
+                      </tr>
+
+                      {/* Gross Profit */}
+                      <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          GROSS PROFIT
+                        </td>
+                        {columnHeaders.map((header) => {
+                          const headerIncome = groupedAccounts.income.reduce(
+                            (sum, group) => {
+                              return (
+                                sum +
+                                getCellValue(
+                                  group.account,
+                                  header,
+                                  true,
+                                  group.subAccounts,
+                                )
+                              );
+                            },
+                            0,
+                          );
+                          const headerCogs = groupedAccounts.cogs.reduce(
+                            (sum, group) => {
+                              return (
+                                sum +
+                                getCellValue(
+                                  group.account,
+                                  header,
+                                  true,
+                                  group.subAccounts,
+                                )
+                              );
+                            },
+                            0,
+                          );
+                          const headerGross = headerIncome - headerCogs;
+                          return (
+                            <td
+                              key={header}
+                              className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
+                                headerGross >= 0
+                                  ? "text-green-700"
+                                  : "text-red-700"
+                              }`}
+                            >
+                              {formatCurrency(headerGross)}
+                            </td>
+                          );
+                        })}
+                        <td
+                          className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-xl ${
+                            grossProfit >= 0 ? "text-green-700" : "text-red-700"
+                          }`}
+                        >
+                          {formatCurrency(grossProfit)}
+                        </td>
+                      </tr>
+
+                      {/* Gross Profit Percentage */}
+                      <tr>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          Gross Profit %
+                        </td>
+                        {columnHeaders.map((header) => {
+                          const headerIncome = groupedAccounts.income.reduce(
+                            (sum, group) => {
+                              return (
+                                sum +
+                                getCellValue(
+                                  group.account,
+                                  header,
+                                  true,
+                                  group.subAccounts,
+                                )
+                              );
+                            },
+                            0,
+                          );
+                          const headerCogs = groupedAccounts.cogs.reduce(
+                            (sum, group) => {
+                              return (
+                                sum +
+                                getCellValue(
+                                  group.account,
+                                  header,
+                                  true,
+                                  group.subAccounts,
+                                )
+                              );
+                            },
+                            0,
+                          );
+                          const headerGross = headerIncome - headerCogs;
+                          const pct =
+                            headerIncome !== 0 ? headerGross / headerIncome : 0;
+                          return (
+                            <td
+                              key={header}
+                              className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right"
+                            >
+                              {formatPercentage(pct)}
+                            </td>
+                          );
+                        })}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                          {formatPercentage(grossProfitPercent)}
+                        </td>
+                      </tr>
+
+                      {/* Spacer */}
+                      <tr>
+                        <td
+                          colSpan={columnHeaders.length + 2}
+                          className="py-2"
+                        ></td>
+                      </tr>
+
                       {/* EXPENSES Section */}
                       <tr className="bg-red-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-800">EXPENSES</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-800">
+                          EXPENSES
+                        </td>
                         {columnHeaders.map((header) => (
                           <td
                             key={header}
@@ -1629,7 +2408,15 @@ export default function FinancialsPage() {
                           >
                             {formatCurrency(
                               groupedAccounts.expenses.reduce((sum, group) => {
-                                return sum + getCellValue(group.account, header, true, group.subAccounts)
+                                return (
+                                  sum +
+                                  getCellValue(
+                                    group.account,
+                                    header,
+                                    true,
+                                    group.subAccounts,
+                                  )
+                                );
                               }, 0),
                             )}
                           </td>
@@ -1645,33 +2432,53 @@ export default function FinancialsPage() {
                           <tr className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 pl-12">
                               <div className="flex items-center">
-                                {group.subAccounts && group.subAccounts.length > 0 && (
-                                  <button
-                                    onClick={() => toggleAccountExpansion(group.account.account)}
-                                    className="mr-2 p-1 hover:bg-gray-200 rounded"
-                                  >
-                                    <ChevronRight
-                                      className={`w-4 h-4 transition-transform ${
-                                        expandedAccounts.has(group.account.account) ? "rotate-90" : ""
-                                      }`}
-                                    />
-                                  </button>
-                                )}
-                                <span className={group.subAccounts ? "font-semibold" : ""}>
+                                {group.subAccounts &&
+                                  group.subAccounts.length > 0 && (
+                                    <button
+                                      onClick={() =>
+                                        toggleAccountExpansion(
+                                          group.account.account,
+                                        )
+                                      }
+                                      className="mr-2 p-1 hover:bg-gray-200 rounded"
+                                    >
+                                      <ChevronRight
+                                        className={`w-4 h-4 transition-transform ${
+                                          expandedAccounts.has(
+                                            group.account.account,
+                                          )
+                                            ? "rotate-90"
+                                            : ""
+                                        }`}
+                                      />
+                                    </button>
+                                  )}
+                                <span
+                                  className={
+                                    group.subAccounts ? "font-semibold" : ""
+                                  }
+                                >
                                   {group.account.account}
                                 </span>
                               </div>
                             </td>
                             {columnHeaders.map((header) => (
-                              <td key={header} className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right">
+                              <td
+                                key={header}
+                                className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right"
+                              >
                                 <button
                                   onClick={() =>
                                     showTransactionDetails(
                                       group.account,
                                       undefined,
-                                      viewMode === "Detail" ? header : undefined,
+                                      viewMode === "Detail"
+                                        ? header
+                                        : undefined,
                                       viewMode === "Class" ? header : undefined,
-                                      !expandedAccounts.has(group.account.account), // Show combined if collapsed
+                                      !expandedAccounts.has(
+                                        group.account.account,
+                                      ), // Show combined if collapsed
                                       group.subAccounts,
                                     )
                                   }
@@ -1681,7 +2488,9 @@ export default function FinancialsPage() {
                                     getCellValue(
                                       group.account,
                                       header,
-                                      !expandedAccounts.has(group.account.account), // Combined if collapsed
+                                      !expandedAccounts.has(
+                                        group.account.account,
+                                      ), // Combined if collapsed
                                       group.subAccounts,
                                     ),
                                   )}
@@ -1696,7 +2505,9 @@ export default function FinancialsPage() {
                                     undefined,
                                     undefined,
                                     undefined,
-                                    !expandedAccounts.has(group.account.account), // Show combined if collapsed
+                                    !expandedAccounts.has(
+                                      group.account.account,
+                                    ), // Show combined if collapsed
                                     group.subAccounts,
                                   )
                                 }
@@ -1715,10 +2526,15 @@ export default function FinancialsPage() {
                           {group.subAccounts &&
                             expandedAccounts.has(group.account.account) &&
                             group.subAccounts.map((subAccount) => (
-                              <tr key={subAccount.account} className="hover:bg-gray-50 bg-gray-25">
+                              <tr
+                                key={subAccount.account}
+                                className="hover:bg-gray-50 bg-gray-25"
+                              >
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 pl-20">
                                   <div className="flex items-center">
-                                    <span className="text-gray-400 mr-2">└</span>
+                                    <span className="text-gray-400 mr-2">
+                                      └
+                                    </span>
                                     {subAccount.sub_account}
                                   </div>
                                 </td>
@@ -1732,19 +2548,30 @@ export default function FinancialsPage() {
                                         showTransactionDetails(
                                           group.account,
                                           subAccount,
-                                          viewMode === "Detail" ? header : undefined,
-                                          viewMode === "Class" ? header : undefined,
+                                          viewMode === "Detail"
+                                            ? header
+                                            : undefined,
+                                          viewMode === "Class"
+                                            ? header
+                                            : undefined,
                                         )
                                       }
                                       className="hover:underline"
                                     >
-                                      {formatCurrency(getCellValue(subAccount, header))}
+                                      {formatCurrency(
+                                        getCellValue(subAccount, header),
+                                      )}
                                     </button>
                                   </td>
                                 ))}
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right">
                                   <button
-                                    onClick={() => showTransactionDetails(group.account, subAccount)}
+                                    onClick={() =>
+                                      showTransactionDetails(
+                                        group.account,
+                                        subAccount,
+                                      )
+                                    }
                                     className="hover:underline"
                                   >
                                     {formatCurrency(subAccount.amount)}
@@ -1757,7 +2584,9 @@ export default function FinancialsPage() {
 
                       {/* Total Expenses */}
                       <tr className="bg-red-100 font-semibold">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-800">TOTAL EXPENSES</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-800">
+                          TOTAL EXPENSES
+                        </td>
                         {columnHeaders.map((header) => (
                           <td
                             key={header}
@@ -1765,7 +2594,15 @@ export default function FinancialsPage() {
                           >
                             {formatCurrency(
                               groupedAccounts.expenses.reduce((sum, group) => {
-                                return sum + getCellValue(group.account, header, true, group.subAccounts)
+                                return (
+                                  sum +
+                                  getCellValue(
+                                    group.account,
+                                    header,
+                                    true,
+                                    group.subAccounts,
+                                  )
+                                );
                               }, 0),
                             )}
                           </td>
@@ -1777,26 +2614,64 @@ export default function FinancialsPage() {
 
                       {/* Net Income */}
                       <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">NET INCOME</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          NET INCOME
+                        </td>
                         {columnHeaders.map((header) => {
-                          const headerIncome = groupedAccounts.income.reduce((sum, group) => {
-                            return sum + getCellValue(group.account, header, true, group.subAccounts)
-                          }, 0)
-
-                          const headerExpenses = groupedAccounts.expenses.reduce((sum, group) => {
-                            return sum + getCellValue(group.account, header, true, group.subAccounts)
-                          }, 0)
-                          const headerNet = headerIncome - headerExpenses
+                          const headerIncome = groupedAccounts.income.reduce(
+                            (sum, group) => {
+                              return (
+                                sum +
+                                getCellValue(
+                                  group.account,
+                                  header,
+                                  true,
+                                  group.subAccounts,
+                                )
+                              );
+                            },
+                            0,
+                          );
+                          const headerCogs = groupedAccounts.cogs.reduce(
+                            (sum, group) => {
+                              return (
+                                sum +
+                                getCellValue(
+                                  group.account,
+                                  header,
+                                  true,
+                                  group.subAccounts,
+                                )
+                              );
+                            },
+                            0,
+                          );
+                          const headerExpenses =
+                            groupedAccounts.expenses.reduce((sum, group) => {
+                              return (
+                                sum +
+                                getCellValue(
+                                  group.account,
+                                  header,
+                                  true,
+                                  group.subAccounts,
+                                )
+                              );
+                            }, 0);
+                          const headerNet =
+                            headerIncome - headerCogs - headerExpenses;
                           return (
                             <td
                               key={header}
                               className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
-                                headerNet >= 0 ? "text-green-700" : "text-red-700"
+                                headerNet >= 0
+                                  ? "text-green-700"
+                                  : "text-red-700"
                               }`}
                             >
                               {formatCurrency(headerNet)}
                             </td>
-                          )
+                          );
                         })}
                         <td
                           className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-xl ${
@@ -1822,10 +2697,17 @@ export default function FinancialsPage() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 text-center">{transactionModalTitle}</h3>
-                  <p className="text-sm text-gray-600 text-center">{modalTransactionDetails.length} transactions</p>
+                  <h3 className="text-lg font-semibold text-gray-900 text-center">
+                    {transactionModalTitle}
+                  </h3>
+                  <p className="text-sm text-gray-600 text-center">
+                    {modalTransactionDetails.length} transactions
+                  </p>
                 </div>
-                <button onClick={() => setShowTransactionModal(false)} className="text-gray-400 hover:text-gray-600">
+                <button
+                  onClick={() => setShowTransactionModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
                   <X className="w-6 h-6" />
                 </button>
               </div>
@@ -1834,43 +2716,57 @@ export default function FinancialsPage() {
               {modalTransactionDetails.length > 0 && (
                 <div className="mt-4 grid grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
                   <div className="text-center">
-                    <div className="text-sm text-gray-600 text-center">Total Debits</div>
+                    <div className="text-sm text-gray-600 text-center">
+                      Total Debits
+                    </div>
                     <div className="text-lg font-semibold text-red-600 text-center">
                       {formatCurrency(
                         modalTransactionDetails.reduce((sum, t) => {
                           const debitValue = t.debit
-                            ? Number.parseFloat(t.debit.toString().replace(/[^0-9.-]/g, "")) || 0
-                            : 0
-                          return sum + debitValue
+                            ? Number.parseFloat(
+                                t.debit.toString().replace(/[^0-9.-]/g, ""),
+                              ) || 0
+                            : 0;
+                          return sum + debitValue;
                         }, 0),
                       )}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm text-gray-600 text-center">Total Credits</div>
+                    <div className="text-sm text-gray-600 text-center">
+                      Total Credits
+                    </div>
                     <div className="text-lg font-semibold text-green-600 text-center">
                       {formatCurrency(
                         modalTransactionDetails.reduce((sum, t) => {
                           const creditValue = t.credit
-                            ? Number.parseFloat(t.credit.toString().replace(/[^0-9.-]/g, "")) || 0
-                            : 0
-                          return sum + creditValue
+                            ? Number.parseFloat(
+                                t.credit.toString().replace(/[^0-9.-]/g, ""),
+                              ) || 0
+                            : 0;
+                          return sum + creditValue;
                         }, 0),
                       )}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm text-gray-600 text-center">Net Impact</div>
+                    <div className="text-sm text-gray-600 text-center">
+                      Net Impact
+                    </div>
                     <div
                       className={`text-lg font-semibold text-center ${
                         modalTransactionDetails.reduce((sum, t) => {
                           const creditValue = t.credit
-                            ? Number.parseFloat(t.credit.toString().replace(/[^0-9.-]/g, "")) || 0
-                            : 0
+                            ? Number.parseFloat(
+                                t.credit.toString().replace(/[^0-9.-]/g, ""),
+                              ) || 0
+                            : 0;
                           const debitValue = t.debit
-                            ? Number.parseFloat(t.debit.toString().replace(/[^0-9.-]/g, "")) || 0
-                            : 0
-                          return sum + (creditValue - debitValue)
+                            ? Number.parseFloat(
+                                t.debit.toString().replace(/[^0-9.-]/g, ""),
+                              ) || 0
+                            : 0;
+                          return sum + (creditValue - debitValue);
                         }, 0) >= 0
                           ? "text-green-600"
                           : "text-red-600"
@@ -1880,19 +2776,25 @@ export default function FinancialsPage() {
                         Math.abs(
                           modalTransactionDetails.reduce((sum, t) => {
                             const creditValue = t.credit
-                              ? Number.parseFloat(t.credit.toString().replace(/[^0-9.-]/g, "")) || 0
-                              : 0
+                              ? Number.parseFloat(
+                                  t.credit.toString().replace(/[^0-9.-]/g, ""),
+                                ) || 0
+                              : 0;
                             const debitValue = t.debit
-                              ? Number.parseFloat(t.debit.toString().replace(/[^0-9.-]/g, "")) || 0
-                              : 0
-                            return sum + (creditValue - debitValue)
+                              ? Number.parseFloat(
+                                  t.debit.toString().replace(/[^0-9.-]/g, ""),
+                                ) || 0
+                              : 0;
+                            return sum + (creditValue - debitValue);
                           }, 0),
                         ),
                       )}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm text-gray-600 text-center">Transactions</div>
+                    <div className="text-sm text-gray-600 text-center">
+                      Transactions
+                    </div>
                     <div className="text-lg font-semibold text-blue-600 text-center">
                       {modalTransactionDetails.length}
                     </div>
@@ -1939,12 +2841,20 @@ export default function FinancialsPage() {
                     {modalTransactionDetails.map((transaction, index) => {
                       // Calculate the net amount for this transaction
                       const debitValue = transaction.debit
-                        ? Number.parseFloat(transaction.debit.toString().replace(/[^0-9.-]/g, "")) || 0
-                        : 0
+                        ? Number.parseFloat(
+                            transaction.debit
+                              .toString()
+                              .replace(/[^0-9.-]/g, ""),
+                          ) || 0
+                        : 0;
                       const creditValue = transaction.credit
-                        ? Number.parseFloat(transaction.credit.toString().replace(/[^0-9.-]/g, "")) || 0
-                        : 0
-                      const netAmount = creditValue - debitValue
+                        ? Number.parseFloat(
+                            transaction.credit
+                              .toString()
+                              .replace(/[^0-9.-]/g, ""),
+                          ) || 0
+                        : 0;
+                      const netAmount = creditValue - debitValue;
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
@@ -1952,10 +2862,17 @@ export default function FinancialsPage() {
                             {formatDateDisplay(transaction.date)}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-900">
-                            {transaction.name || transaction.vendor || transaction.customer || "N/A"}
+                            {transaction.name ||
+                              transaction.vendor ||
+                              transaction.customer ||
+                              "N/A"}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{transaction.memo || "N/A"}</td>
-                          <td className="px-6 py-4 text-sm text-blue-600">{transaction.entry_number || "N/A"}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {transaction.memo || "N/A"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-blue-600">
+                            {transaction.entry_number || "N/A"}
+                          </td>
                           <td className="px-6 py-4 text-sm text-purple-600 text-center">
                             {transaction.account_type || "N/A"}
                           </td>
@@ -1980,7 +2897,7 @@ export default function FinancialsPage() {
                             )}
                           </td>
                         </tr>
-                      )
+                      );
                     })}
                   </tbody>
                 </table>
@@ -1990,5 +2907,5 @@ export default function FinancialsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
