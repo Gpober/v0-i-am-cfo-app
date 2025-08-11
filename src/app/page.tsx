@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import React from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import Link from "next/link"
 import {
   DollarSign,
@@ -13,6 +14,7 @@ import {
   BarChart3,
   AlertTriangle,
   Calendar,
+  ChevronDown,
   Target,
   Activity,
   PieChart,
@@ -86,7 +88,7 @@ const classifyPLAccount = (accountType, reportCategory, accountName) => {
 }
 
 // Cash Flow Classification using the same logic as cash-flow page
-const classifyCashFlowTransaction = (accountType, reportCategory) => {
+const classifyCashFlowTransaction = (accountType) => {
   const typeLower = accountType?.toLowerCase() || ""
 
   // Operating activities - Income and Expenses
@@ -125,6 +127,18 @@ export default function FinancialOverviewPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState("June")
   const [selectedYear, setSelectedYear] = useState("2024")
+  type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
+  type ViewMode = "Total" | "Detail" | "Class"
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("YTD")
+  const [viewMode, setViewMode] = useState<ViewMode>("Total")
+  const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false)
+  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false)
+  const [yearDropdownOpen, setYearDropdownOpen] = useState(false)
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false)
+  const timePeriodDropdownRef = useRef<HTMLDivElement>(null)
+  const monthDropdownRef = useRef<HTMLDivElement>(null)
+  const yearDropdownRef = useRef<HTMLDivElement>(null)
+  const propertyDropdownRef = useRef<HTMLDivElement>(null)
   const [financialData, setFinancialData] = useState(null)
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
@@ -159,6 +173,10 @@ export default function FinancialOverviewPage() {
   const [loadingProperty, setLoadingProperty] = useState(false)
   const [trendError, setTrendError] = useState<string | null>(null)
   const [propertyError, setPropertyError] = useState<string | null>(null)
+  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set(["All Properties"]))
+  const [availableProperties, setAvailableProperties] = useState<string[]>(["All Properties"])
+  const [customStartDate, setCustomStartDate] = useState("")
+  const [customEndDate, setCustomEndDate] = useState("")
   const orgId = "1"
   const classFilter: string | null = null
 
@@ -186,48 +204,107 @@ export default function FinancialOverviewPage() {
     return { year, month, day, dateOnly }
   }
 
-  const getMonthYear = (dateString) => {
-    const { year, month } = getDateParts(dateString)
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ]
-    return `${monthNames[month - 1]} ${year}`
-  }
+  // Removed unused getMonthYear function
 
   const isDateInRange = (dateString, startDate, endDate) => {
     const { dateOnly } = getDateParts(dateString)
     return dateOnly >= startDate && dateOnly <= endDate
   }
 
-  // Calculate date range (same logic as other pages)
+  // Calculate date range (matches financials page logic)
   const calculateDateRange = () => {
-    const monthIndex = monthsList.indexOf(selectedMonth)
-    const year = Number.parseInt(selectedYear)
-    const startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`
+    let startDate: string
+    let endDate: string
 
-    // Calculate last day of month
-    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    let lastDay = daysInMonth[monthIndex]
+    if (timePeriod === "Custom") {
+      startDate = customStartDate || "2025-01-01"
+      endDate = customEndDate || "2025-06-30"
+    } else if (timePeriod === "YTD") {
+      const year = Number.parseInt(selectedYear)
+      startDate = `${year}-01-01`
+      endDate = `${year}-06-30`
+    } else if (timePeriod === "Monthly") {
+      const monthIndex = monthsList.indexOf(selectedMonth)
+      const year = Number.parseInt(selectedYear)
+      startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`
 
-    // Handle leap year for February
-    if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
-      lastDay = 29
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let lastDay = daysInMonth[monthIndex]
+      if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+        lastDay = 29
+      }
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+    } else if (timePeriod === "Quarterly") {
+      const monthIndex = monthsList.indexOf(selectedMonth)
+      const year = Number.parseInt(selectedYear)
+      const quarter = Math.floor(monthIndex / 3)
+      const quarterStartMonth = quarter * 3
+      startDate = `${year}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`
+
+      const quarterEndMonth = quarterStartMonth + 2
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let lastDay = daysInMonth[quarterEndMonth]
+      if (quarterEndMonth === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+        lastDay = 29
+      }
+      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+    } else {
+      const now = new Date()
+      const currentYear = now.getFullYear()
+      const currentMonth = now.getMonth() + 1
+      let startYear = currentYear
+      let startMonth = currentMonth - 12
+      if (startMonth <= 0) {
+        startMonth += 12
+        startYear -= 1
+      }
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let lastDay = daysInMonth[currentMonth - 1]
+      if (currentMonth === 2 && ((currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0)) {
+        lastDay = 29
+      }
+      endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     }
 
-    const endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     return { startDate, endDate }
   }
+
+  // Click outside handler for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        propertyDropdownRef.current &&
+        !propertyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setPropertyDropdownOpen(false)
+      }
+      if (
+        timePeriodDropdownRef.current &&
+        !timePeriodDropdownRef.current.contains(event.target as Node)
+      ) {
+        setTimePeriodDropdownOpen(false)
+      }
+      if (
+        monthDropdownRef.current &&
+        !monthDropdownRef.current.contains(event.target as Node)
+      ) {
+        setMonthDropdownOpen(false)
+      }
+      if (
+        yearDropdownRef.current &&
+        !yearDropdownRef.current.contains(event.target as Node)
+      ) {
+        setYearDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   // Fetch financial data from Supabase (same connection as other pages)
   const fetchFinancialData = async () => {
@@ -238,42 +315,65 @@ export default function FinancialOverviewPage() {
       const { startDate, endDate } = calculateDateRange()
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
+      const selectedProperty =
+        Array.from(selectedProperties)[0] || "All Properties"
 
-      console.log(`🔍 FINANCIAL OVERVIEW - Fetching data for ${selectedMonth} ${selectedYear}`)
+      console.log(
+        `🔍 FINANCIAL OVERVIEW - Fetching data for ${selectedMonth} ${selectedYear}`,
+      )
       console.log(`📅 Date range: ${startDate} to ${endDate}`)
+      console.log(`🏢 Property Filter: "${selectedProperty}"`)
 
       // Fetch current period data using same query structure as other pages
-      const { data: currentTransactions, error: currentError } = await supabase
+      let currentQuery = supabase
         .from("journal_entry_lines")
-        .select(`
-          entry_number, 
-          class, 
-          date, 
-          account, 
-          account_type, 
-          debit, 
-          credit, 
-          memo, 
-          customer, 
-          vendor, 
-          name, 
-          entry_bank_account, 
-          normal_balance, 
+        .select(
+          `
+          entry_number,
+          class,
+          date,
+          account,
+          account_type,
+          debit,
+          credit,
+          memo,
+          customer,
+          vendor,
+          name,
+          entry_bank_account,
+          normal_balance,
           report_category,
           is_cash_account,
           detail_type,
           account_behavior
-        `)
+        `
+        )
         .gte("date", startDate)
         .lte("date", endDate)
         .order("date", { ascending: true })
 
+      if (selectedProperty !== "All Properties") {
+        currentQuery = currentQuery.eq("class", selectedProperty)
+      }
+
+      const { data: currentTransactions, error: currentError } = await currentQuery
       if (currentError) throw currentError
 
       // Filter transactions using timezone-independent date comparison
       const filteredCurrentTransactions = currentTransactions.filter((tx) => {
         return isDateInRange(tx.date, startDate, endDate)
       })
+
+      const properties = new Set<string>()
+      filteredCurrentTransactions.forEach((tx) => {
+        if (tx.class && tx.class.trim()) {
+          properties.add(tx.class.trim())
+        }
+      })
+      setAvailableProperties([
+        "All Properties",
+        ...Array.from(properties).sort(),
+      ])
 
       console.log(`📊 Current period: ${filteredCurrentTransactions.length} transactions`)
 
@@ -289,22 +389,22 @@ export default function FinancialOverviewPage() {
       }
       const prevEndDate = `${prevYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-${String(prevLastDay).padStart(2, "0")}`
 
-      const { data: prevTransactions, error: prevError } = await supabase
+      let prevQuery = supabase
         .from("journal_entry_lines")
         .select(`
-          entry_number, 
-          class, 
-          date, 
-          account, 
-          account_type, 
-          debit, 
-          credit, 
-          memo, 
-          customer, 
-          vendor, 
-          name, 
-          entry_bank_account, 
-          normal_balance, 
+          entry_number,
+          class,
+          date,
+          account,
+          account_type,
+          debit,
+          credit,
+          memo,
+          customer,
+          vendor,
+          name,
+          entry_bank_account,
+          normal_balance,
           report_category,
           is_cash_account,
           detail_type,
@@ -313,6 +413,12 @@ export default function FinancialOverviewPage() {
         .gte("date", prevStartDate)
         .lte("date", prevEndDate)
         .order("date", { ascending: true })
+
+      if (selectedProperty !== "All Properties") {
+        prevQuery = prevQuery.eq("class", selectedProperty)
+      }
+
+      const { data: prevTransactions, error: prevError } = await prevQuery
 
       const filteredPrevTransactions =
         prevTransactions && !prevError
@@ -335,22 +441,22 @@ export default function FinancialOverviewPage() {
         }
         const trendEndDate = `${trendYear}-${String(trendMonthIndex + 1).padStart(2, "0")}-${String(trendLastDay).padStart(2, "0")}`
 
-        const { data: monthData } = await supabase
+        let monthQuery = supabase
           .from("journal_entry_lines")
           .select(`
-            entry_number, 
-            class, 
-            date, 
-            account, 
-            account_type, 
-            debit, 
-            credit, 
-            memo, 
-            customer, 
-            vendor, 
-            name, 
-            entry_bank_account, 
-            normal_balance, 
+            entry_number,
+            class,
+            date,
+            account,
+            account_type,
+            debit,
+            credit,
+            memo,
+            customer,
+            vendor,
+            name,
+            entry_bank_account,
+            normal_balance,
             report_category,
             is_cash_account,
             detail_type,
@@ -359,6 +465,12 @@ export default function FinancialOverviewPage() {
           .gte("date", trendStartDate)
           .lte("date", trendEndDate)
           .order("date", { ascending: true })
+
+        if (selectedProperty !== "All Properties") {
+          monthQuery = monthQuery.eq("class", selectedProperty)
+        }
+
+        const { data: monthData } = await monthQuery
 
         const filteredMonthData = monthData
           ? monthData.filter((tx) => isDateInRange(tx.date, trendStartDate, trendEndDate))
@@ -473,7 +585,7 @@ export default function FinancialOverviewPage() {
     let totalCogs = 0
     let totalExpenses = 0
 
-    for (const [account, data] of accountMap.entries()) {
+    for (const [, data] of accountMap.entries()) {
       let amount
       if (data.category === "INCOME") {
         amount = data.totalCredits - data.totalDebits
@@ -722,11 +834,13 @@ export default function FinancialOverviewPage() {
   }
 
   // Load data on component mount and when filters change
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     fetchFinancialData()
     loadTrendData()
     loadPropertyData()
-  }, [selectedMonth, selectedYear])
+  }, [timePeriod, selectedMonth, selectedYear, selectedProperties, customStartDate, customEndDate])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Helper functions
   const formatCurrency = (value) => {
@@ -892,34 +1006,6 @@ export default function FinancialOverviewPage() {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Month Dropdown */}
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" }}
-              >
-                {monthsList.map((month) => (
-                  <option key={month} value={month}>
-                    {month}
-                  </option>
-                ))}
-              </select>
-
-              {/* Year Dropdown */}
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" }}
-              >
-                {yearsList.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-
               <button
                 onClick={fetchFinancialData}
                 disabled={isLoading}
@@ -929,6 +1015,245 @@ export default function FinancialOverviewPage() {
                 {isLoading ? "Loading..." : "Refresh"}
               </button>
             </div>
+          </div>
+      </div>
+    </div>
+    
+      {/* Filters */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Time Period Dropdown */}
+            <div className="relative" ref={timePeriodDropdownRef}>
+              <button
+                onClick={() => setTimePeriodDropdownOpen(!timePeriodDropdownOpen)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                {timePeriod}
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </button>
+
+              {timePeriodDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg">
+                  {(["Monthly", "Quarterly", "YTD", "Trailing 12", "Custom"] as TimePeriod[]).map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => {
+                        setTimePeriod(period)
+                        setTimePeriodDropdownOpen(false)
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Month/Year dropdowns for Monthly and Quarterly */}
+            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+              <>
+                <div className="relative" ref={monthDropdownRef}>
+                  <button
+                    onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                  >
+                    {selectedMonth}
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </button>
+
+                  {monthDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {monthsList.map((month) => (
+                        <button
+                          key={month}
+                          onClick={() => {
+                            setSelectedMonth(month)
+                            setMonthDropdownOpen(false)
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
+                        >
+                          {month}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative" ref={yearDropdownRef}>
+                  <button
+                    onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                  >
+                    {selectedYear}
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </button>
+
+                  {yearDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {yearsList.map((year) => (
+                        <button
+                          key={year}
+                          onClick={() => {
+                            setSelectedYear(year)
+                            setYearDropdownOpen(false)
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
+                        >
+                          {year}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Year dropdown for YTD */}
+            {timePeriod === "YTD" && (
+              <div className="relative" ref={yearDropdownRef}>
+                <button
+                  onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                >
+                  {selectedYear}
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </button>
+
+                {yearDropdownOpen && (
+                  <div className="absolute z-10 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {yearsList.map((year) => (
+                      <button
+                        key={year}
+                        onClick={() => {
+                          setSelectedYear(year)
+                          setYearDropdownOpen(false)
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
+                      >
+                        {year}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Property Filter */}
+            <div className="relative" ref={propertyDropdownRef}>
+              <button
+                onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+              >
+                Properties: {Array.from(selectedProperties).join(", ")}
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </button>
+
+              {propertyDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {availableProperties.map((property) => (
+                    <label
+                      key={property}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedProperties.has(property)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedProperties)
+                          if (e.target.checked) {
+                            if (property === "All Properties") {
+                              newSelected.clear()
+                              newSelected.add("All Properties")
+                            } else {
+                              newSelected.delete("All Properties")
+                              newSelected.add(property)
+                            }
+                          } else {
+                            newSelected.delete(property)
+                            if (newSelected.size === 0) {
+                              newSelected.add("All Properties")
+                            }
+                          }
+                          setSelectedProperties(newSelected)
+                        }}
+                        className="mr-3 rounded"
+                        style={{ accentColor: BRAND_COLORS.primary }}
+                      />
+                      {property}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center border border-gray-300 rounded-lg">
+              <button
+                onClick={() => setViewMode("Total")}
+                className={`px-4 py-2 text-sm font-medium rounded-l-lg ${
+                  viewMode === "Total" ? "text-white" : "text-gray-700 hover:bg-gray-50"
+                }`}
+                style={{
+                  backgroundColor:
+                    viewMode === "Total" ? BRAND_COLORS.primary : undefined,
+                }}
+              >
+                Total
+              </button>
+              <button
+                onClick={() => setViewMode("Detail")}
+                className={`px-4 py-2 text-sm font-medium border-l border-gray-300 ${
+                  viewMode === "Detail" ? "text-white" : "text-gray-700 hover:bg-gray-50"
+                }`}
+                style={{
+                  backgroundColor:
+                    viewMode === "Detail" ? BRAND_COLORS.primary : undefined,
+                }}
+              >
+                Detail
+              </button>
+              <button
+                onClick={() => setViewMode("Class")}
+                className={`px-4 py-2 text-sm font-medium rounded-r-lg border-l border-gray-300 ${
+                  viewMode === "Class" ? "text-white" : "text-gray-700 hover:bg-gray-50"
+                }`}
+                style={{
+                  backgroundColor:
+                    viewMode === "Class" ? BRAND_COLORS.primary : undefined,
+                }}
+              >
+                Class
+              </button>
+            </div>
+
+            {/* Custom Date Range */}
+            {timePeriod === "Custom" && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                />
+                <span className="text-gray-500">to</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
