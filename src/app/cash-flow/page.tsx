@@ -248,26 +248,231 @@ export default function CashFlowPage() {
 
   const handleExportCashFlowExcel = () => {
     const months = Array.from(
-      new Set(cashFlowData.map((row) => row.monthName)),
-    )
-    const rows = [
-      { Account: "Operating Activities" },
-      { Account: "Financing Activities" },
-      { Account: "Investing Activities" },
-      { Account: "Net Change in Cash" },
-    ] as Record<string, any>[]
+      new Set(
+        cashTransactions.map((tx) =>
+          monthsList[getMonthFromDate(tx.date) - 1],
+        ),
+      ),
+    ).sort((a, b) => monthsList.indexOf(a) - monthsList.indexOf(b))
+
+    const breakdown: Record<string, CashFlowBreakdown & { netChange: number }> = {}
 
     months.forEach((m) => {
-      const filtered = cashFlowData.filter((row) => row.monthName === m)
-      rows[0][m] = filtered.reduce((sum, r) => sum + r.operatingCashFlow, 0)
-      rows[1][m] = filtered.reduce((sum, r) => sum + r.financingCashFlow, 0)
-      rows[2][m] = filtered.reduce((sum, r) => sum + r.investingCashFlow, 0)
-      rows[3][m] = filtered.reduce((sum, r) => sum + r.netChangeInCash, 0)
+      breakdown[m] = {
+        operating: {
+          rentalIncome: 0,
+          otherIncome: 0,
+          operatingExpenses: 0,
+          cogs: 0,
+          net: 0,
+        },
+        financing: {
+          loanProceeds: 0,
+          loanPayments: 0,
+          mortgageProceeds: 0,
+          mortgagePayments: 0,
+          equityContributions: 0,
+          distributions: 0,
+          net: 0,
+        },
+        investing: {
+          propertyPurchases: 0,
+          propertySales: 0,
+          propertyImprovements: 0,
+          equipmentPurchases: 0,
+          otherInvestments: 0,
+          investmentProceeds: 0,
+          net: 0,
+        },
+        netChange: 0,
+      }
     })
 
-    const worksheet = XLSX.utils.json_to_sheet(rows, {
-      header: ["Account", ...months],
+    cashTransactions.forEach((tx: any) => {
+      const monthName = monthsList[getMonthFromDate(tx.date) - 1]
+      if (!breakdown[monthName]) return
+
+      const account = tx.account?.toLowerCase() || ""
+      const accountType = tx.account_type?.toLowerCase() || ""
+      const classification = classifyTransaction(
+        tx.account_type,
+        tx.report_category,
+      )
+      const impact = tx.cashFlowImpact || 0
+
+      if (classification === "operating") {
+        breakdown[monthName].operating.net += impact
+
+        if (accountType.includes("income") && impact > 0) {
+          if (account.includes("rent") || account.includes("rental")) {
+            breakdown[monthName].operating.rentalIncome += impact
+          } else {
+            breakdown[monthName].operating.otherIncome += impact
+          }
+        } else if (
+          (accountType.includes("expense") || accountType.includes("cost")) &&
+          impact < 0
+        ) {
+          if (accountType.includes("cost of goods sold")) {
+            breakdown[monthName].operating.cogs += Math.abs(impact)
+          } else {
+            breakdown[monthName].operating.operatingExpenses += Math.abs(impact)
+          }
+        }
+      } else if (classification === "financing") {
+        breakdown[monthName].financing.net += impact
+
+        if (account.includes("mortgage") && !account.includes("interest")) {
+          if (impact > 0)
+            breakdown[monthName].financing.mortgageProceeds += impact
+          if (impact < 0)
+            breakdown[monthName].financing.mortgagePayments += Math.abs(impact)
+        } else if (account.includes("loan") && !account.includes("interest")) {
+          if (impact > 0)
+            breakdown[monthName].financing.loanProceeds += impact
+          if (impact < 0)
+            breakdown[monthName].financing.loanPayments += Math.abs(impact)
+        } else if (accountType.includes("equity")) {
+          if (impact > 0)
+            breakdown[monthName].financing.equityContributions += impact
+          if (impact < 0)
+            breakdown[monthName].financing.distributions += Math.abs(impact)
+        }
+      } else if (classification === "investing") {
+        breakdown[monthName].investing.net += impact
+
+        if (
+          accountType.includes("fixed assets") ||
+          accountType.includes("property")
+        ) {
+          if (impact < 0)
+            breakdown[monthName].investing.propertyPurchases += Math.abs(impact)
+          if (impact > 0)
+            breakdown[monthName].investing.propertySales += impact
+        } else if (account.includes("improvement")) {
+          breakdown[monthName].investing.propertyImprovements += Math.abs(impact)
+        } else if (account.includes("equipment")) {
+          breakdown[monthName].investing.equipmentPurchases += Math.abs(impact)
+        } else if (impact < 0) {
+          breakdown[monthName].investing.otherInvestments += Math.abs(impact)
+        } else if (impact > 0) {
+          breakdown[monthName].investing.investmentProceeds += impact
+        }
+      }
     })
+
+    months.forEach((m) => {
+      breakdown[m].netChange =
+        breakdown[m].operating.net +
+        breakdown[m].financing.net +
+        breakdown[m].investing.net
+    })
+
+    const sheetData: (string | number)[][] = []
+    sheetData.push(["Account", ...months])
+
+    const pushRow = (
+      label: string,
+      values: (number | string)[] = [],
+    ) => {
+      sheetData.push([label, ...values])
+    }
+
+    const emptyRow = Array(months.length)
+      .fill(0)
+      .map(() => "")
+
+    pushRow("Operating Activities", [...emptyRow])
+    pushRow(
+      "  Rental Income",
+      months.map((m) => breakdown[m].operating.rentalIncome),
+    )
+    pushRow(
+      "  Other Income",
+      months.map((m) => breakdown[m].operating.otherIncome),
+    )
+    pushRow(
+      "  Operating Expenses",
+      months.map((m) => -breakdown[m].operating.operatingExpenses),
+    )
+    pushRow(
+      "  Cost of Goods Sold",
+      months.map((m) => -breakdown[m].operating.cogs),
+    )
+    pushRow(
+      "Total Operating Activities",
+      months.map((m) => breakdown[m].operating.net),
+    )
+    sheetData.push(["", ...emptyRow])
+
+    pushRow("Financing Activities", [...emptyRow])
+    pushRow(
+      "  Loan Proceeds",
+      months.map((m) => breakdown[m].financing.loanProceeds),
+    )
+    pushRow(
+      "  Loan Payments",
+      months.map((m) => -breakdown[m].financing.loanPayments),
+    )
+    pushRow(
+      "  Mortgage Proceeds",
+      months.map((m) => breakdown[m].financing.mortgageProceeds),
+    )
+    pushRow(
+      "  Mortgage Payments",
+      months.map((m) => -breakdown[m].financing.mortgagePayments),
+    )
+    pushRow(
+      "  Equity Contributions",
+      months.map((m) => breakdown[m].financing.equityContributions),
+    )
+    pushRow(
+      "  Distributions",
+      months.map((m) => -breakdown[m].financing.distributions),
+    )
+    pushRow(
+      "Total Financing Activities",
+      months.map((m) => breakdown[m].financing.net),
+    )
+    sheetData.push(["", ...emptyRow])
+
+    pushRow("Investing Activities", [...emptyRow])
+    pushRow(
+      "  Property Purchases",
+      months.map((m) => -breakdown[m].investing.propertyPurchases),
+    )
+    pushRow(
+      "  Property Sales",
+      months.map((m) => breakdown[m].investing.propertySales),
+    )
+    pushRow(
+      "  Property Improvements",
+      months.map((m) => -breakdown[m].investing.propertyImprovements),
+    )
+    pushRow(
+      "  Equipment Purchases",
+      months.map((m) => -breakdown[m].investing.equipmentPurchases),
+    )
+    pushRow(
+      "  Other Investments",
+      months.map((m) => -breakdown[m].investing.otherInvestments),
+    )
+    pushRow(
+      "  Investment Proceeds",
+      months.map((m) => breakdown[m].investing.investmentProceeds),
+    )
+    pushRow(
+      "Total Investing Activities",
+      months.map((m) => breakdown[m].investing.net),
+    )
+    sheetData.push(["", ...emptyRow])
+
+    pushRow(
+      "Net Change in Cash",
+      months.map((m) => breakdown[m].netChange),
+    )
+
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetData)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "Cash Flow")
     XLSX.writeFile(workbook, "cash_flow.xlsx")
@@ -275,16 +480,228 @@ export default function CashFlowPage() {
 
   const handleExportCashFlowPdf = () => {
     const months = Array.from(
-      new Set(cashFlowData.map((row) => row.monthName)),
-    )
+      new Set(
+        cashTransactions.map((tx) =>
+          monthsList[getMonthFromDate(tx.date) - 1],
+        ),
+      ),
+    ).sort((a, b) => monthsList.indexOf(a) - monthsList.indexOf(b))
+
+    const breakdown: Record<string, CashFlowBreakdown & { netChange: number }> = {}
+
+    months.forEach((m) => {
+      breakdown[m] = {
+        operating: {
+          rentalIncome: 0,
+          otherIncome: 0,
+          operatingExpenses: 0,
+          cogs: 0,
+          net: 0,
+        },
+        financing: {
+          loanProceeds: 0,
+          loanPayments: 0,
+          mortgageProceeds: 0,
+          mortgagePayments: 0,
+          equityContributions: 0,
+          distributions: 0,
+          net: 0,
+        },
+        investing: {
+          propertyPurchases: 0,
+          propertySales: 0,
+          propertyImprovements: 0,
+          equipmentPurchases: 0,
+          otherInvestments: 0,
+          investmentProceeds: 0,
+          net: 0,
+        },
+        netChange: 0,
+      }
+    })
+
+    cashTransactions.forEach((tx: any) => {
+      const monthName = monthsList[getMonthFromDate(tx.date) - 1]
+      if (!breakdown[monthName]) return
+
+      const account = tx.account?.toLowerCase() || ""
+      const accountType = tx.account_type?.toLowerCase() || ""
+      const classification = classifyTransaction(
+        tx.account_type,
+        tx.report_category,
+      )
+      const impact = tx.cashFlowImpact || 0
+
+      if (classification === "operating") {
+        breakdown[monthName].operating.net += impact
+
+        if (accountType.includes("income") && impact > 0) {
+          if (account.includes("rent") || account.includes("rental")) {
+            breakdown[monthName].operating.rentalIncome += impact
+          } else {
+            breakdown[monthName].operating.otherIncome += impact
+          }
+        } else if (
+          (accountType.includes("expense") || accountType.includes("cost")) &&
+          impact < 0
+        ) {
+          if (accountType.includes("cost of goods sold")) {
+            breakdown[monthName].operating.cogs += Math.abs(impact)
+          } else {
+            breakdown[monthName].operating.operatingExpenses += Math.abs(impact)
+          }
+        }
+      } else if (classification === "financing") {
+        breakdown[monthName].financing.net += impact
+
+        if (account.includes("mortgage") && !account.includes("interest")) {
+          if (impact > 0)
+            breakdown[monthName].financing.mortgageProceeds += impact
+          if (impact < 0)
+            breakdown[monthName].financing.mortgagePayments += Math.abs(impact)
+        } else if (account.includes("loan") && !account.includes("interest")) {
+          if (impact > 0)
+            breakdown[monthName].financing.loanProceeds += impact
+          if (impact < 0)
+            breakdown[monthName].financing.loanPayments += Math.abs(impact)
+        } else if (accountType.includes("equity")) {
+          if (impact > 0)
+            breakdown[monthName].financing.equityContributions += impact
+          if (impact < 0)
+            breakdown[monthName].financing.distributions += Math.abs(impact)
+        }
+      } else if (classification === "investing") {
+        breakdown[monthName].investing.net += impact
+
+        if (
+          accountType.includes("fixed assets") ||
+          accountType.includes("property")
+        ) {
+          if (impact < 0)
+            breakdown[monthName].investing.propertyPurchases += Math.abs(impact)
+          if (impact > 0)
+            breakdown[monthName].investing.propertySales += impact
+        } else if (account.includes("improvement")) {
+          breakdown[monthName].investing.propertyImprovements += Math.abs(impact)
+        } else if (account.includes("equipment")) {
+          breakdown[monthName].investing.equipmentPurchases += Math.abs(impact)
+        } else if (impact < 0) {
+          breakdown[monthName].investing.otherInvestments += Math.abs(impact)
+        } else if (impact > 0) {
+          breakdown[monthName].investing.investmentProceeds += impact
+        }
+      }
+    })
+
+    months.forEach((m) => {
+      breakdown[m].netChange =
+        breakdown[m].operating.net +
+        breakdown[m].financing.net +
+        breakdown[m].investing.net
+    })
+
     const doc = new jsPDF()
     const tableColumn = ["Account", ...months]
-    const body = [
-      ["Operating Activities", ...months.map((m) => cashFlowData.filter((r) => r.monthName === m).reduce((sum, r) => sum + r.operatingCashFlow, 0))],
-      ["Financing Activities", ...months.map((m) => cashFlowData.filter((r) => r.monthName === m).reduce((sum, r) => sum + r.financingCashFlow, 0))],
-      ["Investing Activities", ...months.map((m) => cashFlowData.filter((r) => r.monthName === m).reduce((sum, r) => sum + r.investingCashFlow, 0))],
-      ["Net Change in Cash", ...months.map((m) => cashFlowData.filter((r) => r.monthName === m).reduce((sum, r) => sum + r.netChangeInCash, 0))],
-    ]
+    const body: (string | number)[][] = []
+
+    const fill = Array(months.length).fill("")
+    const push = (
+      label: string,
+      values: (number | string)[] = [],
+    ) => {
+      body.push([label, ...values])
+    }
+
+    push("Operating Activities", [...fill])
+    push(
+      "  Rental Income",
+      months.map((m) => breakdown[m].operating.rentalIncome),
+    )
+    push(
+      "  Other Income",
+      months.map((m) => breakdown[m].operating.otherIncome),
+    )
+    push(
+      "  Operating Expenses",
+      months.map((m) => -breakdown[m].operating.operatingExpenses),
+    )
+    push(
+      "  Cost of Goods Sold",
+      months.map((m) => -breakdown[m].operating.cogs),
+    )
+    push(
+      "Total Operating Activities",
+      months.map((m) => breakdown[m].operating.net),
+    )
+    push("", [...fill])
+
+    push("Financing Activities", [...fill])
+    push(
+      "  Loan Proceeds",
+      months.map((m) => breakdown[m].financing.loanProceeds),
+    )
+    push(
+      "  Loan Payments",
+      months.map((m) => -breakdown[m].financing.loanPayments),
+    )
+    push(
+      "  Mortgage Proceeds",
+      months.map((m) => breakdown[m].financing.mortgageProceeds),
+    )
+    push(
+      "  Mortgage Payments",
+      months.map((m) => -breakdown[m].financing.mortgagePayments),
+    )
+    push(
+      "  Equity Contributions",
+      months.map((m) => breakdown[m].financing.equityContributions),
+    )
+    push(
+      "  Distributions",
+      months.map((m) => -breakdown[m].financing.distributions),
+    )
+    push(
+      "Total Financing Activities",
+      months.map((m) => breakdown[m].financing.net),
+    )
+    push("", [...fill])
+
+    push("Investing Activities", [...fill])
+    push(
+      "  Property Purchases",
+      months.map((m) => -breakdown[m].investing.propertyPurchases),
+    )
+    push(
+      "  Property Sales",
+      months.map((m) => breakdown[m].investing.propertySales),
+    )
+    push(
+      "  Property Improvements",
+      months.map((m) => -breakdown[m].investing.propertyImprovements),
+    )
+    push(
+      "  Equipment Purchases",
+      months.map((m) => -breakdown[m].investing.equipmentPurchases),
+    )
+    push(
+      "  Other Investments",
+      months.map((m) => -breakdown[m].investing.otherInvestments),
+    )
+    push(
+      "  Investment Proceeds",
+      months.map((m) => breakdown[m].investing.investmentProceeds),
+    )
+    push(
+      "Total Investing Activities",
+      months.map((m) => breakdown[m].investing.net),
+    )
+    push("", [...fill])
+
+    push(
+      "Net Change in Cash",
+      months.map((m) => breakdown[m].netChange),
+    )
+
     autoTable(doc, {
       head: [tableColumn],
       body,
