@@ -333,26 +333,15 @@ export default function FinancialOverviewPage() {
       totalIncome: data.current.totalIncome,
       totalExpenses: data.current.totalExpenses,
       netIncome: data.current.netIncome,
-      grossProfit: data.current.grossProfit,
-      operatingCashFlow: data.current.operatingCashFlow,
-      financingCashFlow: data.current.financingCashFlow,
-      investingCashFlow: data.current.investingCashFlow,
       netCashFlow: data.current.netCashFlow,
     },
     previous: {
       totalIncome: data.previous.totalIncome,
       totalExpenses: data.previous.totalExpenses,
       netIncome: data.previous.netIncome,
-      grossProfit: data.previous.grossProfit,
-      operatingCashFlow: data.previous.operatingCashFlow,
-      financingCashFlow: data.previous.financingCashFlow,
-      investingCashFlow: data.previous.investingCashFlow,
       netCashFlow: data.previous.netCashFlow,
     },
-    growth: data.growth,
-    summary: data.summary,
-    propertyBreakdown: data.propertyBreakdown?.slice(0, 5) || [],
-    alerts: data.alerts,
+    alerts: (data.alerts || []).map(({ title, message }) => ({ title, message })),
   })
 
   const generateSynopsis = async (summaryData) => {
@@ -364,6 +353,11 @@ export default function FinancialOverviewPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: payload }),
       })
+      if (res.status === 413) {
+        console.error("❌ Synopsis request too large")
+        setSynopsis("Synopsis data too large to analyze")
+        return
+      }
       if (!res.ok) {
         const errText = await res.text()
         console.error("❌ Error generating synopsis:", res.status, errText)

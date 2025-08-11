@@ -69,10 +69,10 @@ This project includes an AI-powered synopsis endpoint that provides CFO-style in
    ```bash
    curl -X POST \
      -H "Content-Type: application/json" \
-     -d '{"data": "<financial details here>"}' \
-     http://localhost:3000/api/financial-synopsis
+   -d '{"data": "<financial details here>"}' \
+    http://localhost:3000/api/financial-synopsis
    ```
 
-The response will include a `synopsis` field summarizing alerts and insights like a CFO.
+The request payload should be kept small—only key revenue, expense, cash‑flow, and alert metrics are necessary. The API trims input to 10 kB and returns a 413 status if the payload exceeds this limit. 
 
-On the application's Overview page, this synopsis is generated automatically and shown at the top for quick review.
+The response includes a `synopsis` field summarizing alerts and insights like a CFO. On the application's Overview page, this synopsis is generated automatically and shown at the top for quick review.

@@ -31,7 +31,11 @@ export async function POST(req: Request) {
     const synopsis = completion.choices[0]?.message?.content?.trim() || ""
 
     return NextResponse.json({ synopsis })
-  } catch {
+  } catch (err) {
+    if ((err as { status?: number })?.status === 413) {
+      return NextResponse.json({ error: "Synopsis data too large" }, { status: 413 })
+    }
+    console.error("Unable to generate synopsis", err)
     return NextResponse.json({ error: "Unable to generate synopsis" }, { status: 500 })
   }
 }
