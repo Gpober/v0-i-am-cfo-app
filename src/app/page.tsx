@@ -302,6 +302,30 @@ export default function FinancialOverviewPage() {
     }
   }, [])
 
+  // Load available classes for filter dropdown
+  const fetchAvailableClasses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("journal_entry_lines")
+        .select("class")
+        .not("class", "is", null)
+      if (error) throw error
+      const classes = new Set<string>()
+      data.forEach((row) => {
+        if (row.class && row.class.trim()) {
+          classes.add(row.class.trim())
+        }
+      })
+      setAvailableClasses(["All Classes", ...Array.from(classes).sort()])
+    } catch (err) {
+      console.error("Error fetching classes:", err)
+    }
+  }
+
+  useEffect(() => {
+    fetchAvailableClasses()
+  }, [])
+
   // Fetch financial data from Supabase (same connection as other pages)
   const fetchFinancialData = async () => {
     try {
@@ -311,14 +335,21 @@ export default function FinancialOverviewPage() {
       const { startDate, endDate } = calculateDateRange()
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
-      const selectedClass =
-        Array.from(selectedClasses)[0] || "All Classes"
+      const selectedClassList = Array.from(selectedClasses).filter(
+        (c) => c !== "All Classes",
+      )
 
       console.log(
         `🔍 FINANCIAL OVERVIEW - Fetching data for ${selectedMonth} ${selectedYear}`,
       )
       console.log(`📅 Date range: ${startDate} to ${endDate}`)
-      console.log(`🏢 Class Filter: "${selectedClass}"`)
+      console.log(
+        `🏢 Class Filter: ${
+          selectedClassList.length > 0
+            ? selectedClassList.join(", ")
+            : "All Classes"
+        }`,
+      )
 
       // Fetch current period data using same query structure as other pages
       let currentQuery = supabase
@@ -348,8 +379,8 @@ export default function FinancialOverviewPage() {
         .lte("date", endDate)
         .order("date", { ascending: true })
 
-      if (selectedClass !== "All Classes") {
-        currentQuery = currentQuery.eq("class", selectedClass)
+      if (selectedClassList.length > 0) {
+        currentQuery = currentQuery.in("class", selectedClassList)
       }
 
       const { data: currentTransactions, error: currentError } = await currentQuery
@@ -359,17 +390,6 @@ export default function FinancialOverviewPage() {
       const filteredCurrentTransactions = currentTransactions.filter((tx) => {
         return isDateInRange(tx.date, startDate, endDate)
       })
-
-      const classes = new Set<string>()
-      filteredCurrentTransactions.forEach((tx) => {
-        if (tx.class && tx.class.trim()) {
-          classes.add(tx.class.trim())
-        }
-      })
-      setAvailableClasses([
-        "All Classes",
-        ...Array.from(classes).sort(),
-      ])
 
       console.log(`📊 Current period: ${filteredCurrentTransactions.length} transactions`)
 
@@ -410,8 +430,8 @@ export default function FinancialOverviewPage() {
         .lte("date", prevEndDate)
         .order("date", { ascending: true })
 
-      if (selectedClass !== "All Classes") {
-        prevQuery = prevQuery.eq("class", selectedClass)
+      if (selectedClassList.length > 0) {
+        prevQuery = prevQuery.in("class", selectedClassList)
       }
 
       const { data: prevTransactions, error: prevError } = await prevQuery
@@ -462,8 +482,8 @@ export default function FinancialOverviewPage() {
           .lte("date", trendEndDate)
           .order("date", { ascending: true })
 
-        if (selectedClass !== "All Classes") {
-          monthQuery = monthQuery.eq("class", selectedClass)
+        if (selectedClassList.length > 0) {
+          monthQuery = monthQuery.in("class", selectedClassList)
         }
 
         const { data: monthData } = await monthQuery
@@ -1018,7 +1038,7 @@ export default function FinancialOverviewPage() {
       {/* Filters */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-4 w-full">
             {/* Time Period Dropdown */}
             <div className="relative" ref={timePeriodDropdownRef}>
               <button
