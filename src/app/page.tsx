@@ -174,6 +174,8 @@ export default function FinancialOverviewPage() {
   const [availableClasses, setAvailableClasses] = useState<string[]>(["All Classes"])
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
+  const [aiSynopsis, setAiSynopsis] = useState<string | null>(null)
+  const [generatingSynopsis, setGeneratingSynopsis] = useState(false)
   const orgId = "1"
 
   // Generate months and years lists (same as other pages)
@@ -856,6 +858,37 @@ export default function FinancialOverviewPage() {
     }
   }
 
+  const handleGenerateSynopsis = async () => {
+    if (!financialData) return
+    setGeneratingSynopsis(true)
+    setAiSynopsis(null)
+    try {
+      const res = await fetch("/api/ai-synopsis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          period: `${selectedMonth} ${selectedYear}`,
+          summary: {
+            revenue: financialData.current.totalIncome,
+            netIncome: financialData.current.netIncome,
+            netCashFlow: financialData.current.netCashFlow,
+            grossProfit: financialData.current.grossProfit,
+          },
+        }),
+      })
+      if (!res.ok) {
+        throw new Error("Request failed")
+      }
+      const data = await res.json()
+      setAiSynopsis(data.result)
+    } catch (err) {
+      console.error("AI synopsis error:", err)
+      setAiSynopsis("Unable to generate AI synopsis.")
+    } finally {
+      setGeneratingSynopsis(false)
+    }
+  }
+
   // Load data on component mount and when filters change
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
@@ -864,6 +897,13 @@ export default function FinancialOverviewPage() {
     loadPropertyData()
   }, [timePeriod, selectedMonth, selectedYear, selectedClasses, customStartDate, customEndDate])
   /* eslint-enable react-hooks/exhaustive-deps */
+
+  useEffect(() => {
+    if (financialData) {
+      handleGenerateSynopsis()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [financialData])
 
   // Helper functions
   const formatCurrency = (value) => {
@@ -1699,6 +1739,23 @@ export default function FinancialOverviewPage() {
                 </div>
               </div>
             </div>
+
+            {/* AI Synopsis */}
+            <Card>
+              <CardHeader className="flex items-center justify-between">
+                <CardTitle className="text-lg font-semibold">AI Synopsis</CardTitle>
+                <Button className="text-sm" onClick={handleGenerateSynopsis} disabled={generatingSynopsis}>
+                  {generatingSynopsis ? "Generating..." : "Regenerate"}
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {aiSynopsis ? (
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{aiSynopsis}</p>
+                ) : (
+                  <p className="text-sm text-gray-500">No synopsis available.</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <div className="text-center py-12">
