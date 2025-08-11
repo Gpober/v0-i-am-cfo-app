@@ -51,3 +51,26 @@ npm install
 
 # Start the development server
 npm start
+
+```
+
+## 🤖 AI CFO Synopsis
+
+This project includes an AI-powered synopsis endpoint that provides CFO-style insights for selected financial data. To use it:
+
+1. Set your OpenAI API key in an environment variable:
+
+   ```bash
+   export OPENAI_API_KEY="your_api_key_here"
+   ```
+
+2. Send a POST request to `/api/financial-synopsis` with a JSON body containing the financial information to review:
+
+   ```bash
+   curl -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"data": "<financial details here>"}' \
+     http://localhost:3000/api/financial-synopsis
+   ```
+
+The response will include a `synopsis` field summarizing alerts and insights like a CFO.
