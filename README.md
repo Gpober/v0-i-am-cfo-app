@@ -74,3 +74,5 @@ This project includes an AI-powered synopsis endpoint that provides CFO-style in
    ```
 
 The response will include a `synopsis` field summarizing alerts and insights like a CFO.
+
+On the application's Overview page, this synopsis is generated automatically and shown at the top for quick review.
