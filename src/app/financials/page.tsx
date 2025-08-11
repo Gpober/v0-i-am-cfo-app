@@ -130,6 +130,47 @@ const smartLog = (message: string, data?: any, level: "info" | "warn" | "error" 
   }
 }
 
+// TIMEZONE-INDEPENDENT DATE UTILITIES
+// Extract date parts directly from string without timezone conversion
+const getDateParts = (dateString: string) => {
+  const dateOnly = dateString.split("T")[0] // Get YYYY-MM-DD part only
+  const [year, month, day] = dateOnly.split("-").map(Number)
+  return { year, month, day, dateOnly }
+}
+
+// Get month name from date string without timezone issues
+const getMonthYear = (dateString: string) => {
+  const { year, month } = getDateParts(dateString)
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ]
+  return `${monthNames[month - 1]} ${year}`
+}
+
+// Compare dates as strings (YYYY-MM-DD format)
+const isDateInRange = (dateString: string, startDate: string, endDate: string): boolean => {
+  const { dateOnly } = getDateParts(dateString)
+  return dateOnly >= startDate && dateOnly <= endDate
+}
+
+// Format date for display without timezone conversion
+const formatDateDisplay = (dateString: string) => {
+  const { year, month, day } = getDateParts(dateString)
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  return `${monthNames[month - 1]} ${day}, ${year}`
+}
+
 export default function FinancialsPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>("June")
   const [selectedYear, setSelectedYear] = useState<string>("2025")
@@ -204,9 +245,8 @@ export default function FinancialsPage() {
     }
   }, [])
 
-  // Calculate date range based on selected period
+  // Calculate date range based on selected period - COMPLETELY TIMEZONE INDEPENDENT
   const calculateDateRange = () => {
-    const now = new Date()
     let startDate: string
     let endDate: string
 
@@ -221,23 +261,58 @@ export default function FinancialsPage() {
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
       startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`
-      const lastDay = new Date(year, monthIndex + 1, 0).getDate()
-      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${lastDay}`
+
+      // Calculate last day of month without Date object to avoid timezone issues
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let lastDay = daysInMonth[monthIndex]
+
+      // Handle leap year for February
+      if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+        lastDay = 29
+      }
+
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     } else if (timePeriod === "Quarterly") {
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
       const quarter = Math.floor(monthIndex / 3)
       const quarterStartMonth = quarter * 3
       startDate = `${year}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`
+
       const quarterEndMonth = quarterStartMonth + 2
-      const lastDay = new Date(year, quarterEndMonth + 1, 0).getDate()
-      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${lastDay}`
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let lastDay = daysInMonth[quarterEndMonth]
+
+      // Handle leap year for February
+      if (quarterEndMonth === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+        lastDay = 29
+      }
+
+      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     } else {
-      // Trailing 12
-      const twelveMonthsAgo = new Date(now)
-      twelveMonthsAgo.setMonth(now.getMonth() - 12)
-      startDate = twelveMonthsAgo.toISOString().split("T")[0]
-      endDate = now.toISOString().split("T")[0]
+      // Trailing 12 - calculate 12 months back from current date
+      const now = new Date()
+      const currentYear = now.getFullYear()
+      const currentMonth = now.getMonth() + 1
+
+      let startYear = currentYear
+      let startMonth = currentMonth - 12
+      if (startMonth <= 0) {
+        startMonth += 12
+        startYear -= 1
+      }
+
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let lastDay = daysInMonth[currentMonth - 1]
+
+      // Handle leap year for February
+      if (currentMonth === 2 && ((currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0)) {
+        lastDay = 29
+      }
+
+      endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     }
 
     return { startDate, endDate }
@@ -280,7 +355,7 @@ export default function FinancialsPage() {
     return null // Not a P&L account (likely Balance Sheet account)
   }
 
-  // Fetch P&L data using ENHANCED database strategy
+  // Fetch P&L data using ENHANCED database strategy with TIMEZONE-INDEPENDENT dates
   const fetchPLData = async () => {
     setIsLoadingData(true)
     setDataError(null)
@@ -289,7 +364,7 @@ export default function FinancialsPage() {
       const { startDate, endDate } = calculateDateRange()
       const selectedProperty = Array.from(selectedProperties)[0] || "All Properties"
 
-      smartLog(`🔍 ENHANCED P&L DATA FETCH - Using Enhanced Database Strategy`)
+      smartLog(`🔍 TIMEZONE-INDEPENDENT P&L DATA FETCH`)
       smartLog(`📅 Period: ${startDate} to ${endDate}`)
       smartLog(`🏢 Property Filter: "${selectedProperty}"`)
 
@@ -330,8 +405,25 @@ export default function FinancialsPage() {
 
       smartLog(`📊 Fetched ${allTransactions.length} total transactions`)
 
+      // Filter transactions using TIMEZONE-INDEPENDENT date comparison
+      const filteredTransactions = allTransactions.filter((tx) => {
+        return isDateInRange(tx.date, startDate, endDate)
+      })
+
+      smartLog(`📅 After timezone-independent date filtering: ${filteredTransactions.length} transactions`)
+      smartLog(`📅 Date range check: ${startDate} to ${endDate}`)
+      smartLog(
+        `📅 Sample dates:`,
+        filteredTransactions.slice(0, 5).map((tx) => ({
+          original: tx.date,
+          dateOnly: getDateParts(tx.date).dateOnly,
+          monthYear: getMonthYear(tx.date),
+          formatted: formatDateDisplay(tx.date),
+        })),
+      )
+
       // Filter for P&L accounts using enhanced classification
-      const plTransactions = allTransactions.filter((tx) => {
+      const plTransactions = filteredTransactions.filter((tx) => {
         const classification = classifyPLAccount(tx.account_type, tx.account, tx.report_category)
         return classification !== null
       })
@@ -352,11 +444,11 @@ export default function FinancialsPage() {
       const processedAccounts = await processPLTransactionsEnhanced(plTransactions, startDate, endDate)
       setPlAccounts(processedAccounts)
 
-      smartLog(`✅ Processed ${processedAccounts.length} P&L accounts using enhanced strategy`)
+      smartLog(`✅ Processed ${processedAccounts.length} P&L accounts using timezone-independent strategy`)
 
       setNotification({
         show: true,
-        message: `Loaded ${plTransactions.length} P&L transactions successfully using enhanced database strategy`,
+        message: `Loaded ${plTransactions.length} P&L transactions successfully using timezone-independent date handling`,
         type: "success",
       })
 
@@ -372,47 +464,27 @@ export default function FinancialsPage() {
         message: `Error loading data: ${errorMessage}`,
         type: "error",
       })
-      smartLog("❌ Error fetching enhanced P&L data:", err, "error")
+      smartLog("❌ Error fetching timezone-independent P&L data:", err, "error")
     } finally {
       setIsLoadingData(false)
     }
   }
 
   const handleExportExcel = () => {
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ]
-
-    const monthKey = (dateStr: string) => {
-      const date = parseDateOnly(dateStr)
-      return `${monthNames[date.getMonth()]} ${date.getFullYear()}`
-    }
-
-    const months = Array.from(
-      new Set(
-        plAccounts.flatMap((acc) =>
-          acc.transactions.map((tx) => monthKey(tx.date)),
-        ),
-      ),
-    ).sort(
-      (a, b) => new Date(a + " 1").getTime() - new Date(b + " 1").getTime(),
-    )
-
     const data = plAccounts.map((acc) => {
       const row: Record<string, any> = { Account: acc.account }
-      months.forEach((m) => {
-        const txs = acc.transactions.filter((tx) => monthKey(tx.date) === m)
+
+      // Get unique months from transactions using timezone-independent method
+      const months = Array.from(new Set(acc.transactions.map((tx) => getMonthYear(tx.date)))).sort((a, b) => {
+        const [monthA, yearA] = a.split(" ")
+        const [monthB, yearB] = b.split(" ")
+        const monthIndexA = monthsList.indexOf(monthA)
+        const monthIndexB = monthsList.indexOf(monthB)
+        return Number(yearA) - Number(yearB) || monthIndexA - monthIndexB
+      })
+
+      months.forEach((monthYear) => {
+        const txs = acc.transactions.filter((tx) => getMonthYear(tx.date) === monthYear)
         const credits = txs.reduce((sum, tx) => {
           const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
           return sum + (isNaN(val) ? 0 : val)
@@ -421,55 +493,34 @@ export default function FinancialsPage() {
           const val = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
           return sum + (isNaN(val) ? 0 : val)
         }, 0)
-        row[m] = acc.category === "INCOME" ? credits - debits : debits - credits
+        row[monthYear] = acc.category === "INCOME" ? credits - debits : debits - credits
       })
       return row
     })
 
-    const worksheet = XLSX.utils.json_to_sheet(data, {
-      header: ["Account", ...months],
-    })
+    const worksheet = XLSX.utils.json_to_sheet(data)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "P&L")
     XLSX.writeFile(workbook, "pl_accounts.xlsx")
   }
 
   const handleExportPdf = () => {
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ]
-
-    const monthKey = (dateStr: string) => {
-      const date = parseDateOnly(dateStr)
-      return `${monthNames[date.getMonth()]} ${date.getFullYear()}`
-    }
-
+    // Get unique months from all transactions using timezone-independent method
     const months = Array.from(
-      new Set(
-        plAccounts.flatMap((acc) =>
-          acc.transactions.map((tx) => monthKey(tx.date)),
-        ),
-      ),
-    ).sort(
-      (a, b) => new Date(a + " 1").getTime() - new Date(b + " 1").getTime(),
-    )
+      new Set(plAccounts.flatMap((acc) => acc.transactions.map((tx) => getMonthYear(tx.date)))),
+    ).sort((a, b) => {
+      const [monthA, yearA] = a.split(" ")
+      const [monthB, yearB] = b.split(" ")
+      const monthIndexA = monthsList.indexOf(monthA)
+      const monthIndexB = monthsList.indexOf(monthB)
+      return Number(yearA) - Number(yearB) || monthIndexA - monthIndexB
+    })
 
     const doc = new jsPDF()
     const tableColumn = ["Account", ...months]
     const tableRows = plAccounts.map((acc) => {
-      const row = months.map((m) => {
-        const txs = acc.transactions.filter((tx) => monthKey(tx.date) === m)
+      const row = months.map((monthYear) => {
+        const txs = acc.transactions.filter((tx) => getMonthYear(tx.date) === monthYear)
         const credits = txs.reduce((sum, tx) => {
           const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
           return sum + (isNaN(val) ? 0 : val)
@@ -498,7 +549,7 @@ export default function FinancialsPage() {
   ): Promise<PLAccount[]> => {
     const accountMap = new Map<string, PLAccount>()
 
-    smartLog(`🔄 Processing ${transactions.length} P&L transactions with enhanced strategy`)
+    smartLog(`🔄 Processing ${transactions.length} P&L transactions with timezone-independent strategy`)
 
     // Group transactions by account (EXACTLY like SQL GROUP BY)
     const accountGroups = new Map<string, any[]>()
@@ -597,7 +648,7 @@ export default function FinancialsPage() {
       return a.account.localeCompare(b.account)
     })
 
-    smartLog(`✅ Final result: ${accounts.length} P&L accounts processed with enhanced strategy`)
+    smartLog(`✅ Final result: ${accounts.length} P&L accounts processed with timezone-independent strategy`)
     smartLog(`📊 Income accounts: ${accounts.filter((a) => a.category === "INCOME").length}`)
     smartLog(`📊 Expense accounts: ${accounts.filter((a) => a.category === "EXPENSES").length}`)
 
@@ -617,21 +668,6 @@ export default function FinancialsPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount)
-  }
-
-  // Parse a date string ignoring timezone
-  const parseDateOnly = (dateString: string) => {
-    const [year, month, day] = dateString.split("T")[0].split("-").map(Number)
-    return new Date(year, month - 1, day)
-  }
-
-  // Format date without timezone shifts
-  const formatDate = (dateString: string) => {
-    return parseDateOnly(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
   }
 
   // Group accounts for display
@@ -680,15 +716,14 @@ export default function FinancialsPage() {
     for (const [parentName, group] of parentMap.entries()) {
       if (group.parent) {
         // Calculate combined amount using all unique transactions to avoid double counting
-        const combinedTransactions = [
-          ...group.parent.transactions,
-          ...group.subs.flatMap((sub) => sub.transactions),
-        ]
+        const combinedTransactions = [...group.parent.transactions, ...group.subs.flatMap((sub) => sub.transactions)]
 
         const combinedAmount = combinedTransactions.reduce((sum, tx) => {
           const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
           const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
-          return group.parent!.category === "INCOME" ? sum + (creditValue - debitValue) : sum + (debitValue - creditValue)
+          return group.parent!.category === "INCOME"
+            ? sum + (creditValue - debitValue)
+            : sum + (debitValue - creditValue)
         }, 0)
 
         result.push({
@@ -702,7 +737,9 @@ export default function FinancialsPage() {
         const combinedAmount = combinedTransactions.reduce((sum, tx) => {
           const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
           const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
-          return group.subs[0].category === "INCOME" ? sum + (creditValue - debitValue) : sum + (debitValue - creditValue)
+          return group.subs[0].category === "INCOME"
+            ? sum + (creditValue - debitValue)
+            : sum + (debitValue - creditValue)
         }, 0)
 
         const virtualParent: PLAccount = {
@@ -736,45 +773,41 @@ export default function FinancialsPage() {
     return result.sort((a, b) => a.account.account.localeCompare(b.account.account))
   }
 
-  // Get column headers based on view mode
+  // Get column headers based on view mode - TIMEZONE INDEPENDENT
   const getColumnHeaders = () => {
     if (viewMode === "Total") {
       return []
     } else if (viewMode === "Class") {
       return availableProperties.filter((p) => p !== "All Properties")
     } else if (viewMode === "Detail") {
-      // For Detail view, show months in the date range
+      // For Detail view, show months in the date range using timezone-independent method
       const { startDate, endDate } = calculateDateRange()
       const months = []
-      const start = parseDateOnly(startDate)
-      const end = parseDateOnly(endDate)
-      const current = new Date(start.getFullYear(), start.getMonth(), 1)
 
-      while (current <= end) {
-        const monthNames = [
-          "January",
-          "February",
-          "March",
-          "April",
-          "May",
-          "June",
-          "July",
-          "August",
-          "September",
-          "October",
-          "November",
-          "December",
-        ]
-        const monthKey = `${monthNames[current.getMonth()]} ${current.getFullYear()}`
+      // Parse start and end dates
+      const startParts = getDateParts(startDate)
+      const endParts = getDateParts(endDate)
+
+      let currentYear = startParts.year
+      let currentMonth = startParts.month
+
+      while (currentYear < endParts.year || (currentYear === endParts.year && currentMonth <= endParts.month)) {
+        const monthKey = `${monthsList[currentMonth - 1]} ${currentYear}`
         months.push(monthKey)
-        current.setMonth(current.getMonth() + 1)
+
+        currentMonth++
+        if (currentMonth > 12) {
+          currentMonth = 1
+          currentYear++
+        }
       }
+
       return months
     }
     return []
   }
 
-  // Get cell value based on view mode - MODIFIED to handle combined amounts
+  // Get cell value based on view mode - TIMEZONE INDEPENDENT
   const getCellValue = (account: PLAccount, header: string, isParentCombined = false, subAccounts?: PLAccount[]) => {
     let transactions = account.transactions
 
@@ -801,25 +834,9 @@ export default function FinancialsPage() {
         return debits - credits // Expenses: Debit minus Credit
       }
     } else if (viewMode === "Detail") {
-      // Filter transactions by month and calculate total
+      // Filter transactions by month using timezone-independent method
       const filteredTransactions = transactions.filter((tx) => {
-        const txDate = parseDateOnly(tx.date)
-        const monthNames = [
-          "January",
-          "February",
-          "March",
-          "April",
-          "May",
-          "June",
-          "July",
-          "August",
-          "September",
-          "October",
-          "November",
-          "December",
-        ]
-        const txMonthKey = `${monthNames[txDate.getMonth()]} ${txDate.getFullYear()}`
-        return txMonthKey === header
+        return getMonthYear(tx.date) === header
       })
 
       const credits = filteredTransactions.reduce((sum, tx) => {
@@ -851,7 +868,7 @@ export default function FinancialsPage() {
     setExpandedAccounts(newExpanded)
   }
 
-  // Show transaction details
+  // Show transaction details - TIMEZONE INDEPENDENT
   const showTransactionDetails = (
     account: PLAccount,
     subAccount?: PLAccount,
@@ -873,26 +890,10 @@ export default function FinancialsPage() {
       transactions = account.transactions.filter((tx) => tx.account === account.account)
     }
 
-    // Filter by period if specified (Detail view)
+    // Filter by period if specified (Detail view) - TIMEZONE INDEPENDENT
     if (period && viewMode === "Detail") {
       transactions = transactions.filter((tx) => {
-        const txDate = parseDateOnly(tx.date)
-        const monthNames = [
-          "January",
-          "February",
-          "March",
-          "April",
-          "May",
-          "June",
-          "July",
-          "August",
-          "September",
-          "October",
-          "November",
-          "December",
-        ]
-        const txMonthKey = `${monthNames[txDate.getMonth()]} ${txDate.getFullYear()}`
-        return txMonthKey === period
+        return getMonthYear(tx.date) === period
       })
     }
 
@@ -959,7 +960,7 @@ export default function FinancialsPage() {
                 <h1 className="text-2xl font-bold text-gray-900">Profit & Loss Statement</h1>
                 <p className="text-sm text-gray-600">
                   {timePeriod === "Custom"
-                    ? `${formatDate(startDate)} - ${formatDate(endDate)}`
+                    ? `${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}`
                     : timePeriod === "Monthly"
                       ? `${selectedMonth} ${selectedYear}`
                       : timePeriod === "Quarterly"
@@ -968,7 +969,9 @@ export default function FinancialsPage() {
                           ? `January - June ${selectedYear}`
                           : `${timePeriod} Period`}
                 </p>
-                <p className="text-xs text-blue-600 mt-1">💰 Using account_type field for precise P&L classification</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  💰 Using timezone-independent date handling for precise P&L classification
+                </p>
               </div>
             </div>
 
@@ -1345,7 +1348,8 @@ export default function FinancialsPage() {
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">Profit & Loss Statement - {viewMode} View</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  {plAccounts.length} accounts • Using account_type for P&L classification
+                  {plAccounts.length} accounts • Timezone-independent date handling • Using account_type for P&L
+                  classification
                   {viewMode === "Detail" && " • Monthly breakdown"}
                   {viewMode === "Class" && " • By property"}
                 </p>
@@ -1354,7 +1358,7 @@ export default function FinancialsPage() {
               {isLoadingData ? (
                 <div className="flex items-center justify-center py-8">
                   <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                  <span>Loading enhanced P&L data...</span>
+                  <span>Loading timezone-independent P&L data...</span>
                 </div>
               ) : (
                 <div className="overflow-x-auto custom-scrollbar">
@@ -1740,8 +1744,8 @@ export default function FinancialsPage() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{transactionModalTitle}</h3>
-                  <p className="text-sm text-gray-600">{modalTransactionDetails.length} transactions</p>
+                  <h3 className="text-lg font-semibold text-gray-900 text-center">{transactionModalTitle}</h3>
+                  <p className="text-sm text-gray-600 text-center">{modalTransactionDetails.length} transactions</p>
                 </div>
                 <button onClick={() => setShowTransactionModal(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-6 h-6" />
@@ -1752,8 +1756,8 @@ export default function FinancialsPage() {
               {modalTransactionDetails.length > 0 && (
                 <div className="mt-4 grid grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
                   <div className="text-center">
-                    <div className="text-sm text-gray-600">Total Debits</div>
-                    <div className="text-lg font-semibold text-red-600">
+                    <div className="text-sm text-gray-600 text-center">Total Debits</div>
+                    <div className="text-lg font-semibold text-red-600 text-center">
                       {formatCurrency(
                         modalTransactionDetails.reduce((sum, t) => {
                           const debitValue = t.debit
@@ -1765,8 +1769,8 @@ export default function FinancialsPage() {
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm text-gray-600">Total Credits</div>
-                    <div className="text-lg font-semibold text-green-600">
+                    <div className="text-sm text-gray-600 text-center">Total Credits</div>
+                    <div className="text-lg font-semibold text-green-600 text-center">
                       {formatCurrency(
                         modalTransactionDetails.reduce((sum, t) => {
                           const creditValue = t.credit
@@ -1778,9 +1782,9 @@ export default function FinancialsPage() {
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm text-gray-600">Net Impact</div>
+                    <div className="text-sm text-gray-600 text-center">Net Impact</div>
                     <div
-                      className={`text-lg font-semibold ${
+                      className={`text-lg font-semibold text-center ${
                         modalTransactionDetails.reduce((sum, t) => {
                           const creditValue = t.credit
                             ? Number.parseFloat(t.credit.toString().replace(/[^0-9.-]/g, "")) || 0
@@ -1810,8 +1814,10 @@ export default function FinancialsPage() {
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm text-gray-600">Transactions</div>
-                    <div className="text-lg font-semibold text-blue-600">{modalTransactionDetails.length}</div>
+                    <div className="text-sm text-gray-600 text-center">Transactions</div>
+                    <div className="text-lg font-semibold text-blue-600 text-center">
+                      {modalTransactionDetails.length}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1834,7 +1840,7 @@ export default function FinancialsPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Entry #
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
                         Account Type
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1865,14 +1871,16 @@ export default function FinancialsPage() {
                       return (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatDate(transaction.date)}
+                            {formatDateDisplay(transaction.date)}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-900">
                             {transaction.name || transaction.vendor || transaction.customer || "N/A"}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">{transaction.memo || "N/A"}</td>
                           <td className="px-6 py-4 text-sm text-blue-600">{transaction.entry_number || "N/A"}</td>
-                          <td className="px-6 py-4 text-sm text-purple-600">{transaction.account_type || "N/A"}</td>
+                          <td className="px-6 py-4 text-sm text-purple-600 text-center">
+                            {transaction.account_type || "N/A"}
+                          </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
                               netAmount >= 0 ? "text-green-600" : "text-red-600"
