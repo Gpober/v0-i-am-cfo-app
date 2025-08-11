@@ -197,6 +197,45 @@ const formatDateDisplay = (dateString: string) => {
   return `${monthNames[month - 1]} ${day}, ${year}`;
 };
 
+const formatMonthRange = (startDate: string, endDate: string) => {
+  const shortNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const longNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const start = getDateParts(startDate);
+  const end = getDateParts(endDate);
+  const startLabel = shortNames[start.month - 1];
+  const endLabel = longNames[end.month - 1];
+  if (start.year === end.year) {
+    return `${startLabel} - ${endLabel} ${start.year}`;
+  }
+  return `${startLabel} ${start.year} - ${endLabel} ${end.year}`;
+};
+
 export default function FinancialsPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>("June");
   const [selectedYear, setSelectedYear] = useState<string>("2025");
@@ -1412,7 +1451,7 @@ export default function FinancialsPage() {
                 </h1>
                 <p className="text-sm text-gray-600">
                   {timePeriod === "Custom"
-                    ? `${formatDateDisplay(currentStartDate)} - ${formatDateDisplay(currentEndDate)}`
+                    ? formatMonthRange(currentStartDate, currentEndDate)
                     : timePeriod === "Monthly"
                       ? `${selectedMonth} ${selectedYear}`
                       : timePeriod === "Quarterly"
