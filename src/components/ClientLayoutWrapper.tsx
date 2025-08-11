@@ -47,8 +47,8 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
                   <div className="w-8 h-8 flex items-center justify-center relative mr-3">
                     <svg viewBox="0 0 120 120" className="w-full h-full">
                       <circle cx="60" cy="60" r="55" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="2" />
-                      <circle cx="60" cy="60" r="42" fill={BRAND_COLORS.primary} />
-                      <g fill="white">
+                      <circle cx="60" cy="60" r="42" fill="white" />
+                      <g fill={BRAND_COLORS.primary}>
                         <rect x="35" y="70" width="6" height="15" rx="1" />
                         <rect x="44" y="65" width="6" height="20" rx="1" />
                         <rect x="53" y="55" width="6" height="30" rx="1" />
@@ -57,22 +57,22 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
                         <rect x="80" y="45" width="6" height="40" rx="1" />
                         <path
                           d="M35 72 L44 67 L53 57 L62 52 L71 62 L80 47"
-                          stroke="#FFFFFF"
+                          stroke={BRAND_COLORS.primary}
                           strokeWidth="2.5"
                           fill="none"
                         />
-                        <circle cx="35" cy="72" r="2.5" fill="#FFFFFF" />
-                        <circle cx="44" cy="67" r="2.5" fill="#FFFFFF" />
-                        <circle cx="53" cy="57" r="2.5" fill="#FFFFFF" />
-                        <circle cx="62" cy="52" r="2.5" fill="#FFFFFF" />
-                        <circle cx="71" cy="62" r="2.5" fill="#FFFFFF" />
-                        <circle cx="80" cy="47" r="2.5" fill="#FFFFFF" />
+                        <circle cx="35" cy="72" r="2.5" fill={BRAND_COLORS.primary} />
+                        <circle cx="44" cy="67" r="2.5" fill={BRAND_COLORS.primary} />
+                        <circle cx="53" cy="57" r="2.5" fill={BRAND_COLORS.primary} />
+                        <circle cx="62" cy="52" r="2.5" fill={BRAND_COLORS.primary} />
+                        <circle cx="71" cy="62" r="2.5" fill={BRAND_COLORS.primary} />
+                        <circle cx="80" cy="47" r="2.5" fill={BRAND_COLORS.primary} />
                       </g>
                       <text
                         x="60"
                         y="95"
                         textAnchor="middle"
-                        fill="white"
+                        fill={BRAND_COLORS.primary}
                         fontSize="11"
                         fontWeight="bold"
                         fontFamily="Arial, sans-serif"
