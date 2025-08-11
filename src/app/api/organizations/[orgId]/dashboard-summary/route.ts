@@ -1,0 +1,110 @@
+import { NextResponse } from "next/server"
+import { supabase } from "@/lib/supabaseClient"
+
+const isIncomeAccount = (type: string | null) => {
+  const t = type?.toLowerCase() || ""
+  return (
+    t === "income" ||
+    t === "other income" ||
+    t.includes("income") ||
+    t.includes("revenue")
+  )
+}
+
+const isExpenseAccount = (type: string | null) => {
+  const t = type?.toLowerCase() || ""
+  return (
+    t === "expense" ||
+    t === "other expense" ||
+    t.includes("expense")
+  )
+}
+
+const isCogsAccount = (type: string | null) => {
+  const t = type?.toLowerCase() || ""
+  return t === "cost of goods sold" || t.includes("cost of goods sold")
+}
+
+interface Entry {
+  class: string | null
+  account_type: string | null
+  debit: number | string | null
+  credit: number | string | null
+}
+
+export async function GET(req: Request) {
+  const url = new URL(req.url)
+  const month = Number.parseInt(url.searchParams.get("month") || "1", 10)
+  const year = Number.parseInt(url.searchParams.get("year") || "2024", 10)
+  const classId = url.searchParams.get("class")
+  const includeProperties = url.searchParams.get("includeProperties") === "true"
+
+  if (!includeProperties) {
+    return NextResponse.json({ propertyBreakdown: [] })
+  }
+
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  let lastDay = daysInMonth[month - 1]
+  if (month === 2 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+    lastDay = 29
+  }
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+
+  let query = supabase
+    .from("journal_entry_lines")
+    .select("class,account_type,debit,credit")
+    .gte("date", startDate)
+    .lte("date", endDate)
+
+  if (classId) {
+    query = query.eq("class", classId)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  const map: Record<string, {
+    name: string
+    revenue: number
+    grossProfit: number
+    operatingExpenses: number
+    netIncome: number
+    cogs: number
+  }> = {}
+
+  ;(data || []).forEach((tx: Entry) => {
+    const property = tx.class || "Unassigned"
+    if (!map[property]) {
+      map[property] = {
+        name: property,
+        revenue: 0,
+        grossProfit: 0,
+        operatingExpenses: 0,
+        netIncome: 0,
+        cogs: 0,
+      }
+    }
+
+    const debit = Number(tx.debit) || 0
+    const credit = Number(tx.credit) || 0
+
+    if (isIncomeAccount(tx.account_type)) {
+      map[property].revenue += credit - debit
+    } else if (isCogsAccount(tx.account_type)) {
+      map[property].cogs += debit - credit
+    } else if (isExpenseAccount(tx.account_type)) {
+      map[property].operatingExpenses += debit - credit
+    }
+  })
+
+  const propertyBreakdown = Object.values(map).map((p) => {
+    p.grossProfit = p.revenue - p.cogs
+    p.netIncome = p.grossProfit - p.operatingExpenses
+    return p
+  })
+
+  return NextResponse.json({ propertyBreakdown })
+}

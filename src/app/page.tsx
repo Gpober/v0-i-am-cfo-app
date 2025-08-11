@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import {
   DollarSign,
@@ -15,19 +15,26 @@ import {
   Calendar,
   Target,
   Activity,
+  PieChart,
 } from "lucide-react"
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   PieChart as RechartsPieChart,
-  Cell,
   Pie,
+  Cell,
 } from "recharts"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { supabase } from "@/lib/supabaseClient"
 
 // IAM CFO Brand Colors
@@ -121,6 +128,39 @@ export default function FinancialOverviewPage() {
   const [financialData, setFinancialData] = useState(null)
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [chartType, setChartType] = useState<"line" | "bar">("line")
+  type MonthlyPoint = {
+    monthName: string
+    year: number
+    totalRevenue: number
+    totalExpenses: number
+    netProfit: number
+  }
+  type TrendPoint = {
+    month: string
+    totalIncome: number
+    netIncome: number
+    expenses: number
+  }
+  const [trendData, setTrendData] = useState<TrendPoint[]>([])
+  type PropertyPoint = {
+    name: string
+    revenue: number
+    grossProfit: number
+    operatingExpenses: number
+    netIncome: number
+    cogs: number
+  }
+  const [propertyData, setPropertyData] = useState<PropertyPoint[]>([])
+  const [propertyChartMetric, setPropertyChartMetric] = useState<
+    "income" | "gp" | "ni" | "expenses" | "cogs"
+  >("income")
+  const [loadingTrend, setLoadingTrend] = useState(false)
+  const [loadingProperty, setLoadingProperty] = useState(false)
+  const [trendError, setTrendError] = useState<string | null>(null)
+  const [propertyError, setPropertyError] = useState<string | null>(null)
+  const orgId = "1"
+  const classFilter: string | null = null
 
   // Generate months and years lists (same as other pages)
   const monthsList = [
@@ -624,9 +664,68 @@ export default function FinancialOverviewPage() {
     return alerts
   }
 
+  const loadTrendData = async () => {
+    try {
+      setLoadingTrend(true)
+      setTrendError(null)
+      const endMonth = monthsList.indexOf(selectedMonth) + 1
+      const res = await fetch(
+        `/api/organizations/${orgId}/trend-data?months=12&endMonth=${endMonth}&endYear=${selectedYear}`
+      )
+      if (!res.ok) throw new Error("Failed to fetch trend data")
+      const json: { monthlyData: MonthlyPoint[] } = await res.json()
+      const mapped: TrendPoint[] = (json.monthlyData || []).map((d) => ({
+        month: `${d.monthName} ${d.year}`,
+        totalIncome: d.totalRevenue,
+        netIncome: d.netProfit,
+        expenses: d.totalExpenses,
+      }))
+      setTrendData(mapped)
+    } catch (e) {
+      const err = e as Error
+      setTrendError(err.message || "Failed to load trend data")
+      setTrendData([])
+    } finally {
+      setLoadingTrend(false)
+    }
+  }
+
+  const loadPropertyData = async () => {
+    try {
+      setLoadingProperty(true)
+      setPropertyError(null)
+      const endMonth = monthsList.indexOf(selectedMonth) + 1
+      const res = await fetch(
+        `/api/organizations/${orgId}/dashboard-summary?month=${endMonth}&year=${selectedYear}&period=month&includeProperties=true`
+      )
+      if (!res.ok) throw new Error("Failed to fetch property data")
+      const json: { propertyBreakdown: PropertyPoint[] } = await res.json()
+      setPropertyData(json.propertyBreakdown || [])
+    } catch (e) {
+      const err = e as Error
+      setPropertyError(err.message || "Failed to load property data")
+      setPropertyData([])
+    } finally {
+      setLoadingProperty(false)
+    }
+  }
+
+  const handleSync = async () => {
+    try {
+      await fetch("/api/sync", { method: "POST" })
+    } catch (e) {
+      console.error("Sync failed", e)
+    } finally {
+      loadTrendData()
+      loadPropertyData()
+    }
+  }
+
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchFinancialData()
+    loadTrendData()
+    loadPropertyData()
   }, [selectedMonth, selectedYear])
 
   // Helper functions
@@ -649,6 +748,79 @@ export default function FinancialOverviewPage() {
 
   const formatPercentage = (value) => {
     return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
+  }
+
+  const propertyChartData = useMemo(() => {
+    const key = (
+      {
+        income: "revenue",
+        gp: "grossProfit",
+        ni: "netIncome",
+        expenses: "operatingExpenses",
+        cogs: "cogs",
+      }[propertyChartMetric] as keyof PropertyPoint
+    )
+    return propertyData
+      .map((p) => ({ ...p, value: p[key] as number }))
+      .filter((p) => p.value > 0)
+      .sort((a, b) => b.value - a.value)
+  }, [propertyData, propertyChartMetric])
+
+  const totalPropertyValue = useMemo(
+    () => propertyChartData.reduce((sum, p) => sum + p.value, 0),
+    [propertyChartData]
+  )
+
+  const metricLabels = {
+    income: "Revenue",
+    gp: "Gross Profit",
+    ni: "Net Income",
+    expenses: "Expenses",
+    cogs: "COGS",
+  }
+
+  const metricOptions = [
+    { key: "income", label: "Revenue" },
+    { key: "cogs", label: "COGS" },
+    { key: "gp", label: "Gross Profit" },
+    { key: "expenses", label: "Expenses" },
+    { key: "ni", label: "Net Income" },
+  ] as const
+
+  const TrendTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const revenue = payload.find((p) => p.dataKey === "totalIncome")?.value || 0
+      const net = payload.find((p) => p.dataKey === "netIncome")?.value || 0
+      const margin = revenue ? (net / revenue) * 100 : 0
+      return (
+        <div className="rounded-md border bg-white p-2 text-xs shadow">
+          <div className="font-semibold">{label}</div>
+          <div>Revenue: {formatCurrency(revenue)}</div>
+          <div>Net Income: {formatCurrency(net)}</div>
+          <div>Margin: {margin.toFixed(1)}%</div>
+        </div>
+      )
+    }
+    return null
+  }
+
+  const PropertyTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload
+      const percent = totalPropertyValue
+        ? (data.value / totalPropertyValue) * 100
+        : 0
+      return (
+        <div className="rounded-md border bg-white p-2 text-xs shadow">
+          <div className="font-semibold">{data.name}</div>
+          <div>
+            {metricLabels[propertyChartMetric]}: {formatCurrency(data.value)}
+          </div>
+          <div>{percent.toFixed(1)}%</div>
+        </div>
+      )
+    }
+    return null
   }
 
   // Quick actions configuration
@@ -874,80 +1046,145 @@ export default function FinancialOverviewPage() {
 
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Revenue Trend Chart */}
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Revenue Trend</h3>
-                  <div className="text-sm text-gray-600 mt-1">Last 12 months performance</div>
-                </div>
-                <div className="p-6">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={financialData.trends}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={60} />
-                      <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
-                      <Tooltip
-                        formatter={(value) => [formatCurrency(value), "Revenue"]}
-                        labelStyle={{ color: "#374151" }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="totalIncome"
-                        stroke={BRAND_COLORS.primary}
-                        strokeWidth={3}
-                        dot={{ fill: BRAND_COLORS.primary, strokeWidth: 2, r: 4 }}
-                        activeDot={{ r: 6, stroke: BRAND_COLORS.primary, strokeWidth: 2 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+              {/* Revenue & Net Income Trend */}
+              <Card>
+                <CardHeader className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-gray-600" />
+                    <CardTitle className="text-lg font-semibold">Revenue & Net Income Trend</CardTitle>
+                    {classFilter && <Badge variant="secondary">{classFilter}</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      className={`h-8 w-8 p-0 ${chartType === "line" ? "" : "bg-white text-gray-700 border border-gray-200"}`}
+                      onClick={() => setChartType("line")}
+                    >
+                      <TrendingUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      className={`h-8 w-8 p-0 ${chartType === "bar" ? "" : "bg-white text-gray-700 border border-gray-200"}`}
+                      onClick={() => setChartType("bar")}
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {trendError && <div className="text-sm text-red-500 mb-2">{trendError}</div>}
+                  {loadingTrend && <div className="text-sm text-gray-500">Loading trends...</div>}
+                  {!loadingTrend && trendData.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                      <p>No trend data available</p>
+                      <Button className="mt-4 flex items-center gap-2" onClick={handleSync}>
+                        <RefreshCw className="h-4 w-4" /> Sync
+                      </Button>
+                    </div>
+                  )}
+                  {!loadingTrend && trendData.length > 0 && (
+                    <ResponsiveContainer width="100%" height={300}>
+                      {chartType === "line" ? (
+                        <LineChart data={trendData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                          <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                          <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+                          <Tooltip content={<TrendTooltip />} />
+                          <Legend />
+                          <Line type="monotone" dataKey="totalIncome" stroke={BRAND_COLORS.tertiary} strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="netIncome" stroke={BRAND_COLORS.primary} strokeWidth={2} dot={false} />
+                        </LineChart>
+                      ) : (
+                        <BarChart data={trendData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                          <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                          <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+                          <Tooltip content={<TrendTooltip />} />
+                          <Legend />
+                          <Bar dataKey="totalIncome" fill={BRAND_COLORS.tertiary} />
+                          <Bar dataKey="netIncome">
+                            {trendData.map((entry, idx) => (
+                              <Cell key={idx} fill={entry.netIncome < 0 ? BRAND_COLORS.danger : BRAND_COLORS.primary} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      )}
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
 
-              {/* Property Performance Chart */}
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Property Performance</h3>
-                  <div className="text-sm text-gray-600 mt-1">Net income by property</div>
-                </div>
-                <div className="p-6">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <RechartsPieChart>
-                      <Pie
-                        data={financialData.propertyBreakdown.filter((p) => p.netIncome > 0).slice(0, 8)}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        innerRadius={40}
-                        paddingAngle={2}
-                        dataKey="netIncome"
-                        label={({ name, percent }) =>
-                          percent > 0.05 ? `${name.substring(0, 8)}${name.length > 8 ? "..." : ""}` : ""
-                        }
-                        labelLine={false}
+              {/* Property Performance Pie Chart */}
+              <Card>
+                <CardHeader className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PieChart className="h-4 w-4 text-gray-600" />
+                    <CardTitle className="text-lg font-semibold">Property Performance</CardTitle>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {metricOptions.map((m) => (
+                      <Button
+                        key={m.key}
+                        className={`h-8 px-2 text-xs ${
+                          propertyChartMetric === m.key
+                            ? ""
+                            : "bg-white text-gray-700 border border-gray-200"
+                        }`}
+                        onClick={() => setPropertyChartMetric(m.key)}
                       >
-                        {financialData.propertyBreakdown.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={
-                              [
-                                BRAND_COLORS.primary,
-                                BRAND_COLORS.success,
-                                BRAND_COLORS.warning,
-                                BRAND_COLORS.secondary,
-                                BRAND_COLORS.tertiary,
-                                BRAND_COLORS.accent,
-                                "#8884d8",
-                                "#82ca9d",
-                              ][index % 8]
-                            }
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value, name) => [formatCurrency(value), "Net Income"]} />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+                        {m.label}
+                      </Button>
+                    ))}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {propertyError && <div className="text-sm text-red-500 mb-2">{propertyError}</div>}
+                  {loadingProperty && <div className="text-sm text-gray-500">Loading properties...</div>}
+                  {!loadingProperty && propertyChartData.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                      <p>No property data available</p>
+                      <Button className="mt-4 flex items-center gap-2" onClick={handleSync}>
+                        <RefreshCw className="h-4 w-4" /> Sync
+                      </Button>
+                    </div>
+                  )}
+                  {!loadingProperty && propertyChartData.length > 0 && (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <RechartsPieChart>
+                        <Pie
+                          data={propertyChartData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={100}
+                          paddingAngle={2}
+                        >
+                          {propertyChartData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={
+                                [
+                                  BRAND_COLORS.primary,
+                                  BRAND_COLORS.secondary,
+                                  BRAND_COLORS.tertiary,
+                                  BRAND_COLORS.accent,
+                                  BRAND_COLORS.success,
+                                  BRAND_COLORS.warning,
+                                  "#8884d8",
+                                  "#82ca9d",
+                                ][index % 8]
+                              }
+                              stroke="#fff"
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<PropertyTooltip />} />
+                        <Legend />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
             {/* Financial Health Summary */}
