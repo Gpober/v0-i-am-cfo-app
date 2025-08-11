@@ -5,3 +5,17 @@
 body {
   @apply bg-iamcfo-background text-iamcfo-text font-sans;
 }
+
+/* Utility to freeze the first column of wide tables */
+.sticky-first-col th:first-child,
+.sticky-first-col td:first-child {
+  position: sticky;
+  left: 0;
+  background: inherit;
+  border-right: 1px solid #e5e7eb; /* Tailwind's gray-200 */
+  z-index: 1;
+}
+
+.sticky-first-col th:first-child {
+  z-index: 2;
+}
