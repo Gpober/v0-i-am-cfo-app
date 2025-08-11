@@ -499,9 +499,15 @@ export default function FinancialsPage() {
     }).format(amount)
   }
 
-  // Format date
+  // Parse a date string ignoring timezone
+  const parseDateOnly = (dateString: string) => {
+    const [year, month, day] = dateString.split("T")[0].split("-").map(Number)
+    return new Date(year, month - 1, day)
+  }
+
+  // Format date without timezone shifts
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+    return parseDateOnly(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -605,8 +611,8 @@ export default function FinancialsPage() {
       // For Detail view, show months in the date range
       const { startDate, endDate } = calculateDateRange()
       const months = []
-      const start = new Date(startDate)
-      const end = new Date(endDate)
+      const start = parseDateOnly(startDate)
+      const end = parseDateOnly(endDate)
       const current = new Date(start.getFullYear(), start.getMonth(), 1)
 
       while (current <= end) {
@@ -662,7 +668,7 @@ export default function FinancialsPage() {
     } else if (viewMode === "Detail") {
       // Filter transactions by month and calculate total
       const filteredTransactions = transactions.filter((tx) => {
-        const txDate = new Date(tx.date)
+        const txDate = parseDateOnly(tx.date)
         const monthNames = [
           "January",
           "February",
@@ -735,7 +741,7 @@ export default function FinancialsPage() {
     // Filter by period if specified (Detail view)
     if (period && viewMode === "Detail") {
       transactions = transactions.filter((tx) => {
-        const txDate = new Date(tx.date)
+        const txDate = parseDateOnly(tx.date)
         const monthNames = [
           "January",
           "February",
