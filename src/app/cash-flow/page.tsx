@@ -265,6 +265,16 @@ export default function CashFlowPage() {
       financing: new Set<string>(),
       investing: new Set<string>(),
     }
+    const accountTypes: Record<string, Record<string, string>> = {
+      operating: {},
+      financing: {},
+      investing: {},
+    }
+    const accountTypes: Record<string, Record<string, string>> = {
+      operating: {},
+      financing: {},
+      investing: {},
+    }
 
     months.forEach((m) => {
       breakdown[m] = { operating: {}, financing: {}, investing: {} }
@@ -289,17 +299,33 @@ export default function CashFlowPage() {
         const activity = breakdown[monthName][classification]
         activity[account] = (activity[account] || 0) + impact
         accounts[classification].add(account)
+        accountTypes[classification][account] = tx.account_type || ""
       }
     })
 
     const sheetData: (string | number | { f: string })[][] = []
-    sheetData.push(["Account", ...months])
+    sheetData.push(["Account", ...months, "Total"])
+
+    const formatCell = (value: number | { f: string }) =>
+      typeof value === "number"
+        ? { v: value, t: "n", z: '"$"#,##0.00_);("$"#,##0.00)' }
+        : { t: "n", f: value.f, z: '"$"#,##0.00_);("$"#,##0.00)' }
 
     const pushRow = (
       label: string,
       values: (number | string | { f: string })[] = [],
+      computeTotal = true,
     ) => {
-      sheetData.push([label, ...values])
+      const row = [label, ...values.map((v) => (typeof v === "number" || (typeof v === "object" && "f" in v) ? formatCell(v as any) : v))]
+      if (computeTotal) {
+        const rowIdx = sheetData.length + 1
+        const start = columnLetter(2)
+        const end = columnLetter(months.length + 1)
+        row.push({ t: "n", f: `SUM(${start}${rowIdx}:${end}${rowIdx})`, z: '"$"#,##0.00_);("$"#,##0.00)' })
+      } else {
+        row.push("")
+      }
+      sheetData.push(row)
     }
 
     const columnLetter = (col: number) => {
@@ -312,16 +338,19 @@ export default function CashFlowPage() {
       return temp
     }
 
-    const emptyRow = Array(months.length)
-      .fill(0)
-      .map(() => "")
+    const emptyRow = Array(months.length).fill("")
 
     // Operating Activities
-    pushRow("Operating Activities", [...emptyRow])
+    pushRow("Operating Activities", [...emptyRow], false)
     const opStart = sheetData.length + 1
-    Array.from(accounts.operating)
+    const opAccounts = Array.from(accounts.operating)
+    const incomeOps = opAccounts
+      .filter((a) => accountTypes.operating[a]?.toLowerCase().includes("income"))
       .sort()
-      .forEach((acc) => {
+    const otherOps = opAccounts
+      .filter((a) => !accountTypes.operating[a]?.toLowerCase().includes("income"))
+      .sort()
+    ;[...incomeOps, ...otherOps].forEach((acc) => {
       pushRow(
         `  ${acc}`,
         months.map((m) => breakdown[m].operating[acc] || 0),
@@ -335,19 +364,19 @@ export default function CashFlowPage() {
       })),
     )
     const opTotalRow = sheetData.length
-    sheetData.push(["", ...emptyRow])
+    pushRow("", [...emptyRow], false)
 
     // Financing Activities
-    pushRow("Financing Activities", [...emptyRow])
+    pushRow("Financing Activities", [...emptyRow], false)
     const finStart = sheetData.length + 1
     Array.from(accounts.financing)
       .sort()
       .forEach((acc) => {
-      pushRow(
-        `  ${acc}`,
-        months.map((m) => breakdown[m].financing[acc] || 0),
-      )
-    })
+        pushRow(
+          `  ${acc}`,
+          months.map((m) => breakdown[m].financing[acc] || 0),
+        )
+      })
     const finEnd = sheetData.length
     pushRow(
       "Total Financing Activities",
@@ -356,19 +385,19 @@ export default function CashFlowPage() {
       })),
     )
     const finTotalRow = sheetData.length
-    sheetData.push(["", ...emptyRow])
+    pushRow("", [...emptyRow], false)
 
     // Investing Activities
-    pushRow("Investing Activities", [...emptyRow])
+    pushRow("Investing Activities", [...emptyRow], false)
     const invStart = sheetData.length + 1
     Array.from(accounts.investing)
       .sort()
       .forEach((acc) => {
-      pushRow(
-        `  ${acc}`,
-        months.map((m) => breakdown[m].investing[acc] || 0),
-      )
-    })
+        pushRow(
+          `  ${acc}`,
+          months.map((m) => breakdown[m].investing[acc] || 0),
+        )
+      })
     const invEnd = sheetData.length
     pushRow(
       "Total Investing Activities",
@@ -377,7 +406,7 @@ export default function CashFlowPage() {
       })),
     )
     const invTotalRow = sheetData.length
-    sheetData.push(["", ...emptyRow])
+    pushRow("", [...emptyRow], false)
 
     // Net Change in Cash
     pushRow(
@@ -412,6 +441,11 @@ export default function CashFlowPage() {
       financing: new Set<string>(),
       investing: new Set<string>(),
     }
+    const accountTypes: Record<string, Record<string, string>> = {
+      operating: {},
+      financing: {},
+      investing: {},
+    }
 
     months.forEach((m) => {
       breakdown[m] = { operating: {}, financing: {}, investing: {} }
@@ -436,30 +470,41 @@ export default function CashFlowPage() {
         const activity = breakdown[monthName][classification]
         activity[account] = (activity[account] || 0) + impact
         accounts[classification].add(account)
+        accountTypes[classification][account] = tx.account_type || ""
       }
     })
-
     const doc = new jsPDF()
-    const tableColumn = ["Account", ...months]
+    const tableColumn = ["Account", ...months, "Total"]
     const body: (string | number)[][] = []
-    const fill = Array(months.length).fill("")
+    const fill = Array(months.length + 1).fill("")
+    const format = (val: number) => {
+      const abs = Math.abs(val).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+      return val < 0 ? `($${abs})` : `$${abs}`
+    }
     const push = (label: string, values: (number | string)[] = []) => {
       body.push([label, ...values])
     }
 
     // Operating Activities
     push("Operating Activities", [...fill])
-    Array.from(accounts.operating)
+    const opAccounts = Array.from(accounts.operating)
+    const incomeOps = opAccounts
+      .filter((a) => accountTypes.operating[a]?.toLowerCase().includes("income"))
       .sort()
-      .forEach((acc) => {
-      push(
-        `  ${acc}`,
-        months.map((m) => breakdown[m].operating[acc] || 0),
-      )
+    const otherOps = opAccounts
+      .filter((a) => !accountTypes.operating[a]?.toLowerCase().includes("income"))
+      .sort()
+    ;[...incomeOps, ...otherOps].forEach((acc) => {
+      const vals = months.map((m) => breakdown[m].operating[acc] || 0)
+      push(`  ${acc}`, [...vals.map(format), format(sum(vals))])
     })
+    const opTotals = months.map((m) => sum(Object.values(breakdown[m].operating)))
     push(
       "Total Operating Activities",
-      months.map((m) => sum(Object.values(breakdown[m].operating))),
+      [...opTotals.map(format), format(sum(opTotals))],
     )
     push("", [...fill])
 
@@ -468,14 +513,13 @@ export default function CashFlowPage() {
     Array.from(accounts.financing)
       .sort()
       .forEach((acc) => {
-      push(
-        `  ${acc}`,
-        months.map((m) => breakdown[m].financing[acc] || 0),
-      )
-    })
+        const vals = months.map((m) => breakdown[m].financing[acc] || 0)
+        push(`  ${acc}`, [...vals.map(format), format(sum(vals))])
+      })
+    const finTotals = months.map((m) => sum(Object.values(breakdown[m].financing)))
     push(
       "Total Financing Activities",
-      months.map((m) => sum(Object.values(breakdown[m].financing))),
+      [...finTotals.map(format), format(sum(finTotals))],
     )
     push("", [...fill])
 
@@ -484,28 +528,25 @@ export default function CashFlowPage() {
     Array.from(accounts.investing)
       .sort()
       .forEach((acc) => {
-      push(
-        `  ${acc}`,
-        months.map((m) => breakdown[m].investing[acc] || 0),
-      )
-    })
+        const vals = months.map((m) => breakdown[m].investing[acc] || 0)
+        push(`  ${acc}`, [...vals.map(format), format(sum(vals))])
+      })
+    const invTotals = months.map((m) => sum(Object.values(breakdown[m].investing)))
     push(
       "Total Investing Activities",
-      months.map((m) => sum(Object.values(breakdown[m].investing))),
+      [...invTotals.map(format), format(sum(invTotals))],
     )
     push("", [...fill])
 
     // Net Change
-    push(
-      "Net Change in Cash",
-      months.map((m) =>
-        sum([
-          sum(Object.values(breakdown[m].operating)),
-          sum(Object.values(breakdown[m].financing)),
-          sum(Object.values(breakdown[m].investing)),
-        ]),
-      ),
+    const netVals = months.map((m) =>
+      sum([
+        sum(Object.values(breakdown[m].operating)),
+        sum(Object.values(breakdown[m].financing)),
+        sum(Object.values(breakdown[m].investing)),
+      ]),
     )
+    push("Net Change in Cash", [...netVals.map(format), format(sum(netVals))])
 
     autoTable(doc, {
       head: [tableColumn],
