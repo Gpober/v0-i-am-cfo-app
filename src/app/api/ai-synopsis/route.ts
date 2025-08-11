@@ -4,7 +4,11 @@ export async function POST(request: Request) {
   const { period, summary } = await request.json()
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: "Missing OpenAI API key" }, { status: 500 })
+    console.warn("OPENAI_API_KEY is not set")
+    return NextResponse.json(
+      { result: "AI synopsis unavailable: missing OpenAI API key." },
+      { status: 200 },
+    )
   }
 
   try {
@@ -31,7 +35,10 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const err = await response.text()
       console.error("OpenAI API error:", err)
-      return NextResponse.json({ error: "OpenAI API request failed" }, { status: 500 })
+      return NextResponse.json(
+        { result: "AI synopsis unavailable." },
+        { status: 200 },
+      )
     }
 
     const data = await response.json()
@@ -39,6 +46,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ result: text })
   } catch (error) {
     console.error("AI synopsis generation failed:", error)
-    return NextResponse.json({ error: "Failed to generate synopsis" }, { status: 500 })
+    return NextResponse.json(
+      { result: "AI synopsis unavailable." },
+      { status: 200 },
+    )
   }
 }
