@@ -1107,7 +1107,7 @@ export default function CashFlowPage() {
       // Sort by property and month
       cashFlowArray.sort((a, b) => {
         if (a.property !== b.property) {
-          return a.property.localeCompare(b.property)
+          return (a.property || "").localeCompare(b.property || "")
         }
         return a.month - b.month
       })
@@ -1385,7 +1385,7 @@ export default function CashFlowPage() {
           if (!isIncomeA && isIncomeB) return 1
 
           // Within same category, sort alphabetically
-          return a.offsetAccount.localeCompare(b.offsetAccount)
+          return (a.offsetAccount || "").localeCompare(b.offsetAccount || "")
         }),
       financing: offsetAccountData.filter((account) => {
         const sampleTx = cashTransactions.find((tx) => tx.account === account.offsetAccount)
