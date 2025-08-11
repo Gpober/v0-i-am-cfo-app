@@ -328,18 +328,53 @@ export default function FinancialOverviewPage() {
     fetchAvailableClasses()
   }, [])
 
+  const buildSynopsisInput = (data) => ({
+    current: {
+      totalIncome: data.current.totalIncome,
+      totalExpenses: data.current.totalExpenses,
+      netIncome: data.current.netIncome,
+      grossProfit: data.current.grossProfit,
+      operatingCashFlow: data.current.operatingCashFlow,
+      financingCashFlow: data.current.financingCashFlow,
+      investingCashFlow: data.current.investingCashFlow,
+      netCashFlow: data.current.netCashFlow,
+    },
+    previous: {
+      totalIncome: data.previous.totalIncome,
+      totalExpenses: data.previous.totalExpenses,
+      netIncome: data.previous.netIncome,
+      grossProfit: data.previous.grossProfit,
+      operatingCashFlow: data.previous.operatingCashFlow,
+      financingCashFlow: data.previous.financingCashFlow,
+      investingCashFlow: data.previous.investingCashFlow,
+      netCashFlow: data.previous.netCashFlow,
+    },
+    growth: data.growth,
+    summary: data.summary,
+    propertyBreakdown: data.propertyBreakdown?.slice(0, 5) || [],
+    alerts: data.alerts,
+  })
+
   const generateSynopsis = async (summaryData) => {
     try {
       setSynopsisLoading(true)
+      const payload = buildSynopsisInput(summaryData)
       const res = await fetch("/api/financial-synopsis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: JSON.stringify(summaryData) }),
+        body: JSON.stringify({ data: payload }),
       })
+      if (!res.ok) {
+        const errText = await res.text()
+        console.error("❌ Error generating synopsis:", res.status, errText)
+        setSynopsis("Unable to generate synopsis")
+        return
+      }
       const json = await res.json()
       setSynopsis(json.synopsis || "")
     } catch (err) {
       console.error("❌ Error generating synopsis:", err)
+      setSynopsis("Unable to generate synopsis")
     } finally {
       setSynopsisLoading(false)
     }

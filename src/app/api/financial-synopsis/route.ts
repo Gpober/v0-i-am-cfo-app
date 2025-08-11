@@ -2,18 +2,23 @@ import { NextResponse } from "next/server"
 import OpenAI from "openai"
 
 // POST /api/financial-synopsis
-// Expects JSON: { data: string }
+// Expects JSON: { data: any }
 // Returns JSON: { synopsis: string }
 export async function POST(req: Request) {
   try {
-    const { data } = await req.json()
-    if (!data || typeof data !== "string") {
+    const body = await req.json()
+    const rawData = body.data
+    if (!rawData) {
       return NextResponse.json({ error: "Missing financial data" }, { status: 400 })
     }
 
+    const serialized =
+      typeof rawData === "string" ? rawData : JSON.stringify(rawData)
+    const trimmed = serialized.length > 10000 ? serialized.slice(0, 10000) : serialized
+
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-    const prompt = `You are an experienced Chief Financial Officer. Review the following financial information and provide any notable alerts, risks, or insights in a concise summary.\n\n${data}`
+    const prompt = `You are an experienced Chief Financial Officer. Review the following financial information and provide any notable alerts, risks, or insights in a concise summary.\n\n${trimmed}`
 
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
