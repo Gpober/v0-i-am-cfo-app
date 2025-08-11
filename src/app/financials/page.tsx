@@ -379,27 +379,110 @@ export default function FinancialsPage() {
   }
 
   const handleExportExcel = () => {
-    const data = plAccounts.map((acc) => ({
-      Account: acc.account,
-      ParentAccount: acc.parent_account,
-      Amount: acc.amount,
-      Category: acc.category,
-    }))
-    const worksheet = XLSX.utils.json_to_sheet(data)
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+
+    const monthKey = (dateStr: string) => {
+      const date = parseDateOnly(dateStr)
+      return `${monthNames[date.getMonth()]} ${date.getFullYear()}`
+    }
+
+    const months = Array.from(
+      new Set(
+        plAccounts.flatMap((acc) =>
+          acc.transactions.map((tx) => monthKey(tx.date)),
+        ),
+      ),
+    ).sort(
+      (a, b) => new Date(a + " 1").getTime() - new Date(b + " 1").getTime(),
+    )
+
+    const data = plAccounts.map((acc) => {
+      const row: Record<string, any> = { Account: acc.account }
+      months.forEach((m) => {
+        const txs = acc.transactions.filter((tx) => monthKey(tx.date) === m)
+        const credits = txs.reduce((sum, tx) => {
+          const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+          return sum + (isNaN(val) ? 0 : val)
+        }, 0)
+        const debits = txs.reduce((sum, tx) => {
+          const val = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
+          return sum + (isNaN(val) ? 0 : val)
+        }, 0)
+        row[m] = acc.category === "INCOME" ? credits - debits : debits - credits
+      })
+      return row
+    })
+
+    const worksheet = XLSX.utils.json_to_sheet(data, {
+      header: ["Account", ...months],
+    })
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "P&L")
     XLSX.writeFile(workbook, "pl_accounts.xlsx")
   }
 
   const handleExportPdf = () => {
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+
+    const monthKey = (dateStr: string) => {
+      const date = parseDateOnly(dateStr)
+      return `${monthNames[date.getMonth()]} ${date.getFullYear()}`
+    }
+
+    const months = Array.from(
+      new Set(
+        plAccounts.flatMap((acc) =>
+          acc.transactions.map((tx) => monthKey(tx.date)),
+        ),
+      ),
+    ).sort(
+      (a, b) => new Date(a + " 1").getTime() - new Date(b + " 1").getTime(),
+    )
+
     const doc = new jsPDF()
-    const tableColumn = ["Account", "Parent Account", "Amount", "Category"]
-    const tableRows = plAccounts.map((acc) => [
-      acc.account,
-      acc.parent_account,
-      acc.amount,
-      acc.category,
-    ])
+    const tableColumn = ["Account", ...months]
+    const tableRows = plAccounts.map((acc) => {
+      const row = months.map((m) => {
+        const txs = acc.transactions.filter((tx) => monthKey(tx.date) === m)
+        const credits = txs.reduce((sum, tx) => {
+          const val = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+          return sum + (isNaN(val) ? 0 : val)
+        }, 0)
+        const debits = txs.reduce((sum, tx) => {
+          const val = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
+          return sum + (isNaN(val) ? 0 : val)
+        }, 0)
+        return acc.category === "INCOME" ? credits - debits : debits - credits
+      })
+      return [acc.account, ...row]
+    })
+
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,

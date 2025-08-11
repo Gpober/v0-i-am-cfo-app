@@ -2,7 +2,10 @@
 
 import React from "react"
 import { useState, useEffect } from "react"
-import { RefreshCw, ChevronDown, ChevronRight, X } from "lucide-react"
+import { RefreshCw, ChevronDown, ChevronRight, X, Download } from "lucide-react"
+import * as XLSX from "xlsx"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 import { supabase } from "@/lib/supabaseClient"
 
 // IAM CFO Brand Colors
@@ -155,6 +158,7 @@ export default function CashFlowPage() {
   const [cashFlowData, setCashFlowData] = useState<CashFlowRow[]>([])
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [rowBreakdown, setRowBreakdown] = useState<CashFlowBreakdown | null>(null)
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
 
   // Offset view state
   const [offsetAccountData, setOffsetAccountData] = useState<OffsetAccountData[]>([])
@@ -240,6 +244,52 @@ export default function CashFlowPage() {
     const month = Math.ceil(week / 4.33)
     const weekInMonth = week - Math.floor((month - 1) * 4.33)
     return `${monthNames[Math.min(month - 1, 11)]} W${Math.max(1, Math.ceil(weekInMonth))}`
+  }
+
+  const handleExportCashFlowExcel = () => {
+    const months = Array.from(
+      new Set(cashFlowData.map((row) => row.monthName)),
+    )
+    const rows = [
+      { Account: "Operating Activities" },
+      { Account: "Financing Activities" },
+      { Account: "Investing Activities" },
+      { Account: "Net Change in Cash" },
+    ] as Record<string, any>[]
+
+    months.forEach((m) => {
+      const filtered = cashFlowData.filter((row) => row.monthName === m)
+      rows[0][m] = filtered.reduce((sum, r) => sum + r.operatingCashFlow, 0)
+      rows[1][m] = filtered.reduce((sum, r) => sum + r.financingCashFlow, 0)
+      rows[2][m] = filtered.reduce((sum, r) => sum + r.investingCashFlow, 0)
+      rows[3][m] = filtered.reduce((sum, r) => sum + r.netChangeInCash, 0)
+    })
+
+    const worksheet = XLSX.utils.json_to_sheet(rows, {
+      header: ["Account", ...months],
+    })
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Cash Flow")
+    XLSX.writeFile(workbook, "cash_flow.xlsx")
+  }
+
+  const handleExportCashFlowPdf = () => {
+    const months = Array.from(
+      new Set(cashFlowData.map((row) => row.monthName)),
+    )
+    const doc = new jsPDF()
+    const tableColumn = ["Account", ...months]
+    const body = [
+      ["Operating Activities", ...months.map((m) => cashFlowData.filter((r) => r.monthName === m).reduce((sum, r) => sum + r.operatingCashFlow, 0))],
+      ["Financing Activities", ...months.map((m) => cashFlowData.filter((r) => r.monthName === m).reduce((sum, r) => sum + r.financingCashFlow, 0))],
+      ["Investing Activities", ...months.map((m) => cashFlowData.filter((r) => r.monthName === m).reduce((sum, r) => sum + r.investingCashFlow, 0))],
+      ["Net Change in Cash", ...months.map((m) => cashFlowData.filter((r) => r.monthName === m).reduce((sum, r) => sum + r.netChangeInCash, 0))],
+    ]
+    autoTable(doc, {
+      head: [tableColumn],
+      body,
+    })
+    doc.save("cash_flow.pdf")
   }
 
   // ENHANCED: Classification function with transfers as separate category
@@ -1199,6 +1249,27 @@ export default function CashFlowPage() {
                   </button>
                 </div>
               )}
+              <div className="relative">
+                <button
+                  onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                  className="inline-flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{ backgroundColor: BRAND_COLORS.primary, "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </button>
+                {exportDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded-lg shadow-lg">
+                    <button onClick={handleExportCashFlowExcel} className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100">
+                      Excel
+                    </button>
+                    <button onClick={handleExportCashFlowPdf} className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100">
+                      PDF
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <button
                 onClick={() => {
