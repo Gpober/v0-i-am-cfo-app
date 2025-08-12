@@ -17,10 +17,18 @@ import {
   LineChart,
   Line,
 } from "recharts"
-import {
-  RefreshCw,
-  Download,
-} from "lucide-react"
+import { GitCompare, RefreshCw, Download } from "lucide-react"
+
+// I AM CFO Brand Colors
+const BRAND_COLORS = {
+  primary: "#56B6E9",
+  secondary: "#3A9BD1",
+  tertiary: "#7CC4ED",
+  accent: "#2E86C1",
+  success: "#27AE60",
+  warning: "#F39C12",
+  danger: "#E74C3C",
+}
 
 type KPI = "revenue" | "cogs" | "grossProfit" | "opex" | "netIncome"
 
@@ -333,90 +341,115 @@ export default function ComparativeAnalysisPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Comparative Analysis</h1>
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <GitCompare
+                className="w-8 h-8"
+                style={{ color: BRAND_COLORS.primary }}
+              />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Comparative Analysis
+                </h1>
+                <p className="text-sm text-gray-600">
+                  Quick variance analysis across periods or properties
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refresh}
+                disabled={loading}
+              >
+                <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportCSV}
+                disabled={!topMovers.length}
+              >
+                <Download className="h-4 w-4 mr-1" /> Export CSV
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {summary.length > 0 && (
-        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-          {summary.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ul>
-      )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {summary.length > 0 && (
+          <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+            {summary.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        )}
 
-      {/* Controls */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Mode</label>
+        {/* Controls */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Mode</label>
             <select
               value={mode}
-              onChange={(e) =>
-                setMode(e.target.value as "period" | "class")
-              }
+              onChange={(e) => setMode(e.target.value as "period" | "class")}
               className="w-full border rounded p-2 text-sm"
             >
-            <option value="period">Period vs Period</option>
-            <option value="class">Class vs Class</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Start A</label>
-          <input
-            type="date"
-            value={startA}
-            onChange={(e) => setStartA(e.target.value)}
-            className="w-full border rounded p-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">End A</label>
-          <input
-            type="date"
-            value={endA}
-            onChange={(e) => setEndA(e.target.value)}
-            className="w-full border rounded p-2 text-sm"
-          />
-        </div>
-        {mode === "period" && (
-          <>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Start B</label>
-              <input
-                type="date"
-                value={startB}
-                onChange={(e) => setStartB(e.target.value)}
-                className="w-full border rounded p-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">End B</label>
-              <input
-                type="date"
-                value={endB}
-                onChange={(e) => setEndB(e.target.value)}
-                className="w-full border rounded p-2 text-sm"
-              />
-            </div>
-          </>
-        )}
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Class/Property A</label>
-          <select
-            value={propertyA}
-            onChange={(e) => setPropertyA(e.target.value)}
-            className="w-full border rounded p-2 text-sm"
-          >
-            {availableProperties.map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
-        </div>
-        {mode === "class" && (
+              <option value="period">Period vs Period</option>
+              <option value="class">Class vs Class</option>
+            </select>
+          </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Class/Property B</label>
+            <label className="block text-xs text-gray-500 mb-1">Start A</label>
+            <input
+              type="date"
+              value={startA}
+              onChange={(e) => setStartA(e.target.value)}
+              className="w-full border rounded p-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">End A</label>
+            <input
+              type="date"
+              value={endA}
+              onChange={(e) => setEndA(e.target.value)}
+              className="w-full border rounded p-2 text-sm"
+            />
+          </div>
+          {mode === "period" && (
+            <>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Start B</label>
+                <input
+                  type="date"
+                  value={startB}
+                  onChange={(e) => setStartB(e.target.value)}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">End B</label>
+                <input
+                  type="date"
+                  value={endB}
+                  onChange={(e) => setEndB(e.target.value)}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+            </>
+          )}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">
+              Class/Property A
+            </label>
             <select
-              value={propertyB}
-              onChange={(e) => setPropertyB(e.target.value)}
+              value={propertyA}
+              onChange={(e) => setPropertyA(e.target.value)}
               className="w-full border rounded p-2 text-sm"
             >
               {availableProperties.map((p) => (
@@ -424,135 +457,147 @@ export default function ComparativeAnalysisPage() {
               ))}
             </select>
           </div>
+          {mode === "class" && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">
+                Class/Property B
+              </label>
+              <select
+                value={propertyB}
+                onChange={(e) => setPropertyB(e.target.value)}
+                className="w-full border rounded p-2 text-sm"
+              >
+                {availableProperties.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {datasetA && datasetB && (
+          <>
+            {/* KPI cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+              {(
+                [
+                  { title: "Revenue", key: "revenue" },
+                  { title: "COGS", key: "cogs" },
+                  { title: "Gross Profit", key: "grossProfit" },
+                  { title: "OpEx", key: "opex" },
+                  { title: "Net Income", key: "netIncome" },
+                ] as { title: string; key: KPI }[]
+              ).map((k) => {
+                const A = datasetA.kpis[k.key]
+                const B = datasetB.kpis[k.key]
+                const variance = A - B
+                const pct = B !== 0 ? ((variance / B) * 100).toFixed(1) : "0"
+                return (
+                  <KPICard
+                    key={k.key}
+                    title={k.title}
+                    value={formatCurrency(A)}
+                    change={`${variance >= 0 ? "+" : ""}${pct}%`}
+                    positive={variance >= 0}
+                  />
+                )
+              })}
+            </div>
+
+            {/* Bar chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>KPIs Comparison</CardTitle>
+              </CardHeader>
+              <CardContent className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={kpiData()}>
+                    <XAxis dataKey="kpi" />
+                    <YAxis tickFormatter={(v) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <Legend />
+                    <Bar dataKey="A" fill={BRAND_COLORS.primary} />
+                    <Bar dataKey="B" fill={BRAND_COLORS.secondary} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Trend chart */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Trend - {kpiTrend}</CardTitle>
+                <select
+                  value={kpiTrend}
+                  onChange={(e) => setKpiTrend(e.target.value as KPI)}
+                  className="border rounded p-1 text-xs"
+                >
+                  <option value="revenue">Revenue</option>
+                  <option value="cogs">COGS</option>
+                  <option value="grossProfit">Gross Profit</option>
+                  <option value="opex">OpEx</option>
+                  <option value="netIncome">Net Income</option>
+                </select>
+              </CardHeader>
+              <CardContent className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData()}>
+                    <XAxis dataKey="date" />
+                    <YAxis tickFormatter={(v) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="A"
+                      stroke={BRAND_COLORS.primary}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="B"
+                      stroke={BRAND_COLORS.secondary}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Top movers table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Movers</CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="py-2">Account</th>
+                      <th className="py-2">A</th>
+                      <th className="py-2">B</th>
+                      <th className="py-2">Var $</th>
+                      <th className="py-2">Var %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topMovers.map((m) => (
+                      <tr key={m.account} className="border-t">
+                        <td className="py-1">{m.account}</td>
+                        <td className="py-1">{formatCurrency(m.A)}</td>
+                        <td className="py-1">{formatCurrency(m.B)}</td>
+                        <td className="py-1">{formatCurrency(m.variance)}</td>
+                        <td className="py-1">
+                          {m.variancePct !== null
+                            ? `${m.variancePct.toFixed(1)}%`
+                            : ""}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
-
-      <div className="flex gap-2">
-        <Button onClick={refresh} disabled={loading}>
-          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
-        </Button>
-        <Button variant="outline" onClick={exportCSV} disabled={!topMovers.length}>
-          <Download className="h-4 w-4 mr-1" /> Export CSV
-        </Button>
-      </div>
-
-      {datasetA && datasetB && (
-        <>
-          {/* KPI cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            {(
-              [
-                {
-                  title: "Revenue",
-                  key: "revenue",
-                },
-                { title: "COGS", key: "cogs" },
-                { title: "Gross Profit", key: "grossProfit" },
-                { title: "OpEx", key: "opex" },
-                { title: "Net Income", key: "netIncome" },
-              ] as { title: string; key: KPI }[]
-            ).map((k) => {
-              const A = datasetA.kpis[k.key]
-              const B = datasetB.kpis[k.key]
-              const variance = A - B
-              const pct = B !== 0 ? ((variance / B) * 100).toFixed(1) : "0"
-              return (
-                <KPICard
-                  key={k.key}
-                  title={k.title}
-                  value={formatCurrency(A)}
-                  change={`${variance >= 0 ? "+" : ""}${pct}%`}
-                  positive={variance >= 0}
-                />
-              )
-            })}
-          </div>
-
-          {/* Bar chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>KPIs Comparison</CardTitle>
-            </CardHeader>
-            <CardContent className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={kpiData()}>
-                  <XAxis dataKey="kpi" />
-                  <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                  <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                  <Legend />
-                  <Bar dataKey="A" fill="#56B6E9" />
-                  <Bar dataKey="B" fill="#3A9BD1" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Trend chart */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Trend - {kpiTrend}</CardTitle>
-              <select
-                value={kpiTrend}
-                onChange={(e) => setKpiTrend(e.target.value as KPI)}
-                className="border rounded p-1 text-xs"
-              >
-                <option value="revenue">Revenue</option>
-                <option value="cogs">COGS</option>
-                <option value="grossProfit">Gross Profit</option>
-                <option value="opex">OpEx</option>
-                <option value="netIncome">Net Income</option>
-              </select>
-            </CardHeader>
-            <CardContent className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trendData()}>
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                  <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                  <Legend />
-                  <Line type="monotone" dataKey="A" stroke="#56B6E9" />
-                  <Line type="monotone" dataKey="B" stroke="#3A9BD1" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Top movers table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Movers</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left">
-                    <th className="py-2">Account</th>
-                    <th className="py-2">A</th>
-                    <th className="py-2">B</th>
-                    <th className="py-2">Var $</th>
-                    <th className="py-2">Var %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topMovers.map((m) => (
-                    <tr key={m.account} className="border-t">
-                      <td className="py-1">{m.account}</td>
-                      <td className="py-1">{formatCurrency(m.A)}</td>
-                      <td className="py-1">{formatCurrency(m.B)}</td>
-                      <td className="py-1">{formatCurrency(m.variance)}</td>
-                      <td className="py-1">
-                        {m.variancePct !== null
-                          ? `${m.variancePct.toFixed(1)}%`
-                          : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        </>
-      )}
     </div>
   )
 }
