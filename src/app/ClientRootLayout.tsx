@@ -4,7 +4,7 @@ import type React from "react"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { useState } from "react"
-import { BarChart3, DollarSign, TrendingUp, CreditCard, FileText, Users, Menu, X } from "lucide-react"
+import { BarChart3, DollarSign, TrendingUp, CreditCard, FileText, Users, Menu, X, GitCompare } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import Image from "next/image"
@@ -45,6 +45,7 @@ const navigation = [
   { name: "Overview", href: "/", icon: BarChart3 },
   { name: "P&L", href: "/financials", icon: TrendingUp },
   { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
+  { name: "Comparative Analysis", href: "/comparative-analysis", icon: GitCompare },
   { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
   { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
   { name: "A/P", href: "/accounts-payable", icon: Users },
