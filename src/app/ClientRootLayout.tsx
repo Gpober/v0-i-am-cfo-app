@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import { useState } from "react"
+import type React from "react";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { useState } from "react";
 import {
   BarChart3,
   DollarSign,
@@ -14,12 +14,12 @@ import {
   Menu,
   X,
   BarChart2,
-} from "lucide-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import Image from "next/image"
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import Image from "next/image";
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] });
 
 // I AM CFO Brand Colors
 const BRAND_COLORS = {
@@ -42,40 +42,44 @@ const BRAND_COLORS = {
     800: "#1E293B",
     900: "#0F172A",
   },
-}
+};
 
 // I AM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
   <div className={`${className} flex items-center justify-center relative`}>
     <Image src="/favicon.png" alt="I AM CFO Logo" width={32} height={32} />
   </div>
-)
+);
 
 const navigation = [
   { name: "Overview", href: "/", icon: BarChart3 },
   { name: "P&L", href: "/financials", icon: TrendingUp },
-  { name: "Comparative Analysis", href: "/comparative-analysis", icon: BarChart2 },
   { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
+  {
+    name: "Comparative Analysis",
+    href: "/comparative-analysis",
+    icon: BarChart2,
+  },
   { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
   { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
   { name: "A/P", href: "/accounts-payable", icon: Users },
-]
+];
 
 export default function ClientRootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarVisible, setSidebarVisible] = useState(false)
-  const pathname = usePathname()
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const pathname = usePathname();
 
   if (pathname === "/login") {
     return (
       <html lang="en">
         <body className={inter.className}>{children}</body>
       </html>
-    )
+    );
   }
 
   return (
@@ -89,8 +93,13 @@ export default function ClientRootLayout({
           />
 
           {/* Mobile sidebar */}
-          <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? "block" : "hidden"}`}>
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
+          <div
+            className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? "block" : "hidden"}`}
+          >
+            <div
+              className="fixed inset-0 bg-gray-600 bg-opacity-75"
+              onClick={() => setSidebarOpen(false)}
+            />
             <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white">
               <div className="absolute top-0 right-0 -mr-12 pt-2">
                 <button
@@ -103,32 +112,40 @@ export default function ClientRootLayout({
               </div>
               <div className="flex flex-shrink-0 items-center px-4 py-4">
                 <IAMCFOLogo className="w-8 h-8 mr-3" />
-                <span className="text-xl font-bold text-gray-900">I AM CFO</span>
+                <span className="text-xl font-bold text-gray-900">
+                  I AM CFO
+                </span>
               </div>
               <div className="mt-5 h-0 flex-1 overflow-y-auto">
                 <nav className="space-y-1 px-2">
                   {navigation.map((item) => {
-                    const isActive = pathname === item.href
+                    const isActive = pathname === item.href;
                     return (
                       <Link
                         key={item.name}
                         href={item.href}
                         className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
-                          isActive ? "text-white" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                          isActive
+                            ? "text-white"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                         }`}
                         style={{
-                          backgroundColor: isActive ? BRAND_COLORS.primary : undefined,
+                          backgroundColor: isActive
+                            ? BRAND_COLORS.primary
+                            : undefined,
                         }}
                         onClick={() => setSidebarOpen(false)}
                       >
                         <item.icon
                           className={`mr-4 h-6 w-6 flex-shrink-0 ${
-                            isActive ? "text-white" : "text-gray-400 group-hover:text-gray-500"
+                            isActive
+                              ? "text-white"
+                              : "text-gray-400 group-hover:text-gray-500"
                           }`}
                         />
                         {item.name}
                       </Link>
-                    )
+                    );
                   })}
                 </nav>
               </div>
@@ -145,30 +162,38 @@ export default function ClientRootLayout({
               <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
                 <div className="flex flex-shrink-0 items-center px-4">
                   <IAMCFOLogo className="w-8 h-8 mr-3" />
-                  <span className="text-xl font-bold text-gray-900">I AM CFO</span>
+                  <span className="text-xl font-bold text-gray-900">
+                    I AM CFO
+                  </span>
                 </div>
                 <nav className="mt-5 flex-1 space-y-1 px-2">
                   {navigation.map((item) => {
-                    const isActive = pathname === item.href
+                    const isActive = pathname === item.href;
                     return (
                       <Link
                         key={item.name}
                         href={item.href}
                         className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                          isActive ? "text-white" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                          isActive
+                            ? "text-white"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                         }`}
                         style={{
-                          backgroundColor: isActive ? BRAND_COLORS.primary : undefined,
+                          backgroundColor: isActive
+                            ? BRAND_COLORS.primary
+                            : undefined,
                         }}
                       >
                         <item.icon
                           className={`mr-3 h-6 w-6 flex-shrink-0 ${
-                            isActive ? "text-white" : "text-gray-400 group-hover:text-gray-500"
+                            isActive
+                              ? "text-white"
+                              : "text-gray-400 group-hover:text-gray-500"
                           }`}
                         />
                         {item.name}
                       </Link>
-                    )
+                    );
                   })}
                 </nav>
               </div>
@@ -184,7 +209,11 @@ export default function ClientRootLayout({
               <button
                 type="button"
                 className="-ml-0.5 -mt-0.5 inline-flex h-12 w-12 items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset"
-                style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                style={
+                  {
+                    "--tw-ring-color": BRAND_COLORS.primary + "33",
+                  } as React.CSSProperties
+                }
                 onClick={() => setSidebarOpen(true)}
               >
                 <Menu className="h-6 w-6" />
@@ -196,5 +225,5 @@ export default function ClientRootLayout({
         </div>
       </body>
     </html>
-  )
+  );
 }
