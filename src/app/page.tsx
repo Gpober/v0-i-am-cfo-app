@@ -139,6 +139,8 @@ export default function FinancialOverviewPage() {
   const [financialData, setFinancialData] = useState(null)
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [synopsis, setSynopsis] = useState("")
+  const [synopsisLoading, setSynopsisLoading] = useState(false)
   const [chartType, setChartType] = useState<"line" | "bar">("line")
   type MonthlyPoint = {
     monthName: string
@@ -351,6 +353,23 @@ export default function FinancialOverviewPage() {
     fetchAvailableClasses()
   }, [])
 
+  const generateSynopsis = async (summaryData) => {
+    try {
+      setSynopsisLoading(true)
+      const res = await fetch("/api/financial-synopsis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: JSON.stringify(summaryData) }),
+      })
+      const json = await res.json()
+      setSynopsis(json.synopsis || "")
+    } catch (err) {
+      console.error("❌ Error generating synopsis:", err)
+    } finally {
+      setSynopsisLoading(false)
+    }
+  }
+
   // Fetch financial data from Supabase (same connection as other pages)
   const fetchFinancialData = async () => {
     try {
@@ -529,6 +548,7 @@ export default function FinancialOverviewPage() {
       // Process the data using same logic as other pages
       const processedData = processFinancialData(filteredCurrentTransactions, filteredPrevTransactions, trendData)
       setFinancialData(processedData)
+      await generateSynopsis(processedData)
       setLastUpdated(new Date())
     } catch (err) {
       console.error("❌ Error fetching financial data:", err)
@@ -1112,7 +1132,23 @@ export default function FinancialOverviewPage() {
           </div>
       </div>
     </div>
-    
+
+      {/* AI Synopsis */}
+      {(synopsis || synopsisLoading) && (
+        <div className="bg-white border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+              <h2 className="text-sm font-semibold mb-2">CFO Alerts</h2>
+              {synopsisLoading ? (
+                <p className="text-sm text-gray-600">Generating synopsis...</p>
+              ) : (
+                <p className="text-sm text-gray-700 whitespace-pre-line">{synopsis}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
