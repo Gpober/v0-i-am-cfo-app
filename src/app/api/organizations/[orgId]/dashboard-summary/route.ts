@@ -34,8 +34,6 @@ interface Entry {
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
-  const month = Number.parseInt(url.searchParams.get("month") || "1", 10)
-  const year = Number.parseInt(url.searchParams.get("year") || "2024", 10)
   const classId = url.searchParams.get("class")
   const includeProperties = url.searchParams.get("includeProperties") === "true"
 
@@ -43,13 +41,26 @@ export async function GET(req: Request) {
     return NextResponse.json({ propertyBreakdown: [] })
   }
 
-  const startDate = `${year}-${String(month).padStart(2, "0")}-01`
-  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-  let lastDay = daysInMonth[month - 1]
-  if (month === 2 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
-    lastDay = 29
+  const start = url.searchParams.get("start")
+  const end = url.searchParams.get("end")
+
+  let startDate: string
+  let endDate: string
+
+  if (start && end) {
+    startDate = start
+    endDate = end
+  } else {
+    const month = Number.parseInt(url.searchParams.get("month") || "1", 10)
+    const year = Number.parseInt(url.searchParams.get("year") || "2024", 10)
+    startDate = `${year}-${String(month).padStart(2, "0")}-01`
+    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    let lastDay = daysInMonth[month - 1]
+    if (month === 2 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+      lastDay = 29
+    }
+    endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
   }
-  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
 
   let query = supabase
     .from("journal_entry_lines")

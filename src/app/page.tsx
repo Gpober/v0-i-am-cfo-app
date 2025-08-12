@@ -854,9 +854,9 @@ export default function FinancialOverviewPage() {
     try {
       setLoadingProperty(true)
       setPropertyError(null)
-      const endMonth = monthsList.indexOf(selectedMonth) + 1
+      const { startDate, endDate } = calculateDateRange()
       const res = await fetch(
-        `/api/organizations/${orgId}/dashboard-summary?month=${endMonth}&year=${selectedYear}&period=month&includeProperties=true`
+        `/api/organizations/${orgId}/dashboard-summary?start=${startDate}&end=${endDate}&includeProperties=true`
       )
       if (!res.ok) throw new Error("Failed to fetch property data")
       const json: { propertyBreakdown: PropertyPoint[] } = await res.json()
@@ -958,6 +958,32 @@ export default function FinancialOverviewPage() {
     { key: "expenses", label: "Expenses" },
     { key: "ni", label: "Net Income" },
   ] as const
+
+  const { startDate: propertyStart, endDate: propertyEnd } = calculateDateRange()
+  const propertySubtitle =
+    timePeriod === "Monthly"
+      ? `Ranked by net income for ${selectedMonth} ${selectedYear}`
+      : `Ranked by net income for ${formatDate(propertyStart)} - ${formatDate(propertyEnd)}`
+
+  const topPropertyTotals = useMemo(() => {
+    if (!financialData?.propertyBreakdown) {
+      return { revenue: 0, expenses: 0, netIncome: 0, margin: 0 }
+    }
+    const top = financialData.propertyBreakdown.slice(0, 10)
+    const totals = top.reduce(
+      (acc, p) => {
+        acc.revenue += p.revenue || 0
+        acc.expenses += p.expenses || 0
+        acc.netIncome += p.netIncome || 0
+        return acc
+      },
+      { revenue: 0, expenses: 0, netIncome: 0 }
+    )
+    return {
+      ...totals,
+      margin: totals.revenue ? (totals.netIncome / totals.revenue) * 100 : 0,
+    }
+  }, [financialData])
 
   const TrendTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -1602,9 +1628,7 @@ export default function FinancialOverviewPage() {
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Top Performing Properties</h3>
-                <div className="text-sm text-gray-600 mt-1">
-                  Ranked by net income for {selectedMonth} {selectedYear}
-                </div>
+                <div className="text-sm text-gray-600 mt-1">{propertySubtitle}</div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -1686,33 +1710,32 @@ export default function FinancialOverviewPage() {
               </div>
             </div>
 
-            {/* Summary Stats */}
+            {/* Top Properties Summary */}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
-                    {financialData.summary.totalTransactions.toLocaleString()}
+                    {formatCurrency(topPropertyTotals.revenue)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Total Transactions</div>
+                  <div className="text-sm text-gray-600 mt-1">Revenue</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{financialData.summary.activeProperties}</div>
-                  <div className="text-sm text-gray-600 mt-1">Active Properties</div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {formatCurrency(topPropertyTotals.expenses)}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">Expenses</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(financialData.current.grossProfit)}
+                    {formatCurrency(topPropertyTotals.netIncome)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Gross Profit</div>
+                  <div className="text-sm text-gray-600 mt-1">Net Income</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    {financialData.current.totalIncome > 0
-                      ? ((financialData.current.grossProfit / financialData.current.totalIncome) * 100).toFixed(1)
-                      : "0.0"}
-                    %
+                    {topPropertyTotals.margin.toFixed(1)}%
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Gross Margin</div>
+                  <div className="text-sm text-gray-600 mt-1">Margin</div>
                 </div>
               </div>
             </div>
