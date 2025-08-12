@@ -198,8 +198,12 @@ const formatDateDisplay = (dateString: string) => {
 };
 
 export default function FinancialsPage() {
-  const [selectedMonth, setSelectedMonth] = useState<string>("June");
-  const [selectedYear, setSelectedYear] = useState<string>("2025");
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    monthsList[new Date().getMonth()],
+  );
+  const [selectedYear, setSelectedYear] = useState<string>(
+    new Date().getFullYear().toString(),
+  );
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("YTD");
   const [viewMode, setViewMode] = useState<ViewMode>("Total");
   const [notification, setNotification] = useState<NotificationState>({
@@ -366,33 +370,29 @@ export default function FinancialsPage() {
 
       endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else {
-      // Trailing 12 - calculate 12 months back from current date
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1;
-
-      let startYear = currentYear;
-      let startMonth = currentMonth - 12;
-      if (startMonth <= 0) {
+      // Trailing 12 - based on selected month/year
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
+      let startYear = year;
+      let startMonth = monthIndex - 11;
+      if (startMonth < 0) {
         startMonth += 12;
         startYear -= 1;
       }
-
-      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
+      startDate = `${startYear}-${String(startMonth + 1).padStart(2, "0")}-01`;
 
       const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-      let lastDay = daysInMonth[currentMonth - 1];
+      let lastDay = daysInMonth[monthIndex];
 
       // Handle leap year for February
       if (
-        currentMonth === 2 &&
-        ((currentYear % 4 === 0 && currentYear % 100 !== 0) ||
-          currentYear % 400 === 0)
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
       ) {
         lastDay = 29;
       }
 
-      endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     }
 
     return { startDate, endDate };
@@ -1411,7 +1411,7 @@ export default function FinancialsPage() {
                   Profit & Loss Statement
                 </h1>
                 <p className="text-sm text-gray-600">
-                  {timePeriod === "Custom"
+                  {timePeriod === "Custom" || timePeriod === "Trailing 12"
                     ? `${formatDateDisplay(currentStartDate)} - ${formatDateDisplay(currentEndDate)}`
                     : timePeriod === "Monthly"
                       ? `${selectedMonth} ${selectedYear}`
@@ -1530,8 +1530,8 @@ export default function FinancialsPage() {
               )}
             </div>
 
-            {/* Month/Year dropdowns for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+            {/* Month & year dropdowns allow adjusting Monthly, Quarterly, or Trailing 12 ranges */}
+            {(timePeriod === "Monthly" || timePeriod === "Quarterly" || timePeriod === "Trailing 12") && (
               <>
                 <div className="relative" ref={monthDropdownRef}>
                   <button

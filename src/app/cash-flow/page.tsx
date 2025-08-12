@@ -121,8 +121,12 @@ const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear()
 
 export default function CashFlowPage() {
   // All state variables
-  const [selectedMonth, setSelectedMonth] = useState<string>("June")
-  const [selectedYear, setSelectedYear] = useState<string>("2024")
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    monthsList[new Date().getMonth()],
+  )
+  const [selectedYear, setSelectedYear] = useState<string>(
+    new Date().getFullYear().toString(),
+  )
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("Monthly")
   const [selectedProperty, setSelectedProperty] = useState("All Properties")
   const [selectedBankAccount, setSelectedBankAccount] = useState("All Bank Accounts")
@@ -625,11 +629,18 @@ export default function CashFlowPage() {
       const lastDay = new Date(year, quarterEndMonth + 1, 0).getDate()
       endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${lastDay}`
     } else {
-      // Trailing 12
-      const twelveMonthsAgo = new Date(now)
-      twelveMonthsAgo.setMonth(now.getMonth() - 12)
-      startDate = twelveMonthsAgo.toISOString().split("T")[0]
-      endDate = now.toISOString().split("T")[0]
+      // Trailing 12 - based on selected month/year
+      const monthIndex = monthsList.indexOf(selectedMonth)
+      const year = Number.parseInt(selectedYear)
+      let startYear = year
+      let startMonth = monthIndex - 11
+      if (startMonth < 0) {
+        startMonth += 12
+        startYear -= 1
+      }
+      startDate = `${startYear}-${String(startMonth + 1).padStart(2, "0")}-01`
+      const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     }
 
     return { startDate, endDate }
@@ -1448,7 +1459,7 @@ export default function CashFlowPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Cash Flow Statement</h1>
               <p className="text-sm text-gray-600 mt-1">
-                {timePeriod === "Custom"
+                {timePeriod === "Custom" || timePeriod === "Trailing 12"
                   ? `${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
                   : timePeriod === "Monthly"
                     ? `${selectedMonth} ${selectedYear}`
@@ -1580,8 +1591,8 @@ export default function CashFlowPage() {
               <option value="Custom">Custom Date Range</option>
             </select>
 
-            {/* Month Dropdown - Show for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+            {/* Month dropdown visible for Monthly, Quarterly, and Trailing 12 views */}
+            {(timePeriod === "Monthly" || timePeriod === "Quarterly" || timePeriod === "Trailing 12") && (
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
@@ -1596,8 +1607,8 @@ export default function CashFlowPage() {
               </select>
             )}
 
-            {/* Year Dropdown - Show for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+            {/* Year dropdown visible for Monthly, Quarterly, and Trailing 12 views */}
+            {(timePeriod === "Monthly" || timePeriod === "Quarterly" || timePeriod === "Trailing 12") && (
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
@@ -1704,7 +1715,7 @@ export default function CashFlowPage() {
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Cash Flow by Bank Account</h3>
                 <div className="text-sm text-gray-600 mt-1">
-                  {timePeriod === "Custom"
+                  {timePeriod === "Custom" || timePeriod === "Trailing 12"
                     ? `For the period ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
                     : timePeriod === "Monthly"
                       ? `For ${selectedMonth} ${selectedYear}`
@@ -1839,7 +1850,7 @@ export default function CashFlowPage() {
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Cash Flow by Offset Account</h3>
                 <div className="text-sm text-gray-600 mt-1">
-                  {timePeriod === "Custom"
+                  {timePeriod === "Custom" || timePeriod === "Trailing 12"
                     ? `For the period ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
                     : timePeriod === "Monthly"
                       ? `For ${selectedMonth} ${selectedYear}`
@@ -2717,7 +2728,7 @@ export default function CashFlowPage() {
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Statement of Cash Flows</h3>
                 <div className="text-sm text-gray-600 mt-1">
-                  {timePeriod === "Custom"
+                  {timePeriod === "Custom" || timePeriod === "Trailing 12"
                     ? `For the period ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
                     : timePeriod === "Monthly"
                       ? `For ${selectedMonth} ${selectedYear}`
