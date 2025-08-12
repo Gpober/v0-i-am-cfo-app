@@ -30,7 +30,7 @@ import {
 } from "recharts"
 import Image from "next/image"
 
-// IAM CFO Brand Colors
+// I AM CFO Brand Colors
 const BRAND_COLORS = {
   primary: "#56B6E9",
   secondary: "#3A9BD1",
@@ -916,10 +916,10 @@ const useDeviceType = () => {
   return deviceType
 }
 
-// IAM CFO Logo Component
+// I AM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
   <div className={`${className} flex items-center justify-center relative`}>
-    <Image src="/favicon.png" alt="IAM CFO Logo" width={32} height={32} />
+    <Image src="/favicon.png" alt="I AM CFO Logo" width={32} height={32} />
   </div>
 )
 
@@ -3109,7 +3109,7 @@ export default function MobileResponsiveFinancialsPage() {
             <div className="flex items-center">
               <IAMCFOLogo className="w-6 h-6 mr-3" />
               <div>
-                <h1 className="text-lg font-bold text-gray-900">IAM CFO</h1>
+                <h1 className="text-lg font-bold text-gray-900">I AM CFO</h1>
                 <p className="text-xs text-gray-600">
                   {deviceType === "mobile" ? "Mobile" : deviceType === "tablet" ? "Tablet" : "Desktop"} View
                 </p>

@@ -6,6 +6,24 @@ body {
   @apply bg-iamcfo-background text-iamcfo-text font-sans;
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply text-center;
+}
+
+h1 + p,
+h2 + p,
+h3 + p,
+h4 + p,
+h5 + p,
+h6 + p {
+  @apply text-center;
+}
+
 /* Utility to freeze the first column of wide tables */
 .sticky-first-col th:first-child,
 .sticky-first-col td:first-child {

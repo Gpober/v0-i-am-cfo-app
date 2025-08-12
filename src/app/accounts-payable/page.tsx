@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Users, Clock, AlertCircle, CheckCircle, RefreshCw, Search, Calendar } from "lucide-react"
 
-// IAM CFO Brand Colors
+// I AM CFO Brand Colors
 const BRAND_COLORS = {
   primary: "#56B6E9",
   secondary: "#3A9BD1",

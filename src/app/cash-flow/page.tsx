@@ -8,7 +8,7 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { supabase } from "@/lib/supabaseClient"
 
-// IAM CFO Brand Colors
+// I AM CFO Brand Colors
 const BRAND_COLORS = {
   primary: "#56B6E9",
   secondary: "#3A9BD1",
@@ -98,7 +98,7 @@ interface BankAccountData {
 }
 
 type ViewMode = "offset" | "traditional" | "bybank"
-type PeriodType = "monthly" | "weekly"
+type PeriodType = "monthly" | "weekly" | "total"
 type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
 
 // Generate months and years lists
@@ -778,7 +778,7 @@ export default function CashFlowPage() {
           const month = getMonthFromDate(tx.date)
           const year = getYearFromDate(tx.date)
           periodKey = `${year}-${month.toString().padStart(2, "0")}`
-        } else {
+        } else if (periodType === "weekly") {
           const date = getDateParts(tx.date)
           const year = date.year
           const startOfYear = new Date(year, 0, 1)
@@ -788,6 +788,8 @@ export default function CashFlowPage() {
             ) + 1
           const week = Math.ceil(dayOfYear / 7)
           periodKey = `${year}-W${week.toString().padStart(2, "0")}`
+        } else {
+          periodKey = "total"
         }
 
         periodSet.add(periodKey)
@@ -833,11 +835,13 @@ export default function CashFlowPage() {
             const monthNum = Number.parseInt(monthStr)
             label = `${getMonthName(monthNum)} ${year}`
             month = monthNum
-          } else {
+          } else if (periodType === "weekly") {
             const [year, weekStr] = key.split("-")
             const weekNum = Number.parseInt(weekStr.replace("W", ""))
             label = getWeekLabel(Number.parseInt(year), weekNum)
             week = weekNum
+          } else {
+            label = "Total"
           }
 
           return { key, label, month, week }
@@ -927,7 +931,7 @@ export default function CashFlowPage() {
           const month = getMonthFromDate(tx.date)
           const year = getYearFromDate(tx.date)
           periodKey = `${year}-${month.toString().padStart(2, "0")}`
-        } else {
+        } else if (periodType === "weekly") {
           const date = getDateParts(tx.date)
           const year = date.year
           const startOfYear = new Date(year, 0, 1)
@@ -937,6 +941,8 @@ export default function CashFlowPage() {
             ) + 1
           const week = Math.ceil(dayOfYear / 7)
           periodKey = `${year}-W${week.toString().padStart(2, "0")}`
+        } else {
+          periodKey = "total"
         }
 
         periodSet.add(periodKey)
@@ -982,11 +988,13 @@ export default function CashFlowPage() {
             const monthNum = Number.parseInt(monthStr)
             label = `${getMonthName(monthNum)} ${year}`
             month = monthNum
-          } else {
+          } else if (periodType === "weekly") {
             const [year, weekStr] = key.split("-")
             const weekNum = Number.parseInt(weekStr.replace("W", ""))
             label = getWeekLabel(Number.parseInt(year), weekNum)
             week = weekNum
+          } else {
+            label = "Total"
           }
 
           return { key, label, month, week }
@@ -1541,10 +1549,22 @@ export default function CashFlowPage() {
                   <button
                     onClick={() => setPeriodType("weekly")}
                     className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                      periodType === "weekly" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      periodType === "weekly"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
                     }`}
                   >
                     📊 Weekly
+                  </button>
+                  <button
+                    onClick={() => setPeriodType("total")}
+                    className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                      periodType === "total"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Σ Total
                   </button>
                 </div>
               )}
@@ -1793,9 +1813,11 @@ export default function CashFlowPage() {
                             {period.label}
                           </th>
                         ))}
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Total
-                        </th>
+                        {periodType !== "total" && (
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Total
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1825,11 +1847,13 @@ export default function CashFlowPage() {
                               </td>
                             )
                           })}
-                          <td className="px-6 py-4 text-right">
-                            <span className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}>
-                              {formatCurrency(account.total)}
-                            </span>
-                          </td>
+                          {periodType !== "total" && (
+                            <td className="px-6 py-4 text-right">
+                              <span className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {formatCurrency(account.total)}
+                              </span>
+                            </td>
+                          )}
                         </tr>
                       ))}
 
@@ -1848,17 +1872,19 @@ export default function CashFlowPage() {
                             </td>
                           )
                         })}
-                        <td className="px-6 py-4 text-right">
-                          <span
-                            className={`font-bold text-xl ${
-                              bankAccountData.reduce((sum, acc) => sum + acc.total, 0) >= 0
-                                ? "text-green-700"
-                                : "text-red-700"
-                            }`}
-                          >
-                            {formatCurrency(bankAccountData.reduce((sum, acc) => sum + acc.total, 0))}
-                          </span>
-                        </td>
+                        {periodType !== "total" && (
+                          <td className="px-6 py-4 text-right">
+                            <span
+                              className={`font-bold text-xl ${
+                                bankAccountData.reduce((sum, acc) => sum + acc.total, 0) >= 0
+                                  ? "text-green-700"
+                                  : "text-red-700"
+                              }`}
+                            >
+                              {formatCurrency(bankAccountData.reduce((sum, acc) => sum + acc.total, 0))}
+                            </span>
+                          </td>
+                        )}
                       </tr>
                     </tbody>
                   </table>
@@ -2015,9 +2041,11 @@ export default function CashFlowPage() {
                                       {period.label}
                                     </th>
                                   ))}
-                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Total
-                                  </th>
+                                  {periodType !== "total" && (
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Total
+                                    </th>
+                                  )}
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
@@ -2049,13 +2077,15 @@ export default function CashFlowPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="px-6 py-4 text-right">
-                                      <span
-                                        className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
-                                      >
-                                        {formatCurrency(account.total)}
-                                      </span>
-                                    </td>
+                                    {periodType !== "total" && (
+                                      <td className="px-6 py-4 text-right">
+                                        <span
+                                          className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
+                                        >
+                                          {formatCurrency(account.total)}
+                                        </span>
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
 
@@ -2079,13 +2109,15 @@ export default function CashFlowPage() {
                                       </td>
                                     )
                                   })}
-                                  <td className="px-6 py-4 text-right">
-                                    <span
-                                      className={`font-bold text-xl ${operatingTotal >= 0 ? "text-green-700" : "text-red-700"}`}
-                                    >
-                                      {formatCurrency(operatingTotal)}
-                                    </span>
-                                  </td>
+                                  {periodType !== "total" && (
+                                    <td className="px-6 py-4 text-right">
+                                      <span
+                                        className={`font-bold text-xl ${operatingTotal >= 0 ? "text-green-700" : "text-red-700"}`}
+                                      >
+                                        {formatCurrency(operatingTotal)}
+                                      </span>
+                                    </td>
+                                  )}
                                 </tr>
                               </tbody>
                             </table>
@@ -2142,9 +2174,11 @@ export default function CashFlowPage() {
                                       {period.label}
                                     </th>
                                   ))}
-                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Total
-                                  </th>
+                                  {periodType !== "total" && (
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Total
+                                    </th>
+                                  )}
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
@@ -2176,13 +2210,15 @@ export default function CashFlowPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="px-6 py-4 text-right">
-                                      <span
-                                        className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
-                                      >
-                                        {formatCurrency(account.total)}
-                                      </span>
-                                    </td>
+                                    {periodType !== "total" && (
+                                      <td className="px-6 py-4 text-right">
+                                        <span
+                                          className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
+                                        >
+                                          {formatCurrency(account.total)}
+                                        </span>
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
 
@@ -2206,13 +2242,15 @@ export default function CashFlowPage() {
                                       </td>
                                     )
                                   })}
-                                  <td className="px-6 py-4 text-right">
-                                    <span
-                                      className={`font-bold text-xl ${financingTotal >= 0 ? "text-green-700" : "text-red-700"}`}
-                                    >
-                                      {formatCurrency(financingTotal)}
-                                    </span>
-                                  </td>
+                                  {periodType !== "total" && (
+                                    <td className="px-6 py-4 text-right">
+                                      <span
+                                        className={`font-bold text-xl ${financingTotal >= 0 ? "text-green-700" : "text-red-700"}`}
+                                      >
+                                        {formatCurrency(financingTotal)}
+                                      </span>
+                                    </td>
+                                  )}
                                 </tr>
                               </tbody>
                             </table>
@@ -2270,9 +2308,11 @@ export default function CashFlowPage() {
                                       {period.label}
                                     </th>
                                   ))}
-                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Total
-                                  </th>
+                                  {periodType !== "total" && (
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Total
+                                    </th>
+                                  )}
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
@@ -2304,13 +2344,15 @@ export default function CashFlowPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="px-6 py-4 text-right">
-                                      <span
-                                        className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
-                                      >
-                                        {formatCurrency(account.total)}
-                                      </span>
-                                    </td>
+                                    {periodType !== "total" && (
+                                      <td className="px-6 py-4 text-right">
+                                        <span
+                                          className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
+                                        >
+                                          {formatCurrency(account.total)}
+                                        </span>
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
 
@@ -2334,13 +2376,15 @@ export default function CashFlowPage() {
                                       </td>
                                     )
                                   })}
-                                  <td className="px-6 py-4 text-right">
-                                    <span
-                                      className={`font-bold text-xl ${investingTotal >= 0 ? "text-green-700" : "text-red-700"}`}
-                                    >
-                                      {formatCurrency(investingTotal)}
-                                    </span>
-                                  </td>
+                                  {periodType !== "total" && (
+                                    <td className="px-6 py-4 text-right">
+                                      <span
+                                        className={`font-bold text-xl ${investingTotal >= 0 ? "text-green-700" : "text-red-700"}`}
+                                      >
+                                        {formatCurrency(investingTotal)}
+                                      </span>
+                                    </td>
+                                  )}
                                 </tr>
                               </tbody>
                             </table>
@@ -2399,9 +2443,11 @@ export default function CashFlowPage() {
                                         {period.label}
                                       </th>
                                     ))}
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Total
-                                    </th>
+                                    {periodType !== "total" && (
+                                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Total
+                                      </th>
+                                    )}
                                   </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -2436,13 +2482,15 @@ export default function CashFlowPage() {
                                           </td>
                                         )
                                       })}
-                                      <td className="px-6 py-4 text-right">
-                                        <span
-                                          className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
-                                        >
-                                          {formatCurrency(account.total)}
-                                        </span>
-                                      </td>
+                                      {periodType !== "total" && (
+                                        <td className="px-6 py-4 text-right">
+                                          <span
+                                            className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
+                                          >
+                                            {formatCurrency(account.total)}
+                                          </span>
+                                        </td>
+                                      )}
                                     </tr>
                                   ))}
 
@@ -2466,13 +2514,15 @@ export default function CashFlowPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="px-6 py-4 text-right">
-                                      <span
-                                        className={`font-bold text-xl ${transferTotal >= 0 ? "text-green-700" : "text-red-700"}`}
-                                      >
-                                        {formatCurrency(transferTotal)}
-                                      </span>
-                                    </td>
+                                    {periodType !== "total" && (
+                                      <td className="px-6 py-4 text-right">
+                                        <span
+                                          className={`font-bold text-xl ${transferTotal >= 0 ? "text-green-700" : "text-red-700"}`}
+                                        >
+                                          {formatCurrency(transferTotal)}
+                                        </span>
+                                      </td>
+                                    )}
                                   </tr>
                                 </tbody>
                               </table>
@@ -2528,9 +2578,11 @@ export default function CashFlowPage() {
                                       {period.label}
                                     </th>
                                   ))}
-                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Total
-                                  </th>
+                                  {periodType !== "total" && (
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Total
+                                    </th>
+                                  )}
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
@@ -2562,13 +2614,15 @@ export default function CashFlowPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="px-6 py-4 text-right">
-                                      <span
-                                        className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
-                                      >
-                                        {formatCurrency(account.total)}
-                                      </span>
-                                    </td>
+                                    {periodType !== "total" && (
+                                      <td className="px-6 py-4 text-right">
+                                        <span
+                                          className={`font-bold ${account.total >= 0 ? "text-green-600" : "text-red-600"}`}
+                                        >
+                                          {formatCurrency(account.total)}
+                                        </span>
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
 
@@ -2592,13 +2646,15 @@ export default function CashFlowPage() {
                                       </td>
                                     )
                                   })}
-                                  <td className="px-6 py-4 text-right">
-                                    <span
-                                      className={`font-bold text-xl ${otherTotal >= 0 ? "text-green-700" : "text-red-700"}`}
-                                    >
-                                      {formatCurrency(otherTotal)}
-                                    </span>
-                                  </td>
+                                  {periodType !== "total" && (
+                                    <td className="px-6 py-4 text-right">
+                                      <span
+                                        className={`font-bold text-xl ${otherTotal >= 0 ? "text-green-700" : "text-red-700"}`}
+                                      >
+                                        {formatCurrency(otherTotal)}
+                                      </span>
+                                    </td>
+                                  )}
                                 </tr>
                               </tbody>
                             </table>
@@ -2669,9 +2725,11 @@ export default function CashFlowPage() {
                                       {period.label}
                                     </th>
                                   ))}
-                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Total
-                                  </th>
+                                  {periodType !== "total" && (
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Total
+                                    </th>
+                                  )}
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
@@ -2713,29 +2771,31 @@ export default function CashFlowPage() {
                                       </td>
                                     )
                                   })}
-                                  <td className="px-6 py-4 text-right">
-                                    <span
-                                      className={`font-bold text-xl ${(() => {
-                                        const grandTotal =
-                                          accountsByClass.operating.reduce((sum, acc) => sum + acc.total, 0) +
-                                          accountsByClass.financing.reduce((sum, acc) => sum + acc.total, 0) +
-                                          accountsByClass.investing.reduce((sum, acc) => sum + acc.total, 0) +
-                                          accountsByClass.transfer.reduce((sum, acc) => sum + acc.total, 0) +
-                                          accountsByClass.other.reduce((sum, acc) => sum + acc.total, 0)
-                                        return grandTotal >= 0 ? "text-green-700" : "text-red-700"
-                                      })()}`}
-                                    >
-                                      {(() => {
-                                        const grandTotal =
-                                          accountsByClass.operating.reduce((sum, acc) => sum + acc.total, 0) +
-                                          accountsByClass.financing.reduce((sum, acc) => sum + acc.total, 0) +
-                                          accountsByClass.investing.reduce((sum, acc) => sum + acc.total, 0) +
-                                          accountsByClass.transfer.reduce((sum, acc) => sum + acc.total, 0) +
-                                          accountsByClass.other.reduce((sum, acc) => sum + acc.total, 0)
-                                        return formatCurrency(grandTotal)
-                                      })()}
-                                    </span>
-                                  </td>
+                                  {periodType !== "total" && (
+                                    <td className="px-6 py-4 text-right">
+                                      <span
+                                        className={`font-bold text-xl ${(() => {
+                                          const grandTotal =
+                                            accountsByClass.operating.reduce((sum, acc) => sum + acc.total, 0) +
+                                            accountsByClass.financing.reduce((sum, acc) => sum + acc.total, 0) +
+                                            accountsByClass.investing.reduce((sum, acc) => sum + acc.total, 0) +
+                                            accountsByClass.transfer.reduce((sum, acc) => sum + acc.total, 0) +
+                                            accountsByClass.other.reduce((sum, acc) => sum + acc.total, 0)
+                                          return grandTotal >= 0 ? "text-green-700" : "text-red-700"
+                                        })()}`}
+                                      >
+                                        {(() => {
+                                          const grandTotal =
+                                            accountsByClass.operating.reduce((sum, acc) => sum + acc.total, 0) +
+                                            accountsByClass.financing.reduce((sum, acc) => sum + acc.total, 0) +
+                                            accountsByClass.investing.reduce((sum, acc) => sum + acc.total, 0) +
+                                            accountsByClass.transfer.reduce((sum, acc) => sum + acc.total, 0) +
+                                            accountsByClass.other.reduce((sum, acc) => sum + acc.total, 0)
+                                          return formatCurrency(grandTotal)
+                                        })()}
+                                      </span>
+                                    </td>
+                                  )}
                                 </tr>
                               </tbody>
                             </table>
