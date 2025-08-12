@@ -185,6 +185,7 @@ export default function ComparativeAnalysisPage() {
   const [topMovers, setTopMovers] = useState<Mover[]>([])
   const [summary, setSummary] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     const initDates = () => {
@@ -200,6 +201,7 @@ export default function ComparativeAnalysisPage() {
     }
     initDates()
     fetchProperties()
+    setMounted(true)
   }, [])
 
   const fetchProperties = async () => {
@@ -513,16 +515,18 @@ export default function ComparativeAnalysisPage() {
             <CardTitle>KPIs Comparison</CardTitle>
           </CardHeader>
           <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={kpiData()}>
-                <XAxis dataKey="kpi" />
-                <YAxis tickFormatter={(v) => formatCurrency(v, 0)} />
-                <Tooltip formatter={(v) => formatCurrency(Number(v), 0)} />
-                <Legend />
-                <Bar dataKey="A" name="A" fill={BRAND_COLORS.primary} />
-                <Bar dataKey="B" name="B" fill={BRAND_COLORS.secondary} />
-              </BarChart>
-            </ResponsiveContainer>
+            {mounted && (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={kpiData()}>
+                  <XAxis dataKey="kpi" />
+                  <YAxis tickFormatter={(v) => formatCurrency(v, 0)} />
+                  <Tooltip formatter={(v) => formatCurrency(Number(v), 0)} />
+                  <Legend />
+                  <Bar dataKey="A" name="A" fill={BRAND_COLORS.primary} />
+                  <Bar dataKey="B" name="B" fill={BRAND_COLORS.secondary} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -543,26 +547,28 @@ export default function ComparativeAnalysisPage() {
             </select>
           </CardHeader>
           <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData()}>
-                <XAxis dataKey="date" />
-                <YAxis tickFormatter={(v) => formatCurrency(v, 0)} />
-                <Tooltip formatter={(v) => formatCurrency(Number(v), 0)} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="A"
-                  name="A"
-                  stroke={BRAND_COLORS.primary}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="B"
-                  name="B"
-                  stroke={BRAND_COLORS.secondary}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {mounted && (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData()}>
+                  <XAxis dataKey="date" />
+                  <YAxis tickFormatter={(v) => formatCurrency(v, 0)} />
+                  <Tooltip formatter={(v) => formatCurrency(Number(v), 0)} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="A"
+                    name="A"
+                    stroke={BRAND_COLORS.primary}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="B"
+                    name="B"
+                    stroke={BRAND_COLORS.secondary}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
