@@ -623,9 +623,25 @@ export default function CashFlowPage() {
       startDate = `${year}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`
       const quarterEndMonth = quarterStartMonth + 2
       const lastDay = new Date(year, quarterEndMonth + 1, 0).getDate()
-      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${lastDay}`
+      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+    } else if (timePeriod === "Trailing 12") {
+      const monthIndex = monthsList.indexOf(selectedMonth)
+      const year = Number.parseInt(selectedYear)
+
+      // Start date is 11 months before selected month
+      let startYear = year
+      let startMonth = monthIndex + 1 - 11
+      if (startMonth <= 0) {
+        startMonth += 12
+        startYear -= 1
+      }
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+
+      // End date is last day of selected month
+      const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     } else {
-      // Trailing 12
+      // Fallback Trailing 12 from current date
       const twelveMonthsAgo = new Date(now)
       twelveMonthsAgo.setMonth(now.getMonth() - 12)
       startDate = twelveMonthsAgo.toISOString().split("T")[0]
@@ -651,6 +667,12 @@ export default function CashFlowPage() {
       return `Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
     } else if (timePeriod === "YTD") {
       return `YTD ${new Date().getFullYear()}`
+    } else if (timePeriod === "Trailing 12") {
+      const startMonth = getMonthName(getMonthFromDate(startDate)).slice(0, 3)
+      const endMonth = getMonthName(getMonthFromDate(endDate)).slice(0, 3)
+      const startYear = getYearFromDate(startDate)
+      const endYear = getYearFromDate(endDate)
+      return `${startMonth} ${startYear} - ${endMonth} ${endYear}`
     }
     return "Trailing 12 Months"
   }
@@ -1454,7 +1476,9 @@ export default function CashFlowPage() {
                     ? `${selectedMonth} ${selectedYear}`
                     : timePeriod === "Quarterly"
                       ? `Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
-                      : `${timePeriod} Period`}
+                      : timePeriod === "Trailing 12"
+                        ? `${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                        : `${timePeriod} Period`}
               </p>
               {/* ENHANCED: Updated header information with transfer mode */}
               <p className="text-xs text-blue-600 mt-1">
@@ -1580,8 +1604,10 @@ export default function CashFlowPage() {
               <option value="Custom">Custom Date Range</option>
             </select>
 
-            {/* Month Dropdown - Show for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+            {/* Month Dropdown - Show for Monthly, Quarterly, and Trailing 12 */}
+            {(timePeriod === "Monthly" ||
+              timePeriod === "Quarterly" ||
+              timePeriod === "Trailing 12") && (
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
@@ -1596,8 +1622,10 @@ export default function CashFlowPage() {
               </select>
             )}
 
-            {/* Year Dropdown - Show for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+            {/* Year Dropdown - Show for Monthly, Quarterly, and Trailing 12 */}
+            {(timePeriod === "Monthly" ||
+              timePeriod === "Quarterly" ||
+              timePeriod === "Trailing 12") && (
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}

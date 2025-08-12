@@ -365,25 +365,43 @@ export default function FinancialsPage() {
       }
 
       endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else if (timePeriod === "Trailing 12") {
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
+
+      // Start date is 11 months before the selected month
+      let startYear = year;
+      let startMonth = monthIndex + 1 - 11;
+      if (startMonth <= 0) {
+        startMonth += 12;
+        startYear -= 1;
+      }
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
+
+      // End date is the last day of the selected month
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
+      }
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else {
-      // Trailing 12 - calculate 12 months back from current date
+      // Fallback: use current date for trailing 12
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth() + 1;
-
       let startYear = currentYear;
       let startMonth = currentMonth - 12;
       if (startMonth <= 0) {
         startMonth += 12;
         startYear -= 1;
       }
-
       startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
-
       const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
       let lastDay = daysInMonth[currentMonth - 1];
-
-      // Handle leap year for February
       if (
         currentMonth === 2 &&
         ((currentYear % 4 === 0 && currentYear % 100 !== 0) ||
@@ -391,7 +409,6 @@ export default function FinancialsPage() {
       ) {
         lastDay = 29;
       }
-
       endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     }
 
@@ -1419,7 +1436,9 @@ export default function FinancialsPage() {
                         ? `Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
                         : timePeriod === "YTD"
                           ? `January - June ${selectedYear}`
-                          : `${timePeriod} Period`}
+                          : timePeriod === "Trailing 12"
+                            ? `${formatDateDisplay(currentStartDate)} - ${formatDateDisplay(currentEndDate)}`
+                            : `${timePeriod} Period`}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
                   💰 Using timezone-independent date handling for precise P&L
@@ -1530,8 +1549,10 @@ export default function FinancialsPage() {
               )}
             </div>
 
-            {/* Month/Year dropdowns for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+            {/* Month/Year dropdowns for Monthly, Quarterly, and Trailing 12 */}
+            {(timePeriod === "Monthly" ||
+              timePeriod === "Quarterly" ||
+              timePeriod === "Trailing 12") && (
               <>
                 <div className="relative" ref={monthDropdownRef}>
                   <button
