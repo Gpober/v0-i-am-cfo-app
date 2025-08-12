@@ -324,9 +324,23 @@ export default function FinancialsPage() {
       startDate = customStartDate || "2025-01-01";
       endDate = customEndDate || "2025-06-30";
     } else if (timePeriod === "YTD") {
+      const monthIndex = monthsList.indexOf(selectedMonth);
       const year = Number.parseInt(selectedYear);
       startDate = `${year}-01-01`;
-      endDate = `${year}-06-30`;
+
+      // Calculate last day of selected month without Date object
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+
+      // Handle leap year for February
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
+      }
+
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else if (timePeriod === "Monthly") {
       const monthIndex = monthsList.indexOf(selectedMonth);
       const year = Number.parseInt(selectedYear);
@@ -365,25 +379,43 @@ export default function FinancialsPage() {
       }
 
       endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else if (timePeriod === "Trailing 12") {
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
+
+      // Start date is 11 months before the selected month
+      let startYear = year;
+      let startMonth = monthIndex + 1 - 11;
+      if (startMonth <= 0) {
+        startMonth += 12;
+        startYear -= 1;
+      }
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
+
+      // End date is the last day of the selected month
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
+      }
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else {
-      // Trailing 12 - calculate 12 months back from current date
+      // Fallback: use current date for trailing 12
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth() + 1;
-
       let startYear = currentYear;
       let startMonth = currentMonth - 12;
       if (startMonth <= 0) {
         startMonth += 12;
         startYear -= 1;
       }
-
       startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
-
       const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
       let lastDay = daysInMonth[currentMonth - 1];
-
-      // Handle leap year for February
       if (
         currentMonth === 2 &&
         ((currentYear % 4 === 0 && currentYear % 100 !== 0) ||
@@ -391,7 +423,6 @@ export default function FinancialsPage() {
       ) {
         lastDay = 29;
       }
-
       endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     }
 
@@ -1418,8 +1449,10 @@ export default function FinancialsPage() {
                       : timePeriod === "Quarterly"
                         ? `Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
                         : timePeriod === "YTD"
-                          ? `January - June ${selectedYear}`
-                          : `${timePeriod} Period`}
+                          ? `January - ${selectedMonth} ${selectedYear}`
+                          : timePeriod === "Trailing 12"
+                            ? `${formatDateDisplay(currentStartDate)} - ${formatDateDisplay(currentEndDate)}`
+                            : `${timePeriod} Period`}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
                   💰 Using timezone-independent date handling for precise P&L
@@ -1530,8 +1563,11 @@ export default function FinancialsPage() {
               )}
             </div>
 
-            {/* Month/Year dropdowns for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+            {/* Month/Year dropdowns for Monthly, Quarterly, YTD, and Trailing 12 */}
+            {(timePeriod === "Monthly" ||
+              timePeriod === "Quarterly" ||
+              timePeriod === "YTD" ||
+              timePeriod === "Trailing 12") && (
               <>
                 <div className="relative" ref={monthDropdownRef}>
                   <button
@@ -1599,40 +1635,6 @@ export default function FinancialsPage() {
               </>
             )}
 
-            {/* Year dropdown for YTD */}
-            {timePeriod === "YTD" && (
-              <div className="relative" ref={yearDropdownRef}>
-                <button
-                  onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  style={
-                    {
-                      "--tw-ring-color": BRAND_COLORS.primary + "33",
-                    } as React.CSSProperties
-                  }
-                >
-                  {selectedYear}
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </button>
-
-                {yearDropdownOpen && (
-                  <div className="absolute z-10 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {yearsList.map((year) => (
-                      <button
-                        key={year}
-                        onClick={() => {
-                          setSelectedYear(year);
-                          setYearDropdownOpen(false);
-                        }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
-                      >
-                        {year}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Property Filter */}
             <div className="relative" ref={propertyDropdownRef}>

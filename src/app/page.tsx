@@ -216,9 +216,16 @@ export default function FinancialOverviewPage() {
       startDate = customStartDate || "2025-01-01"
       endDate = customEndDate || "2025-06-30"
     } else if (timePeriod === "YTD") {
+      const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
       startDate = `${year}-01-01`
-      endDate = `${year}-06-30`
+
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let lastDay = daysInMonth[monthIndex]
+      if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+        lastDay = 29
+      }
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     } else if (timePeriod === "Monthly") {
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
@@ -244,6 +251,24 @@ export default function FinancialOverviewPage() {
         lastDay = 29
       }
       endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+    } else if (timePeriod === "Trailing 12") {
+      const monthIndex = monthsList.indexOf(selectedMonth)
+      const year = Number.parseInt(selectedYear)
+
+      let startYear = year
+      let startMonth = monthIndex + 1 - 11
+      if (startMonth <= 0) {
+        startMonth += 12
+        startYear -= 1
+      }
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      let lastDay = daysInMonth[monthIndex]
+      if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
+        lastDay = 29
+      }
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     } else {
       const now = new Date()
       const currentYear = now.getFullYear()
@@ -887,6 +912,16 @@ export default function FinancialOverviewPage() {
     return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
   }
 
+  const formatDate = (dateString: string) => {
+    const { year, month, day } = getDateParts(dateString)
+    const date = new Date(year, month - 1, day)
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
+
   const propertyChartData = useMemo(() => {
     const key = (
       {
@@ -1021,7 +1056,17 @@ export default function FinancialOverviewPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Financial Overview</h1>
               <p className="text-sm text-gray-600 mt-1">
-                Comprehensive financial performance using the same data as P&L and Cash Flow reports
+                {timePeriod === "Custom"
+                  ? `${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                  : timePeriod === "Monthly"
+                    ? `${selectedMonth} ${selectedYear}`
+                    : timePeriod === "Quarterly"
+                      ? `Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
+                      : timePeriod === "YTD"
+                        ? `January - ${selectedMonth} ${selectedYear}`
+                        : timePeriod === "Trailing 12"
+                          ? `${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                          : `${timePeriod} Period`}
               </p>
               {lastUpdated && (
                 <p className="text-xs text-gray-500 mt-1">Last updated: {lastUpdated.toLocaleString()}</p>
@@ -1076,8 +1121,11 @@ export default function FinancialOverviewPage() {
               )}
             </div>
 
-            {/* Month/Year dropdowns for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
+            {/* Month/Year dropdowns for Monthly, Quarterly, YTD, and Trailing 12 */}
+            {(timePeriod === "Monthly" ||
+              timePeriod === "Quarterly" ||
+              timePeriod === "YTD" ||
+              timePeriod === "Trailing 12") && (
               <>
                 <div className="relative" ref={monthDropdownRef}>
                   <button
@@ -1135,37 +1183,6 @@ export default function FinancialOverviewPage() {
                   )}
                 </div>
               </>
-            )}
-
-            {/* Year dropdown for YTD */}
-            {timePeriod === "YTD" && (
-              <div className="relative" ref={yearDropdownRef}>
-                <button
-                  onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
-                >
-                  {selectedYear}
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </button>
-
-                {yearDropdownOpen && (
-                  <div className="absolute z-10 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {yearsList.map((year) => (
-                      <button
-                        key={year}
-                        onClick={() => {
-                          setSelectedYear(year)
-                          setYearDropdownOpen(false)
-                        }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
-                      >
-                        {year}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             )}
 
             
