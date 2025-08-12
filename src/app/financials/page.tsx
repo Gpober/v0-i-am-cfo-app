@@ -1902,7 +1902,7 @@ export default function FinancialsPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto custom-scrollbar">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 sticky-first-col">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1926,7 +1926,7 @@ export default function FinancialsPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {/* INCOME Section */}
                       <tr className="bg-green-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-800">
+                        <td className="!bg-green-50 px-6 py-4 whitespace-nowrap text-sm font-bold text-green-800">
                           INCOME
                         </td>
                         {columnHeaders.map((header) => (
@@ -2112,7 +2112,7 @@ export default function FinancialsPage() {
 
                       {/* Total Income */}
                       <tr className="bg-green-100 font-semibold">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-800">
+                        <td className="!bg-green-100 px-6 py-4 whitespace-nowrap text-sm text-green-800">
                           TOTAL INCOME
                         </td>
                         {columnHeaders.map((header) => (
@@ -2142,7 +2142,7 @@ export default function FinancialsPage() {
 
                       {/* COGS Section */}
                       <tr className="bg-yellow-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-800">
+                        <td className="!bg-yellow-50 px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-800">
                           COGS
                         </td>
                         {columnHeaders.map((header) => (
@@ -2328,7 +2328,7 @@ export default function FinancialsPage() {
 
                       {/* Total COGS */}
                       <tr className="bg-yellow-100 font-semibold">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-800">
+                        <td className="!bg-yellow-100 px-6 py-4 whitespace-nowrap text-sm text-yellow-800">
                           TOTAL COGS
                         </td>
                         {columnHeaders.map((header) => (
@@ -2358,7 +2358,7 @@ export default function FinancialsPage() {
 
                       {/* Gross Profit */}
                       <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="!bg-gray-100 px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           GROSS PROFIT
                         </td>
                         {columnHeaders.map((header) => {
@@ -2474,7 +2474,7 @@ export default function FinancialsPage() {
 
                       {/* EXPENSES Section */}
                       <tr className="bg-red-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-800">
+                        <td className="!bg-red-50 px-6 py-4 whitespace-nowrap text-sm font-bold text-red-800">
                           EXPENSES
                         </td>
                         {columnHeaders.map((header) => (
@@ -2660,7 +2660,7 @@ export default function FinancialsPage() {
 
                       {/* Total Expenses */}
                       <tr className="bg-red-100 font-semibold">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-800">
+                        <td className="!bg-red-100 px-6 py-4 whitespace-nowrap text-sm text-red-800">
                           TOTAL EXPENSES
                         </td>
                         {columnHeaders.map((header) => (
@@ -2690,7 +2690,7 @@ export default function FinancialsPage() {
 
                       {/* Net Income */}
                       <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="!bg-gray-100 px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           NET INCOME
                         </td>
                         {columnHeaders.map((header) => {
