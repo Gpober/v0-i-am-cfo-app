@@ -854,9 +854,9 @@ export default function FinancialOverviewPage() {
     try {
       setLoadingProperty(true)
       setPropertyError(null)
-      const endMonth = monthsList.indexOf(selectedMonth) + 1
+      const { startDate, endDate } = calculateDateRange()
       const res = await fetch(
-        `/api/organizations/${orgId}/dashboard-summary?month=${endMonth}&year=${selectedYear}&period=month&includeProperties=true`
+        `/api/organizations/${orgId}/dashboard-summary?start=${startDate}&end=${endDate}&includeProperties=true`
       )
       if (!res.ok) throw new Error("Failed to fetch property data")
       const json: { propertyBreakdown: PropertyPoint[] } = await res.json()
@@ -958,6 +958,12 @@ export default function FinancialOverviewPage() {
     { key: "expenses", label: "Expenses" },
     { key: "ni", label: "Net Income" },
   ] as const
+
+  const { startDate: propertyStart, endDate: propertyEnd } = calculateDateRange()
+  const propertySubtitle =
+    timePeriod === "Monthly"
+      ? `Ranked by net income for ${selectedMonth} ${selectedYear}`
+      : `Ranked by net income for ${formatDate(propertyStart)} - ${formatDate(propertyEnd)}`
 
   const TrendTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -1602,9 +1608,7 @@ export default function FinancialOverviewPage() {
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Top Performing Properties</h3>
-                <div className="text-sm text-gray-600 mt-1">
-                  Ranked by net income for {selectedMonth} {selectedYear}
-                </div>
+                <div className="text-sm text-gray-600 mt-1">{propertySubtitle}</div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
