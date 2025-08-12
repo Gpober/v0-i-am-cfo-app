@@ -139,6 +139,8 @@ export default function FinancialOverviewPage() {
   const [financialData, setFinancialData] = useState(null)
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [synopsis, setSynopsis] = useState("")
+  const [synopsisLoading, setSynopsisLoading] = useState(false)
   const [chartType, setChartType] = useState<"line" | "bar">("line")
   type MonthlyPoint = {
     monthName: string
@@ -351,6 +353,52 @@ export default function FinancialOverviewPage() {
     fetchAvailableClasses()
   }, [])
 
+  const buildSynopsisInput = (data) => ({
+    current: {
+      totalIncome: data.current.totalIncome,
+      totalExpenses: data.current.totalExpenses,
+      netIncome: data.current.netIncome,
+      netCashFlow: data.current.netCashFlow,
+    },
+    previous: {
+      totalIncome: data.previous.totalIncome,
+      totalExpenses: data.previous.totalExpenses,
+      netIncome: data.previous.netIncome,
+      netCashFlow: data.previous.netCashFlow,
+    },
+    alerts: (data.alerts || []).map(({ title, message }) => ({ title, message })),
+  })
+
+  const generateSynopsis = async (summaryData) => {
+    try {
+      setSynopsisLoading(true)
+      const payload = buildSynopsisInput(summaryData)
+      const res = await fetch("/api/financial-synopsis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: payload }),
+      })
+      if (res.status === 413) {
+        console.error("❌ Synopsis request too large")
+        setSynopsis("Synopsis data too large to analyze")
+        return
+      }
+      if (!res.ok) {
+        const errText = await res.text()
+        console.error("❌ Error generating synopsis:", res.status, errText)
+        setSynopsis("Unable to generate synopsis")
+        return
+      }
+      const json = await res.json()
+      setSynopsis(json.synopsis || "")
+    } catch (err) {
+      console.error("❌ Error generating synopsis:", err)
+      setSynopsis("Unable to generate synopsis")
+    } finally {
+      setSynopsisLoading(false)
+    }
+  }
+
   // Fetch financial data from Supabase (same connection as other pages)
   const fetchFinancialData = async () => {
     try {
@@ -529,6 +577,7 @@ export default function FinancialOverviewPage() {
       // Process the data using same logic as other pages
       const processedData = processFinancialData(filteredCurrentTransactions, filteredPrevTransactions, trendData)
       setFinancialData(processedData)
+      await generateSynopsis(processedData)
       setLastUpdated(new Date())
     } catch (err) {
       console.error("❌ Error fetching financial data:", err)
@@ -1112,7 +1161,23 @@ export default function FinancialOverviewPage() {
           </div>
       </div>
     </div>
-    
+
+      {/* AI Synopsis */}
+      {(synopsis || synopsisLoading) && (
+        <div className="bg-white border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+              <h2 className="text-sm font-semibold mb-2">CFO Alerts</h2>
+              {synopsisLoading ? (
+                <p className="text-sm text-gray-600">Generating synopsis...</p>
+              ) : (
+                <p className="text-sm text-gray-700 whitespace-pre-line">{synopsis}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
