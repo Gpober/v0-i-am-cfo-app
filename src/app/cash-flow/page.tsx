@@ -98,7 +98,7 @@ interface BankAccountData {
 }
 
 type ViewMode = "offset" | "traditional" | "bybank"
-type PeriodType = "monthly" | "weekly"
+type PeriodType = "monthly" | "weekly" | "total"
 type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
 
 // Generate months and years lists
@@ -778,7 +778,7 @@ export default function CashFlowPage() {
           const month = getMonthFromDate(tx.date)
           const year = getYearFromDate(tx.date)
           periodKey = `${year}-${month.toString().padStart(2, "0")}`
-        } else {
+        } else if (periodType === "weekly") {
           const date = getDateParts(tx.date)
           const year = date.year
           const startOfYear = new Date(year, 0, 1)
@@ -788,6 +788,8 @@ export default function CashFlowPage() {
             ) + 1
           const week = Math.ceil(dayOfYear / 7)
           periodKey = `${year}-W${week.toString().padStart(2, "0")}`
+        } else {
+          periodKey = "total"
         }
 
         periodSet.add(periodKey)
@@ -833,11 +835,13 @@ export default function CashFlowPage() {
             const monthNum = Number.parseInt(monthStr)
             label = `${getMonthName(monthNum)} ${year}`
             month = monthNum
-          } else {
+          } else if (periodType === "weekly") {
             const [year, weekStr] = key.split("-")
             const weekNum = Number.parseInt(weekStr.replace("W", ""))
             label = getWeekLabel(Number.parseInt(year), weekNum)
             week = weekNum
+          } else {
+            label = "Total"
           }
 
           return { key, label, month, week }
@@ -927,7 +931,7 @@ export default function CashFlowPage() {
           const month = getMonthFromDate(tx.date)
           const year = getYearFromDate(tx.date)
           periodKey = `${year}-${month.toString().padStart(2, "0")}`
-        } else {
+        } else if (periodType === "weekly") {
           const date = getDateParts(tx.date)
           const year = date.year
           const startOfYear = new Date(year, 0, 1)
@@ -937,6 +941,8 @@ export default function CashFlowPage() {
             ) + 1
           const week = Math.ceil(dayOfYear / 7)
           periodKey = `${year}-W${week.toString().padStart(2, "0")}`
+        } else {
+          periodKey = "total"
         }
 
         periodSet.add(periodKey)
@@ -982,11 +988,13 @@ export default function CashFlowPage() {
             const monthNum = Number.parseInt(monthStr)
             label = `${getMonthName(monthNum)} ${year}`
             month = monthNum
-          } else {
+          } else if (periodType === "weekly") {
             const [year, weekStr] = key.split("-")
             const weekNum = Number.parseInt(weekStr.replace("W", ""))
             label = getWeekLabel(Number.parseInt(year), weekNum)
             week = weekNum
+          } else {
+            label = "Total"
           }
 
           return { key, label, month, week }
@@ -1541,10 +1549,22 @@ export default function CashFlowPage() {
                   <button
                     onClick={() => setPeriodType("weekly")}
                     className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                      periodType === "weekly" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      periodType === "weekly"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
                     }`}
                   >
                     📊 Weekly
+                  </button>
+                  <button
+                    onClick={() => setPeriodType("total")}
+                    className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                      periodType === "total"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Σ Total
                   </button>
                 </div>
               )}
