@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://crconmdpaujoeeuadgkd.supabase.co"
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://crconmdpaujoeeuadgkd.supabase.co"
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || ""
-const supabase = createClient(supabaseUrl, supabaseKey)
+
+const getClient = () => createClient(supabaseUrl, supabaseKey)
 
 const startOfISOWeek = (d: Date) => {
   const date = new Date(d)
@@ -26,6 +29,8 @@ export async function GET(req: Request) {
   const today = new Date()
   const histStart = new Date(today)
   histStart.setDate(histStart.getDate() - histWeeks * 7)
+
+  const supabase = getClient()
 
   let query = supabase
     .from("journal_entry_lines")
@@ -101,6 +106,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const body = await req.json()
   const { name, params } = body
+  const supabase = getClient()
   const { error } = await supabase
     .from("cashflow_scenarios")
     .insert({ name, params, created_at: new Date().toISOString() })

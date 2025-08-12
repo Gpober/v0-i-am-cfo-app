@@ -1,3 +1,5 @@
+"use client"
+
 // src/components/ui/button.tsx
 import React from "react";
 
