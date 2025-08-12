@@ -38,7 +38,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { supabase } from "@/lib/supabaseClient"
 
-// IAM CFO Brand Colors
+// I AM CFO Brand Colors
 const BRAND_COLORS = {
   primary: "#56B6E9",
   secondary: "#3A9BD1",

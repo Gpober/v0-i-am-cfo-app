@@ -18,7 +18,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// IAM CFO Brand Colors
+// I AM CFO Brand Colors
 const BRAND_COLORS = {
   primary: "#56B6E9",
   secondary: "#3A9BD1",

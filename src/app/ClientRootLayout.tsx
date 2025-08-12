@@ -11,7 +11,7 @@ import Image from "next/image"
 
 const inter = Inter({ subsets: ["latin"] })
 
-// IAM CFO Brand Colors
+// I AM CFO Brand Colors
 const BRAND_COLORS = {
   primary: "#56B6E9",
   secondary: "#3A9BD1",
@@ -34,10 +34,10 @@ const BRAND_COLORS = {
   },
 }
 
-// IAM CFO Logo Component
+// I AM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
   <div className={`${className} flex items-center justify-center relative`}>
-    <Image src="/favicon.png" alt="IAM CFO Logo" width={32} height={32} />
+    <Image src="/favicon.png" alt="I AM CFO Logo" width={32} height={32} />
   </div>
 )
 
@@ -92,7 +92,7 @@ export default function ClientRootLayout({
               </div>
               <div className="flex flex-shrink-0 items-center px-4 py-4">
                 <IAMCFOLogo className="w-8 h-8 mr-3" />
-                <span className="text-xl font-bold text-gray-900">IAM CFO</span>
+                <span className="text-xl font-bold text-gray-900">I AM CFO</span>
               </div>
               <div className="mt-5 h-0 flex-1 overflow-y-auto">
                 <nav className="space-y-1 px-2">
@@ -134,7 +134,7 @@ export default function ClientRootLayout({
               <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
                 <div className="flex flex-shrink-0 items-center px-4">
                   <IAMCFOLogo className="w-8 h-8 mr-3" />
-                  <span className="text-xl font-bold text-gray-900">IAM CFO</span>
+                  <span className="text-xl font-bold text-gray-900">I AM CFO</span>
                 </div>
                 <nav className="mt-5 flex-1 space-y-1 px-2">
                   {navigation.map((item) => {

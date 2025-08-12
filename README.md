@@ -1,8 +1,8 @@
-# IAM CFO - Financial Management Platform
+# I AM CFO - Financial Management Platform
 
 A comprehensive financial management platform designed specifically for rental property businesses, integrating property management with advanced financial analytics.
 
-![IAM CFO Dashboard](https://img.shields.io/badge/Built%20with-React%20%7C%20TypeScript%20%7C%20Tailwind-blue)
+![I AM CFO Dashboard](https://img.shields.io/badge/Built%20with-React%20%7C%20TypeScript%20%7C%20Tailwind-blue)
 
 ## 🚀 Features
 

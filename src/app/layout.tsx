@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import ClientRootLayout from "./ClientRootLayout"
 
 export const metadata: Metadata = {
-  title: "IAM CFO - Financial Dashboard",
+  title: "I AM CFO - Financial Dashboard",
   description: "Comprehensive financial management and reporting dashboard",
 }
 
