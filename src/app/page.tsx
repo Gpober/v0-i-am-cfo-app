@@ -6,8 +6,6 @@ import Link from "next/link"
 import {
   DollarSign,
   TrendingUp,
-  Building2,
-  CreditCard,
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
@@ -37,6 +35,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { supabase } from "@/lib/supabaseClient"
+import AIAssistant from "@/components/AIAssistant"
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
@@ -1021,37 +1020,6 @@ export default function FinancialOverviewPage() {
     return null
   }
 
-  // Quick actions configuration
-  const quickActions = [
-    {
-      title: "P&L Statement",
-      description: "Detailed profit and loss analysis",
-      href: "/financials",
-      icon: BarChart3,
-      color: BRAND_COLORS.primary,
-    },
-    {
-      title: "Cash Flow Analysis",
-      description: "Track cash inflows and outflows",
-      href: "/cash-flow",
-      icon: TrendingUp,
-      color: BRAND_COLORS.success,
-    },
-    {
-      title: "Balance Sheet",
-      description: "Assets, liabilities, and equity",
-      href: "/balance-sheet",
-      icon: Building2,
-      color: BRAND_COLORS.secondary,
-    },
-    {
-      title: "Accounts Receivable",
-      description: "Customer payments and aging",
-      href: "/accounts-receivable",
-      icon: CreditCard,
-      color: BRAND_COLORS.warning,
-    },
-  ]
 
   if (error) {
     return (
@@ -1539,33 +1507,7 @@ export default function FinancialOverviewPage() {
 
             {/* Financial Health Summary */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Quick Actions */}
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
-                  <div className="text-sm text-gray-600 mt-1">Access detailed financial reports</div>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {quickActions.map((action) => (
-                      <Link
-                        key={action.title}
-                        href={action.href}
-                        className="group p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all"
-                      >
-                        <div className="flex items-center mb-3">
-                          <action.icon className="w-6 h-6 mr-3" style={{ color: action.color }} />
-                          <h4 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                            {action.title}
-                          </h4>
-                        </div>
-                        <p className="text-sm text-gray-600">{action.description}</p>
-                        <div className="mt-2 text-xs text-blue-600 font-medium">View Details →</div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <AIAssistant />
 
               {/* Alerts & Notifications */}
               <div className="bg-white rounded-lg shadow-sm overflow-hidden">
