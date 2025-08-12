@@ -13,7 +13,6 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -21,6 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Download, RefreshCw, X } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
+
+const BRAND_COLORS = {
+  primary: "#56B6E9",
+};
 
 type KPIs = {
   revenue: number;
@@ -50,6 +55,11 @@ export default function ComparativeAnalysisPage() {
   const [selectedKpi, setSelectedKpi] = useState<keyof KPIs>("revenue");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [allLinesA, setAllLinesA] = useState<any[]>([]);
+  const [allLinesB, setAllLinesB] = useState<any[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalTransactions, setModalTransactions] = useState<any[]>([]);
 
   useEffect(() => {
     fetchClasses();
@@ -229,6 +239,8 @@ export default function ComparativeAnalysisPage() {
       setDataB(kpiB);
       setVarianceRows(computeVarianceTable(linesA, linesB));
       setLineData(buildLineData(linesA, linesB, selectedKpi));
+      setAllLinesA(linesA);
+      setAllLinesB(linesB);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -266,21 +278,29 @@ export default function ComparativeAnalysisPage() {
     const revPct = percent(dataA.revenue - dataB.revenue, dataB.revenue);
     if (revPct)
       bullets.push(
-        `Revenue ${revPct > 0 ? "up" : "down"} ${Math.abs(revPct).toFixed(1)}%`,
+        `Revenue ${revPct > 0 ? "up" : "down"} ${Math.abs(revPct).toFixed(2)}%`,
       );
     const opPct = percent(dataA.opEx - dataB.opEx, dataB.opEx);
     if (opPct)
       bullets.push(
-        `OpEx ${opPct > 0 ? "up" : "down"} ${Math.abs(opPct).toFixed(1)}%`,
+        `OpEx ${opPct > 0 ? "up" : "down"} ${Math.abs(opPct).toFixed(2)}%`,
       );
     const netPct = percent(dataA.netIncome - dataB.netIncome, dataB.netIncome);
     if (netPct)
       bullets.push(
-        `Net Income ${netPct > 0 ? "up" : "down"} ${Math.abs(netPct).toFixed(
-          1,
-        )}%`,
+        `Net Income ${netPct > 0 ? "up" : "down"} ${Math.abs(netPct).toFixed(2)}%`,
       );
     return bullets.slice(0, 3);
+  };
+
+  const showTransactionDetails = (account: string) => {
+    const combined = [
+      ...allLinesA.map((l) => ({ ...l, set: "A" })),
+      ...allLinesB.map((l) => ({ ...l, set: "B" })),
+    ].filter((l) => l.account === account);
+    setModalTitle(account);
+    setModalTransactions(combined);
+    setShowModal(true);
   };
 
   const handleExport = () => {
@@ -421,12 +441,33 @@ export default function ComparativeAnalysisPage() {
           </>
         )}
 
-        <Button onClick={fetchData} disabled={loading}>
+        <button
+          onClick={fetchData}
+          disabled={loading}
+          className="inline-flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2"
+          style={
+            {
+              backgroundColor: BRAND_COLORS.primary,
+              "--tw-ring-color": BRAND_COLORS.primary + "33",
+            } as React.CSSProperties
+          }
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           {loading ? "Loading..." : "Refresh"}
-        </Button>
-        <Button onClick={handleExport} className="border">
+        </button>
+        <button
+          onClick={handleExport}
+          className="inline-flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2"
+          style={
+            {
+              backgroundColor: BRAND_COLORS.primary,
+              "--tw-ring-color": BRAND_COLORS.primary + "33",
+            } as React.CSSProperties
+          }
+        >
+          <Download className="w-4 h-4 mr-2" />
           Export CSV
-        </Button>
+        </button>
       </div>
 
       {error && <div className="text-red-600 text-sm">{error}</div>}
@@ -446,8 +487,8 @@ export default function ComparativeAnalysisPage() {
           <ResponsiveContainer>
             <ReBarChart data={barChartData}>
               <XAxis dataKey="kpi" />
-              <YAxis />
-              <Tooltip />
+              <YAxis tickFormatter={(v) => formatCurrency(v)} />
+              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
               <Legend />
               <Bar dataKey="A" fill="#56B6E9" />
               <Bar dataKey="B" fill="#94A3B8" />
@@ -461,8 +502,8 @@ export default function ComparativeAnalysisPage() {
           <ResponsiveContainer>
             <LineChart data={lineData}>
               <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
+              <YAxis tickFormatter={(v) => formatCurrency(v)} />
+              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
               <Legend />
               <Line type="monotone" dataKey="A" stroke="#56B6E9" />
               <Line type="monotone" dataKey="B" stroke="#94A3B8" />
@@ -508,26 +549,17 @@ export default function ComparativeAnalysisPage() {
                             INCOME
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-green-800 text-right">
-                            {t.a.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.a)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-green-800 text-right">
-                            {t.b.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.b)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-green-800 text-right">
-                            {t.var.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.var)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-green-800 text-right">
                             {t.varPct !== null
-                              ? (t.varPct * 100).toFixed(1) + "%"
+                              ? (t.varPct * 100).toFixed(2) + "%"
                               : ""}
                           </td>
                         </>
@@ -535,31 +567,26 @@ export default function ComparativeAnalysisPage() {
                     })()}
                   </tr>
                   {varianceRows.income.map((r) => (
-                    <tr key={r.account}>
+                    <tr
+                      key={r.account}
+                      onClick={() => showTransactionDetails(r.account)}
+                      className="hover:bg-gray-50 cursor-pointer"
+                    >
                       <td className="px-4 py-2 text-sm text-gray-700">
                         {r.account}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.a.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.a)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.b.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.b)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.var.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.var)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
                         {r.varPct !== null
-                          ? (r.varPct * 100).toFixed(1) + "%"
+                          ? (r.varPct * 100).toFixed(2) + "%"
                           : ""}
                       </td>
                     </tr>
@@ -579,26 +606,17 @@ export default function ComparativeAnalysisPage() {
                             COGS
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-yellow-800 text-right">
-                            {t.a.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.a)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-yellow-800 text-right">
-                            {t.b.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.b)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-yellow-800 text-right">
-                            {t.var.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.var)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-yellow-800 text-right">
                             {t.varPct !== null
-                              ? (t.varPct * 100).toFixed(1) + "%"
+                              ? (t.varPct * 100).toFixed(2) + "%"
                               : ""}
                           </td>
                         </>
@@ -606,31 +624,26 @@ export default function ComparativeAnalysisPage() {
                     })()}
                   </tr>
                   {varianceRows.cogs.map((r) => (
-                    <tr key={r.account}>
+                    <tr
+                      key={r.account}
+                      onClick={() => showTransactionDetails(r.account)}
+                      className="hover:bg-gray-50 cursor-pointer"
+                    >
                       <td className="px-4 py-2 text-sm text-gray-700">
                         {r.account}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.a.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.a)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.b.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.b)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.var.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.var)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
                         {r.varPct !== null
-                          ? (r.varPct * 100).toFixed(1) + "%"
+                          ? (r.varPct * 100).toFixed(2) + "%"
                           : ""}
                       </td>
                     </tr>
@@ -650,26 +663,17 @@ export default function ComparativeAnalysisPage() {
                             EXPENSES
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-red-800 text-right">
-                            {t.a.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.a)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-red-800 text-right">
-                            {t.b.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.b)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-red-800 text-right">
-                            {t.var.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatCurrency(t.var)}
                           </td>
                           <td className="px-4 py-2 text-sm font-bold text-red-800 text-right">
                             {t.varPct !== null
-                              ? (t.varPct * 100).toFixed(1) + "%"
+                              ? (t.varPct * 100).toFixed(2) + "%"
                               : ""}
                           </td>
                         </>
@@ -677,31 +681,26 @@ export default function ComparativeAnalysisPage() {
                     })()}
                   </tr>
                   {varianceRows.expenses.map((r) => (
-                    <tr key={r.account}>
+                    <tr
+                      key={r.account}
+                      onClick={() => showTransactionDetails(r.account)}
+                      className="hover:bg-gray-50 cursor-pointer"
+                    >
                       <td className="px-4 py-2 text-sm text-gray-700">
                         {r.account}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.a.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.a)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.b.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.b)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
-                        {r.var.toLocaleString(undefined, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
+                        {formatCurrency(r.var)}
                       </td>
                       <td className="px-4 py-2 text-sm text-right">
                         {r.varPct !== null
-                          ? (r.varPct * 100).toFixed(1) + "%"
+                          ? (r.varPct * 100).toFixed(2) + "%"
                           : ""}
                       </td>
                     </tr>
@@ -728,37 +727,89 @@ export default function ComparativeAnalysisPage() {
                     <td
                       className={`px-4 py-2 text-sm font-bold text-right ${color(a)}`}
                     >
-                      {a.toLocaleString(undefined, {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      })}
+                      {formatCurrency(a)}
                     </td>
                     <td
                       className={`px-4 py-2 text-sm font-bold text-right ${color(b)}`}
                     >
-                      {b.toLocaleString(undefined, {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      })}
+                      {formatCurrency(b)}
                     </td>
                     <td
                       className={`px-4 py-2 text-sm font-bold text-right ${color(v)}`}
                     >
-                      {v.toLocaleString(undefined, {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      })}
+                      {formatCurrency(v)}
                     </td>
                     <td
                       className={`px-4 py-2 text-sm font-bold text-right ${color(v)}`}
                     >
-                      {vp !== null ? (vp * 100).toFixed(1) + "%" : ""}
+                      {vp !== null ? (vp * 100).toFixed(2) + "%" : ""}
                     </td>
                   </tr>
                 );
               })()}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold">{modalTitle} - Transaction Details</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Date
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Memo
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                      Amount
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+                      Class
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+                      Set
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {modalTransactions.map((t, idx) => {
+                    const amt = (Number(t.credit) || 0) - (Number(t.debit) || 0);
+                    return (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm">{formatDate(t.date)}</td>
+                        <td className="px-4 py-2 text-sm">{t.memo || ""}</td>
+                        <td
+                          className={`px-4 py-2 text-sm text-right ${
+                            amt >= 0 ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          {formatCurrency(Math.abs(amt))}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-center">
+                          {t.class || ""}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-center">{t.set}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>
