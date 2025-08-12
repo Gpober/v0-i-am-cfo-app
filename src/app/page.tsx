@@ -1096,16 +1096,6 @@ export default function FinancialOverviewPage() {
             {lastUpdated && (
               <p className="text-xs text-gray-500 mt-1">Last updated: {lastUpdated.toLocaleString()}</p>
             )}
-            <div className="flex items-center space-x-4 mt-4">
-              <button
-                onClick={fetchFinancialData}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-                {isLoading ? "Loading..." : "Refresh"}
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -1230,6 +1220,14 @@ export default function FinancialOverviewPage() {
                 />
               </div>
             )}
+            <button
+              onClick={fetchFinancialData}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+              {isLoading ? "Loading..." : "Refresh"}
+            </button>
           </div>
         </div>
       </div>
