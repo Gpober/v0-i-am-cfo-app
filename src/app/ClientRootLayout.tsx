@@ -4,7 +4,17 @@ import type React from "react"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { useState } from "react"
-import { BarChart3, DollarSign, TrendingUp, CreditCard, FileText, Users, Menu, X } from "lucide-react"
+import {
+  BarChart3,
+  DollarSign,
+  TrendingUp,
+  CreditCard,
+  FileText,
+  Users,
+  Menu,
+  X,
+  BarChart2,
+} from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import Image from "next/image"
@@ -44,6 +54,7 @@ const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
 const navigation = [
   { name: "Overview", href: "/", icon: BarChart3 },
   { name: "P&L", href: "/financials", icon: TrendingUp },
+  { name: "Comparative Analysis", href: "/comparative-analysis", icon: BarChart2 },
   { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
   { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
   { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
