@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { RefreshCw, ChevronDown, ChevronRight, X, Download } from "lucide-react"
 import * as XLSX from "xlsx"
 import jsPDF from "jspdf"
@@ -124,7 +124,10 @@ export default function CashFlowPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>("June")
   const [selectedYear, setSelectedYear] = useState<string>("2024")
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("Monthly")
-  const [selectedProperty, setSelectedProperty] = useState("All Properties")
+  const [propertyDropdownOpen, setPropertyDropdownOpen] = useState(false)
+  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(
+    new Set(["All Properties"]),
+  )
   const [selectedBankAccount, setSelectedBankAccount] = useState("All Bank Accounts")
   const [viewMode, setViewMode] = useState<ViewMode>("offset")
   const [periodType, setPeriodType] = useState<PeriodType>("monthly")
@@ -177,6 +180,23 @@ export default function CashFlowPage() {
 
   // Store detailed transaction data for reuse
   const [transactionData, setTransactionData] = useState<Map<string, any[]>>(new Map())
+
+  const propertyDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        propertyDropdownRef.current &&
+        !propertyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setPropertyDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   // Extract date parts directly from string
   const getDateParts = (dateString: string) => {
@@ -709,7 +729,9 @@ export default function CashFlowPage() {
 
       console.log(`🔍 CASH FLOW BY BANK ACCOUNT - Using Enhanced Database`)
       console.log(`📅 Period: ${startDate} to ${endDate}`)
-      console.log(`🏢 Property Filter: "${selectedProperty}"`)
+      console.log(
+        `🏢 Property Filter: "${Array.from(selectedProperties).join(", ")}"`,
+      )
       console.log(`🔄 Include Transfers: ${includeTransfers}`)
 
       // FIXED QUERY: Corrected transfer toggle logic
@@ -731,8 +753,11 @@ export default function CashFlowPage() {
         query = query.eq("is_cash_account", false).neq("report_category", "transfer")
       }
 
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
+      const selectedList = Array.from(selectedProperties).filter(
+        (p) => p !== "All Properties",
+      )
+      if (selectedList.length) {
+        query = query.in("class", selectedList)
       }
 
       const { data: cashFlowTransactions, error } = await query
@@ -853,7 +878,9 @@ export default function CashFlowPage() {
 
       console.log(`🔍 CASH FLOW OFFSET VIEW - Using Enhanced Database`)
       console.log(`📅 Period: ${startDate} to ${endDate}`)
-      console.log(`🏢 Property Filter: "${selectedProperty}"`)
+      console.log(
+        `🏢 Property Filter: "${Array.from(selectedProperties).join(", ")}"`,
+      )
       console.log(`🏦 Bank Account Filter: "${selectedBankAccount}"`)
       console.log(`🔄 Include Transfers: ${includeTransfers}`)
 
@@ -876,8 +903,11 @@ export default function CashFlowPage() {
         query = query.eq("is_cash_account", false).neq("report_category", "transfer")
       }
 
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
+      const selectedList = Array.from(selectedProperties).filter(
+        (p) => p !== "All Properties",
+      )
+      if (selectedList.length) {
+        query = query.in("class", selectedList)
       }
 
       if (selectedBankAccount !== "All Bank Accounts") {
@@ -1022,7 +1052,9 @@ export default function CashFlowPage() {
 
       console.log(`🔍 CASH FLOW TRADITIONAL VIEW - Using Enhanced Database`)
       console.log(`📅 Period: ${startDate} to ${endDate}`)
-      console.log(`🏢 Property Filter: "${selectedProperty}"`)
+      console.log(
+        `🏢 Property Filter: "${Array.from(selectedProperties).join(", ")}"`,
+      )
       console.log(`🏦 Bank Account Filter: "${selectedBankAccount}"`)
       console.log(`🔄 Include Transfers: ${includeTransfers}`)
 
@@ -1045,8 +1077,11 @@ export default function CashFlowPage() {
         query = query.eq("is_cash_account", false).neq("report_category", "transfer")
       }
 
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
+      const selectedList = Array.from(selectedProperties).filter(
+        (p) => p !== "All Properties",
+      )
+      if (selectedList.length) {
+        query = query.in("class", selectedList)
       }
 
       if (selectedBankAccount !== "All Bank Accounts") {
@@ -1432,7 +1467,7 @@ export default function CashFlowPage() {
     selectedYear,
     customStartDate,
     customEndDate,
-    selectedProperty,
+    selectedProperties,
     selectedBankAccount,
     viewMode,
     periodType,
@@ -1634,18 +1669,57 @@ export default function CashFlowPage() {
             )}
 
             {/* Property Filter */}
-            <select
-              value={selectedProperty}
-              onChange={(e) => setSelectedProperty(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-              style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" } as React.CSSProperties}
-            >
-              {availableProperties.map((property) => (
-                <option key={property} value={property}>
-                  {property}
-                </option>
-              ))}
-            </select>
+            <div className="relative" ref={propertyDropdownRef}>
+              <button
+                onClick={() => setPropertyDropdownOpen(!propertyDropdownOpen)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={
+                  {
+                    "--tw-ring-color": BRAND_COLORS.secondary + "33",
+                  } as React.CSSProperties
+                }
+              >
+                Properties: {Array.from(selectedProperties).join(", ")}
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </button>
+
+              {propertyDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {availableProperties.map((property) => (
+                    <label
+                      key={property}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedProperties.has(property)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedProperties)
+                          if (e.target.checked) {
+                            if (property === "All Properties") {
+                              newSelected.clear()
+                              newSelected.add("All Properties")
+                            } else {
+                              newSelected.delete("All Properties")
+                              newSelected.add(property)
+                            }
+                          } else {
+                            newSelected.delete(property)
+                            if (newSelected.size === 0) {
+                              newSelected.add("All Properties")
+                            }
+                          }
+                          setSelectedProperties(newSelected)
+                        }}
+                        className="mr-3 rounded"
+                        style={{ accentColor: BRAND_COLORS.primary }}
+                      />
+                      {property}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Bank Account Filter - Show for offset and traditional views */}
             {(viewMode === "offset" || viewMode === "traditional") && (
@@ -1711,11 +1785,18 @@ export default function CashFlowPage() {
                       : timePeriod === "Quarterly"
                         ? `For Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
                         : `For ${timePeriod} Period`}
-                  {selectedProperty !== "All Properties" && (
-                    <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                      Property: {selectedProperty}
-                    </span>
-                  )}
+                  {(() => {
+                    const selectedList = Array.from(selectedProperties).filter(
+                      (p) => p !== "All Properties",
+                    )
+                    return (
+                      selectedList.length > 0 && (
+                        <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          Property: {selectedList.join(", ")}
+                        </span>
+                      )
+                    )
+                  })()}
                 </div>
                 <div className="text-xs text-blue-600 mt-1">
                   🏦 Enhanced with entry_bank_account field - Shows exact bank source for every transaction
@@ -1846,11 +1927,18 @@ export default function CashFlowPage() {
                       : timePeriod === "Quarterly"
                         ? `For Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
                         : `For ${timePeriod} Period`}
-                  {selectedProperty !== "All Properties" && (
-                    <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                      Property: {selectedProperty}
-                    </span>
-                  )}
+                  {(() => {
+                    const selectedList = Array.from(selectedProperties).filter(
+                      (p) => p !== "All Properties",
+                    )
+                    return (
+                      selectedList.length > 0 && (
+                        <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          Property: {selectedList.join(", ")}
+                        </span>
+                      )
+                    )
+                  })()}
                   {selectedBankAccount !== "All Bank Accounts" && (
                     <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                       Bank: {selectedBankAccount}
@@ -2724,11 +2812,18 @@ export default function CashFlowPage() {
                       : timePeriod === "Quarterly"
                         ? `For Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
                         : `For ${timePeriod} Period`}
-                  {selectedProperty !== "All Properties" && (
-                    <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                      Property: {selectedProperty}
-                    </span>
-                  )}
+                  {(() => {
+                    const selectedList = Array.from(selectedProperties).filter(
+                      (p) => p !== "All Properties",
+                    )
+                    return (
+                      selectedList.length > 0 && (
+                        <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          Property: {selectedList.join(", ")}
+                        </span>
+                      )
+                    )
+                  })()}
                   {selectedBankAccount !== "All Bank Accounts" && (
                     <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                       Bank: {selectedBankAccount}

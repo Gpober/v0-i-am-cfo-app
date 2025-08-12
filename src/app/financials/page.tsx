@@ -315,6 +315,11 @@ export default function FinancialsPage() {
     };
   }, []);
 
+  // Load all available properties once for dropdown
+  useEffect(() => {
+    fetchAvailableProperties();
+  }, []);
+
   // Calculate date range based on selected period - COMPLETELY TIMEZONE INDEPENDENT
   const calculateDateRange = () => {
     let startDate: string;
@@ -440,6 +445,29 @@ export default function FinancialsPage() {
     return null; // Not a P&L account (likely Balance Sheet account)
   };
 
+  // Load available properties for filter dropdown
+  const fetchAvailableProperties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("journal_entry_lines")
+        .select("class")
+        .not("class", "is", null);
+      if (error) throw error;
+      const properties = new Set<string>();
+      data.forEach((row) => {
+        if (row.class && row.class.trim()) {
+          properties.add(row.class.trim());
+        }
+      });
+      setAvailableProperties([
+        "All Properties",
+        ...Array.from(properties).sort(),
+      ]);
+    } catch (err) {
+      console.error("Error fetching properties:", err);
+    }
+  };
+
   // Fetch P&L data using ENHANCED database strategy with TIMEZONE-INDEPENDENT dates
   const fetchPLData = async () => {
     setIsLoadingData(true);
@@ -447,31 +475,38 @@ export default function FinancialsPage() {
 
     try {
       const { startDate, endDate } = calculateDateRange();
-      const selectedProperty =
-        Array.from(selectedProperties)[0] || "All Properties";
+      const selectedPropertyList = Array.from(selectedProperties).filter(
+        (p) => p !== "All Properties",
+      );
 
       smartLog(`🔍 TIMEZONE-INDEPENDENT P&L DATA FETCH`);
       smartLog(`📅 Period: ${startDate} to ${endDate}`);
-      smartLog(`🏢 Property Filter: "${selectedProperty}"`);
+      smartLog(
+        `🏢 Property Filter: ${
+          selectedPropertyList.length > 0
+            ? selectedPropertyList.join(", ")
+            : "All Properties"
+        }`,
+      );
 
       // ENHANCED QUERY: Use the new database structure with better field selection
       let query = supabase
         .from("journal_entry_lines")
         .select(
           `
-         entry_number, 
-         class, 
-         date, 
-         account, 
-         account_type, 
-         debit, 
-         credit, 
-         memo, 
-         customer, 
-         vendor, 
-         name, 
-         entry_bank_account, 
-         normal_balance, 
+         entry_number,
+         class,
+         date,
+         account,
+         account_type,
+         debit,
+         credit,
+         memo,
+         customer,
+         vendor,
+         name,
+         entry_bank_account,
+         normal_balance,
          report_category,
          is_cash_account,
          detail_type,
@@ -483,8 +518,8 @@ export default function FinancialsPage() {
         .order("date", { ascending: true });
 
       // Apply property filter
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty);
+      if (selectedPropertyList.length > 0) {
+        query = query.in("class", selectedPropertyList);
       }
 
       const { data: allTransactions, error } = await query;
@@ -524,18 +559,6 @@ export default function FinancialsPage() {
 
       smartLog(`📈 Filtered to ${plTransactions.length} P&L transactions`);
       smartLog(`🔍 Sample P&L transactions:`, plTransactions.slice(0, 5));
-
-      // Get unique properties for filter dropdown using 'class' field
-      const properties = new Set<string>();
-      plTransactions.forEach((tx) => {
-        if (tx.class && tx.class.trim()) {
-          properties.add(tx.class.trim());
-        }
-      });
-      setAvailableProperties([
-        "All Properties",
-        ...Array.from(properties).sort(),
-      ]);
 
       // Process transactions using ENHANCED logic
       const processedAccounts = await processPLTransactionsEnhanced(
@@ -1182,7 +1205,12 @@ export default function FinancialsPage() {
     if (viewMode === "Total") {
       return [];
     } else if (viewMode === "Class") {
-      return availableProperties.filter((p) => p !== "All Properties");
+      const selectedList = Array.from(selectedProperties).filter(
+        (p) => p !== "All Properties",
+      );
+      return selectedList.length > 0
+        ? selectedList
+        : availableProperties.filter((p) => p !== "All Properties");
     } else if (viewMode === "Detail") {
       // For Detail view, show months in the date range using timezone-independent method
       const { startDate, endDate } = calculateDateRange();
