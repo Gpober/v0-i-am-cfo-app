@@ -35,9 +35,10 @@ export async function POST(req: NextRequest) {
       .gte('date', startDate)
       .lte('date', endDate)
 
-    if (className !== 'All') {
-      const encodedClass = encodeURIComponent(className)
-      query = query.or(`class.eq.${encodedClass},class_name.eq.${encodedClass}`)
+    const normalized = String(className).toLowerCase()
+    if (!['all', 'all classes', 'all class'].includes(normalized)) {
+      const escaped = String(className).replace(/"/g, '\\"')
+      query = query.or(`class.eq."${escaped}",class_name.eq."${escaped}"`)
     }
 
     const { data, error } = await query
@@ -159,6 +160,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing OpenAI API key' }, { status: 500 })
     }
 
+    if (req.nextUrl.searchParams.get('debug') === '1') {
+      return NextResponse.json({ summary, aiInsights: '[debug] skipped OpenAI' })
+    }
+
     const prompt =
       'You are an AI CFO. Analyze this summarized financial packet and produce:\n1) A concise narrative of the period\n2) 3–7 actionable insights\n3) Notable anomalies to investigate (why & next step)\nKeep it operator-practical and specific.'
 
@@ -186,15 +191,15 @@ export async function POST(req: NextRequest) {
     })
 
     if (!openaiRes.ok) {
-      let err: unknown
+      let details
       try {
-        err = await openaiRes.json()
+        details = await openaiRes.json()
       } catch {
-        err = { error: await openaiRes.text() }
+        details = await openaiRes.text()
       }
-      console.error('OpenAI error:', err)
+      console.error('OpenAI error:', details)
       return NextResponse.json(
-        typeof err === 'string' ? { error: err } : err,
+        { error: 'OpenAIError', details },
         { status: openaiRes.status }
       )
     }
