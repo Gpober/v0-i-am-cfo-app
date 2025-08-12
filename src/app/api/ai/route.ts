@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     let query = supabaseServer
-      .from('journal_entry_lines_rows')
+      .from('public.journal_entry_lines')
       .select(
         'class, class_name, account_name, account_type, report_category, vendor, debit, credit, amount, is_cash_account'
       )
