@@ -29,6 +29,7 @@ import {
   ComposedChart,
 } from "recharts"
 import Image from "next/image"
+import AISection from "@/components/ai/AISection"
 
 // IAM CFO Brand Colors
 const BRAND_COLORS = {
@@ -3325,6 +3326,9 @@ export default function MobileResponsiveFinancialsPage() {
             </div>
           </div>
         )}
+
+        {/* AI CFO Section */}
+        <AISection />
 
         {/* KPI Cards */}
         {renderMobileKPICards()}
