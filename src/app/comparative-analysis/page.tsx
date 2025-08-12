@@ -248,6 +248,12 @@ export default function ComparativeAnalysisPage() {
     }
   };
 
+  useEffect(() => {
+    if (allLinesA.length || allLinesB.length) {
+      setLineData(buildLineData(allLinesA, allLinesB, selectedKpi));
+    }
+  }, [selectedKpi, allLinesA, allLinesB]);
+
   const barChartData =
     dataA && dataB
       ? [
@@ -498,17 +504,36 @@ export default function ComparativeAnalysisPage() {
       )}
 
       {lineData.length > 0 && (
-        <div className="w-full h-64">
-          <ResponsiveContainer>
-            <LineChart data={lineData}>
-              <XAxis dataKey="date" />
-              <YAxis tickFormatter={(v) => formatCurrency(v)} />
-              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-              <Legend />
-              <Line type="monotone" dataKey="A" stroke="#56B6E9" />
-              <Line type="monotone" dataKey="B" stroke="#94A3B8" />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="w-full">
+          <div className="flex justify-end mb-2">
+            <Select
+              value={selectedKpi}
+              onValueChange={(v) => setSelectedKpi(v as keyof KPIs)}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="revenue">Revenue</SelectItem>
+                <SelectItem value="cogs">COGS</SelectItem>
+                <SelectItem value="grossProfit">Gross Profit</SelectItem>
+                <SelectItem value="opEx">OpEx</SelectItem>
+                <SelectItem value="netIncome">Net Income</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer>
+              <LineChart data={lineData} margin={{ left: 40, right: 20 }}>
+                <XAxis dataKey="date" />
+                <YAxis tickFormatter={(v) => formatCurrency(v)} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                <Legend />
+                <Line type="monotone" dataKey="A" stroke="#56B6E9" />
+                <Line type="monotone" dataKey="B" stroke="#94A3B8" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 
