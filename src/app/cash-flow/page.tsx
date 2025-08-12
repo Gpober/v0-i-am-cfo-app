@@ -606,8 +606,11 @@ export default function CashFlowPage() {
       startDate = customStartDate || "2024-01-01"
       endDate = customEndDate || "2024-12-31"
     } else if (timePeriod === "YTD") {
-      startDate = `${now.getFullYear()}-01-01`
-      endDate = now.toISOString().split("T")[0]
+      const monthIndex = monthsList.indexOf(selectedMonth)
+      const year = Number.parseInt(selectedYear)
+      startDate = `${year}-01-01`
+      const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     } else if (timePeriod === "Monthly") {
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
@@ -666,7 +669,7 @@ export default function CashFlowPage() {
     } else if (timePeriod === "Quarterly") {
       return `Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
     } else if (timePeriod === "YTD") {
-      return `YTD ${new Date().getFullYear()}`
+      return `January - ${selectedMonth} ${selectedYear}`
     } else if (timePeriod === "Trailing 12") {
       const startMonth = getMonthName(getMonthFromDate(startDate)).slice(0, 3)
       const endMonth = getMonthName(getMonthFromDate(endDate)).slice(0, 3)
@@ -1476,9 +1479,11 @@ export default function CashFlowPage() {
                     ? `${selectedMonth} ${selectedYear}`
                     : timePeriod === "Quarterly"
                       ? `Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
-                      : timePeriod === "Trailing 12"
-                        ? `${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
-                        : `${timePeriod} Period`}
+                      : timePeriod === "YTD"
+                        ? `January - ${selectedMonth} ${selectedYear}`
+                        : timePeriod === "Trailing 12"
+                          ? `${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                          : `${timePeriod} Period`}
               </p>
               {/* ENHANCED: Updated header information with transfer mode */}
               <p className="text-xs text-blue-600 mt-1">
@@ -1604,9 +1609,10 @@ export default function CashFlowPage() {
               <option value="Custom">Custom Date Range</option>
             </select>
 
-            {/* Month Dropdown - Show for Monthly, Quarterly, and Trailing 12 */}
+            {/* Month Dropdown - Show for Monthly, Quarterly, YTD, and Trailing 12 */}
             {(timePeriod === "Monthly" ||
               timePeriod === "Quarterly" ||
+              timePeriod === "YTD" ||
               timePeriod === "Trailing 12") && (
               <select
                 value={selectedMonth}
@@ -1622,9 +1628,10 @@ export default function CashFlowPage() {
               </select>
             )}
 
-            {/* Year Dropdown - Show for Monthly, Quarterly, and Trailing 12 */}
+            {/* Year Dropdown - Show for Monthly, Quarterly, YTD, and Trailing 12 */}
             {(timePeriod === "Monthly" ||
               timePeriod === "Quarterly" ||
+              timePeriod === "YTD" ||
               timePeriod === "Trailing 12") && (
               <select
                 value={selectedYear}
@@ -1738,7 +1745,11 @@ export default function CashFlowPage() {
                       ? `For ${selectedMonth} ${selectedYear}`
                       : timePeriod === "Quarterly"
                         ? `For Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
-                        : `For ${timePeriod} Period`}
+                        : timePeriod === "YTD"
+                          ? `For January - ${selectedMonth} ${selectedYear}`
+                          : timePeriod === "Trailing 12"
+                            ? `For ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                            : `For ${timePeriod} Period`}
                   {selectedProperty !== "All Properties" && (
                     <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                       Property: {selectedProperty}
@@ -1873,7 +1884,11 @@ export default function CashFlowPage() {
                       ? `For ${selectedMonth} ${selectedYear}`
                       : timePeriod === "Quarterly"
                         ? `For Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
-                        : `For ${timePeriod} Period`}
+                        : timePeriod === "YTD"
+                          ? `For January - ${selectedMonth} ${selectedYear}`
+                          : timePeriod === "Trailing 12"
+                            ? `For ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                            : `For ${timePeriod} Period`}
                   {selectedProperty !== "All Properties" && (
                     <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                       Property: {selectedProperty}
@@ -2751,7 +2766,11 @@ export default function CashFlowPage() {
                       ? `For ${selectedMonth} ${selectedYear}`
                       : timePeriod === "Quarterly"
                         ? `For Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
-                        : `For ${timePeriod} Period`}
+                        : timePeriod === "YTD"
+                          ? `For January - ${selectedMonth} ${selectedYear}`
+                          : timePeriod === "Trailing 12"
+                            ? `For ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                            : `For ${timePeriod} Period`}
                   {selectedProperty !== "All Properties" && (
                     <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                       Property: {selectedProperty}
