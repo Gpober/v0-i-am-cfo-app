@@ -2771,8 +2771,8 @@ export default function FinancialsPage() {
       {/* Transaction Details Modal */}
       {showTransactionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-200 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 text-center">
@@ -2881,7 +2881,7 @@ export default function FinancialsPage() {
               )}
             </div>
 
-            <div className="p-6 overflow-auto max-h-[70vh]">
+            <div className="flex-1 overflow-auto p-6 pb-16">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -2890,28 +2890,16 @@ export default function FinancialsPage() {
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
+                        Payee/Customer
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Memo
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Entry #
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
-                        Account Type
-                      </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Amount
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Debit
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Credit
-                      </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Property
+                        Class
                       </th>
                     </tr>
                   </thead>
@@ -2948,24 +2936,12 @@ export default function FinancialsPage() {
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {transaction.memo || "N/A"}
                           </td>
-                          <td className="px-6 py-4 text-sm text-blue-600">
-                            {transaction.entry_number || "N/A"}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-purple-600 text-center">
-                            {transaction.account_type || "N/A"}
-                          </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
                               netAmount >= 0 ? "text-green-600" : "text-red-600"
                             }`}
                           >
                             {formatCurrency(Math.abs(netAmount))}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                            {debitValue > 0 ? formatCurrency(debitValue) : ""}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                            {creditValue > 0 ? formatCurrency(creditValue) : ""}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             {transaction.class && (
