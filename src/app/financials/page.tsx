@@ -1530,7 +1530,7 @@ export default function FinancialsPage() {
               )}
             </div>
 
-            {/* Month/Year dropdowns for Monthly, Quarterly, and Trailing 12 */}
+            {/* Month & year dropdowns allow adjusting Monthly, Quarterly, or Trailing 12 ranges */}
             {(timePeriod === "Monthly" || timePeriod === "Quarterly" || timePeriod === "Trailing 12") && (
               <>
                 <div className="relative" ref={monthDropdownRef}>

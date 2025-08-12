@@ -1591,7 +1591,7 @@ export default function CashFlowPage() {
               <option value="Custom">Custom Date Range</option>
             </select>
 
-            {/* Month Dropdown - Show for Monthly, Quarterly, and Trailing 12 */}
+            {/* Month dropdown visible for Monthly, Quarterly, and Trailing 12 views */}
             {(timePeriod === "Monthly" || timePeriod === "Quarterly" || timePeriod === "Trailing 12") && (
               <select
                 value={selectedMonth}
@@ -1607,7 +1607,7 @@ export default function CashFlowPage() {
               </select>
             )}
 
-            {/* Year Dropdown - Show for Monthly, Quarterly, and Trailing 12 */}
+            {/* Year dropdown visible for Monthly, Quarterly, and Trailing 12 views */}
             {(timePeriod === "Monthly" || timePeriod === "Quarterly" || timePeriod === "Trailing 12") && (
               <select
                 value={selectedYear}
