@@ -708,6 +708,55 @@ export default function ComparativeAnalysisPage() {
                   ))}
                 </>
               )}
+
+              {/* Net Income */}
+              {(() => {
+                const inc = sectionTotals(varianceRows.income);
+                const cog = sectionTotals(varianceRows.cogs);
+                const exp = sectionTotals(varianceRows.expenses);
+                const a = inc.a + cog.a + exp.a;
+                const b = inc.b + cog.b + exp.b;
+                const v = a - b;
+                const vp = b ? v / Math.abs(b) : null;
+                const color = (n: number) =>
+                  n >= 0 ? "text-green-800" : "text-red-800";
+                return (
+                  <tr className="bg-gray-100">
+                    <td className="!bg-gray-100 px-4 py-2 text-sm font-bold text-gray-800">
+                      NET INCOME
+                    </td>
+                    <td
+                      className={`px-4 py-2 text-sm font-bold text-right ${color(a)}`}
+                    >
+                      {a.toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}
+                    </td>
+                    <td
+                      className={`px-4 py-2 text-sm font-bold text-right ${color(b)}`}
+                    >
+                      {b.toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}
+                    </td>
+                    <td
+                      className={`px-4 py-2 text-sm font-bold text-right ${color(v)}`}
+                    >
+                      {v.toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}
+                    </td>
+                    <td
+                      className={`px-4 py-2 text-sm font-bold text-right ${color(v)}`}
+                    >
+                      {vp !== null ? (vp * 100).toFixed(1) + "%" : ""}
+                    </td>
+                  </tr>
+                );
+              })()}
             </tbody>
           </table>
         </div>
