@@ -965,6 +965,26 @@ export default function FinancialOverviewPage() {
       ? `Ranked by net income for ${selectedMonth} ${selectedYear}`
       : `Ranked by net income for ${formatDate(propertyStart)} - ${formatDate(propertyEnd)}`
 
+  const topPropertyTotals = useMemo(() => {
+    if (!financialData?.propertyBreakdown) {
+      return { revenue: 0, expenses: 0, netIncome: 0, margin: 0 }
+    }
+    const top = financialData.propertyBreakdown.slice(0, 10)
+    const totals = top.reduce(
+      (acc, p) => {
+        acc.revenue += p.revenue || 0
+        acc.expenses += p.expenses || 0
+        acc.netIncome += p.netIncome || 0
+        return acc
+      },
+      { revenue: 0, expenses: 0, netIncome: 0 }
+    )
+    return {
+      ...totals,
+      margin: totals.revenue ? (totals.netIncome / totals.revenue) * 100 : 0,
+    }
+  }, [financialData])
+
   const TrendTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const revenue = payload.find((p) => p.dataKey === "totalIncome")?.value || 0
@@ -1690,33 +1710,32 @@ export default function FinancialOverviewPage() {
               </div>
             </div>
 
-            {/* Summary Stats */}
+            {/* Top Properties Summary */}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
-                    {financialData.summary.totalTransactions.toLocaleString()}
+                    {formatCurrency(topPropertyTotals.revenue)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Total Transactions</div>
+                  <div className="text-sm text-gray-600 mt-1">Revenue</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{financialData.summary.activeProperties}</div>
-                  <div className="text-sm text-gray-600 mt-1">Active Properties</div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {formatCurrency(topPropertyTotals.expenses)}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">Expenses</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(financialData.current.grossProfit)}
+                    {formatCurrency(topPropertyTotals.netIncome)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Gross Profit</div>
+                  <div className="text-sm text-gray-600 mt-1">Net Income</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    {financialData.current.totalIncome > 0
-                      ? ((financialData.current.grossProfit / financialData.current.totalIncome) * 100).toFixed(1)
-                      : "0.0"}
-                    %
+                    {topPropertyTotals.margin.toFixed(1)}%
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Gross Margin</div>
+                  <div className="text-sm text-gray-600 mt-1">Margin</div>
                 </div>
               </div>
             </div>
