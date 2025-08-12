@@ -35,10 +35,11 @@ export default function AISection() {
         const data = await res.json()
         if (data.error) throw new Error(data.details || data.error)
         setGrade(data.data)
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Unknown error"
         setGrade({
           grade: "N/A",
-          reasoning: err.message,
+          reasoning: message,
           insights: [],
         })
       } finally {
@@ -63,8 +64,9 @@ export default function AISection() {
       const data = await res.json()
       if (data.error) throw new Error(data.details || data.error)
       setMessages([...newMessages, { role: "assistant", content: data.data.answer }])
-    } catch (err: any) {
-      setMessages([...newMessages, { role: "assistant", content: `Error: ${err.message}` }])
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error"
+      setMessages([...newMessages, { role: "assistant", content: `Error: ${message}` }])
     } finally {
       setLoadingChat(false)
     }

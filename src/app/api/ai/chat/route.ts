@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import OpenAI from "openai"
 
-export const runtime = "node"
+export const runtime = "nodejs"
 
 interface ChatRequest {
   messages: { role: "user" | "assistant"; content: string }[]
@@ -10,6 +10,15 @@ interface ChatRequest {
   endDate?: string
   classes?: string[]
   properties?: string[]
+}
+
+interface JournalEntry {
+  amount: number | null
+  account_type: string | null
+  account_name?: string | null
+  class?: string | null
+  property?: string | null
+  date?: string | null
 }
 
 export async function POST(req: NextRequest) {
@@ -49,7 +58,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const summary = summarize(data || [])
+    const summary = summarize((data as JournalEntry[]) || [])
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -78,15 +87,16 @@ export async function POST(req: NextRequest) {
     const answer = completion.choices[0]?.message?.content || ""
 
     return NextResponse.json({ data: { answer } })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error"
     return NextResponse.json(
-      { error: "Unexpected error", details: err.message },
+      { error: "Unexpected error", details: message },
       { status: 500 }
     )
   }
 }
 
-function summarize(rows: any[]) {
+function summarize(rows: JournalEntry[]) {
   let revenue = 0
   let expenses = 0
 
