@@ -2890,28 +2890,16 @@ export default function FinancialsPage() {
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
+                        Payee/Customer
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Memo
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Entry #
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
-                        Account Type
-                      </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Amount
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Debit
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Credit
-                      </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Property
+                        Class
                       </th>
                     </tr>
                   </thead>
@@ -2948,24 +2936,12 @@ export default function FinancialsPage() {
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {transaction.memo || "N/A"}
                           </td>
-                          <td className="px-6 py-4 text-sm text-blue-600">
-                            {transaction.entry_number || "N/A"}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-purple-600 text-center">
-                            {transaction.account_type || "N/A"}
-                          </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
                               netAmount >= 0 ? "text-green-600" : "text-red-600"
                             }`}
                           >
                             {formatCurrency(Math.abs(netAmount))}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                            {debitValue > 0 ? formatCurrency(debitValue) : ""}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                            {creditValue > 0 ? formatCurrency(creditValue) : ""}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             {transaction.class && (

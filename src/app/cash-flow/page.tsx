@@ -1379,6 +1379,11 @@ export default function CashFlowPage() {
         bankAccount: row.entry_bank_account,
         accountType: row.account_type,
         reportCategory: row.report_category,
+        entryNumber: row.entry_number,
+        customer: row.customer,
+        vendor: row.vendor,
+        name: row.name,
+        class: row.class,
       }))
 
       setTransactionDetails(transactionDetails)
@@ -3193,22 +3198,16 @@ export default function CashFlowPage() {
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account
+                        Payee/Customer
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Memo
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cash Flow Impact
+                        Amount
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Bank Account
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Report Category
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Class
                       </th>
                     </tr>
                   </thead>
@@ -3218,7 +3217,12 @@ export default function CashFlowPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(transaction.date)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{transaction.account}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {transaction.name ||
+                            transaction.vendor ||
+                            transaction.customer ||
+                            "N/A"}
+                        </td>
                         <td
                           className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate"
                           title={transaction.memo || ""}
@@ -3232,10 +3236,12 @@ export default function CashFlowPage() {
                         >
                           {formatCurrency(transaction.impact)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.bankAccount}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.accountType}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {transaction.reportCategory}
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {transaction.class && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {transaction.class}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
