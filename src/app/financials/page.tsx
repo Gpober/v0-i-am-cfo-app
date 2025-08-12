@@ -198,8 +198,12 @@ const formatDateDisplay = (dateString: string) => {
 };
 
 export default function FinancialsPage() {
-  const [selectedMonth, setSelectedMonth] = useState<string>("June");
-  const [selectedYear, setSelectedYear] = useState<string>("2025");
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    monthsList[new Date().getMonth()],
+  );
+  const [selectedYear, setSelectedYear] = useState<string>(
+    new Date().getFullYear().toString(),
+  );
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("YTD");
   const [viewMode, setViewMode] = useState<ViewMode>("Total");
   const [notification, setNotification] = useState<NotificationState>({

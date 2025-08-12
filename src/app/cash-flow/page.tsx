@@ -121,8 +121,12 @@ const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear()
 
 export default function CashFlowPage() {
   // All state variables
-  const [selectedMonth, setSelectedMonth] = useState<string>("June")
-  const [selectedYear, setSelectedYear] = useState<string>("2024")
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    monthsList[new Date().getMonth()],
+  )
+  const [selectedYear, setSelectedYear] = useState<string>(
+    new Date().getFullYear().toString(),
+  )
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("Monthly")
   const [selectedProperty, setSelectedProperty] = useState("All Properties")
   const [selectedBankAccount, setSelectedBankAccount] = useState("All Bank Accounts")
