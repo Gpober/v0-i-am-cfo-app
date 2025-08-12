@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
 
+export const runtime = 'nodejs'
 export const config = { api: { bodyParser: { sizeLimit: '5mb' } } }
 
 function isValidDate(str: string) {
@@ -35,7 +36,8 @@ export async function POST(req: NextRequest) {
       .lte('date', endDate)
 
     if (className !== 'All') {
-      query = query.or(`class.eq.${className},class_name.eq.${className}`)
+      const encodedClass = encodeURIComponent(className)
+      query = query.or(`class.eq.${encodedClass},class_name.eq.${encodedClass}`)
     }
 
     const { data, error } = await query
@@ -168,17 +170,33 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model,
+        instructions: prompt,
         input: [
-          { role: 'system', content: prompt },
-          { role: 'user', content: JSON.stringify(summary) },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: JSON.stringify(summary),
+              },
+            ],
+          },
         ],
       }),
     })
 
     if (!openaiRes.ok) {
-      const err = await openaiRes.text()
+      let err: unknown
+      try {
+        err = await openaiRes.json()
+      } catch {
+        err = { error: await openaiRes.text() }
+      }
       console.error('OpenAI error:', err)
-      return NextResponse.json({ error: 'Failed to fetch AI insights' }, { status: 500 })
+      return NextResponse.json(
+        typeof err === 'string' ? { error: err } : err,
+        { status: openaiRes.status }
+      )
     }
 
     const aiJson = await openaiRes.json()
