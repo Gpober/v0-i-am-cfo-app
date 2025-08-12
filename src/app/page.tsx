@@ -161,6 +161,7 @@ export default function FinancialOverviewPage() {
     operatingExpenses: number
     netIncome: number
     cogs: number
+    transactionCount: number
   }
   const [propertyData, setPropertyData] = useState<PropertyPoint[]>([])
   const [propertyChartMetric, setPropertyChartMetric] = useState<
@@ -943,6 +944,22 @@ export default function FinancialOverviewPage() {
     [propertyChartData]
   )
 
+  const propertyTotals = useMemo(() => {
+    const totals = propertyData.reduce(
+      (acc, p) => {
+        acc.revenue += p.revenue || 0
+        acc.expenses += p.operatingExpenses || 0
+        acc.netIncome += p.netIncome || 0
+        return acc
+      },
+      { revenue: 0, expenses: 0, netIncome: 0 }
+    )
+    return {
+      ...totals,
+      margin: totals.revenue ? (totals.netIncome / totals.revenue) * 100 : 0,
+    }
+  }, [propertyData])
+
   const metricLabels = {
     income: "Revenue",
     gp: "Gross Profit",
@@ -1655,7 +1672,7 @@ export default function FinancialOverviewPage() {
                             {formatCurrency(property.revenue)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(property.expenses)}
+                            {formatCurrency(property.operatingExpenses)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
@@ -1691,28 +1708,27 @@ export default function FinancialOverviewPage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
-                    {financialData.summary.totalTransactions.toLocaleString()}
+                    {formatCurrency(propertyTotals.revenue)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Total Transactions</div>
+                  <div className="text-sm text-gray-600 mt-1">Total Revenue</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{financialData.summary.activeProperties}</div>
-                  <div className="text-sm text-gray-600 mt-1">Active Properties</div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {formatCurrency(propertyTotals.expenses)}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">Total Expenses</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(financialData.current.grossProfit)}
+                    {formatCurrency(propertyTotals.netIncome)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Gross Profit</div>
+                  <div className="text-sm text-gray-600 mt-1">Net Income</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    {financialData.current.totalIncome > 0
-                      ? ((financialData.current.grossProfit / financialData.current.totalIncome) * 100).toFixed(1)
-                      : "0.0"}
-                    %
+                    {propertyTotals.margin.toFixed(1)}%
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Gross Margin</div>
+                  <div className="text-sm text-gray-600 mt-1">Margin</div>
                 </div>
               </div>
             </div>
