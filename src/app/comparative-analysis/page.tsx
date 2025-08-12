@@ -277,7 +277,7 @@ export default function ComparativeAnalysisPage() {
       )
     if (movers[0])
       bullets.push(
-        `${movers[0].account} moved ${formatCurrency(movers[0].variance)}`,
+        `${movers[0].account} moved ${formatCurrency(movers[0].variance, 0)}`,
       )
     setSummary(bullets.slice(0, 3))
   }
@@ -287,9 +287,9 @@ export default function ComparativeAnalysisPage() {
       ["Account", "A", "B", "Variance", "Variance %"],
       ...topMovers.map((r) => [
         r.account,
-        r.A.toFixed(2),
-        r.B.toFixed(2),
-        r.variance.toFixed(2),
+        r.A.toFixed(0),
+        r.B.toFixed(0),
+        r.variance.toFixed(0),
         r.variancePct !== null ? r.variancePct.toFixed(2) : "",
       ]),
     ]
@@ -341,7 +341,7 @@ export default function ComparativeAnalysisPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
@@ -366,7 +366,7 @@ export default function ComparativeAnalysisPage() {
                 onClick={refresh}
                 disabled={loading}
               >
-                <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+                <RefreshCw className="h-4 w-4 mr-1" /> Compare
               </Button>
               <Button
                 variant="outline"
@@ -391,13 +391,13 @@ export default function ComparativeAnalysisPage() {
         )}
 
         {/* Controls */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Mode</label>
             <select
               value={mode}
               onChange={(e) => setMode(e.target.value as "period" | "class")}
-              className="w-full border rounded p-2 text-sm"
+              className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
             >
               <option value="period">Period vs Period</option>
               <option value="class">Class vs Class</option>
@@ -409,7 +409,7 @@ export default function ComparativeAnalysisPage() {
               type="date"
               value={startA}
               onChange={(e) => setStartA(e.target.value)}
-              className="w-full border rounded p-2 text-sm"
+              className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
             />
           </div>
           <div>
@@ -418,7 +418,7 @@ export default function ComparativeAnalysisPage() {
               type="date"
               value={endA}
               onChange={(e) => setEndA(e.target.value)}
-              className="w-full border rounded p-2 text-sm"
+              className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
             />
           </div>
           {mode === "period" && (
@@ -429,7 +429,7 @@ export default function ComparativeAnalysisPage() {
                   type="date"
                   value={startB}
                   onChange={(e) => setStartB(e.target.value)}
-                  className="w-full border rounded p-2 text-sm"
+                  className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
                 />
               </div>
               <div>
@@ -438,7 +438,7 @@ export default function ComparativeAnalysisPage() {
                   type="date"
                   value={endB}
                   onChange={(e) => setEndB(e.target.value)}
-                  className="w-full border rounded p-2 text-sm"
+                  className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
                 />
               </div>
             </>
@@ -450,7 +450,7 @@ export default function ComparativeAnalysisPage() {
             <select
               value={propertyA}
               onChange={(e) => setPropertyA(e.target.value)}
-              className="w-full border rounded p-2 text-sm"
+              className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
             >
               {availableProperties.map((p) => (
                 <option key={p}>{p}</option>
@@ -465,7 +465,7 @@ export default function ComparativeAnalysisPage() {
               <select
                 value={propertyB}
                 onChange={(e) => setPropertyB(e.target.value)}
-                className="w-full border rounded p-2 text-sm"
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
               >
                 {availableProperties.map((p) => (
                   <option key={p}>{p}</option>
@@ -475,128 +475,126 @@ export default function ComparativeAnalysisPage() {
           )}
         </div>
 
-        {datasetA && datasetB && (
-          <>
-            {/* KPI cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-              {(
-                [
-                  { title: "Revenue", key: "revenue" },
-                  { title: "COGS", key: "cogs" },
-                  { title: "Gross Profit", key: "grossProfit" },
-                  { title: "OpEx", key: "opex" },
-                  { title: "Net Income", key: "netIncome" },
-                ] as { title: string; key: KPI }[]
-              ).map((k) => {
-                const A = datasetA.kpis[k.key]
-                const B = datasetB.kpis[k.key]
-                const variance = A - B
-                const pct = B !== 0 ? ((variance / B) * 100).toFixed(1) : "0"
-                return (
-                  <KPICard
-                    key={k.key}
-                    title={k.title}
-                    value={formatCurrency(A)}
-                    change={`${variance >= 0 ? "+" : ""}${pct}%`}
-                    positive={variance >= 0}
-                  />
-                )
-              })}
-            </div>
+        {/* KPI cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {(
+            [
+              { title: "Revenue", key: "revenue" },
+              { title: "COGS", key: "cogs" },
+              { title: "Gross Profit", key: "grossProfit" },
+              { title: "OpEx", key: "opex" },
+              { title: "Net Income", key: "netIncome" },
+            ] as { title: string; key: KPI }[]
+          ).map((k) => {
+            const A = datasetA?.kpis[k.key] ?? 0
+            const B = datasetB?.kpis[k.key] ?? 0
+            const variance = A - B
+            const pct = B !== 0 ? ((variance / B) * 100).toFixed(1) : "0"
+            return (
+              <KPICard
+                key={k.key}
+                title={k.title}
+                value={formatCurrency(A, 0)}
+                change={`${variance >= 0 ? "+" : ""}${pct}%`}
+                positive={variance >= 0}
+              />
+            )
+          })}
+        </div>
 
-            {/* Bar chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>KPIs Comparison</CardTitle>
-              </CardHeader>
-              <CardContent className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={kpiData()}>
-                    <XAxis dataKey="kpi" />
-                    <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Legend />
-                    <Bar dataKey="A" fill={BRAND_COLORS.primary} />
-                    <Bar dataKey="B" fill={BRAND_COLORS.secondary} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+        {/* Bar chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>KPIs Comparison</CardTitle>
+          </CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={kpiData()}>
+                <XAxis dataKey="kpi" />
+                <YAxis tickFormatter={(v) => formatCurrency(v, 0)} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v), 0)} />
+                <Legend />
+                <Bar dataKey="A" name="A" fill={BRAND_COLORS.primary} />
+                <Bar dataKey="B" name="B" fill={BRAND_COLORS.secondary} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-            {/* Trend chart */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Trend - {kpiTrend}</CardTitle>
-                <select
-                  value={kpiTrend}
-                  onChange={(e) => setKpiTrend(e.target.value as KPI)}
-                  className="border rounded p-1 text-xs"
-                >
-                  <option value="revenue">Revenue</option>
-                  <option value="cogs">COGS</option>
-                  <option value="grossProfit">Gross Profit</option>
-                  <option value="opex">OpEx</option>
-                  <option value="netIncome">Net Income</option>
-                </select>
-              </CardHeader>
-              <CardContent className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData()}>
-                    <XAxis dataKey="date" />
-                    <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="A"
-                      stroke={BRAND_COLORS.primary}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="B"
-                      stroke={BRAND_COLORS.secondary}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+        {/* Trend chart */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Trend - {kpiTrend}</CardTitle>
+            <select
+              value={kpiTrend}
+              onChange={(e) => setKpiTrend(e.target.value as KPI)}
+              className="border rounded p-1 text-xs"
+            >
+              <option value="revenue">Revenue</option>
+              <option value="cogs">COGS</option>
+              <option value="grossProfit">Gross Profit</option>
+              <option value="opex">OpEx</option>
+              <option value="netIncome">Net Income</option>
+            </select>
+          </CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData()}>
+                <XAxis dataKey="date" />
+                <YAxis tickFormatter={(v) => formatCurrency(v, 0)} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v), 0)} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="A"
+                  name="A"
+                  stroke={BRAND_COLORS.primary}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="B"
+                  name="B"
+                  stroke={BRAND_COLORS.secondary}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-            {/* Top movers table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Movers</CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left">
-                      <th className="py-2">Account</th>
-                      <th className="py-2">A</th>
-                      <th className="py-2">B</th>
-                      <th className="py-2">Var $</th>
-                      <th className="py-2">Var %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topMovers.map((m) => (
-                      <tr key={m.account} className="border-t">
-                        <td className="py-1">{m.account}</td>
-                        <td className="py-1">{formatCurrency(m.A)}</td>
-                        <td className="py-1">{formatCurrency(m.B)}</td>
-                        <td className="py-1">{formatCurrency(m.variance)}</td>
-                        <td className="py-1">
-                          {m.variancePct !== null
-                            ? `${m.variancePct.toFixed(1)}%`
-                            : ""}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          </>
-        )}
+        {/* Top movers table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Movers</CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className="py-2">Account</th>
+                  <th className="py-2">A</th>
+                  <th className="py-2">B</th>
+                  <th className="py-2">Var $</th>
+                  <th className="py-2">Var %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topMovers.map((m) => (
+                  <tr key={m.account} className="border-t">
+                    <td className="py-1">{m.account}</td>
+                    <td className="py-1">{formatCurrency(m.A, 0)}</td>
+                    <td className="py-1">{formatCurrency(m.B, 0)}</td>
+                    <td className="py-1">{formatCurrency(m.variance, 0)}</td>
+                    <td className="py-1">
+                      {m.variancePct !== null
+                        ? `${m.variancePct.toFixed(1)}%`
+                        : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
