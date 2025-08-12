@@ -1507,7 +1507,7 @@ export default function FinancialOverviewPage() {
 
             {/* Financial Health Summary */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <AIAssistant />
+              <AIAssistant financialData={financialData} />
 
               {/* Alerts & Notifications */}
               <div className="bg-white rounded-lg shadow-sm overflow-hidden">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import jsPDF from 'jspdf'
 import { Send, FileText } from 'lucide-react'
 
@@ -9,10 +9,51 @@ interface Message {
   content: string
 }
 
-export default function AIAssistant() {
+interface AIAssistantProps {
+  financialData?: unknown
+}
+
+export default function AIAssistant({ financialData }: AIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [insight, setInsight] = useState('')
+  const [insightLoading, setInsightLoading] = useState(false)
+
+  useEffect(() => {
+    const fetchInsights = async () => {
+      setInsightLoading(true)
+      try {
+        const res = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'user',
+                content: `Here is the current financial overview data: ${JSON.stringify(
+                  financialData
+                )}. Provide key insights in a concise summary.`,
+              },
+            ],
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data.error || 'Request failed')
+        }
+        setInsight(data.reply)
+      } catch {
+        setInsight('Unable to load insights at this time.')
+      } finally {
+        setInsightLoading(false)
+      }
+    }
+
+    if (financialData) {
+      fetchInsights()
+    }
+  }, [financialData])
 
   const sendMessage = async () => {
     if (!input.trim()) return
@@ -52,49 +93,57 @@ export default function AIAssistant() {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden flex flex-col h-full">
       <div className="p-6 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">AI Financial Assistant</h3>
-        <div className="text-sm text-gray-600 mt-1">Ask questions to gain CFO-level insights</div>
+        <h3 className="text-lg font-semibold text-gray-900">AI Financial Insights</h3>
+        <div className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">
+          {insightLoading ? 'Analyzing data...' : insight || 'No insights available.'}
+        </div>
       </div>
-      <div className="flex-1 p-6 space-y-4 overflow-y-auto">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`p-3 rounded-lg max-w-[80%] whitespace-pre-wrap ${m.role === 'user' ? 'bg-blue-50 ml-auto' : 'bg-gray-100 mr-auto'}`}
+      <div className="flex-1 flex flex-col">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">AI Financial Assistant</h3>
+          <div className="text-sm text-gray-600 mt-1">Ask questions to gain CFO-level insights</div>
+        </div>
+        <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+          {messages.map((m, i) => (
+            <div
+              key={i}
+              className={`p-3 rounded-lg max-w-[80%] whitespace-pre-wrap ${m.role === 'user' ? 'bg-blue-50 ml-auto' : 'bg-gray-100 mr-auto'}`}
+            >
+              {m.content}
+            </div>
+          ))}
+          {loading && <div className="text-gray-500 text-sm">Thinking...</div>}
+        </div>
+        <div className="p-4 border-t border-gray-200">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              sendMessage()
+            }}
+            className="flex items-center space-x-2"
           >
-            {m.content}
-          </div>
-        ))}
-        {loading && <div className="text-gray-500 text-sm">Thinking...</div>}
-      </div>
-      <div className="p-4 border-t border-gray-200">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            sendMessage()
-          }}
-          className="flex items-center space-x-2"
-        >
-          <input
-            className="flex-1 border rounded px-3 py-2 text-sm"
-            placeholder="Ask a question..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="p-2 bg-blue-600 text-white rounded disabled:opacity-50"
-            disabled={loading}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={downloadReport}
-            className="p-2 border rounded"
-          >
-            <FileText className="w-4 h-4" />
-          </button>
-        </form>
+            <input
+              className="flex-1 border rounded px-3 py-2 text-sm"
+              placeholder="Ask a question..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="p-2 bg-blue-600 text-white rounded disabled:opacity-50"
+              disabled={loading}
+            >
+              <Send className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={downloadReport}
+              className="p-2 border rounded"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )
