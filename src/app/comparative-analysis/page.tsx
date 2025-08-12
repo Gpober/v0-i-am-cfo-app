@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { formatCurrency } from "@/lib/utils"
 import { KPICard } from "@/components/KPICard"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   ResponsiveContainer,
@@ -359,23 +358,26 @@ export default function ComparativeAnalysisPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
+            <div className="flex items-center space-x-3">
+              <button
                 onClick={refresh}
                 disabled={loading}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
+                style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
               >
-                <RefreshCw className="h-4 w-4 mr-1" /> Compare
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
+                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                {loading ? "Loading..." : "Refresh"}
+              </button>
+
+              <button
                 onClick={exportCSV}
                 disabled={!topMovers.length}
+                className="inline-flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
+                style={{ backgroundColor: BRAND_COLORS.primary, "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
               >
-                <Download className="h-4 w-4 mr-1" /> Export CSV
-              </Button>
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </button>
             </div>
           </div>
         </div>
@@ -489,13 +491,16 @@ export default function ComparativeAnalysisPage() {
             const A = datasetA?.kpis[k.key] ?? 0
             const B = datasetB?.kpis[k.key] ?? 0
             const variance = A - B
-            const pct = B !== 0 ? ((variance / B) * 100).toFixed(1) : "0"
+            const change =
+              variance >= 0
+                ? `+${formatCurrency(variance, 0)}`
+                : formatCurrency(variance, 0)
             return (
               <KPICard
                 key={k.key}
                 title={k.title}
                 value={formatCurrency(A, 0)}
-                change={`${variance >= 0 ? "+" : ""}${pct}%`}
+                change={change}
                 positive={variance >= 0}
               />
             )
@@ -504,7 +509,7 @@ export default function ComparativeAnalysisPage() {
 
         {/* Bar chart */}
         <Card>
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle>KPIs Comparison</CardTitle>
           </CardHeader>
           <CardContent className="h-64">
@@ -563,23 +568,23 @@ export default function ComparativeAnalysisPage() {
 
         {/* Top movers table */}
         <Card>
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle>Top Movers</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left">
-                  <th className="py-2">Account</th>
-                  <th className="py-2">A</th>
-                  <th className="py-2">B</th>
-                  <th className="py-2">Var $</th>
-                  <th className="py-2">Var %</th>
+                <tr>
+                  <th className="py-2 text-center">Account</th>
+                  <th className="py-2 text-center">A</th>
+                  <th className="py-2 text-center">B</th>
+                  <th className="py-2 text-center">Var $</th>
+                  <th className="py-2 text-center">Var %</th>
                 </tr>
               </thead>
               <tbody>
                 {topMovers.map((m) => (
-                  <tr key={m.account} className="border-t">
+                  <tr key={m.account} className="border-t text-center">
                     <td className="py-1">{m.account}</td>
                     <td className="py-1">{formatCurrency(m.A, 0)}</td>
                     <td className="py-1">{formatCurrency(m.B, 0)}</td>
