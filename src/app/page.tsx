@@ -1041,6 +1041,12 @@ export default function FinancialOverviewPage() {
     )
   }
 
+  const { startDate: aiStart, endDate: aiEnd } = calculateDateRange()
+  const aiClass =
+    selectedClasses.size === 1 && !selectedClasses.has('All Classes')
+      ? Array.from(selectedClasses)[0]
+      : 'All'
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -1507,7 +1513,7 @@ export default function FinancialOverviewPage() {
 
             {/* Financial Health Summary */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <AIAssistant financialData={financialData} />
+              <AIAssistant filters={{ startDate: aiStart, endDate: aiEnd, class: aiClass }} />
 
               {/* Alerts & Notifications */}
               <div className="bg-white rounded-lg shadow-sm overflow-hidden">
