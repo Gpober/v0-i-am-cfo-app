@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseServer } from '@/lib/supabaseServer'
 
 export const runtime = 'nodejs'
 export const config = { api: { bodyParser: { sizeLimit: '5mb' } } }
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
     }
 
-    let query = supabase
+    let query = supabaseServer
       .from('journal_entry_lines_rows')
       .select(
         'class, class_name, account_name, account_type, report_category, vendor, debit, credit, amount, is_cash_account'
@@ -35,8 +35,11 @@ export async function POST(req: NextRequest) {
       .gte('date', startDate)
       .lte('date', endDate)
 
-    const normalized = String(className).toLowerCase()
-    if (!['all', 'all classes', 'all class'].includes(normalized)) {
+    const isAll =
+      className === 'All' ||
+      className === 'All Classes' ||
+      className === 'All Class'
+    if (!isAll) {
       const escaped = String(className).replace(/"/g, '\\"')
       query = query.or(`class.eq."${escaped}",class_name.eq."${escaped}"`)
     }
@@ -155,13 +158,16 @@ export async function POST(req: NextRequest) {
       anomalies,
     }
 
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: 'Missing OpenAI API key' }, { status: 500 })
+    if (new URL(req.url).searchParams.get('debug') === '1') {
+      return NextResponse.json({ summary, aiInsights: '[debug] skipped OpenAI' })
     }
 
-    if (req.nextUrl.searchParams.get('debug') === '1') {
-      return NextResponse.json({ summary, aiInsights: '[debug] skipped OpenAI' })
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Missing OPENAI_API_KEY' },
+        { status: 500 }
+      )
     }
 
     const prompt =
@@ -191,12 +197,9 @@ export async function POST(req: NextRequest) {
     })
 
     if (!openaiRes.ok) {
-      let details
-      try {
-        details = await openaiRes.json()
-      } catch {
-        details = await openaiRes.text()
-      }
+      const details = await openaiRes
+        .json()
+        .catch(async () => ({ raw: await openaiRes.text() }))
       console.error('OpenAI error:', details)
       return NextResponse.json(
         { error: 'OpenAIError', details },
@@ -211,8 +214,14 @@ export async function POST(req: NextRequest) {
       ''
 
     return NextResponse.json({ summary, aiInsights })
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('AI route error', e)
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    return NextResponse.json(
+      {
+        error: 'ServerError',
+        message: (e as Error)?.message ?? 'Unknown error',
+      },
+      { status: 500 }
+    )
   }
 }
