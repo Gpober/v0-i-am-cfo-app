@@ -471,8 +471,8 @@ export default function EnhancedMobileDashboard() {
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           <Image
-            src="/iamcfo-blue-logo.jpg"
-            alt="I AM CFO Logo"
+            src="/I%20am%20CFO%20Blue.jpg"
+            alt="I am CFO blue logo"
             width={200}
             height={60}
             className="mx-auto"
