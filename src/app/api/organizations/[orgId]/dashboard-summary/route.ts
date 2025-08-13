@@ -87,7 +87,8 @@ export async function GET(req: Request) {
   }> = {}
 
   ;(data || []).forEach((tx: Entry) => {
-    const property = tx.class || "Unassigned"
+    // Group transactions without a class under "General"
+    const property = tx.class || "General"
     if (!map[property]) {
       map[property] = {
         name: property,
@@ -111,11 +112,20 @@ export async function GET(req: Request) {
     }
   })
 
-  const propertyBreakdown = Object.values(map).map((p) => {
-    p.grossProfit = p.revenue - p.cogs
-    p.netIncome = p.grossProfit - p.operatingExpenses
-    return p
-  })
+  const propertyBreakdown = Object.values(map)
+    .map((p) => {
+      p.grossProfit = p.revenue - p.cogs
+      p.netIncome = p.grossProfit - p.operatingExpenses
+      return p
+    })
+    // Only return properties with financial activity
+    .filter(
+      (p) =>
+        p.revenue !== 0 ||
+        p.operatingExpenses !== 0 ||
+        p.cogs !== 0 ||
+        p.netIncome !== 0,
+    )
 
   return NextResponse.json({ propertyBreakdown })
 }

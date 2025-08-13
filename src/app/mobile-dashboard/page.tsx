@@ -1,7 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Menu, X, ChevronLeft } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  Menu,
+  X,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
 interface PropertySummary {
@@ -25,6 +33,9 @@ interface Transaction {
 
 export default function MobileDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [timeMenuOpen, setTimeMenuOpen] = useState(false);
+  const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
+  const [timePeriod, setTimePeriod] = useState("YTD");
   const [view, setView] = useState<"overview" | "summary" | "pl" | "detail">(
     "overview",
   );
@@ -43,10 +54,30 @@ export default function MobileDashboard() {
         "/api/organizations/1/dashboard-summary?includeProperties=true",
       );
       const json = await res.json();
-      setProperties(json.propertyBreakdown || []);
+      const active = (json.propertyBreakdown || []).filter(
+        (p: PropertySummary) =>
+          p.revenue !== 0 || p.operatingExpenses !== 0 || p.cogs !== 0,
+      );
+      setProperties(active);
     };
     load();
   }, []);
+
+  const revenueKing = useMemo(() => {
+    if (!properties.length) return null;
+    return properties.reduce((max, p) =>
+      p.revenue > max.revenue ? p : max,
+    properties[0]).name;
+  }, [properties]);
+
+  const marginMaster = useMemo(() => {
+    if (!properties.length) return null;
+    return properties.reduce((max, p) => {
+      const marginP = p.revenue ? p.netIncome / p.revenue : 0;
+      const marginM = max.revenue ? max.netIncome / max.revenue : 0;
+      return marginP > marginM ? p : max;
+    }, properties[0]).name;
+  }, [properties]);
 
   const companyTotals = properties.reduce(
     (acc, p) => {
@@ -102,7 +133,10 @@ export default function MobileDashboard() {
       .gte("date", start)
       .lte("date", end);
     if (selectedProperty) {
-      query = query.eq("class", selectedProperty);
+      query =
+        selectedProperty === "General"
+          ? query.is("class", null)
+          : query.eq("class", selectedProperty);
     }
     const { data } = await query;
     const rev: Record<string, number> = {};
@@ -144,7 +178,10 @@ export default function MobileDashboard() {
       .gte("date", start)
       .lte("date", end);
     if (selectedProperty) {
-      query = query.eq("class", selectedProperty);
+      query =
+        selectedProperty === "General"
+          ? query.is("class", null)
+          : query.eq("class", selectedProperty);
     }
     const { data } = await query;
     const list: Transaction[] = (data || [])
@@ -181,7 +218,15 @@ export default function MobileDashboard() {
         >
           {menuOpen ? <X /> : <Menu />}
         </button>
-        <h1 className="text-lg font-bold">I AM CFO</h1>
+        <div className="flex items-center gap-2">
+          <Image
+            src="/placeholder-logo.svg"
+            alt="I AM CFO"
+            width={32}
+            height={32}
+          />
+          <span className="text-lg font-bold">I AM CFO</span>
+        </div>
       </header>
 
       {menuOpen && (
@@ -196,8 +241,55 @@ export default function MobileDashboard() {
             >
               Overview
             </li>
-            <li className="menu-item p-2 rounded">Time Periods</li>
-            <li className="menu-item p-2 rounded">Reports</li>
+            <li className="menu-item p-2 rounded">
+              <div
+                className="flex justify-between items-center"
+                onClick={() => setTimeMenuOpen(!timeMenuOpen)}
+              >
+                <span>Time Periods ({timePeriod})</span>
+                {timeMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
+              {timeMenuOpen && (
+                <ul className="mt-2 space-y-1 pl-4">
+                  {['YTD', 'Monthly', 'Quarterly'].map((tp) => (
+                    <li
+                      key={tp}
+                      className="p-1"
+                      onClick={() => {
+                        setTimePeriod(tp);
+                        setMenuOpen(false);
+                        setTimeMenuOpen(false);
+                      }}
+                    >
+                      {tp}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+            <li className="menu-item p-2 rounded">
+              <div
+                className="flex justify-between items-center"
+                onClick={() => setReportsMenuOpen(!reportsMenuOpen)}
+              >
+                <span>Reports</span>
+                {reportsMenuOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
+              {reportsMenuOpen && (
+                <ul className="mt-2 space-y-1 pl-4">
+                  <li className="p-1">
+                    <Link href="/financials" onClick={() => setMenuOpen(false)}>
+                      P&L
+                    </Link>
+                  </li>
+                  <li className="p-1">
+                    <Link href="/cash-flow" onClick={() => setMenuOpen(false)}>
+                      Cash Flow
+                    </Link>
+                  </li>
+                </ul>
+              )}
+            </li>
             <li className="menu-item p-2 rounded">Settings</li>
           </ul>
         </nav>
@@ -215,24 +307,40 @@ export default function MobileDashboard() {
             </span>
           </div>
           <div className="flex flex-wrap justify-between gap-3">
-            {properties.map((p) => (
-              <div
-                key={p.name}
-                className={`property-kpi p-3 flex flex-col justify-between ${selectedProperty === p.name ? "active" : ""}`}
-                onClick={() => handlePropertySelect(p.name)}
-              >
-                <span className="font-semibold">{p.name}</span>
-                <span className="text-xs">
-                  Revenue {formatCurrency(p.revenue)}
-                </span>
-                <span className="text-xs">
-                  Expenses {formatCurrency(p.operatingExpenses + p.cogs)}
-                </span>
-                <span className="text-xs">
-                  Net {formatCurrency(p.netIncome)}
-                </span>
-              </div>
-            ))}
+            {properties.map((p) => {
+              const isRevenueKing = p.name === revenueKing;
+              const isMarginMaster = p.name === marginMaster;
+              return (
+                <div
+                  key={p.name}
+                  className={`property-kpi p-3 flex flex-col justify-between ${selectedProperty === p.name ? "active" : ""}`}
+                  onClick={() => handlePropertySelect(p.name)}
+                >
+                  <span className="font-semibold flex justify-between items-center">
+                    {p.name}
+                    <span>
+                      {isRevenueKing && <span title="Revenue King">👑</span>}
+                      {isMarginMaster && <span title="Margin Master">🏅</span>}
+                    </span>
+                  </span>
+                  <span className="text-xs">
+                    Revenue {formatCurrency(p.revenue)}
+                  </span>
+                  <span className="text-xs">
+                    Expenses {formatCurrency(p.operatingExpenses + p.cogs)}
+                  </span>
+                  <span className="text-xs">
+                    Net {formatCurrency(p.netIncome)}
+                  </span>
+                  {isRevenueKing && (
+                    <span className="text-xs">👑 Revenue King</span>
+                  )}
+                  {isMarginMaster && (
+                    <span className="text-xs">🏅 Margin Master</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
