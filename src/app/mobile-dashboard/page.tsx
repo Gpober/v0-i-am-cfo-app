@@ -50,6 +50,7 @@ interface Transaction {
   running: number;
   payee?: string | null;
   memo?: string | null;
+  className?: string | null;
 }
 
 interface JournalRow {
@@ -124,6 +125,11 @@ export default function EnhancedMobileDashboard() {
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const transactionTotal = useMemo(
+    () => transactions.reduce((sum, t) => sum + t.amount, 0),
+    [transactions],
+  );
 
   const classifyTransaction = (
     accountType: string | null,
@@ -423,6 +429,7 @@ export default function EnhancedMobileDashboard() {
           running: 0,
           payee: row.customer || row.vendor || row.name,
           memo: row.memo,
+          className: row.class,
         };
       });
     let run = 0;
@@ -483,7 +490,12 @@ export default function EnhancedMobileDashboard() {
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <span style={{ fontSize: '28px', fontWeight: 'bold', color: 'white' }}>I AM CFO</span>
+          <span
+            onClick={() => handlePropertySelect(null)}
+            style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', cursor: 'pointer' }}
+          >
+            I AM CFO
+          </span>
         </div>
 
         {/* Dashboard Summary */}
@@ -1152,6 +1164,39 @@ export default function EnhancedMobileDashboard() {
               );
             })}
           </div>
+          <div
+            onClick={() => handlePropertySelect(null)}
+            style={{
+              marginTop: '24px',
+              background: 'white',
+              borderRadius: '16px',
+              padding: '18px',
+              cursor: 'pointer',
+              border: `2px solid ${BRAND_COLORS.gray[200]}`,
+              textAlign: 'center',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
+            }}
+          >
+            <span
+              style={{
+                fontWeight: '700',
+                fontSize: '15px',
+                color: BRAND_COLORS.accent
+              }}
+            >
+              Company Total Net {reportType === "pl" ? "Income" : "Cash"}
+            </span>
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: '800',
+                marginTop: '4px',
+                color: companyTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
+              }}
+            >
+              {formatCompactCurrency(companyTotals.net)}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1466,6 +1511,9 @@ export default function EnhancedMobileDashboard() {
                     {t.payee && (
                       <div style={{ fontSize: '13px', color: '#475569' }}>{t.payee}</div>
                     )}
+                    {t.className && (
+                      <div style={{ fontSize: '12px', color: '#475569' }}>{t.className}</div>
+                    )}
                     {t.memo && (
                       <div style={{ fontSize: '12px', color: '#64748b' }}>{t.memo}</div>
                     )}
@@ -1493,6 +1541,17 @@ export default function EnhancedMobileDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+          <div
+            style={{
+              marginTop: '16px',
+              textAlign: 'right',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: transactionTotal >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+            }}
+          >
+            Total Net Income: {formatCurrency(transactionTotal)}
           </div>
         </div>
       )}
