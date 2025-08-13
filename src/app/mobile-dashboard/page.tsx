@@ -811,7 +811,7 @@ export default function EnhancedMobileDashboard() {
                           GROWTH HERO
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties[Math.floor(Math.random() * properties.length)].name}
+                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
                         </div>
                       </div>
                     </div>
@@ -871,7 +871,7 @@ export default function EnhancedMobileDashboard() {
                           EFFICIENCY ACE
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties[Math.floor(Math.random() * properties.length)].name}
+                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
                         </div>
                       </div>
                     </div>
@@ -890,7 +890,7 @@ export default function EnhancedMobileDashboard() {
                           STABILITY PRO
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties[Math.floor(Math.random() * properties.length)].name}
+                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
                         </div>
                       </div>
                     </div>
