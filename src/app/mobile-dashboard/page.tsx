@@ -357,6 +357,7 @@ export default function EnhancedMobileDashboard() {
     const { data } = await query;
     const op: Record<string, number> = {};
     const fin: Record<string, number> = {};
+    const accountTypes: Record<string, string | null> = {};
     ((data as JournalRow[]) || []).forEach((row) => {
       const debit = Number(row.debit) || 0;
       const credit = Number(row.credit) || 0;
@@ -368,13 +369,31 @@ export default function EnhancedMobileDashboard() {
       );
       if (classification === "operating") {
         op[row.account] = (op[row.account] || 0) + amount;
+        accountTypes[row.account] = row.account_type;
       } else if (classification === "financing") {
         fin[row.account] = (fin[row.account] || 0) + amount;
+        accountTypes[row.account] = row.account_type;
       }
     });
+    const opEntries = Object.entries(op);
+    const incomeOps = opEntries
+      .filter(([name]) =>
+        (accountTypes[name] || "").toLowerCase().includes("income"),
+      )
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    const otherOps = opEntries
+      .filter(([name]) =>
+        !(accountTypes[name] || "").toLowerCase().includes("income"),
+      )
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    const finEntries = Object.entries(fin)
+      .sort((a, b) => a[0].localeCompare(b[0]));
     setCfData({
-      operating: Object.entries(op).map(([name, total]) => ({ name, total })),
-      financing: Object.entries(fin).map(([name, total]) => ({ name, total })),
+      operating: [...incomeOps, ...otherOps].map(([name, total]) => ({
+        name,
+        total,
+      })),
+      financing: finEntries.map(([name, total]) => ({ name, total })),
     });
   };
 
@@ -469,8 +488,7 @@ export default function EnhancedMobileDashboard() {
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <div className="mx-auto flex items-center space-x-4">
-            <div className="w-14 h-14 rounded-full bg-white" />
+          <div className="mx-auto">
             <span className="text-white text-4xl font-bold">I AM CFO</span>
           </div>
         </div>
