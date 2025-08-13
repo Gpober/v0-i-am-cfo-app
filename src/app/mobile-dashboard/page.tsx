@@ -6,7 +6,6 @@ import {
   X,
   ChevronLeft,
   TrendingUp,
-  DollarSign,
   Award,
   AlertTriangle,
   CheckCircle,
@@ -456,9 +455,10 @@ export default function EnhancedMobileDashboard() {
         color: 'white',
         boxShadow: `0 8px 32px ${BRAND_COLORS.primary}33`
       }}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="relative flex items-center justify-center mb-4">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
+            className="absolute left-0"
             style={{
               background: 'rgba(255, 255, 255, 0.2)',
               border: 'none',
@@ -469,10 +469,7 @@ export default function EnhancedMobileDashboard() {
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <div className="flex items-center gap-2">
-            <DollarSign size={32} />
-            <span style={{ fontSize: '20px', fontWeight: 'bold' }}>I AM CFO</span>
-          </div>
+          <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>I AM CFO</span>
         </div>
 
         {/* Dashboard Summary */}
