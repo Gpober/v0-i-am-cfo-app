@@ -6,13 +6,13 @@ import {
   X,
   ChevronLeft,
   TrendingUp,
-  DollarSign,
   Award,
   AlertTriangle,
   CheckCircle,
   Target,
   type LucideIcon,
 } from "lucide-react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 
 // I AM CFO Brand Colors
@@ -456,7 +456,7 @@ export default function EnhancedMobileDashboard() {
         color: 'white',
         boxShadow: `0 8px 32px ${BRAND_COLORS.primary}33`
       }}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="relative flex items-center justify-center mb-4">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             style={{
@@ -466,13 +466,17 @@ export default function EnhancedMobileDashboard() {
               padding: '8px',
               color: 'white'
             }}
+            className="absolute left-0 top-1/2 -translate-y-1/2"
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <div className="flex items-center gap-2">
-            <DollarSign size={32} />
-            <span style={{ fontSize: '20px', fontWeight: 'bold' }}>I AM CFO</span>
-          </div>
+          <Image
+            src="/I%20am%20CFO%20Blue.jpg"
+            alt="I am CFO blue logo"
+            width={200}
+            height={60}
+            className="mx-auto"
+          />
         </div>
 
         {/* Dashboard Summary */}
