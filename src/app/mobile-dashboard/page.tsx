@@ -12,7 +12,6 @@ import {
   Target,
   type LucideIcon,
 } from "lucide-react";
-import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 
 // I AM CFO Brand Colors
@@ -470,13 +469,10 @@ export default function EnhancedMobileDashboard() {
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <Image
-            src="/I%20am%20CFO%20Blue.jpg"
-            alt="I am CFO blue logo"
-            width={200}
-            height={60}
-            className="mx-auto"
-          />
+          <div className="mx-auto flex items-center space-x-4">
+            <div className="w-14 h-14 rounded-full bg-white" />
+            <span className="text-white text-4xl font-bold">I AM CFO</span>
+          </div>
         </div>
 
         {/* Dashboard Summary */}
