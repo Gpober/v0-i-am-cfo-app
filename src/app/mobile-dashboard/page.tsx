@@ -1,45 +1,19 @@
-useEffect(() => {
-    const load = async () => {
-      // TODO: Replace this with your actual Supabase query
-      // const { start, end } = getDateRange();
-      // const query = supabase
-      //   .from("journal_entry_lines")
-      //   .select("account_type, report_category, normal_balance, debit, credit, class, date")
-      //   .gte("date", start)
-      //   .lte("date", end);
-      // const { data } = await query;
-      
-      // Mock data for demonstration - replace with your actual data
-      const mockData: JournalRow[] = [
-        {
-          account: "Rental Revenue - Airbnb",
-          account_type: "Income",
-          debit: 0,
-          credit: 125000,
-          class: "Property A",
-          date: "2024-08-15"
-        },
-        {
-          account: "Property Management",
-          account_type: "Expense", 
-          debit: 25000,
-          credit: 0,
-          class: "Property A",
-          date: "2024-08-15"
-        },
-        {
-          account: "Rental Revenue - Direct",
-          account_type: "Income",
-          debit: 0,
-          credit: 180000,
-          class: "Property B",
-          date: "2024-08-15"
-        },
-        {
-          account: ""use client";
+"use client";
 
+import Image from "next/image";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Menu, X, ChevronLeft, TrendingUp, TrendingDown, DollarSign, PieChart, Award, AlertTriangle, CheckCircle, Target } from "lucide-react";
+import {
+  Menu,
+  X,
+  ChevronLeft,
+  TrendingUp,
+  Award,
+  AlertTriangle,
+  CheckCircle,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 // I AM CFO Brand Colors
 const BRAND_COLORS = {
@@ -75,6 +49,8 @@ interface Transaction {
   date: string;
   amount: number;
   running: number;
+  memo?: string | null;
+  payee?: string | null;
 }
 
 interface JournalRow {
@@ -83,24 +59,45 @@ interface JournalRow {
   debit: number | null;
   credit: number | null;
   class: string | null;
+  memo?: string | null;
+  customer?: string | null;
+  vendor?: string | null;
+  name?: string | null;
   report_category?: string | null;
   normal_balance?: number | null;
   date: string;
 }
 
-type PlSummary = {
-  revenue: number;
-  expenses: number;
-  net: number;
-  margin: number;
+const getMonthName = (m: number) =>
+  new Date(0, m - 1).toLocaleString("en-US", { month: "long" });
+
+type Insight = {
+  title: string;
+  message: string;
+  icon: LucideIcon;
+  type: "success" | "warning" | "info";
 };
 
-type CfSummary = {
-  operating: number;
-  financing: number;
-  net: number;
-  margin: number;
-};
+const insights: Insight[] = [
+  {
+    title: "Revenue trending up",
+    message: "Revenue increased compared to last period.",
+    icon: TrendingUp,
+    type: "success",
+  },
+  {
+    title: "Expense spike detected",
+    message: "Expenses rose faster than revenue this period.",
+    icon: AlertTriangle,
+    type: "warning",
+  },
+  {
+    title: "Stable cash position",
+    message: "Cash flow remains steady.",
+    icon: CheckCircle,
+    type: "info",
+  },
+];
 
 export default function EnhancedMobileDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -291,13 +288,6 @@ export default function EnhancedMobileDashboard() {
     { revenue: 0, expenses: 0, net: 0, operating: 0, financing: 0 },
   );
 
-  const margin = reportType === "pl"
-    ? companyTotals.revenue
-      ? (companyTotals.net / companyTotals.revenue) * 100
-      : 0
-    : companyTotals.operating
-    ? (companyTotals.net / companyTotals.operating) * 100
-    : 0;
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("en-US", {
@@ -315,23 +305,25 @@ export default function EnhancedMobileDashboard() {
     return formatCurrency(n);
   };
 
-  const handlePropertySelect = (name: string | null) => {
+  const handlePropertySelect = async (name: string | null) => {
     setSelectedProperty(name);
-    setView("report"); // Go directly to P&L/Cash Flow report
+    if (reportType === "pl") await loadPL(name);
+    else await loadCF(name);
+    setView("report");
   };
 
-  const loadPL = async () => {
+  const loadPL = async (propertyName: string | null = selectedProperty) => {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
       .select("account, account_type, debit, credit, class, date")
       .gte("date", start)
       .lte("date", end);
-    if (selectedProperty) {
+    if (propertyName) {
       query =
-        selectedProperty === "General"
+        propertyName === "General"
           ? query.is("class", null)
-          : query.eq("class", selectedProperty);
+          : query.eq("class", propertyName);
     }
     const { data } = await query;
     const rev: Record<string, number> = {};
@@ -354,7 +346,7 @@ export default function EnhancedMobileDashboard() {
     });
   };
 
-  const loadCF = async () => {
+  const loadCF = async (propertyName: string | null = selectedProperty) => {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
@@ -363,11 +355,11 @@ export default function EnhancedMobileDashboard() {
       )
       .gte("date", start)
       .lte("date", end);
-    if (selectedProperty) {
+    if (propertyName) {
       query =
-        selectedProperty === "General"
+        propertyName === "General"
           ? query.is("class", null)
-          : query.eq("class", selectedProperty);
+          : query.eq("class", propertyName);
     }
     const { data } = await query;
     const op: Record<string, number> = {};
@@ -393,11 +385,6 @@ export default function EnhancedMobileDashboard() {
     });
   };
 
-  const handleViewReport = async () => {
-    if (reportType === "pl") await loadPL();
-    else await loadCF();
-    setView("report");
-  };
 
   const handleCategory = async (
     account: string,
@@ -406,7 +393,9 @@ export default function EnhancedMobileDashboard() {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
-      .select("date, debit, credit, account, class, report_category")
+      .select(
+        "date, debit, credit, account, class, report_category, memo, customer, vendor, name",
+      )
       .eq("account", account)
       .gte("date", start)
       .lte("date", end);
@@ -429,7 +418,8 @@ export default function EnhancedMobileDashboard() {
           amount =
             row.report_category === "transfer" ? debit - credit : credit - debit;
         }
-        return { date: row.date, amount, running: 0 };
+        const payee = row.name || row.vendor || row.customer || null;
+        return { date: row.date, amount, running: 0, memo: row.memo, payee };
       });
     let run = 0;
     list.forEach((t) => {
@@ -489,8 +479,7 @@ export default function EnhancedMobileDashboard() {
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           <div className="flex items-center gap-2">
-            <DollarSign size={32} />
-            <span style={{ fontSize: '20px', fontWeight: 'bold' }}>I AM CFO</span>
+            <Image src="/iamcfo-logo.jpg" alt="I AM CFO" width={40} height={40} />
           </div>
         </div>
 
@@ -830,7 +819,7 @@ export default function EnhancedMobileDashboard() {
                           GROWTH HERO
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties[Math.floor(Math.random() * properties.length)].name}
+                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
                         </div>
                       </div>
                     </div>
@@ -890,7 +879,7 @@ export default function EnhancedMobileDashboard() {
                           EFFICIENCY ACE
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties[Math.floor(Math.random() * properties.length)].name}
+                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
                         </div>
                       </div>
                     </div>
@@ -909,7 +898,7 @@ export default function EnhancedMobileDashboard() {
                           STABILITY PRO
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties[Math.floor(Math.random() * properties.length)].name}
+                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
                         </div>
                       </div>
                     </div>
@@ -1445,36 +1434,78 @@ export default function EnhancedMobileDashboard() {
 
           <div style={{ display: 'grid', gap: '12px' }}>
             {transactions.map((t, idx) => (
-              <div key={idx} style={{
-                background: 'white',
-                borderRadius: '8px',
-                padding: '16px',
-                border: `1px solid ${BRAND_COLORS.gray[200]}`,
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>
-                    {new Date(t.date).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </span>
-                  <span style={{ 
-                    fontSize: '16px', 
-                    fontWeight: '600',
-                    color: t.amount >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
-                  }}>
+              <div
+                key={idx}
+                style={{
+                  background: 'white',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: t.memo ? '8px' : '4px'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>
+                      {new Date(t.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </div>
+                    {t.payee && (
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          color: '#64748b',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {t.payee}
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: t.amount >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
+                    }}
+                  >
                     {formatCurrency(t.amount)}
                   </span>
                 </div>
-                <div style={{ 
-                  fontSize: '12px', 
-                  color: '#64748b', 
-                  textAlign: 'right',
-                  borderTop: `1px solid ${BRAND_COLORS.gray[100]}`,
-                  paddingTop: '8px'
-                }}>
+                {t.memo && (
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: '#64748b',
+                      marginBottom: '4px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {t.memo}
+                  </div>
+                )}
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#64748b',
+                    textAlign: 'right',
+                    borderTop: `1px solid ${BRAND_COLORS.gray[100]}`,
+                    paddingTop: '8px'
+                  }}
+                >
                   Running Total: {formatCurrency(t.running)}
                 </div>
               </div>
