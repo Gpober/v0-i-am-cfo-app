@@ -6,7 +6,6 @@ import {
   X,
   ChevronLeft,
   TrendingUp,
-  DollarSign,
   Award,
   AlertTriangle,
   CheckCircle,
@@ -148,8 +147,7 @@ interface PropertySummary {
         color: 'white',
         boxShadow: `0 8px 32px ${BRAND_COLORS.primary}33`
       }}>
-        <div className="flex items-center justify-between mb-4">
-        <div className="relative flex items-center justify-center mb-4">
+        <div className="relative mb-4 flex items-center justify-center">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             style={{
@@ -163,12 +161,7 @@ interface PropertySummary {
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <div className="flex items-center gap-2">
-            <DollarSign size={32} />
-            <span style={{ fontSize: '20px', fontWeight: 'bold' }}>I AM CFO</span>
-          <div className="mx-auto">
-            <span className="text-white text-4xl font-bold">I AM CFO</span>
-          </div>
+          <span className="text-white text-4xl font-bold">I AM CFO</span>
         </div>
 
         {/* Dashboard Summary */}
