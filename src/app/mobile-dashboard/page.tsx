@@ -31,6 +31,8 @@ interface JournalRow {
   debit: number | null;
   credit: number | null;
   class: string | null;
+  report_category?: string | null;
+  normal_balance?: number | null;
   date: string;
 }
 
@@ -72,6 +74,39 @@ export default function MobileDashboard() {
   }>({ operating: [], financing: [] });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const classifyTransaction = (
+    accountType: string | null,
+    reportCategory: string | null,
+  ) => {
+    const typeLower = accountType?.toLowerCase() || "";
+    if (reportCategory === "transfer") return "transfer";
+    if (
+      typeLower === "income" ||
+      typeLower === "other income" ||
+      typeLower === "expenses" ||
+      typeLower === "expense" ||
+      typeLower === "cost of goods sold" ||
+      typeLower === "accounts receivable" ||
+      typeLower === "accounts payable"
+    )
+      return "operating";
+    if (
+      typeLower === "fixed assets" ||
+      typeLower === "other assets" ||
+      typeLower === "property, plant & equipment"
+    )
+      return "investing";
+    if (
+      typeLower === "long term liabilities" ||
+      typeLower === "equity" ||
+      typeLower === "credit card" ||
+      typeLower === "other current liabilities" ||
+      typeLower === "line of credit"
+    )
+      return "financing";
+    return "other";
+  };
 
   const getDateRange = useCallback(() => {
     const y = year;
@@ -121,7 +156,9 @@ export default function MobileDashboard() {
       const { start, end } = getDateRange();
       const query = supabase
         .from("journal_entry_lines")
-        .select("account_type, debit, credit, class, date")
+        .select(
+          "account_type, report_category, normal_balance, debit, credit, class, date",
+        )
         .gte("date", start)
         .lte("date", end);
       const { data } = await query;
@@ -133,8 +170,8 @@ export default function MobileDashboard() {
         }
         const debit = Number(row.debit) || 0;
         const credit = Number(row.credit) || 0;
-        const t = (row.account_type || "").toLowerCase();
         if (reportType === "pl") {
+          const t = (row.account_type || "").toLowerCase();
           if (t.includes("income") || t.includes("revenue")) {
             map[cls].revenue = (map[cls].revenue || 0) + (credit - debit);
             map[cls].netIncome = (map[cls].netIncome || 0) + (credit - debit);
@@ -144,11 +181,16 @@ export default function MobileDashboard() {
             map[cls].netIncome = (map[cls].netIncome || 0) - amt;
           }
         } else {
-          const cash = credit - debit;
-          if (t.includes("operating")) {
-            map[cls].operating = (map[cls].operating || 0) + cash;
-          } else if (t.includes("financing")) {
-            map[cls].financing = (map[cls].financing || 0) + cash;
+          const amount =
+            row.report_category === "transfer" ? debit - credit : credit - debit;
+          const classification = classifyTransaction(
+            row.account_type,
+            row.report_category,
+          );
+          if (classification === "operating") {
+            map[cls].operating = (map[cls].operating || 0) + amount;
+          } else if (classification === "financing") {
+            map[cls].financing = (map[cls].financing || 0) + amount;
           }
         }
       });
@@ -289,7 +331,9 @@ export default function MobileDashboard() {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
-      .select("account, account_type, debit, credit, class, date")
+      .select(
+        "account, account_type, report_category, normal_balance, debit, credit, class, date",
+      )
       .gte("date", start)
       .lte("date", end);
     if (selectedProperty) {
@@ -304,11 +348,15 @@ export default function MobileDashboard() {
     ((data as JournalRow[]) || []).forEach((row) => {
       const debit = Number(row.debit) || 0;
       const credit = Number(row.credit) || 0;
-      const t = (row.account_type || "").toLowerCase();
-      const amount = credit - debit;
-      if (t.includes("operating")) {
+      const amount =
+        row.report_category === "transfer" ? debit - credit : credit - debit;
+      const classification = classifyTransaction(
+        row.account_type,
+        row.report_category,
+      );
+      if (classification === "operating") {
         op[row.account] = (op[row.account] || 0) + amount;
-      } else if (t.includes("financing")) {
+      } else if (classification === "financing") {
         fin[row.account] = (fin[row.account] || 0) + amount;
       }
     });
@@ -331,7 +379,7 @@ export default function MobileDashboard() {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
-      .select("date, debit, credit, account, class")
+      .select("date, debit, credit, account, class, report_category")
       .eq("account", account)
       .gte("date", start)
       .lte("date", end);
@@ -351,7 +399,8 @@ export default function MobileDashboard() {
         if (reportType === "pl") {
           amount = type === "revenue" ? credit - debit : debit - credit;
         } else {
-          amount = credit - debit;
+          amount =
+            row.report_category === "transfer" ? debit - credit : credit - debit;
         }
         return { date: row.date, amount, running: 0 };
       });
