@@ -48,6 +48,8 @@ interface Transaction {
   date: string;
   amount: number;
   running: number;
+  payee?: string | null;
+  memo?: string | null;
 }
 
 interface JournalRow {
@@ -59,6 +61,10 @@ interface JournalRow {
   report_category?: string | null;
   normal_balance?: number | null;
   date: string;
+  memo?: string | null;
+  customer?: string | null;
+  vendor?: string | null;
+  name?: string | null;
 }
 
 const getMonthName = (m: number) =>
@@ -386,7 +392,9 @@ export default function EnhancedMobileDashboard() {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
-      .select("date, debit, credit, account, class, report_category")
+      .select(
+        "date, debit, credit, account, class, report_category, memo, customer, vendor, name",
+      )
       .eq("account", account)
       .gte("date", start)
       .lte("date", end);
@@ -409,7 +417,13 @@ export default function EnhancedMobileDashboard() {
           amount =
             row.report_category === "transfer" ? debit - credit : credit - debit;
         }
-        return { date: row.date, amount, running: 0 };
+        return {
+          date: row.date,
+          amount,
+          running: 0,
+          payee: row.customer || row.vendor || row.name,
+          memo: row.memo,
+        };
       });
     let run = 0;
     list.forEach((t) => {
@@ -469,7 +483,7 @@ export default function EnhancedMobileDashboard() {
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>I AM CFO</span>
+          <span style={{ fontSize: '28px', fontWeight: 'bold', color: 'white' }}>I AM CFO</span>
         </div>
 
         {/* Dashboard Summary */}
@@ -1423,36 +1437,58 @@ export default function EnhancedMobileDashboard() {
 
           <div style={{ display: 'grid', gap: '12px' }}>
             {transactions.map((t, idx) => (
-              <div key={idx} style={{
-                background: 'white',
-                borderRadius: '8px',
-                padding: '16px',
-                border: `1px solid ${BRAND_COLORS.gray[200]}`,
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>
-                    {new Date(t.date).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </span>
-                  <span style={{ 
-                    fontSize: '16px', 
-                    fontWeight: '600',
-                    color: t.amount >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
-                  }}>
+              <div
+                key={idx}
+                style={{
+                  background: 'white',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>
+                      {new Date(t.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </div>
+                    {t.payee && (
+                      <div style={{ fontSize: '13px', color: '#475569' }}>{t.payee}</div>
+                    )}
+                    {t.memo && (
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>{t.memo}</div>
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: t.amount >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+                    }}
+                  >
                     {formatCurrency(t.amount)}
                   </span>
                 </div>
-                <div style={{ 
-                  fontSize: '12px', 
-                  color: '#64748b', 
-                  textAlign: 'right',
-                  borderTop: `1px solid ${BRAND_COLORS.gray[100]}`,
-                  paddingTop: '8px'
-                }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#64748b',
+                    textAlign: 'right',
+                    borderTop: `1px solid ${BRAND_COLORS.gray[100]}`,
+                    paddingTop: '8px',
+                  }}
+                >
                   Running Total: {formatCurrency(t.running)}
                 </div>
               </div>
