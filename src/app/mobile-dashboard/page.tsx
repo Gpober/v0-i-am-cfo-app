@@ -1,332 +1,329 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Menu, X, ChevronLeft } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { Menu, X, ChevronLeft } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
-interface Transaction {
-  date: string
-  amount: number
+interface PropertySummary {
+  name: string;
+  revenue: number;
+  operatingExpenses: number;
+  netIncome: number;
+  cogs: number;
 }
 
 interface Category {
-  name: string
-  total: number
-  transactions: Transaction[]
+  name: string;
+  total: number;
 }
 
-interface PropertyData {
-  id: string
-  name: string
-  revenue: number
-  expenses: number
-  netIncome: number
-  margin: number
-  revenueCategories: Category[]
-  expenseCategories: Category[]
-}
-
-interface DashboardData {
-  companyTotal: {
-    totalRevenue: number
-    totalExpenses: number
-    netIncome: number
-    profitMargin: number
-    revenueCategories: Category[]
-    expenseCategories: Category[]
-  }
-  properties: PropertyData[]
-}
-
-const data: DashboardData = {
-  companyTotal: {
-    totalRevenue: 450000,
-    totalExpenses: 320000,
-    netIncome: 130000,
-    profitMargin: 28.9,
-    revenueCategories: [
-      {
-        name: 'Rent',
-        total: 300000,
-        transactions: [
-          { date: '2024-01-01', amount: 4000 },
-          { date: '2024-01-15', amount: 4000 },
-        ],
-      },
-      {
-        name: 'Fees',
-        total: 150000,
-        transactions: [{ date: '2024-01-05', amount: 5000 }],
-      },
-    ],
-    expenseCategories: [
-      {
-        name: 'Maintenance',
-        total: 120000,
-        transactions: [{ date: '2024-01-10', amount: 2000 }],
-      },
-      {
-        name: 'Utilities',
-        total: 200000,
-        transactions: [{ date: '2024-01-20', amount: 3000 }],
-      },
-    ],
-  },
-  properties: [
-    {
-      id: 'prop-a',
-      name: 'Property A',
-      revenue: 125000,
-      expenses: 89000,
-      netIncome: 36000,
-      margin: 28.8,
-      revenueCategories: [
-        {
-          name: 'Rent',
-          total: 80000,
-          transactions: [{ date: '2024-01-01', amount: 3000 }],
-        },
-        {
-          name: 'Fees',
-          total: 45000,
-          transactions: [{ date: '2024-01-05', amount: 2000 }],
-        },
-      ],
-      expenseCategories: [
-        {
-          name: 'Utilities',
-          total: 20000,
-          transactions: [{ date: '2024-01-12', amount: 500 }],
-        },
-        {
-          name: 'Repairs',
-          total: 69000,
-          transactions: [{ date: '2024-01-25', amount: 1000 }],
-        },
-      ],
-    },
-    {
-      id: 'prop-b',
-      name: 'Property B',
-      revenue: 180000,
-      expenses: 120000,
-      netIncome: 60000,
-      margin: 33.3,
-      revenueCategories: [
-        {
-          name: 'Rent',
-          total: 100000,
-          transactions: [{ date: '2024-01-03', amount: 5000 }],
-        },
-        {
-          name: 'Fees',
-          total: 80000,
-          transactions: [{ date: '2024-01-18', amount: 3000 }],
-        },
-      ],
-      expenseCategories: [
-        {
-          name: 'Utilities',
-          total: 40000,
-          transactions: [{ date: '2024-01-11', amount: 1200 }],
-        },
-        {
-          name: 'Repairs',
-          total: 80000,
-          transactions: [{ date: '2024-01-27', amount: 1500 }],
-        },
-      ],
-    },
-  ],
+interface Transaction {
+  date: string;
+  amount: number;
+  running: number;
 }
 
 export default function MobileDashboard() {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null)
-  const [view, setView] = useState<'overview' | 'summary' | 'pnl' | 'details'>('overview')
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [view, setView] = useState<"overview" | "summary" | "pl" | "detail">(
+    "overview",
+  );
+  const [properties, setProperties] = useState<PropertySummary[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
+  const [plData, setPlData] = useState<{
+    revenue: Category[];
+    expenses: Category[];
+  }>({ revenue: [], expenses: [] });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const scope = selectedProperty ? selectedProperty.name : 'Company Total'
-  const scopeData = selectedProperty ? selectedProperty : data.companyTotal
+  useEffect(() => {
+    const load = async () => {
+      const res = await fetch(
+        "/api/organizations/1/dashboard-summary?includeProperties=true",
+      );
+      const json = await res.json();
+      setProperties(json.propertyBreakdown || []);
+    };
+    load();
+  }, []);
 
-  type Scope = typeof scopeData
+  const companyTotals = properties.reduce(
+    (acc, p) => {
+      acc.revenue += p.revenue;
+      acc.expenses += p.operatingExpenses + p.cogs;
+      acc.netIncome += p.netIncome;
+      return acc;
+    },
+    { revenue: 0, expenses: 0, netIncome: 0 },
+  );
 
-  const getRevenue = (s: Scope) =>
-    'totalRevenue' in s ? s.totalRevenue : s.revenue
-  const getExpenses = (s: Scope) =>
-    'totalExpenses' in s ? s.totalExpenses : s.expenses
-  const getMargin = (s: Scope) =>
-    'profitMargin' in s ? s.profitMargin : s.margin
-
-  const openSummary = (property: PropertyData | null) => {
-    setSelectedProperty(property)
-    setView('summary')
-  }
+  const margin = companyTotals.revenue
+    ? (companyTotals.netIncome / companyTotals.revenue) * 100
+    : 0;
 
   const formatCurrency = (n: number) =>
-    n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(n);
+
+  const currentSummary = selectedProperty
+    ? (() => {
+        const p = properties.find((pr) => pr.name === selectedProperty);
+        if (!p) return { revenue: 0, expenses: 0, netIncome: 0, margin: 0 };
+        return {
+          revenue: p.revenue,
+          expenses: p.operatingExpenses + p.cogs,
+          netIncome: p.netIncome,
+          margin: p.revenue ? (p.netIncome / p.revenue) * 100 : 0,
+        };
+      })()
+    : {
+        revenue: companyTotals.revenue,
+        expenses: companyTotals.expenses,
+        netIncome: companyTotals.netIncome,
+        margin,
+      };
+
+  const handlePropertySelect = (name: string | null) => {
+    setSelectedProperty(name);
+    setView("summary");
+  };
+
+  const loadPL = async () => {
+    const year = new Date().getFullYear();
+    const start = `${year}-01-01`;
+    const end = `${year}-12-31`;
+    let query = supabase
+      .from("journal_entry_lines")
+      .select("account, account_type, debit, credit, class, date")
+      .gte("date", start)
+      .lte("date", end);
+    if (selectedProperty) {
+      query = query.eq("class", selectedProperty);
+    }
+    const { data } = await query;
+    const rev: Record<string, number> = {};
+    const exp: Record<string, number> = {};
+    (data || []).forEach((row) => {
+      const debit = Number(row.debit) || 0;
+      const credit = Number(row.credit) || 0;
+      const t = row.account_type?.toLowerCase() || "";
+      const amount = credit - debit;
+      if (t.includes("income") || t.includes("revenue")) {
+        rev[row.account] = (rev[row.account] || 0) + amount;
+      } else if (t.includes("expense")) {
+        const expAmount = debit - credit;
+        exp[row.account] = (exp[row.account] || 0) + expAmount;
+      }
+    });
+    setPlData({
+      revenue: Object.entries(rev).map(([name, total]) => ({ name, total })),
+      expenses: Object.entries(exp).map(([name, total]) => ({ name, total })),
+    });
+  };
+
+  const handleViewPL = async () => {
+    await loadPL();
+    setView("pl");
+  };
+
+  const handleCategory = async (
+    account: string,
+    type: "revenue" | "expense",
+  ) => {
+    const year = new Date().getFullYear();
+    const start = `${year}-01-01`;
+    const end = `${year}-12-31`;
+    let query = supabase
+      .from("journal_entry_lines")
+      .select("date, debit, credit, account, class")
+      .eq("account", account)
+      .gte("date", start)
+      .lte("date", end);
+    if (selectedProperty) {
+      query = query.eq("class", selectedProperty);
+    }
+    const { data } = await query;
+    const list: Transaction[] = (data || [])
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((row) => {
+        const amount =
+          type === "revenue"
+            ? (Number(row.credit) || 0) - (Number(row.debit) || 0)
+            : (Number(row.debit) || 0) - (Number(row.credit) || 0);
+        return { date: row.date, amount, running: 0 };
+      });
+    let run = 0;
+    list.forEach((t) => {
+      run += t.amount;
+      t.running = run;
+    });
+    setTransactions(list);
+    setSelectedCategory(account);
+    setView("detail");
+  };
+
+  const back = () => {
+    if (view === "detail") setView("pl");
+    else if (view === "pl") setView("summary");
+    else if (view === "summary") setView("overview");
+  };
 
   return (
     <div className="dashboard-container">
-      <header className="flex items-center justify-between mb-4">
+      <header className="flex items-center justify-between mb-6">
         <button
-          aria-label="Menu"
+          className="p-2 text-white hamburger-menu rounded-md"
           onClick={() => setMenuOpen(!menuOpen)}
-          className="hamburger-menu"
         >
-          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {menuOpen ? <X /> : <Menu />}
         </button>
         <h1 className="text-lg font-bold">I AM CFO</h1>
       </header>
 
       {menuOpen && (
-        <nav className="bg-white rounded-lg shadow-md p-4 mb-4">
-          {['Overview', 'Time Periods', 'Reports', 'Settings'].map((item) => (
-            <div key={item} className="menu-item text-center">
-              {item}
-            </div>
-          ))}
+        <nav className="mb-4">
+          <ul className="space-y-2 text-sm">
+            <li
+              className="menu-item p-2 rounded"
+              onClick={() => {
+                setView("overview");
+                setMenuOpen(false);
+              }}
+            >
+              Overview
+            </li>
+            <li className="menu-item p-2 rounded">Time Periods</li>
+            <li className="menu-item p-2 rounded">Reports</li>
+            <li className="menu-item p-2 rounded">Settings</li>
+          </ul>
         </nav>
       )}
 
-      {view === 'overview' && (
+      {view === "overview" && (
         <div>
           <div
-            className="company-total cursor-pointer"
-            onClick={() => openSummary(null)}
+            className="company-total flex flex-col justify-center p-4"
+            onClick={() => handlePropertySelect(null)}
           >
-            <div className="text-sm">Company Total</div>
-            <div className="text-2xl font-bold">
-              {formatCurrency(data.companyTotal.netIncome)}
-            </div>
-            <div className="text-xs">Net Income</div>
+            <span className="text-sm">Company Total</span>
+            <span className="text-2xl font-bold">
+              {formatCurrency(companyTotals.netIncome)}
+            </span>
           </div>
-
-          <div className="flex flex-wrap justify-between">
-            {data.properties.map((p) => (
+          <div className="flex flex-wrap justify-between gap-3">
+            {properties.map((p) => (
               <div
-                key={p.id}
-                className="property-kpi cursor-pointer"
-                onClick={() => openSummary(p)}
+                key={p.name}
+                className={`property-kpi p-3 flex flex-col justify-between ${selectedProperty === p.name ? "active" : ""}`}
+                onClick={() => handlePropertySelect(p.name)}
               >
-                <div className="font-semibold mb-1">{p.name}</div>
-                <div className="text-sm text-gray-600">
-                  {formatCurrency(p.netIncome)} net
+                <span className="font-semibold">{p.name}</span>
+                <span className="text-xs">
+                  Revenue {formatCurrency(p.revenue)}
+                </span>
+                <span className="text-xs">
+                  Expenses {formatCurrency(p.operatingExpenses + p.cogs)}
+                </span>
+                <span className="text-xs">
+                  Net {formatCurrency(p.netIncome)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {view === "summary" && (
+        <div>
+          <button className="flex items-center mb-4 text-sm" onClick={back}>
+            <ChevronLeft className="mr-1" size={16} /> Back
+          </button>
+          <div className="summary-card revenue-card" onClick={handleViewPL}>
+            <div className="flex justify-between">
+              <span>Total Revenue</span>
+              <span>{formatCurrency(currentSummary.revenue)}</span>
+            </div>
+          </div>
+          <div className="summary-card expense-card" onClick={handleViewPL}>
+            <div className="flex justify-between">
+              <span>Total Expenses</span>
+              <span>{formatCurrency(currentSummary.expenses)}</span>
+            </div>
+          </div>
+          <div className="summary-card net-income-card" onClick={handleViewPL}>
+            <div className="flex justify-between">
+              <span>Net Income</span>
+              <span>{formatCurrency(currentSummary.netIncome)}</span>
+            </div>
+          </div>
+          <div className="summary-card margin-card" onClick={handleViewPL}>
+            <div className="flex justify-between">
+              <span>Profit Margin</span>
+              <span>{currentSummary.margin.toFixed(1)}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {view === "pl" && (
+        <div>
+          <button className="flex items-center mb-4 text-sm" onClick={back}>
+            <ChevronLeft className="mr-1" size={16} /> Back
+          </button>
+          <h2 className="font-semibold mb-2">Revenue</h2>
+          {plData.revenue.map((cat) => (
+            <div
+              key={cat.name}
+              className="summary-card revenue-card"
+              onClick={() => handleCategory(cat.name, "revenue")}
+            >
+              <div className="flex justify-between">
+                <span>{cat.name}</span>
+                <span>{formatCurrency(cat.total)}</span>
+              </div>
+            </div>
+          ))}
+          <h2 className="font-semibold mt-4 mb-2">Expenses</h2>
+          {plData.expenses.map((cat) => (
+            <div
+              key={cat.name}
+              className="summary-card expense-card"
+              onClick={() => handleCategory(cat.name, "expense")}
+            >
+              <div className="flex justify-between">
+                <span>{cat.name}</span>
+                <span>{formatCurrency(cat.total)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "detail" && (
+        <div>
+          <button className="flex items-center mb-4 text-sm" onClick={back}>
+            <ChevronLeft className="mr-1" size={16} /> Back
+          </button>
+          <h2 className="font-semibold mb-2">{selectedCategory}</h2>
+          <div className="space-y-2">
+            {transactions.map((t, idx) => (
+              <div key={idx} className="summary-card">
+                <div className="flex justify-between">
+                  <span>{t.date}</span>
+                  <span>{formatCurrency(t.amount)}</span>
+                </div>
+                <div className="text-xs text-right">
+                  Running {formatCurrency(t.running)}
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {view === 'summary' && (
-        <div>
-          <button
-            onClick={() => {
-              setView('overview')
-              setSelectedProperty(null)
-            }}
-            className="flex items-center mb-4 text-sm text-primary"
-          >
-            <ChevronLeft className="w-4 h-4 mr-1" /> Back
-          </button>
-          <h2 className="text-lg font-semibold mb-4">{scope} Summary</h2>
-          <div>
-            <div
-              className="summary-card revenue-card cursor-pointer"
-              onClick={() => setView('pnl')}
-            >
-              <div className="text-sm text-text-medium">Total Revenue</div>
-              <div className="text-xl font-bold">{formatCurrency(getRevenue(scopeData))}</div>
-            </div>
-            <div
-              className="summary-card expense-card cursor-pointer"
-              onClick={() => setView('pnl')}
-            >
-              <div className="text-sm text-text-medium">Total Expenses</div>
-              <div className="text-xl font-bold">{formatCurrency(getExpenses(scopeData))}</div>
-            </div>
-            <div
-              className="summary-card net-income-card cursor-pointer"
-              onClick={() => setView('pnl')}
-            >
-              <div className="text-sm text-text-medium">Net Income</div>
-              <div className="text-xl font-bold">
-                {formatCurrency(scopeData.netIncome)}
-              </div>
-            </div>
-            <div
-              className="summary-card margin-card cursor-pointer"
-              onClick={() => setView('pnl')}
-            >
-              <div className="text-sm text-text-medium">Profit Margin</div>
-              <div className="text-xl font-bold">{getMargin(scopeData).toFixed(1)}%</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {view === 'pnl' && (
-        <div>
-          <button
-            onClick={() => setView('summary')}
-            className="flex items-center mb-4 text-sm text-primary"
-          >
-            <ChevronLeft className="w-4 h-4 mr-1" /> Back
-          </button>
-          <h2 className="text-lg font-semibold mb-4">P&amp;L Summary</h2>
-          <div className="mb-4">
-            {scopeData.revenueCategories.map((c) => (
-              <div
-                key={c.name}
-                className="summary-card revenue-card cursor-pointer"
-                onClick={() => {
-                  setSelectedCategory(c)
-                  setView('details')
-                }}
-              >
-                <div className="text-sm text-text-medium">{c.name}</div>
-                <div className="text-xl font-bold">{formatCurrency(c.total)}</div>
-              </div>
-            ))}
-          </div>
-          <div>
-            {scopeData.expenseCategories.map((c) => (
-              <div
-                key={c.name}
-                className="summary-card expense-card cursor-pointer"
-                onClick={() => {
-                  setSelectedCategory(c)
-                  setView('details')
-                }}
-              >
-                <div className="text-sm text-text-medium">{c.name}</div>
-                <div className="text-xl font-bold">{formatCurrency(c.total)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {view === 'details' && selectedCategory && (
-        <div>
-          <button
-            onClick={() => setView('pnl')}
-            className="flex items-center mb-4 text-sm text-primary"
-          >
-            <ChevronLeft className="w-4 h-4 mr-1" /> Back
-          </button>
-          <h2 className="text-lg font-semibold mb-4">{selectedCategory.name}</h2>
-          <div className="space-y-2">
-            {selectedCategory.transactions.map((t, idx) => (
-              <div key={idx} className="summary-card">
-                <div className="text-sm text-text-medium">{t.date}</div>
-                <div className="text-lg font-bold">{formatCurrency(t.amount)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
-  )
+  );
 }
-
