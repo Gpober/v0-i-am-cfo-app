@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Menu, X, ChevronLeft, TrendingUp, DollarSign, PieChart, Award, AlertTriangle, CheckCircle, Target } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 // I AM CFO Brand Colors
 const BRAND_COLORS = {
@@ -41,6 +42,17 @@ interface Transaction {
   running: number;
 }
 
+interface JournalRow {
+  account: string;
+  account_type: string | null;
+  debit: number | null;
+  credit: number | null;
+  class: string | null;
+  report_category?: string | null;
+  normal_balance?: number | null;
+  date: string;
+}
+
 export default function EnhancedMobileDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportType, setReportType] = useState<"pl" | "cf">("pl");
@@ -52,47 +64,226 @@ export default function EnhancedMobileDashboard() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [view, setView] = useState<"overview" | "summary" | "report" | "detail">("overview");
-  const properties: PropertySummary[] = [
-    { name: "Property A", revenue: 125000, expenses: 89000, netIncome: 36000, cogs: 25000, grossProfit: 100000, operating: 45000, financing: -12000 },
-    { name: "Property B", revenue: 180000, expenses: 120000, netIncome: 60000, cogs: 35000, grossProfit: 145000, operating: 65000, financing: -8000 },
-    { name: "Property C", revenue: 95000, expenses: 75000, netIncome: 20000, cogs: 15000, grossProfit: 80000, operating: 25000, financing: -5000 },
-    { name: "Downtown Loft", revenue: 210000, expenses: 140000, netIncome: 70000, cogs: 42000, grossProfit: 168000, operating: 80000, financing: -15000 },
-    { name: "Beach House", revenue: 165000, expenses: 110000, netIncome: 55000, cogs: 28000, grossProfit: 137000, operating: 60000, financing: -10000 }
-  ];
+  const [properties, setProperties] = useState<PropertySummary[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
-  const plData: { revenue: Category[]; expenses: Category[] } = {
-    revenue: [
-      { name: "Rental Income", total: 650000 },
-      { name: "Service Fees", total: 125000 },
-      { name: "Late Fees", total: 8500 }
-    ],
-    expenses: [
-      { name: "Property Management", total: 85000 },
-      { name: "Maintenance & Repairs", total: 125000 },
-      { name: "Insurance", total: 45000 },
-      { name: "Property Taxes", total: 95000 },
-      { name: "Utilities", total: 65000 },
-      { name: "Marketing", total: 25000 },
-      { name: "Legal & Professional", total: 15000 }
-    ]
-  };
-  const cfData: {
-    operating: Category[];
-    financing: Category[];
-  } = {
-    operating: [
-      { name: "Operating Cash Inflow", total: 275000 },
-      { name: "Working Capital Changes", total: -15000 },
-      { name: "Net Operating Activities", total: 260000 }
-    ],
-    financing: [
-      { name: "Loan Payments", total: -45000 },
-      { name: "New Financing", total: 25000 },
-      { name: "Owner Distributions", total: -30000 }
-    ]
-  };
+  const [plData, setPlData] = useState<{ revenue: Category[]; expenses: Category[] }>({ revenue: [], expenses: [] });
+  const [cfData, setCfData] = useState<{ operating: Category[]; financing: Category[] }>({ operating: [], financing: [] });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const classifyTransaction = (
+    accountType: string | null,
+    reportCategory: string | null,
+  ) => {
+    const typeLower = accountType?.toLowerCase() || "";
+    if (reportCategory === "transfer") return "transfer";
+    if (
+      typeLower === "income" ||
+      typeLower === "other income" ||
+      typeLower === "expenses" ||
+      typeLower === "expense" ||
+      typeLower === "cost of goods sold" ||
+      typeLower === "accounts receivable" ||
+      typeLower === "accounts payable"
+    )
+      return "operating";
+    if (
+      typeLower === "fixed assets" ||
+      typeLower === "other assets" ||
+      typeLower === "property, plant & equipment"
+    )
+      return "investing";
+    if (
+      typeLower === "long term liabilities" ||
+      typeLower === "equity" ||
+      typeLower === "credit card" ||
+      typeLower === "other current liabilities" ||
+      typeLower === "line of credit"
+    )
+      return "financing";
+    return "other";
+  };
+
+  const getDateRange = useCallback(() => {
+    const y = year;
+    const m = month;
+    if (reportPeriod === "Custom" && customStart && customEnd) {
+      return { start: customStart, end: customEnd };
+    }
+    if (reportPeriod === "Monthly") {
+      const startDate = new Date(y, m - 1, 1);
+      const endDate = new Date(y, m, 0);
+      return {
+        start: startDate.toISOString().split("T")[0],
+        end: endDate.toISOString().split("T")[0],
+      };
+    }
+    if (reportPeriod === "Quarterly") {
+      const qStart = Math.floor((m - 1) / 3) * 3;
+      const startDate = new Date(y, qStart, 1);
+      const endDate = new Date(y, qStart + 3, 0);
+      return {
+        start: startDate.toISOString().split("T")[0],
+        end: endDate.toISOString().split("T")[0],
+      };
+    }
+    if (reportPeriod === "Year to Date") {
+      const startDate = new Date(y, 0, 1);
+      const endDate = new Date(y, m, 0);
+      return {
+        start: startDate.toISOString().split("T")[0],
+        end: endDate.toISOString().split("T")[0],
+      };
+    }
+    if (reportPeriod === "Trailing 12") {
+      const endDate = new Date(y, m, 0);
+      const startDate = new Date(endDate);
+      startDate.setMonth(startDate.getMonth() - 11);
+      startDate.setDate(1);
+      return {
+        start: startDate.toISOString().split("T")[0],
+        end: endDate.toISOString().split("T")[0],
+      };
+    }
+    return { start: `${y}-01-01`, end: `${y}-12-31` };
+  }, [reportPeriod, month, year, customStart, customEnd]);
+
+  useEffect(() => {
+    const load = async () => {
+      const { start, end } = getDateRange();
+      const query = supabase
+        .from("journal_entry_lines")
+        .select(
+          "account_type, report_category, normal_balance, debit, credit, class, date",
+        )
+        .gte("date", start)
+        .lte("date", end);
+      const { data } = await query;
+      const map: Record<string, PropertySummary> = {};
+      ((data as JournalRow[]) || []).forEach((row) => {
+        const cls = row.class || "General";
+        if (!map[cls]) {
+          map[cls] = { name: cls };
+        }
+        const debit = Number(row.debit) || 0;
+        const credit = Number(row.credit) || 0;
+        if (reportType === "pl") {
+          const t = (row.account_type || "").toLowerCase();
+          if (t.includes("income") || t.includes("revenue")) {
+            map[cls].revenue = (map[cls].revenue || 0) + (credit - debit);
+            map[cls].netIncome = (map[cls].netIncome || 0) + (credit - debit);
+          } else if (t.includes("cost of goods sold")) {
+            const amt = debit - credit;
+            map[cls].cogs = (map[cls].cogs || 0) + amt;
+            map[cls].netIncome = (map[cls].netIncome || 0) - amt;
+          } else if (t.includes("expense")) {
+            const amt = debit - credit;
+            map[cls].expenses = (map[cls].expenses || 0) + amt;
+            map[cls].netIncome = (map[cls].netIncome || 0) - amt;
+          }
+        } else {
+          const amount =
+            row.report_category === "transfer" ? debit - credit : credit - debit;
+          const classification = classifyTransaction(
+            row.account_type,
+            row.report_category,
+          );
+          if (classification === "operating") {
+            map[cls].operating = (map[cls].operating || 0) + amount;
+          } else if (classification === "financing") {
+            map[cls].financing = (map[cls].financing || 0) + amount;
+          }
+        }
+      });
+      const list = Object.values(map).map((p) => {
+        if (reportType === "pl") {
+          const rev = p.revenue || 0;
+          const c = p.cogs || 0;
+          p.grossProfit = rev - c;
+        }
+        return p;
+      }).filter((p) => {
+        return reportType === "pl"
+          ? (p.revenue || 0) !== 0 || (p.expenses || 0) !== 0 || (p.netIncome || 0) !== 0 || (p.cogs || 0) !== 0
+          : (p.operating || 0) !== 0 || (p.financing || 0) !== 0;
+      });
+      setProperties(list);
+    };
+    load();
+  }, [reportType, reportPeriod, month, year, customStart, customEnd, getDateRange]);
+
+  const loadPL = useCallback(
+    async (property: string | null) => {
+      const { start, end } = getDateRange();
+      let query = supabase
+        .from("journal_entry_lines")
+        .select("account, account_type, debit, credit, class, date")
+        .gte("date", start)
+        .lte("date", end);
+      if (property) {
+        query = property === "General" ? query.is("class", null) : query.eq("class", property);
+      }
+      const { data } = await query;
+      const rev: Record<string, number> = {};
+      const exp: Record<string, number> = {};
+      ((data as JournalRow[]) || []).forEach((row) => {
+        const debit = Number(row.debit) || 0;
+        const credit = Number(row.credit) || 0;
+        const t = (row.account_type || "").toLowerCase();
+        const amount = credit - debit;
+        if (t.includes("income") || t.includes("revenue")) {
+          rev[row.account] = (rev[row.account] || 0) + amount;
+        } else if (t.includes("expense")) {
+          const expAmount = debit - credit;
+          exp[row.account] = (exp[row.account] || 0) + expAmount;
+        }
+      });
+      setPlData({
+        revenue: Object.entries(rev).map(([name, total]) => ({ name, total })),
+        expenses: Object.entries(exp).map(([name, total]) => ({ name, total })),
+      });
+    },
+    [getDateRange],
+  );
+
+  const loadCF = useCallback(
+    async (property: string | null) => {
+      const { start, end } = getDateRange();
+      let query = supabase
+        .from("journal_entry_lines")
+        .select(
+          "account, account_type, report_category, normal_balance, debit, credit, class, date",
+        )
+        .gte("date", start)
+        .lte("date", end);
+      if (property) {
+        query = property === "General" ? query.is("class", null) : query.eq("class", property);
+      }
+      const { data } = await query;
+      const op: Record<string, number> = {};
+      const fin: Record<string, number> = {};
+      ((data as JournalRow[]) || []).forEach((row) => {
+        const debit = Number(row.debit) || 0;
+        const credit = Number(row.credit) || 0;
+        const amount =
+          row.report_category === "transfer" ? debit - credit : credit - debit;
+        const classification = classifyTransaction(
+          row.account_type,
+          row.report_category,
+        );
+        if (classification === "operating") {
+          op[row.account] = (op[row.account] || 0) + amount;
+        } else if (classification === "financing") {
+          fin[row.account] = (fin[row.account] || 0) + amount;
+        }
+      });
+      setCfData({
+        operating: Object.entries(op).map(([name, total]) => ({ name, total })),
+        financing: Object.entries(fin).map(([name, total]) => ({ name, total })),
+      });
+    },
+    [getDateRange],
+  );
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("en-US", {
@@ -210,25 +401,60 @@ export default function EnhancedMobileDashboard() {
     return new Date(2024, m - 1, 1).toLocaleDateString('en-US', { month: 'long' });
   };
 
-  const handlePropertySelect = (name: string | null) => {
+  const handlePropertySelect = async (name: string | null) => {
     setSelectedProperty(name);
-    setView("report"); // Go directly to P&L/Cash Flow report
+    if (reportType === "pl") await loadPL(name);
+    else await loadCF(name);
+    setView("report");
   };
 
-  const handleCategory = async (account: string) => {
-    // Mock transaction data
-    const mockTransactions: Transaction[] = [
-      { date: "2024-08-01", amount: 2500, running: 2500 },
-      { date: "2024-08-05", amount: 3200, running: 5700 },
-      { date: "2024-08-12", amount: 2800, running: 8500 },
-      { date: "2024-08-18", amount: 3100, running: 11600 },
-      { date: "2024-08-25", amount: 2900, running: 14500 }
-    ];
-    
-    setTransactions(mockTransactions);
+  const handleCategory = async (
+    account: string,
+    type: "revenue" | "expense" | "operating" | "financing",
+  ) => {
+    const { start, end } = getDateRange();
+    let query = supabase
+      .from("journal_entry_lines")
+      .select("date, debit, credit, account, class, report_category")
+      .eq("account", account)
+      .gte("date", start)
+      .lte("date", end);
+    if (selectedProperty) {
+      query =
+        selectedProperty === "General"
+          ? query.is("class", null)
+          : query.eq("class", selectedProperty);
+    }
+    const { data } = await query;
+    const list: Transaction[] = ((data as JournalRow[]) || [])
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((row) => {
+        const debit = Number(row.debit) || 0;
+        const credit = Number(row.credit) || 0;
+        let amount = 0;
+        if (reportType === "pl") {
+          amount = type === "revenue" ? credit - debit : debit - credit;
+        } else {
+          amount = row.report_category === "transfer" ? debit - credit : credit - debit;
+        }
+        return { date: row.date, amount, running: 0 };
+      });
+    let run = 0;
+    list.forEach((t) => {
+      run += t.amount;
+      t.running = run;
+    });
+    setTransactions(list);
     setSelectedCategory(account);
     setView("detail");
   };
+
+  useEffect(() => {
+    if (view === "report") {
+      if (reportType === "pl") loadPL(selectedProperty);
+      else loadCF(selectedProperty);
+    }
+  }, [view, reportType, reportPeriod, month, year, customStart, customEnd, selectedProperty, loadPL, loadCF]);
 
   const back = () => {
     if (view === "detail") setView("report");
@@ -1053,7 +1279,7 @@ export default function EnhancedMobileDashboard() {
                 {plData.revenue.map((cat) => (
                   <div
                     key={cat.name}
-                    onClick={() => handleCategory(cat.name)}
+                    onClick={() => handleCategory(cat.name, "revenue")}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -1102,7 +1328,7 @@ export default function EnhancedMobileDashboard() {
                 {plData.expenses.map((cat) => (
                   <div
                     key={cat.name}
-                    onClick={() => handleCategory(cat.name)}
+                    onClick={() => handleCategory(cat.name, "expense")}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -1153,7 +1379,7 @@ export default function EnhancedMobileDashboard() {
                 {cfData.operating.map((cat) => (
                   <div
                     key={cat.name}
-                    onClick={() => handleCategory(cat.name)}
+                    onClick={() => handleCategory(cat.name, "operating")}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -1206,7 +1432,7 @@ export default function EnhancedMobileDashboard() {
                 {cfData.financing.map((cat) => (
                   <div
                     key={cat.name}
-                    onClick={() => handleCategory(cat.name)}
+                    onClick={() => handleCategory(cat.name, "financing")}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
