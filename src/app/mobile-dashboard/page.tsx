@@ -131,6 +131,18 @@ export default function EnhancedMobileDashboard() {
     [transactions],
   );
 
+  const plTotals = useMemo(() => {
+    const revenue = plData.revenue.reduce((sum, c) => sum + c.total, 0);
+    const expenses = plData.expenses.reduce((sum, c) => sum + c.total, 0);
+    return { revenue, expenses, net: revenue - expenses };
+  }, [plData]);
+
+  const cfTotals = useMemo(() => {
+    const operating = cfData.operating.reduce((sum, c) => sum + c.total, 0);
+    const financing = cfData.financing.reduce((sum, c) => sum + c.total, 0);
+    return { operating, financing, net: operating + financing };
+  }, [cfData]);
+
   const classifyTransaction = (
     accountType: string | null,
     reportCategory: string | null,
@@ -256,7 +268,11 @@ export default function EnhancedMobileDashboard() {
           ? (p.revenue || 0) !== 0 || (p.expenses || 0) !== 0 || (p.netIncome || 0) !== 0
           : (p.operating || 0) !== 0 || (p.financing || 0) !== 0;
       });
-      setProperties(list);
+      const finalList =
+        map["General"] && !list.find((p) => p.name === "General")
+          ? [...list, map["General"]]
+          : list;
+      setProperties(finalList);
     };
     load();
   }, [reportType, reportPeriod, month, year, customStart, customEnd, getDateRange]);
@@ -1235,13 +1251,14 @@ export default function EnhancedMobileDashboard() {
           </div>
 
           {reportType === "pl" ? (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              <div style={{
-                background: 'white',
-                borderRadius: '12px',
-                padding: '20px',
-                border: `1px solid ${BRAND_COLORS.gray[200]}`
-              }}>
+            <>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`
+                }}>
                 <h3 style={{ 
                   fontSize: '18px', 
                   fontWeight: '600', 
@@ -1334,14 +1351,28 @@ export default function EnhancedMobileDashboard() {
                 ))}
               </div>
             </div>
+            <div
+              style={{
+                marginTop: '8px',
+                textAlign: 'right',
+                fontSize: '16px',
+                fontWeight: '600',
+                color:
+                  plTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+              }}
+            >
+              Net Income: {formatCurrency(plTotals.net)}
+            </div>
+            </>
           ) : (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              <div style={{
-                background: 'white',
-                borderRadius: '12px',
-                padding: '20px',
-                border: `1px solid ${BRAND_COLORS.gray[200]}`
-              }}>
+            <>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`
+                }}>
                 <h3 style={{ 
                   fontSize: '18px', 
                   fontWeight: '600', 
@@ -1442,6 +1473,19 @@ export default function EnhancedMobileDashboard() {
                 ))}
               </div>
             </div>
+            <div
+              style={{
+                marginTop: '8px',
+                textAlign: 'right',
+                fontSize: '16px',
+                fontWeight: '600',
+                color:
+                  cfTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+              }}
+            >
+              Net Cash Flow: {formatCurrency(cfTotals.net)}
+            </div>
+            </>
           )}
         </div>
       )}
@@ -1512,7 +1556,20 @@ export default function EnhancedMobileDashboard() {
                       <div style={{ fontSize: '13px', color: '#475569' }}>{t.payee}</div>
                     )}
                     {t.className && (
-                      <div style={{ fontSize: '12px', color: '#475569' }}>{t.className}</div>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: BRAND_COLORS.accent,
+                          background: `${BRAND_COLORS.primary}20`,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          display: 'inline-block',
+                          marginTop: '2px',
+                        }}
+                      >
+                        {t.className}
+                      </div>
                     )}
                     {t.memo && (
                       <div style={{ fontSize: '12px', color: '#64748b' }}>{t.memo}</div>
@@ -1551,7 +1608,7 @@ export default function EnhancedMobileDashboard() {
               color: transactionTotal >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
             }}
           >
-            Total Net Income: {formatCurrency(transactionTotal)}
+            {reportType === "pl" ? "Total Net Income" : "Total Net Cash Flow"}: {formatCurrency(transactionTotal)}
           </div>
         </div>
       )}
