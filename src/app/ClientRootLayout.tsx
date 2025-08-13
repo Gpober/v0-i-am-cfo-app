@@ -36,14 +36,14 @@ const BRAND_COLORS = {
 
 // I AM CFO Logo Component
 const IAMCFOLogo = ({ className = "w-auto h-14" }) => (
-  <div className={`${className} flex items-center justify-start pl-4`}>
+  <div className={`flex items-center justify-center ${className}`}>
     <Image
       src="/iamcfo-logo.jpg"
       alt="I AM CFO Logo"
       width={220}
       height={56}
-      className="object-cover object-center"
-      style={{ objectPosition: "center" }}
+      className="object-contain"
+      priority
     />
   </div>
 )
@@ -111,7 +111,7 @@ export default function ClientRootLayout({
                   <X className="h-6 w-6 text-white" />
                 </button>
               </div>
-              <div className="flex flex-shrink-0 items-center justify-start px-4 py-4">
+              <div className="flex flex-shrink-0 items-center justify-center px-4 py-4">
                 <IAMCFOLogo className="w-auto h-10" />
               </div>
               <div className="mt-5 h-0 flex-1 overflow-y-auto">
@@ -152,7 +152,7 @@ export default function ClientRootLayout({
           >
             <div className="flex min-h-0 flex-1 flex-col bg-white border-r border-gray-200">
               <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-                <div className="flex flex-shrink-0 items-center justify-start px-4">
+                <div className="flex flex-shrink-0 items-center justify-center px-4">
                   <IAMCFOLogo className="w-auto h-10" />
                 </div>
                 <nav className="mt-5 flex-1 space-y-1 px-2">
