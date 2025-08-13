@@ -1,25 +1,15 @@
-"use client";
+"use client"
 
-import type React from "react";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { useState } from "react";
-import {
-  BarChart3,
-  DollarSign,
-  TrendingUp,
-  CreditCard,
-  FileText,
-  Users,
-  Menu,
-  X,
-  BarChart2,
-} from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import Image from "next/image";
+import type React from "react"
+import { Inter } from "next/font/google"
+import "./globals.css"
+import { useState } from "react"
+import { BarChart3, DollarSign, TrendingUp, CreditCard, FileText, Users, Menu, X, BarChart2 } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import Image from "next/image"
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"] })
 
 // I AM CFO Brand Colors
 const BRAND_COLORS = {
@@ -42,14 +32,21 @@ const BRAND_COLORS = {
     800: "#1E293B",
     900: "#0F172A",
   },
-};
+}
 
 // I AM CFO Logo Component
-const IAMCFOLogo = ({ className = "w-8 h-8" }) => (
-  <div className={`${className} flex items-center justify-center relative`}>
-    <Image src="/favicon.png" alt="I AM CFO Logo" width={32} height={32} />
+const IAMCFOLogo = ({ className = "w-auto h-14" }) => (
+  <div className={`${className} flex items-center justify-start pl-4`}>
+    <Image
+      src="/iamcfo-logo.jpg"
+      alt="I AM CFO Logo"
+      width={220}
+      height={56}
+      className="object-cover object-center"
+      style={{ objectPosition: "center" }}
+    />
   </div>
-);
+)
 
 const navigation = [
   { name: "Overview", href: "/", icon: BarChart3 },
@@ -63,16 +60,16 @@ const navigation = [
   { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
   { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
   { name: "A/P", href: "/accounts-payable", icon: Users },
-];
+]
 
 export default function ClientRootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarVisible, setSidebarVisible] = useState(false);
-  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarVisible, setSidebarVisible] = useState(false)
+  const pathname = usePathname()
 
   // Render mobile dashboard without global navigation
   if (pathname?.startsWith("/mobile-dashboard")) {
@@ -80,7 +77,7 @@ export default function ClientRootLayout({
       <html lang="en">
         <body className={inter.className}>{children}</body>
       </html>
-    );
+    )
   }
 
   if (pathname === "/login") {
@@ -88,7 +85,7 @@ export default function ClientRootLayout({
       <html lang="en">
         <body className={inter.className}>{children}</body>
       </html>
-    );
+    )
   }
 
   return (
@@ -102,13 +99,8 @@ export default function ClientRootLayout({
           />
 
           {/* Mobile sidebar */}
-          <div
-            className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? "block" : "hidden"}`}
-          >
-            <div
-              className="fixed inset-0 bg-gray-600 bg-opacity-75"
-              onClick={() => setSidebarOpen(false)}
-            />
+          <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? "block" : "hidden"}`}>
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
             <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white">
               <div className="absolute top-0 right-0 -mr-12 pt-2">
                 <button
@@ -119,42 +111,33 @@ export default function ClientRootLayout({
                   <X className="h-6 w-6 text-white" />
                 </button>
               </div>
-              <div className="flex flex-shrink-0 items-center px-4 py-4">
-                <IAMCFOLogo className="w-8 h-8 mr-3" />
-                <span className="text-xl font-bold text-gray-900">
-                  I AM CFO
-                </span>
+              <div className="flex flex-shrink-0 items-center justify-start px-4 py-4">
+                <IAMCFOLogo className="w-auto h-10" />
               </div>
               <div className="mt-5 h-0 flex-1 overflow-y-auto">
                 <nav className="space-y-1 px-2">
                   {navigation.map((item) => {
-                    const isActive = pathname === item.href;
+                    const isActive = pathname === item.href
                     return (
                       <Link
                         key={item.name}
                         href={item.href}
                         className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
-                          isActive
-                            ? "text-white"
-                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                          isActive ? "text-white" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                         }`}
                         style={{
-                          backgroundColor: isActive
-                            ? BRAND_COLORS.primary
-                            : undefined,
+                          backgroundColor: isActive ? BRAND_COLORS.primary : undefined,
                         }}
                         onClick={() => setSidebarOpen(false)}
                       >
                         <item.icon
                           className={`mr-4 h-6 w-6 flex-shrink-0 ${
-                            isActive
-                              ? "text-white"
-                              : "text-gray-400 group-hover:text-gray-500"
+                            isActive ? "text-white" : "text-gray-400 group-hover:text-gray-500"
                           }`}
                         />
                         {item.name}
                       </Link>
-                    );
+                    )
                   })}
                 </nav>
               </div>
@@ -169,40 +152,31 @@ export default function ClientRootLayout({
           >
             <div className="flex min-h-0 flex-1 flex-col bg-white border-r border-gray-200">
               <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-                <div className="flex flex-shrink-0 items-center px-4">
-                  <IAMCFOLogo className="w-8 h-8 mr-3" />
-                  <span className="text-xl font-bold text-gray-900">
-                    I AM CFO
-                  </span>
+                <div className="flex flex-shrink-0 items-center justify-start px-4">
+                  <IAMCFOLogo className="w-auto h-10" />
                 </div>
                 <nav className="mt-5 flex-1 space-y-1 px-2">
                   {navigation.map((item) => {
-                    const isActive = pathname === item.href;
+                    const isActive = pathname === item.href
                     return (
                       <Link
                         key={item.name}
                         href={item.href}
                         className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                          isActive
-                            ? "text-white"
-                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                          isActive ? "text-white" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                         }`}
                         style={{
-                          backgroundColor: isActive
-                            ? BRAND_COLORS.primary
-                            : undefined,
+                          backgroundColor: isActive ? BRAND_COLORS.primary : undefined,
                         }}
                       >
                         <item.icon
                           className={`mr-3 h-6 w-6 flex-shrink-0 ${
-                            isActive
-                              ? "text-white"
-                              : "text-gray-400 group-hover:text-gray-500"
+                            isActive ? "text-white" : "text-gray-400 group-hover:text-gray-500"
                           }`}
                         />
                         {item.name}
                       </Link>
-                    );
+                    )
                   })}
                 </nav>
               </div>
@@ -210,9 +184,7 @@ export default function ClientRootLayout({
           </div>
 
           {/* Main content */}
-          <div
-            className={`flex flex-col flex-1 transition-all duration-300 ${sidebarVisible ? "lg:pl-64" : ""}`}
-          >
+          <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarVisible ? "lg:pl-64" : ""}`}>
             {/* Mobile header */}
             <div className="sticky top-0 z-10 bg-white pl-1 pt-1 sm:pl-3 sm:pt-3 lg:hidden">
               <button
@@ -234,5 +206,5 @@ export default function ClientRootLayout({
         </div>
       </body>
     </html>
-  );
+  )
 }
