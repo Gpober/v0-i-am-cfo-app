@@ -42,6 +42,16 @@ interface Transaction {
 export default function MobileDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportType, setReportType] = useState<"pl" | "cf">("pl");
+  const [reportPeriod, setReportPeriod] = useState<
+    "Monthly" | "Quarterly" | "Trailing 12" | "Year to Date" | "Custom"
+  >("Monthly");
+  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
+  const [quarter, setQuarter] = useState<number>(
+    Math.floor(new Date().getMonth() / 3) + 1,
+  );
+  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
   const [properties, setProperties] = useState<PropertySummary[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
   const [plData, setPlData] = useState<{ revenue: Category[]; expenses: Category[] }>({
@@ -164,6 +174,130 @@ export default function MobileDashboard() {
             <option value="pl">P&L Statement</option>
             <option value="cf">Cash Flow Statement</option>
           </select>
+
+          <div style={{ marginTop: 16 }}>
+            <label className="block mb-2">Report Period</label>
+            <select
+              value={reportPeriod}
+              onChange={(e) =>
+                setReportPeriod(
+                  e.target.value as
+                    | "Monthly"
+                    | "Quarterly"
+                    | "Trailing 12"
+                    | "Year to Date"
+                    | "Custom",
+                )
+              }
+              style={{
+                border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                width: "100%",
+                padding: 8,
+              }}
+            >
+              <option value="Monthly">Monthly</option>
+              <option value="Quarterly">Quarterly</option>
+              <option value="Year to Date">Year to Date</option>
+              <option value="Trailing 12">Trailing 12</option>
+              <option value="Custom">Custom Range</option>
+            </select>
+          </div>
+
+          {reportPeriod === "Custom" ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                style={{
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  padding: 8,
+                  flex: 1,
+                }}
+              />
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                style={{
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  padding: 8,
+                  flex: 1,
+                }}
+              />
+            </div>
+          ) : reportPeriod === "Quarterly" ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <select
+                value={quarter}
+                onChange={(e) => setQuarter(Number(e.target.value))}
+                style={{
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  padding: 8,
+                  flex: 1,
+                }}
+              >
+                <option value={1}>Q1</option>
+                <option value={2}>Q2</option>
+                <option value={3}>Q3</option>
+                <option value={4}>Q4</option>
+              </select>
+              <select
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value))}
+                style={{
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  padding: 8,
+                  flex: 1,
+                }}
+              >
+                {Array.from({ length: 5 }, (_, i) => {
+                  const y = new Date().getFullYear() - 2 + i;
+                  return (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <select
+                value={month}
+                onChange={(e) => setMonth(Number(e.target.value))}
+                style={{
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  padding: 8,
+                  flex: 1,
+                }}
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {new Date(0, i).toLocaleString("en", { month: "long" })}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value))}
+                style={{
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  padding: 8,
+                  flex: 1,
+                }}
+              >
+                {Array.from({ length: 5 }, (_, i) => {
+                  const y = new Date().getFullYear() - 2 + i;
+                  return (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
