@@ -74,6 +74,15 @@ export default function ClientRootLayout({
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const pathname = usePathname();
 
+  // Render mobile dashboard without global navigation
+  if (pathname?.startsWith("/mobile-dashboard")) {
+    return (
+      <html lang="en">
+        <body className={inter.className}>{children}</body>
+      </html>
+    );
+  }
+
   if (pathname === "/login") {
     return (
       <html lang="en">

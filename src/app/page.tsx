@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import React from "react"
-import { useState, useEffect, useMemo, useRef } from "react"
-import Link from "next/link"
+import React from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import {
   DollarSign,
   TrendingUp,
@@ -18,7 +18,7 @@ import {
   Target,
   Activity,
   PieChart,
-} from "lucide-react"
+} from "lucide-react";
 import {
   LineChart,
   Line,
@@ -33,10 +33,10 @@ import {
   PieChart as RechartsPieChart,
   Pie,
   Cell,
-} from "recharts"
-import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { supabase } from "@/lib/supabaseClient"
+} from "recharts";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { supabase } from "@/lib/supabaseClient";
 
 // I AM CFO Brand Colors
 const BRAND_COLORS = {
@@ -47,48 +47,49 @@ const BRAND_COLORS = {
   success: "#27AE60",
   warning: "#F39C12",
   danger: "#E74C3C",
-}
+};
 
 // P&L Classification using the same logic as financials page
 const classifyPLAccount = (accountType, reportCategory, accountName) => {
-  const typeLower = accountType?.toLowerCase() || ""
-  const nameLower = accountName?.toLowerCase() || ""
-  const categoryLower = reportCategory?.toLowerCase() || ""
+  const typeLower = accountType?.toLowerCase() || "";
+  const nameLower = accountName?.toLowerCase() || "";
+  const categoryLower = reportCategory?.toLowerCase() || "";
 
   // Exclude transfers and cash accounts first
-  const isTransfer = categoryLower === "transfer" || nameLower.includes("transfer")
+  const isTransfer =
+    categoryLower === "transfer" || nameLower.includes("transfer");
   const isCashAccount =
     typeLower.includes("bank") ||
     typeLower.includes("cash") ||
     nameLower.includes("checking") ||
     nameLower.includes("savings") ||
-    nameLower.includes("cash")
+    nameLower.includes("cash");
 
-  if (isCashAccount || isTransfer) return null
+  if (isCashAccount || isTransfer) return null;
 
   // INCOME ACCOUNTS - Based on account_type
   const isIncomeAccount =
     typeLower === "income" ||
     typeLower === "other income" ||
     typeLower.includes("income") ||
-    typeLower.includes("revenue")
+    typeLower.includes("revenue");
 
   // EXPENSE ACCOUNTS - Based on account_type
   const isExpenseAccount =
     typeLower === "expense" ||
     typeLower === "other expense" ||
     typeLower === "cost of goods sold" ||
-    typeLower.includes("expense")
+    typeLower.includes("expense");
 
-  if (isIncomeAccount) return "INCOME"
-  if (isExpenseAccount) return "EXPENSES"
+  if (isIncomeAccount) return "INCOME";
+  if (isExpenseAccount) return "EXPENSES";
 
-  return null // Not a P&L account (likely Balance Sheet account)
-}
+  return null; // Not a P&L account (likely Balance Sheet account)
+};
 
 // Cash Flow Classification using the same logic as cash-flow page
 const classifyCashFlowTransaction = (accountType) => {
-  const typeLower = accountType?.toLowerCase() || ""
+  const typeLower = accountType?.toLowerCase() || "";
 
   // Operating activities - Income and Expenses
   if (
@@ -100,12 +101,16 @@ const classifyCashFlowTransaction = (accountType) => {
     typeLower === "accounts receivable" ||
     typeLower === "accounts payable"
   ) {
-    return "operating"
+    return "operating";
   }
 
   // Investing activities - Fixed Assets and Other Assets
-  if (typeLower === "fixed assets" || typeLower === "other assets" || typeLower === "property, plant & equipment") {
-    return "investing"
+  if (
+    typeLower === "fixed assets" ||
+    typeLower === "other assets" ||
+    typeLower === "property, plant & equipment"
+  ) {
+    return "investing";
   }
 
   // Financing activities - Liabilities, Equity, Credit Cards
@@ -116,65 +121,75 @@ const classifyCashFlowTransaction = (accountType) => {
     typeLower === "other current liabilities" ||
     typeLower === "line of credit"
   ) {
-    return "financing"
+    return "financing";
   }
 
-  return "other"
-}
+  return "other";
+};
 
 export default function FinancialOverviewPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedMonth, setSelectedMonth] = useState("June")
-  const [selectedYear, setSelectedYear] = useState("2024")
-  type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("YTD")
-  const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false)
-  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false)
-  const [yearDropdownOpen, setYearDropdownOpen] = useState(false)
-  const [classDropdownOpen, setClassDropdownOpen] = useState(false)
-  const timePeriodDropdownRef = useRef<HTMLDivElement>(null)
-  const monthDropdownRef = useRef<HTMLDivElement>(null)
-  const yearDropdownRef = useRef<HTMLDivElement>(null)
-  const classDropdownRef = useRef<HTMLDivElement>(null)
-  const [financialData, setFinancialData] = useState(null)
-  const [error, setError] = useState(null)
-  const [lastUpdated, setLastUpdated] = useState(null)
-  const [chartType, setChartType] = useState<"line" | "bar">("line")
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState("June");
+  const [selectedYear, setSelectedYear] = useState("2024");
+  type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom";
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("YTD");
+  const [timePeriodDropdownOpen, setTimePeriodDropdownOpen] = useState(false);
+  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
+  const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
+  const [classDropdownOpen, setClassDropdownOpen] = useState(false);
+  const timePeriodDropdownRef = useRef<HTMLDivElement>(null);
+  const monthDropdownRef = useRef<HTMLDivElement>(null);
+  const yearDropdownRef = useRef<HTMLDivElement>(null);
+  const classDropdownRef = useRef<HTMLDivElement>(null);
+  const [financialData, setFinancialData] = useState(null);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [chartType, setChartType] = useState<"line" | "bar">("line");
   type MonthlyPoint = {
-    monthName: string
-    year: number
-    totalRevenue: number
-    totalExpenses: number
-    netProfit: number
-  }
+    monthName: string;
+    year: number;
+    totalRevenue: number;
+    totalExpenses: number;
+    netProfit: number;
+  };
   type TrendPoint = {
-    month: string
-    totalIncome: number
-    netIncome: number
-    expenses: number
-  }
-  const [trendData, setTrendData] = useState<TrendPoint[]>([])
+    month: string;
+    totalIncome: number;
+    netIncome: number;
+    expenses: number;
+  };
+  const [trendData, setTrendData] = useState<TrendPoint[]>([]);
   type PropertyPoint = {
-    name: string
-    revenue: number
-    grossProfit: number
-    operatingExpenses: number
-    netIncome: number
-    cogs: number
-  }
-  const [propertyData, setPropertyData] = useState<PropertyPoint[]>([])
+    name: string;
+    revenue: number;
+    grossProfit: number;
+    operatingExpenses: number;
+    netIncome: number;
+    cogs: number;
+  };
+  const [propertyData, setPropertyData] = useState<PropertyPoint[]>([]);
   const [propertyChartMetric, setPropertyChartMetric] = useState<
     "income" | "gp" | "ni" | "expenses" | "cogs"
-  >("income")
-  const [loadingTrend, setLoadingTrend] = useState(false)
-  const [loadingProperty, setLoadingProperty] = useState(false)
-  const [trendError, setTrendError] = useState<string | null>(null)
-  const [propertyError, setPropertyError] = useState<string | null>(null)
-  const [selectedClasses, setSelectedClasses] = useState<Set<string>>(new Set(["All Classes"]))
-  const [availableClasses, setAvailableClasses] = useState<string[]>(["All Classes"])
-  const [customStartDate, setCustomStartDate] = useState("")
-  const [customEndDate, setCustomEndDate] = useState("")
-  const orgId = "1"
+  >("income");
+  const [loadingTrend, setLoadingTrend] = useState(false);
+  const [loadingProperty, setLoadingProperty] = useState(false);
+  const [trendError, setTrendError] = useState<string | null>(null);
+  const [propertyError, setPropertyError] = useState<string | null>(null);
+  const [selectedClasses, setSelectedClasses] = useState<Set<string>>(
+    new Set(["All Classes"]),
+  );
+  const [availableClasses, setAvailableClasses] = useState<string[]>([
+    "All Classes",
+  ]);
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const orgId = "1";
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      window.location.href = "/mobile-dashboard";
+    }
+  }, []);
 
   // Generate months and years lists (same as other pages)
   const monthsList = [
@@ -190,107 +205,125 @@ export default function FinancialOverviewPage() {
     "October",
     "November",
     "December",
-  ]
-  const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - 5 + i).toString())
+  ];
+  const yearsList = Array.from({ length: 10 }, (_, i) =>
+    (new Date().getFullYear() - 5 + i).toString(),
+  );
 
   // Date utilities (same as financials page)
   const getDateParts = (dateString) => {
-    const dateOnly = dateString.split("T")[0]
-    const [year, month, day] = dateOnly.split("-").map(Number)
-    return { year, month, day, dateOnly }
-  }
+    const dateOnly = dateString.split("T")[0];
+    const [year, month, day] = dateOnly.split("-").map(Number);
+    return { year, month, day, dateOnly };
+  };
 
   // Removed unused getMonthYear function
 
   const isDateInRange = (dateString, startDate, endDate) => {
-    const { dateOnly } = getDateParts(dateString)
-    return dateOnly >= startDate && dateOnly <= endDate
-  }
+    const { dateOnly } = getDateParts(dateString);
+    return dateOnly >= startDate && dateOnly <= endDate;
+  };
 
   // Calculate date range (matches financials page logic)
   const calculateDateRange = () => {
-    let startDate: string
-    let endDate: string
+    let startDate: string;
+    let endDate: string;
 
     if (timePeriod === "Custom") {
-      startDate = customStartDate || "2025-01-01"
-      endDate = customEndDate || "2025-06-30"
+      startDate = customStartDate || "2025-01-01";
+      endDate = customEndDate || "2025-06-30";
     } else if (timePeriod === "YTD") {
-      const monthIndex = monthsList.indexOf(selectedMonth)
-      const year = Number.parseInt(selectedYear)
-      startDate = `${year}-01-01`
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
+      startDate = `${year}-01-01`;
 
-      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let lastDay = daysInMonth[monthIndex]
-      if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
-        lastDay = 29
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
       }
-      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else if (timePeriod === "Monthly") {
-      const monthIndex = monthsList.indexOf(selectedMonth)
-      const year = Number.parseInt(selectedYear)
-      startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
+      startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`;
 
-      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let lastDay = daysInMonth[monthIndex]
-      if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
-        lastDay = 29
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
       }
-      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else if (timePeriod === "Quarterly") {
-      const monthIndex = monthsList.indexOf(selectedMonth)
-      const year = Number.parseInt(selectedYear)
-      const quarter = Math.floor(monthIndex / 3)
-      const quarterStartMonth = quarter * 3
-      startDate = `${year}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
+      const quarter = Math.floor(monthIndex / 3);
+      const quarterStartMonth = quarter * 3;
+      startDate = `${year}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`;
 
-      const quarterEndMonth = quarterStartMonth + 2
-      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let lastDay = daysInMonth[quarterEndMonth]
-      if (quarterEndMonth === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
-        lastDay = 29
+      const quarterEndMonth = quarterStartMonth + 2;
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[quarterEndMonth];
+      if (
+        quarterEndMonth === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
       }
-      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else if (timePeriod === "Trailing 12") {
-      const monthIndex = monthsList.indexOf(selectedMonth)
-      const year = Number.parseInt(selectedYear)
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
 
-      let startYear = year
-      let startMonth = monthIndex + 1 - 11
+      let startYear = year;
+      let startMonth = monthIndex + 1 - 11;
       if (startMonth <= 0) {
-        startMonth += 12
-        startYear -= 1
+        startMonth += 12;
+        startYear -= 1;
       }
-      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
 
-      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let lastDay = daysInMonth[monthIndex]
-      if (monthIndex === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)) {
-        lastDay = 29
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
       }
-      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     } else {
-      const now = new Date()
-      const currentYear = now.getFullYear()
-      const currentMonth = now.getMonth() + 1
-      let startYear = currentYear
-      let startMonth = currentMonth - 12
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      let startYear = currentYear;
+      let startMonth = currentMonth - 12;
       if (startMonth <= 0) {
-        startMonth += 12
-        startYear -= 1
+        startMonth += 12;
+        startYear -= 1;
       }
-      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
 
-      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let lastDay = daysInMonth[currentMonth - 1]
-      if (currentMonth === 2 && ((currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0)) {
-        lastDay = 29
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[currentMonth - 1];
+      if (
+        currentMonth === 2 &&
+        ((currentYear % 4 === 0 && currentYear % 100 !== 0) ||
+          currentYear % 400 === 0)
+      ) {
+        lastDay = 29;
       }
-      endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+      endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     }
 
-    return { startDate, endDate }
-  }
+    return { startDate, endDate };
+  };
 
   // Click outside handler for dropdowns
   useEffect(() => {
@@ -299,33 +332,33 @@ export default function FinancialOverviewPage() {
         classDropdownRef.current &&
         !classDropdownRef.current.contains(event.target as Node)
       ) {
-        setClassDropdownOpen(false)
+        setClassDropdownOpen(false);
       }
       if (
         timePeriodDropdownRef.current &&
         !timePeriodDropdownRef.current.contains(event.target as Node)
       ) {
-        setTimePeriodDropdownOpen(false)
+        setTimePeriodDropdownOpen(false);
       }
       if (
         monthDropdownRef.current &&
         !monthDropdownRef.current.contains(event.target as Node)
       ) {
-        setMonthDropdownOpen(false)
+        setMonthDropdownOpen(false);
       }
       if (
         yearDropdownRef.current &&
         !yearDropdownRef.current.contains(event.target as Node)
       ) {
-        setYearDropdownOpen(false)
+        setYearDropdownOpen(false);
       }
-    }
+    };
 
-    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Load available classes for filter dropdown
   const fetchAvailableClasses = async () => {
@@ -333,48 +366,48 @@ export default function FinancialOverviewPage() {
       const { data, error } = await supabase
         .from("journal_entry_lines")
         .select("class")
-        .not("class", "is", null)
-      if (error) throw error
-      const classes = new Set<string>()
+        .not("class", "is", null);
+      if (error) throw error;
+      const classes = new Set<string>();
       data.forEach((row) => {
         if (row.class && row.class.trim()) {
-          classes.add(row.class.trim())
+          classes.add(row.class.trim());
         }
-      })
-      setAvailableClasses(["All Classes", ...Array.from(classes).sort()])
+      });
+      setAvailableClasses(["All Classes", ...Array.from(classes).sort()]);
     } catch (err) {
-      console.error("Error fetching classes:", err)
+      console.error("Error fetching classes:", err);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchAvailableClasses()
-  }, [])
+    fetchAvailableClasses();
+  }, []);
 
   // Fetch financial data from Supabase (same connection as other pages)
   const fetchFinancialData = async () => {
     try {
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
 
-      const { startDate, endDate } = calculateDateRange()
-      const monthIndex = monthsList.indexOf(selectedMonth)
-      const year = Number.parseInt(selectedYear)
+      const { startDate, endDate } = calculateDateRange();
+      const monthIndex = monthsList.indexOf(selectedMonth);
+      const year = Number.parseInt(selectedYear);
       const selectedClassList = Array.from(selectedClasses).filter(
         (c) => c !== "All Classes",
-      )
+      );
 
       console.log(
         `🔍 FINANCIAL OVERVIEW - Fetching data for ${selectedMonth} ${selectedYear}`,
-      )
-      console.log(`📅 Date range: ${startDate} to ${endDate}`)
+      );
+      console.log(`📅 Date range: ${startDate} to ${endDate}`);
       console.log(
         `🏢 Class Filter: ${
           selectedClassList.length > 0
             ? selectedClassList.join(", ")
             : "All Classes"
         }`,
-      )
+      );
 
       // Fetch current period data using same query structure as other pages
       let currentQuery = supabase
@@ -398,41 +431,48 @@ export default function FinancialOverviewPage() {
           is_cash_account,
           detail_type,
           account_behavior
-        `
+        `,
         )
         .gte("date", startDate)
         .lte("date", endDate)
-        .order("date", { ascending: true })
+        .order("date", { ascending: true });
 
       if (selectedClassList.length > 0) {
-        currentQuery = currentQuery.in("class", selectedClassList)
+        currentQuery = currentQuery.in("class", selectedClassList);
       }
 
-      const { data: currentTransactions, error: currentError } = await currentQuery
-      if (currentError) throw currentError
+      const { data: currentTransactions, error: currentError } =
+        await currentQuery;
+      if (currentError) throw currentError;
 
       // Filter transactions using timezone-independent date comparison
       const filteredCurrentTransactions = currentTransactions.filter((tx) => {
-        return isDateInRange(tx.date, startDate, endDate)
-      })
+        return isDateInRange(tx.date, startDate, endDate);
+      });
 
-      console.log(`📊 Current period: ${filteredCurrentTransactions.length} transactions`)
+      console.log(
+        `📊 Current period: ${filteredCurrentTransactions.length} transactions`,
+      );
 
       // Fetch previous period for comparison
-      const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1
-      const prevYear = monthIndex === 0 ? year - 1 : year
-      const prevStartDate = `${prevYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-01`
+      const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1;
+      const prevYear = monthIndex === 0 ? year - 1 : year;
+      const prevStartDate = `${prevYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-01`;
 
-      const prevDaysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-      let prevLastDay = prevDaysInMonth[prevMonthIndex]
-      if (prevMonthIndex === 1 && ((prevYear % 4 === 0 && prevYear % 100 !== 0) || prevYear % 400 === 0)) {
-        prevLastDay = 29
+      const prevDaysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let prevLastDay = prevDaysInMonth[prevMonthIndex];
+      if (
+        prevMonthIndex === 1 &&
+        ((prevYear % 4 === 0 && prevYear % 100 !== 0) || prevYear % 400 === 0)
+      ) {
+        prevLastDay = 29;
       }
-      const prevEndDate = `${prevYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-${String(prevLastDay).padStart(2, "0")}`
+      const prevEndDate = `${prevYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-${String(prevLastDay).padStart(2, "0")}`;
 
       let prevQuery = supabase
         .from("journal_entry_lines")
-        .select(`
+        .select(
+          `
           entry_number,
           class,
           date,
@@ -450,41 +490,53 @@ export default function FinancialOverviewPage() {
           is_cash_account,
           detail_type,
           account_behavior
-        `)
+        `,
+        )
         .gte("date", prevStartDate)
         .lte("date", prevEndDate)
-        .order("date", { ascending: true })
+        .order("date", { ascending: true });
 
       if (selectedClassList.length > 0) {
-        prevQuery = prevQuery.in("class", selectedClassList)
+        prevQuery = prevQuery.in("class", selectedClassList);
       }
 
-      const { data: prevTransactions, error: prevError } = await prevQuery
+      const { data: prevTransactions, error: prevError } = await prevQuery;
 
       const filteredPrevTransactions =
         prevTransactions && !prevError
-          ? prevTransactions.filter((tx) => isDateInRange(tx.date, prevStartDate, prevEndDate))
-          : []
+          ? prevTransactions.filter((tx) =>
+              isDateInRange(tx.date, prevStartDate, prevEndDate),
+            )
+          : [];
 
-      console.log(`📊 Previous period: ${filteredPrevTransactions.length} transactions`)
+      console.log(
+        `📊 Previous period: ${filteredPrevTransactions.length} transactions`,
+      );
 
       // Fetch last 12 months for trend analysis
-      const trendData = []
+      const trendData = [];
       for (let i = 11; i >= 0; i--) {
-        const trendMonthIndex = (monthIndex - i + 12) % 12
-        const trendYear = monthIndex - i < 0 ? year - 1 : year
-        const trendStartDate = `${trendYear}-${String(trendMonthIndex + 1).padStart(2, "0")}-01`
+        const trendMonthIndex = (monthIndex - i + 12) % 12;
+        const trendYear = monthIndex - i < 0 ? year - 1 : year;
+        const trendStartDate = `${trendYear}-${String(trendMonthIndex + 1).padStart(2, "0")}-01`;
 
-        const trendDaysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        let trendLastDay = trendDaysInMonth[trendMonthIndex]
-        if (trendMonthIndex === 1 && ((trendYear % 4 === 0 && trendYear % 100 !== 0) || trendYear % 400 === 0)) {
-          trendLastDay = 29
+        const trendDaysInMonth = [
+          31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
+        ];
+        let trendLastDay = trendDaysInMonth[trendMonthIndex];
+        if (
+          trendMonthIndex === 1 &&
+          ((trendYear % 4 === 0 && trendYear % 100 !== 0) ||
+            trendYear % 400 === 0)
+        ) {
+          trendLastDay = 29;
         }
-        const trendEndDate = `${trendYear}-${String(trendMonthIndex + 1).padStart(2, "0")}-${String(trendLastDay).padStart(2, "0")}`
+        const trendEndDate = `${trendYear}-${String(trendMonthIndex + 1).padStart(2, "0")}-${String(trendLastDay).padStart(2, "0")}`;
 
         let monthQuery = supabase
           .from("journal_entry_lines")
-          .select(`
+          .select(
+            `
             entry_number,
             class,
             date,
@@ -502,70 +554,82 @@ export default function FinancialOverviewPage() {
             is_cash_account,
             detail_type,
             account_behavior
-          `)
+          `,
+          )
           .gte("date", trendStartDate)
           .lte("date", trendEndDate)
-          .order("date", { ascending: true })
+          .order("date", { ascending: true });
 
         if (selectedClassList.length > 0) {
-          monthQuery = monthQuery.in("class", selectedClassList)
+          monthQuery = monthQuery.in("class", selectedClassList);
         }
 
-        const { data: monthData } = await monthQuery
+        const { data: monthData } = await monthQuery;
 
         const filteredMonthData = monthData
-          ? monthData.filter((tx) => isDateInRange(tx.date, trendStartDate, trendEndDate))
-          : []
+          ? monthData.filter((tx) =>
+              isDateInRange(tx.date, trendStartDate, trendEndDate),
+            )
+          : [];
 
-        const monthName = monthsList[trendMonthIndex]
+        const monthName = monthsList[trendMonthIndex];
         trendData.push({
           month: `${monthName.substring(0, 3)} ${trendYear}`,
           data: filteredMonthData,
-        })
+        });
       }
 
-      console.log(`📈 Trend data: ${trendData.length} months`)
+      console.log(`📈 Trend data: ${trendData.length} months`);
 
       // Process the data using same logic as other pages
-      const processedData = processFinancialData(filteredCurrentTransactions, filteredPrevTransactions, trendData)
-      setFinancialData(processedData)
-      setLastUpdated(new Date())
+      const processedData = processFinancialData(
+        filteredCurrentTransactions,
+        filteredPrevTransactions,
+        trendData,
+      );
+      setFinancialData(processedData);
+      setLastUpdated(new Date());
     } catch (err) {
-      console.error("❌ Error fetching financial data:", err)
-      setError(err.message)
+      console.error("❌ Error fetching financial data:", err);
+      setError(err.message);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Process financial data using same logic as P&L and Cash Flow pages
   const processFinancialData = (currentData, prevData, trendData) => {
     // Process P&L data (same as financials page)
-    const current = processPLTransactions(currentData)
-    const previous = processPLTransactions(prevData)
+    const current = processPLTransactions(currentData);
+    const previous = processPLTransactions(prevData);
 
     // Process cash flow data (same as cash-flow page)
-    const currentCashFlow = processCashFlowTransactions(currentData)
-    const previousCashFlow = processCashFlowTransactions(prevData)
+    const currentCashFlow = processCashFlowTransactions(currentData);
+    const previousCashFlow = processCashFlowTransactions(prevData);
 
     // Process trend data
     const trends = trendData.map(({ month, data }) => ({
       month,
       ...processPLTransactions(data),
       ...processCashFlowTransactions(data),
-    }))
+    }));
 
     // Calculate growth rates
     const calculateGrowth = (current, previous) => {
-      if (previous === 0) return current > 0 ? 100 : 0
-      return ((current - previous) / Math.abs(previous)) * 100
-    }
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / Math.abs(previous)) * 100;
+    };
 
     // Get property breakdown
-    const propertyBreakdown = getPropertyBreakdown(currentData)
+    const propertyBreakdown = getPropertyBreakdown(currentData);
 
     // Generate alerts
-    const alerts = generateAlerts(current, previous, currentCashFlow, propertyBreakdown)
+    const alerts = generateAlerts(
+      current,
+      previous,
+      currentCashFlow,
+      propertyBreakdown,
+    );
 
     return {
       current: { ...current, ...currentCashFlow },
@@ -574,28 +638,42 @@ export default function FinancialOverviewPage() {
       growth: {
         revenue: calculateGrowth(current.totalIncome, previous.totalIncome),
         netIncome: calculateGrowth(current.netIncome, previous.netIncome),
-        expenses: calculateGrowth(current.totalExpenses, previous.totalExpenses),
-        cashFlow: calculateGrowth(currentCashFlow.netCashFlow, previousCashFlow.netCashFlow),
+        expenses: calculateGrowth(
+          current.totalExpenses,
+          previous.totalExpenses,
+        ),
+        cashFlow: calculateGrowth(
+          currentCashFlow.netCashFlow,
+          previousCashFlow.netCashFlow,
+        ),
       },
       propertyBreakdown,
       alerts,
       summary: {
         totalTransactions: currentData.length,
-        activeProperties: [...new Set(currentData.map((t) => t.class).filter(Boolean))].length,
-        profitMargin: current.totalIncome ? (current.netIncome / current.totalIncome) * 100 : 0,
+        activeProperties: [
+          ...new Set(currentData.map((t) => t.class).filter(Boolean)),
+        ].length,
+        profitMargin: current.totalIncome
+          ? (current.netIncome / current.totalIncome) * 100
+          : 0,
       },
-    }
-  }
+    };
+  };
 
   // Process P&L transactions (same logic as financials page)
   const processPLTransactions = (transactions) => {
-    const accountMap = new Map()
+    const accountMap = new Map();
 
     transactions.forEach((tx) => {
-      const classification = classifyPLAccount(tx.account_type, tx.report_category, tx.account)
-      if (!classification) return // Skip non-P&L accounts
+      const classification = classifyPLAccount(
+        tx.account_type,
+        tx.report_category,
+        tx.account,
+      );
+      if (!classification) return; // Skip non-P&L accounts
 
-      const account = tx.account
+      const account = tx.account;
       if (!accountMap.has(account)) {
         accountMap.set(account, {
           account,
@@ -604,45 +682,47 @@ export default function FinancialOverviewPage() {
           transactions: [],
           totalCredits: 0,
           totalDebits: 0,
-        })
+        });
       }
 
-      const accountData = accountMap.get(account)
-      accountData.transactions.push(tx)
+      const accountData = accountMap.get(account);
+      accountData.transactions.push(tx);
 
-      const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0
-      const creditValue = tx.credit ? Number.parseFloat(tx.credit.toString()) : 0
+      const debitValue = tx.debit ? Number.parseFloat(tx.debit.toString()) : 0;
+      const creditValue = tx.credit
+        ? Number.parseFloat(tx.credit.toString())
+        : 0;
 
       if (!isNaN(debitValue) && debitValue > 0) {
-        accountData.totalDebits += debitValue
+        accountData.totalDebits += debitValue;
       }
       if (!isNaN(creditValue) && creditValue > 0) {
-        accountData.totalCredits += creditValue
+        accountData.totalCredits += creditValue;
       }
-    })
+    });
 
     // Calculate totals
-    let totalIncome = 0
-    let totalCogs = 0
-    let totalExpenses = 0
+    let totalIncome = 0;
+    let totalCogs = 0;
+    let totalExpenses = 0;
 
     for (const [, data] of accountMap.entries()) {
-      let amount
+      let amount;
       if (data.category === "INCOME") {
-        amount = data.totalCredits - data.totalDebits
-        totalIncome += amount
+        amount = data.totalCredits - data.totalDebits;
+        totalIncome += amount;
       } else {
-        amount = data.totalDebits - data.totalCredits
+        amount = data.totalDebits - data.totalCredits;
         if (data.account_type?.toLowerCase().includes("cost of goods sold")) {
-          totalCogs += amount
+          totalCogs += amount;
         } else {
-          totalExpenses += amount
+          totalExpenses += amount;
         }
       }
     }
 
-    const grossProfit = totalIncome - totalCogs
-    const netIncome = grossProfit - totalExpenses
+    const grossProfit = totalIncome - totalCogs;
+    const netIncome = grossProfit - totalExpenses;
 
     return {
       totalIncome,
@@ -651,52 +731,61 @@ export default function FinancialOverviewPage() {
       grossProfit,
       netIncome,
       accounts: Array.from(accountMap.values()),
-    }
-  }
+    };
+  };
 
   // Process cash flow transactions (same logic as cash-flow page)
   const processCashFlowTransactions = (transactions) => {
-    let operatingCashFlow = 0
-    let financingCashFlow = 0
-    let investingCashFlow = 0
+    let operatingCashFlow = 0;
+    let financingCashFlow = 0;
+    let investingCashFlow = 0;
 
     transactions.forEach((tx) => {
-      if (!tx.entry_bank_account) return // Must have bank account source
+      if (!tx.entry_bank_account) return; // Must have bank account source
 
-      const classification = classifyCashFlowTransaction(tx.account_type, tx.report_category)
+      const classification = classifyCashFlowTransaction(
+        tx.account_type,
+        tx.report_category,
+      );
       const cashImpact =
         tx.report_category === "transfer"
           ? Number.parseFloat(tx.debit) - Number.parseFloat(tx.credit) // Reverse for transfers
-          : tx.normal_balance || Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit) // Normal for others
+          : tx.normal_balance ||
+            Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit); // Normal for others
 
       if (classification === "operating") {
-        operatingCashFlow += cashImpact
+        operatingCashFlow += cashImpact;
       } else if (classification === "financing") {
-        financingCashFlow += cashImpact
+        financingCashFlow += cashImpact;
       } else if (classification === "investing") {
-        investingCashFlow += cashImpact
+        investingCashFlow += cashImpact;
       }
-    })
+    });
 
-    const netCashFlow = operatingCashFlow + financingCashFlow + investingCashFlow
+    const netCashFlow =
+      operatingCashFlow + financingCashFlow + investingCashFlow;
 
     return {
       operatingCashFlow,
       financingCashFlow,
       investingCashFlow,
       netCashFlow,
-    }
-  }
+    };
+  };
 
   // Get property performance breakdown
   const getPropertyBreakdown = (transactions) => {
-    const properties = {}
+    const properties = {};
 
     transactions.forEach((transaction) => {
-      const property = transaction.class || "Unassigned"
-      const category = classifyPLAccount(transaction.account_type, transaction.report_category, transaction.account)
+      const property = transaction.class || "Unassigned";
+      const category = classifyPLAccount(
+        transaction.account_type,
+        transaction.report_category,
+        transaction.account,
+      );
 
-      if (!category) return
+      if (!category) return;
 
       if (!properties[property]) {
         properties[property] = {
@@ -704,35 +793,43 @@ export default function FinancialOverviewPage() {
           expenses: 0,
           netIncome: 0,
           transactionCount: 0,
-        }
+        };
       }
 
-      const debitValue = transaction.debit ? Number.parseFloat(transaction.debit.toString()) : 0
-      const creditValue = transaction.credit ? Number.parseFloat(transaction.credit.toString()) : 0
-      properties[property].transactionCount++
+      const debitValue = transaction.debit
+        ? Number.parseFloat(transaction.debit.toString())
+        : 0;
+      const creditValue = transaction.credit
+        ? Number.parseFloat(transaction.credit.toString())
+        : 0;
+      properties[property].transactionCount++;
 
       if (category === "INCOME") {
-        const amount = creditValue - debitValue
-        properties[property].revenue += amount
+        const amount = creditValue - debitValue;
+        properties[property].revenue += amount;
       } else {
-        const amount = debitValue - creditValue
-        properties[property].expenses += amount
+        const amount = debitValue - creditValue;
+        properties[property].expenses += amount;
       }
 
-      properties[property].netIncome = properties[property].revenue - properties[property].expenses
-    })
+      properties[property].netIncome =
+        properties[property].revenue - properties[property].expenses;
+    });
 
     return Object.entries(properties)
       .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.netIncome - a.netIncome)
-  }
+      .sort((a, b) => b.netIncome - a.netIncome);
+  };
 
   // Generate financial alerts
   const generateAlerts = (current, previous, currentCashFlow, properties) => {
-    const alerts = []
+    const alerts = [];
 
     // Revenue decline alert
-    if (previous.totalIncome > 0 && current.totalIncome < previous.totalIncome * 0.9) {
+    if (
+      previous.totalIncome > 0 &&
+      current.totalIncome < previous.totalIncome * 0.9
+    ) {
       alerts.push({
         id: "revenue-decline",
         type: "warning",
@@ -740,11 +837,14 @@ export default function FinancialOverviewPage() {
         message: `Revenue decreased by ${(((previous.totalIncome - current.totalIncome) / previous.totalIncome) * 100).toFixed(1)}% from last month`,
         action: "View P&L Details",
         href: "/financials",
-      })
+      });
     }
 
     // High expense growth alert
-    if (previous.totalExpenses > 0 && current.totalExpenses > previous.totalExpenses * 1.15) {
+    if (
+      previous.totalExpenses > 0 &&
+      current.totalExpenses > previous.totalExpenses * 1.15
+    ) {
       alerts.push({
         id: "expense-growth",
         type: "warning",
@@ -752,7 +852,7 @@ export default function FinancialOverviewPage() {
         message: `Expenses increased by ${(((current.totalExpenses - previous.totalExpenses) / previous.totalExpenses) * 100).toFixed(1)}% from last month`,
         action: "Review Expenses",
         href: "/financials",
-      })
+      });
     }
 
     // Cash flow alert
@@ -764,7 +864,7 @@ export default function FinancialOverviewPage() {
         message: `Net cash flow is ${formatCurrency(currentCashFlow.netCashFlow)} this month`,
         action: "View Cash Flow",
         href: "/cash-flow",
-      })
+      });
     } else if (currentCashFlow.netCashFlow > 0) {
       alerts.push({
         id: "positive-cash-flow",
@@ -773,11 +873,11 @@ export default function FinancialOverviewPage() {
         message: `Strong ${formatCurrency(currentCashFlow.netCashFlow)} net cash flow this month`,
         action: "View Cash Flow",
         href: "/cash-flow",
-      })
+      });
     }
 
     // Profitable properties
-    const profitableProperties = properties.filter((p) => p.netIncome > 0)
+    const profitableProperties = properties.filter((p) => p.netIncome > 0);
     if (profitableProperties.length > 0) {
       alerts.push({
         id: "profitable-properties",
@@ -786,11 +886,13 @@ export default function FinancialOverviewPage() {
         message: `${profitableProperties.length} of ${properties.length} properties are profitable`,
         action: "View Properties",
         href: "/financials",
-      })
+      });
     }
 
     // Low margin alert
-    const margin = current.totalIncome ? (current.netIncome / current.totalIncome) * 100 : 0
+    const margin = current.totalIncome
+      ? (current.netIncome / current.totalIncome) * 100
+      : 0;
     if (margin < 10 && margin > -100) {
       alerts.push({
         id: "low-margin",
@@ -799,7 +901,7 @@ export default function FinancialOverviewPage() {
         message: `Current profit margin is ${margin.toFixed(1)}% - consider cost optimization`,
         action: "Analyze Costs",
         href: "/financials",
-      })
+      });
     }
 
     // Strong performance alert
@@ -811,83 +913,90 @@ export default function FinancialOverviewPage() {
         message: `Strong ${margin.toFixed(1)}% profit margin indicates healthy operations`,
         action: "View Details",
         href: "/financials",
-      })
+      });
     }
 
-    return alerts
-  }
+    return alerts;
+  };
 
   const loadTrendData = async () => {
     try {
-      setLoadingTrend(true)
-      setTrendError(null)
-      const endMonth = monthsList.indexOf(selectedMonth) + 1
+      setLoadingTrend(true);
+      setTrendError(null);
+      const endMonth = monthsList.indexOf(selectedMonth) + 1;
       const selectedClassList = Array.from(selectedClasses).filter(
         (c) => c !== "All Classes",
-      )
+      );
       const classQuery =
         selectedClassList.length > 0
           ? `&classId=${encodeURIComponent(selectedClassList.join(","))}`
-          : ""
+          : "";
       const res = await fetch(
         `/api/organizations/${orgId}/trend-data?months=12&endMonth=${endMonth}&endYear=${selectedYear}${classQuery}`,
-      )
-      if (!res.ok) throw new Error("Failed to fetch trend data")
-      const json: { monthlyData: MonthlyPoint[] } = await res.json()
+      );
+      if (!res.ok) throw new Error("Failed to fetch trend data");
+      const json: { monthlyData: MonthlyPoint[] } = await res.json();
       const mapped: TrendPoint[] = (json.monthlyData || []).map((d) => ({
         month: `${d.monthName} ${d.year}`,
         totalIncome: d.totalRevenue,
         netIncome: d.netProfit,
         expenses: d.totalExpenses,
-      }))
-      setTrendData(mapped)
+      }));
+      setTrendData(mapped);
     } catch (e) {
-      const err = e as Error
-      setTrendError(err.message || "Failed to load trend data")
-      setTrendData([])
+      const err = e as Error;
+      setTrendError(err.message || "Failed to load trend data");
+      setTrendData([]);
     } finally {
-      setLoadingTrend(false)
+      setLoadingTrend(false);
     }
-  }
+  };
 
   const loadPropertyData = async () => {
     try {
-      setLoadingProperty(true)
-      setPropertyError(null)
-      const { startDate, endDate } = calculateDateRange()
+      setLoadingProperty(true);
+      setPropertyError(null);
+      const { startDate, endDate } = calculateDateRange();
       const res = await fetch(
-        `/api/organizations/${orgId}/dashboard-summary?start=${startDate}&end=${endDate}&includeProperties=true`
-      )
-      if (!res.ok) throw new Error("Failed to fetch property data")
-      const json: { propertyBreakdown: PropertyPoint[] } = await res.json()
-      setPropertyData(json.propertyBreakdown || [])
+        `/api/organizations/${orgId}/dashboard-summary?start=${startDate}&end=${endDate}&includeProperties=true`,
+      );
+      if (!res.ok) throw new Error("Failed to fetch property data");
+      const json: { propertyBreakdown: PropertyPoint[] } = await res.json();
+      setPropertyData(json.propertyBreakdown || []);
     } catch (e) {
-      const err = e as Error
-      setPropertyError(err.message || "Failed to load property data")
-      setPropertyData([])
+      const err = e as Error;
+      setPropertyError(err.message || "Failed to load property data");
+      setPropertyData([]);
     } finally {
-      setLoadingProperty(false)
+      setLoadingProperty(false);
     }
-  }
+  };
 
   const handleSync = async () => {
     try {
-      await fetch("/api/sync", { method: "POST" })
+      await fetch("/api/sync", { method: "POST" });
     } catch (e) {
-      console.error("Sync failed", e)
+      console.error("Sync failed", e);
     } finally {
-      loadTrendData()
-      loadPropertyData()
+      loadTrendData();
+      loadPropertyData();
     }
-  }
+  };
 
   // Load data on component mount and when filters change
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-    fetchFinancialData()
-    loadTrendData()
-    loadPropertyData()
-  }, [timePeriod, selectedMonth, selectedYear, selectedClasses, customStartDate, customEndDate])
+    fetchFinancialData();
+    loadTrendData();
+    loadPropertyData();
+  }, [
+    timePeriod,
+    selectedMonth,
+    selectedYear,
+    selectedClasses,
+    customStartDate,
+    customEndDate,
+  ]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
   // Helper functions
@@ -896,52 +1005,50 @@ export default function FinancialOverviewPage() {
       style: "currency",
       currency: "USD",
       maximumFractionDigits: 0,
-    }).format(value || 0)
-  }
+    }).format(value || 0);
+  };
 
   const formatCompactCurrency = (value) => {
     if (Math.abs(value) >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`
+      return `${(value / 1000000).toFixed(1)}M`;
     } else if (Math.abs(value) >= 1000) {
-      return `${(value / 1000).toFixed(1)}K`
+      return `${(value / 1000).toFixed(1)}K`;
     }
-    return formatCurrency(value)
-  }
+    return formatCurrency(value);
+  };
 
   const formatPercentage = (value) => {
-    return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
-  }
+    return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+  };
 
   const formatDate = (dateString: string) => {
-    const { year, month, day } = getDateParts(dateString)
-    const date = new Date(year, month - 1, day)
+    const { year, month, day } = getDateParts(dateString);
+    const date = new Date(year, month - 1, day);
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
-    })
-  }
+    });
+  };
 
   const propertyChartData = useMemo(() => {
-    const key = (
-      {
-        income: "revenue",
-        gp: "grossProfit",
-        ni: "netIncome",
-        expenses: "operatingExpenses",
-        cogs: "cogs",
-      }[propertyChartMetric] as keyof PropertyPoint
-    )
+    const key = {
+      income: "revenue",
+      gp: "grossProfit",
+      ni: "netIncome",
+      expenses: "operatingExpenses",
+      cogs: "cogs",
+    }[propertyChartMetric] as keyof PropertyPoint;
     return propertyData
       .map((p) => ({ ...p, value: p[key] as number }))
       .filter((p) => p.value > 0)
-      .sort((a, b) => b.value - a.value)
-  }, [propertyData, propertyChartMetric])
+      .sort((a, b) => b.value - a.value);
+  }, [propertyData, propertyChartMetric]);
 
   const totalPropertyValue = useMemo(
     () => propertyChartData.reduce((sum, p) => sum + p.value, 0),
-    [propertyChartData]
-  )
+    [propertyChartData],
+  );
 
   const metricLabels = {
     income: "Revenue",
@@ -949,7 +1056,7 @@ export default function FinancialOverviewPage() {
     ni: "Net Income",
     expenses: "Expenses",
     cogs: "COGS",
-  }
+  };
 
   const metricOptions = [
     { key: "income", label: "Revenue" },
@@ -957,39 +1064,41 @@ export default function FinancialOverviewPage() {
     { key: "gp", label: "Gross Profit" },
     { key: "expenses", label: "Expenses" },
     { key: "ni", label: "Net Income" },
-  ] as const
+  ] as const;
 
-  const { startDate: propertyStart, endDate: propertyEnd } = calculateDateRange()
+  const { startDate: propertyStart, endDate: propertyEnd } =
+    calculateDateRange();
   const propertySubtitle =
     timePeriod === "Monthly"
       ? `Ranked by net income for ${selectedMonth} ${selectedYear}`
-      : `Ranked by net income for ${formatDate(propertyStart)} - ${formatDate(propertyEnd)}`
+      : `Ranked by net income for ${formatDate(propertyStart)} - ${formatDate(propertyEnd)}`;
 
   const topPropertyTotals = useMemo(() => {
     if (!financialData?.propertyBreakdown) {
-      return { revenue: 0, expenses: 0, netIncome: 0, margin: 0 }
+      return { revenue: 0, expenses: 0, netIncome: 0, margin: 0 };
     }
-    const top = financialData.propertyBreakdown.slice(0, 10)
+    const top = financialData.propertyBreakdown.slice(0, 10);
     const totals = top.reduce(
       (acc, p) => {
-        acc.revenue += p.revenue || 0
-        acc.expenses += p.expenses || 0
-        acc.netIncome += p.netIncome || 0
-        return acc
+        acc.revenue += p.revenue || 0;
+        acc.expenses += p.expenses || 0;
+        acc.netIncome += p.netIncome || 0;
+        return acc;
       },
-      { revenue: 0, expenses: 0, netIncome: 0 }
-    )
+      { revenue: 0, expenses: 0, netIncome: 0 },
+    );
     return {
       ...totals,
       margin: totals.revenue ? (totals.netIncome / totals.revenue) * 100 : 0,
-    }
-  }, [financialData])
+    };
+  }, [financialData]);
 
   const TrendTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-      const revenue = payload.find((p) => p.dataKey === "totalIncome")?.value || 0
-      const net = payload.find((p) => p.dataKey === "netIncome")?.value || 0
-      const margin = revenue ? (net / revenue) * 100 : 0
+      const revenue =
+        payload.find((p) => p.dataKey === "totalIncome")?.value || 0;
+      const net = payload.find((p) => p.dataKey === "netIncome")?.value || 0;
+      const margin = revenue ? (net / revenue) * 100 : 0;
       return (
         <div className="rounded-md border bg-white p-2 text-xs shadow">
           <div className="font-semibold">{label}</div>
@@ -997,17 +1106,17 @@ export default function FinancialOverviewPage() {
           <div>Net Income: {formatCurrency(net)}</div>
           <div>Margin: {margin.toFixed(1)}%</div>
         </div>
-      )
+      );
     }
-    return null
-  }
+    return null;
+  };
 
   const PropertyTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload
+      const data = payload[0].payload;
       const percent = totalPropertyValue
         ? (data.value / totalPropertyValue) * 100
-        : 0
+        : 0;
       return (
         <div className="rounded-md border bg-white p-2 text-xs shadow">
           <div className="font-semibold">{data.name}</div>
@@ -1016,10 +1125,10 @@ export default function FinancialOverviewPage() {
           </div>
           <div>{percent.toFixed(1)}%</div>
         </div>
-      )
+      );
     }
-    return null
-  }
+    return null;
+  };
 
   // Quick actions configuration
   const quickActions = [
@@ -1051,7 +1160,7 @@ export default function FinancialOverviewPage() {
       icon: CreditCard,
       color: BRAND_COLORS.warning,
     },
-  ]
+  ];
 
   if (error) {
     return (
@@ -1059,7 +1168,9 @@ export default function FinancialOverviewPage() {
         <div className="bg-white p-8 rounded-lg shadow-sm max-w-md w-full">
           <div className="text-center">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Data</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Unable to Load Data
+            </h2>
             <p className="text-gray-600 mb-4">{error}</p>
             <button
               onClick={fetchFinancialData}
@@ -1070,7 +1181,7 @@ export default function FinancialOverviewPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -1080,7 +1191,9 @@ export default function FinancialOverviewPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="relative flex justify-center">
             <div className="flex flex-col items-center text-center">
-              <h1 className="text-2xl font-bold text-gray-900">Financial Overview</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Financial Overview
+              </h1>
               <p className="text-sm text-gray-600 mt-1">
                 {timePeriod === "Custom"
                   ? `${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
@@ -1095,7 +1208,9 @@ export default function FinancialOverviewPage() {
                           : `${timePeriod} Period`}
               </p>
               {lastUpdated && (
-                <p className="text-xs text-gray-500 mt-1">Last updated: {lastUpdated.toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Last updated: {lastUpdated.toLocaleString()}
+                </p>
               )}
             </div>
             <button
@@ -1103,13 +1218,15 @@ export default function FinancialOverviewPage() {
               disabled={isLoading}
               className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+              />
               {isLoading ? "Loading..." : "Refresh"}
             </button>
           </div>
         </div>
       </div>
-    
+
       {/* Filters */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -1117,9 +1234,15 @@ export default function FinancialOverviewPage() {
             {/* Time Period Dropdown */}
             <div className="relative" ref={timePeriodDropdownRef}>
               <button
-                onClick={() => setTimePeriodDropdownOpen(!timePeriodDropdownOpen)}
+                onClick={() =>
+                  setTimePeriodDropdownOpen(!timePeriodDropdownOpen)
+                }
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                style={
+                  {
+                    "--tw-ring-color": BRAND_COLORS.primary + "33",
+                  } as React.CSSProperties
+                }
               >
                 <Calendar className="w-4 h-4 mr-2" />
                 {timePeriod}
@@ -1128,12 +1251,20 @@ export default function FinancialOverviewPage() {
 
               {timePeriodDropdownOpen && (
                 <div className="absolute z-10 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg">
-                  {(["Monthly", "Quarterly", "YTD", "Trailing 12", "Custom"] as TimePeriod[]).map((period) => (
+                  {(
+                    [
+                      "Monthly",
+                      "Quarterly",
+                      "YTD",
+                      "Trailing 12",
+                      "Custom",
+                    ] as TimePeriod[]
+                  ).map((period) => (
                     <button
                       key={period}
                       onClick={() => {
-                        setTimePeriod(period)
-                        setTimePeriodDropdownOpen(false)
+                        setTimePeriod(period);
+                        setTimePeriodDropdownOpen(false);
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                     >
@@ -1154,7 +1285,11 @@ export default function FinancialOverviewPage() {
                   <button
                     onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
                     className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                    style={
+                      {
+                        "--tw-ring-color": BRAND_COLORS.primary + "33",
+                      } as React.CSSProperties
+                    }
                   >
                     {selectedMonth}
                     <ChevronDown className="w-4 h-4 ml-2" />
@@ -1166,8 +1301,8 @@ export default function FinancialOverviewPage() {
                         <button
                           key={month}
                           onClick={() => {
-                            setSelectedMonth(month)
-                            setMonthDropdownOpen(false)
+                            setSelectedMonth(month);
+                            setMonthDropdownOpen(false);
                           }}
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                         >
@@ -1182,7 +1317,11 @@ export default function FinancialOverviewPage() {
                   <button
                     onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
                     className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                    style={
+                      {
+                        "--tw-ring-color": BRAND_COLORS.primary + "33",
+                      } as React.CSSProperties
+                    }
                   >
                     {selectedYear}
                     <ChevronDown className="w-4 h-4 ml-2" />
@@ -1194,8 +1333,8 @@ export default function FinancialOverviewPage() {
                         <button
                           key={year}
                           onClick={() => {
-                            setSelectedYear(year)
-                            setYearDropdownOpen(false)
+                            setSelectedYear(year);
+                            setYearDropdownOpen(false);
                           }}
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                         >
@@ -1208,8 +1347,6 @@ export default function FinancialOverviewPage() {
               </>
             )}
 
-            
-
             {/* Custom Date Range */}
             {timePeriod === "Custom" && (
               <div className="flex items-center gap-2">
@@ -1218,7 +1355,11 @@ export default function FinancialOverviewPage() {
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                  style={
+                    {
+                      "--tw-ring-color": BRAND_COLORS.primary + "33",
+                    } as React.CSSProperties
+                  }
                 />
                 <span className="text-gray-500">to</span>
                 <input
@@ -1226,7 +1367,11 @@ export default function FinancialOverviewPage() {
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                  style={
+                    {
+                      "--tw-ring-color": BRAND_COLORS.primary + "33",
+                    } as React.CSSProperties
+                  }
                 />
               </div>
             )}
@@ -1239,7 +1384,9 @@ export default function FinancialOverviewPage() {
         {isLoading && !financialData ? (
           <div className="flex items-center justify-center py-12">
             <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mr-3" />
-            <span className="text-lg text-gray-600">Loading financial data from Supabase...</span>
+            <span className="text-lg text-gray-600">
+              Loading financial data from Supabase...
+            </span>
           </div>
         ) : financialData ? (
           <div className="space-y-8">
@@ -1251,13 +1398,17 @@ export default function FinancialOverviewPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-gray-600 text-sm font-medium mb-2">Total Revenue</div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">
+                      Total Revenue
+                    </div>
                     <div className="text-2xl font-bold text-gray-900">
                       {formatCompactCurrency(financialData.current.totalIncome)}
                     </div>
                     <div
                       className={`flex items-center text-xs font-medium mt-1 ${
-                        financialData.growth.revenue >= 0 ? "text-green-600" : "text-red-600"
+                        financialData.growth.revenue >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
                       }`}
                     >
                       {financialData.growth.revenue >= 0 ? (
@@ -1265,10 +1416,14 @@ export default function FinancialOverviewPage() {
                       ) : (
                         <ArrowDownRight className="w-3 h-3 mr-1" />
                       )}
-                      {formatPercentage(financialData.growth.revenue)} vs last month
+                      {formatPercentage(financialData.growth.revenue)} vs last
+                      month
                     </div>
                   </div>
-                  <DollarSign className="w-8 h-8" style={{ color: BRAND_COLORS.primary }} />
+                  <DollarSign
+                    className="w-8 h-8"
+                    style={{ color: BRAND_COLORS.primary }}
+                  />
                 </div>
               </div>
 
@@ -1278,13 +1433,17 @@ export default function FinancialOverviewPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-gray-600 text-sm font-medium mb-2">Net Income</div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">
+                      Net Income
+                    </div>
                     <div className="text-2xl font-bold text-gray-900">
                       {formatCompactCurrency(financialData.current.netIncome)}
                     </div>
                     <div
                       className={`flex items-center text-xs font-medium mt-1 ${
-                        financialData.growth.netIncome >= 0 ? "text-green-600" : "text-red-600"
+                        financialData.growth.netIncome >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
                       }`}
                     >
                       {financialData.growth.netIncome >= 0 ? (
@@ -1292,7 +1451,8 @@ export default function FinancialOverviewPage() {
                       ) : (
                         <ArrowDownRight className="w-3 h-3 mr-1" />
                       )}
-                      {formatPercentage(financialData.growth.netIncome)} vs last month
+                      {formatPercentage(financialData.growth.netIncome)} vs last
+                      month
                     </div>
                   </div>
                   <TrendingUp className="w-8 h-8 text-green-500" />
@@ -1305,13 +1465,17 @@ export default function FinancialOverviewPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-gray-600 text-sm font-medium mb-2">Net Cash Flow</div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">
+                      Net Cash Flow
+                    </div>
                     <div className="text-2xl font-bold text-gray-900">
                       {formatCompactCurrency(financialData.current.netCashFlow)}
                     </div>
                     <div
                       className={`flex items-center text-xs font-medium mt-1 ${
-                        financialData.growth.cashFlow >= 0 ? "text-green-600" : "text-red-600"
+                        financialData.growth.cashFlow >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
                       }`}
                     >
                       {financialData.growth.cashFlow >= 0 ? (
@@ -1319,10 +1483,14 @@ export default function FinancialOverviewPage() {
                       ) : (
                         <ArrowDownRight className="w-3 h-3 mr-1" />
                       )}
-                      {formatPercentage(financialData.growth.cashFlow)} vs last month
+                      {formatPercentage(financialData.growth.cashFlow)} vs last
+                      month
                     </div>
                   </div>
-                  <Activity className="w-8 h-8" style={{ color: BRAND_COLORS.warning }} />
+                  <Activity
+                    className="w-8 h-8"
+                    style={{ color: BRAND_COLORS.warning }}
+                  />
                 </div>
               </div>
 
@@ -1332,7 +1500,9 @@ export default function FinancialOverviewPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-gray-600 text-sm font-medium mb-2">Profit Margin</div>
+                    <div className="text-gray-600 text-sm font-medium mb-2">
+                      Profit Margin
+                    </div>
                     <div className="text-2xl font-bold text-gray-900">
                       {financialData.summary.profitMargin.toFixed(1)}%
                     </div>
@@ -1340,7 +1510,10 @@ export default function FinancialOverviewPage() {
                       {financialData.summary.activeProperties} active properties
                     </div>
                   </div>
-                  <Target className="w-8 h-8" style={{ color: BRAND_COLORS.secondary }} />
+                  <Target
+                    className="w-8 h-8"
+                    style={{ color: BRAND_COLORS.secondary }}
+                  />
                 </div>
               </div>
             </div>
@@ -1352,14 +1525,20 @@ export default function FinancialOverviewPage() {
                 <CardHeader className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-gray-600" />
-                    <CardTitle className="text-lg font-semibold">Revenue & Net Income Trend</CardTitle>
+                    <CardTitle className="text-lg font-semibold">
+                      Revenue & Net Income Trend
+                    </CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="relative" ref={classDropdownRef}>
                       <button
                         onClick={() => setClassDropdownOpen(!classDropdownOpen)}
                         className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                        style={{ "--tw-ring-color": BRAND_COLORS.primary + "33" } as React.CSSProperties}
+                        style={
+                          {
+                            "--tw-ring-color": BRAND_COLORS.primary + "33",
+                          } as React.CSSProperties
+                        }
                       >
                         Class: {Array.from(selectedClasses).join(", ")}
                         <ChevronDown className="w-4 h-4 ml-1" />
@@ -1376,22 +1555,22 @@ export default function FinancialOverviewPage() {
                                 type="checkbox"
                                 checked={selectedClasses.has(cls)}
                                 onChange={(e) => {
-                                  const newSelected = new Set(selectedClasses)
+                                  const newSelected = new Set(selectedClasses);
                                   if (e.target.checked) {
                                     if (cls === "All Classes") {
-                                      newSelected.clear()
-                                      newSelected.add("All Classes")
+                                      newSelected.clear();
+                                      newSelected.add("All Classes");
                                     } else {
-                                      newSelected.delete("All Classes")
-                                      newSelected.add(cls)
+                                      newSelected.delete("All Classes");
+                                      newSelected.add(cls);
                                     }
                                   } else {
-                                    newSelected.delete(cls)
+                                    newSelected.delete(cls);
                                     if (newSelected.size === 0) {
-                                      newSelected.add("All Classes")
+                                      newSelected.add("All Classes");
                                     }
                                   }
-                                  setSelectedClasses(newSelected)
+                                  setSelectedClasses(newSelected);
                                 }}
                                 className="mr-3 rounded"
                                 style={{ accentColor: BRAND_COLORS.primary }}
@@ -1417,12 +1596,23 @@ export default function FinancialOverviewPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {trendError && <div className="text-sm text-red-500 mb-2">{trendError}</div>}
-                  {loadingTrend && <div className="text-sm text-gray-500">Loading trends...</div>}
+                  {trendError && (
+                    <div className="text-sm text-red-500 mb-2">
+                      {trendError}
+                    </div>
+                  )}
+                  {loadingTrend && (
+                    <div className="text-sm text-gray-500">
+                      Loading trends...
+                    </div>
+                  )}
                   {!loadingTrend && trendData.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 text-gray-500">
                       <p>No trend data available</p>
-                      <Button className="mt-4 flex items-center gap-2" onClick={handleSync}>
+                      <Button
+                        className="mt-4 flex items-center gap-2"
+                        onClick={handleSync}
+                      >
                         <RefreshCw className="h-4 w-4" /> Sync
                       </Button>
                     </div>
@@ -1431,25 +1621,59 @@ export default function FinancialOverviewPage() {
                     <ResponsiveContainer width="100%" height={300}>
                       {chartType === "line" ? (
                         <LineChart data={trendData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="#f1f5f9"
+                          />
                           <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                          <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+                          <YAxis
+                            tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                            tick={{ fontSize: 12 }}
+                          />
                           <Tooltip content={<TrendTooltip />} />
                           <Legend />
-                          <Line type="monotone" dataKey="totalIncome" stroke={BRAND_COLORS.tertiary} strokeWidth={2} dot={false} />
-                          <Line type="monotone" dataKey="netIncome" stroke={BRAND_COLORS.primary} strokeWidth={2} dot={false} />
+                          <Line
+                            type="monotone"
+                            dataKey="totalIncome"
+                            stroke={BRAND_COLORS.tertiary}
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="netIncome"
+                            stroke={BRAND_COLORS.primary}
+                            strokeWidth={2}
+                            dot={false}
+                          />
                         </LineChart>
                       ) : (
                         <BarChart data={trendData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="#f1f5f9"
+                          />
                           <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                          <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+                          <YAxis
+                            tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                            tick={{ fontSize: 12 }}
+                          />
                           <Tooltip content={<TrendTooltip />} />
                           <Legend />
-                          <Bar dataKey="totalIncome" fill={BRAND_COLORS.tertiary} />
+                          <Bar
+                            dataKey="totalIncome"
+                            fill={BRAND_COLORS.tertiary}
+                          />
                           <Bar dataKey="netIncome">
                             {trendData.map((entry, idx) => (
-                              <Cell key={idx} fill={entry.netIncome < 0 ? BRAND_COLORS.danger : BRAND_COLORS.primary} />
+                              <Cell
+                                key={idx}
+                                fill={
+                                  entry.netIncome < 0
+                                    ? BRAND_COLORS.danger
+                                    : BRAND_COLORS.primary
+                                }
+                              />
                             ))}
                           </Bar>
                         </BarChart>
@@ -1464,7 +1688,9 @@ export default function FinancialOverviewPage() {
                 <CardHeader className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <PieChart className="h-4 w-4 text-gray-600" />
-                    <CardTitle className="text-lg font-semibold">Property Performance</CardTitle>
+                    <CardTitle className="text-lg font-semibold">
+                      Property Performance
+                    </CardTitle>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {metricOptions.map((m) => (
@@ -1483,12 +1709,23 @@ export default function FinancialOverviewPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {propertyError && <div className="text-sm text-red-500 mb-2">{propertyError}</div>}
-                  {loadingProperty && <div className="text-sm text-gray-500">Loading properties...</div>}
+                  {propertyError && (
+                    <div className="text-sm text-red-500 mb-2">
+                      {propertyError}
+                    </div>
+                  )}
+                  {loadingProperty && (
+                    <div className="text-sm text-gray-500">
+                      Loading properties...
+                    </div>
+                  )}
                   {!loadingProperty && propertyChartData.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 text-gray-500">
                       <p>No property data available</p>
-                      <Button className="mt-4 flex items-center gap-2" onClick={handleSync}>
+                      <Button
+                        className="mt-4 flex items-center gap-2"
+                        onClick={handleSync}
+                      >
                         <RefreshCw className="h-4 w-4" /> Sync
                       </Button>
                     </div>
@@ -1539,8 +1776,12 @@ export default function FinancialOverviewPage() {
               {/* Quick Actions */}
               <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
-                  <div className="text-sm text-gray-600 mt-1">Access detailed financial reports</div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Quick Actions
+                  </h3>
+                  <div className="text-sm text-gray-600 mt-1">
+                    Access detailed financial reports
+                  </div>
                 </div>
                 <div className="p-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1551,13 +1792,20 @@ export default function FinancialOverviewPage() {
                         className="group p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all"
                       >
                         <div className="flex items-center mb-3">
-                          <action.icon className="w-6 h-6 mr-3" style={{ color: action.color }} />
+                          <action.icon
+                            className="w-6 h-6 mr-3"
+                            style={{ color: action.color }}
+                          />
                           <h4 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
                             {action.title}
                           </h4>
                         </div>
-                        <p className="text-sm text-gray-600">{action.description}</p>
-                        <div className="mt-2 text-xs text-blue-600 font-medium">View Details →</div>
+                        <p className="text-sm text-gray-600">
+                          {action.description}
+                        </p>
+                        <div className="mt-2 text-xs text-blue-600 font-medium">
+                          View Details →
+                        </div>
                       </Link>
                     ))}
                   </div>
@@ -1567,8 +1815,12 @@ export default function FinancialOverviewPage() {
               {/* Alerts & Notifications */}
               <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Financial Alerts</h3>
-                  <div className="text-sm text-gray-600 mt-1">Important insights and notifications</div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Financial Alerts
+                  </h3>
+                  <div className="text-sm text-gray-600 mt-1">
+                    Important insights and notifications
+                  </div>
                 </div>
                 <div className="p-6">
                   {financialData.alerts.length > 0 ? (
@@ -1587,12 +1839,22 @@ export default function FinancialOverviewPage() {
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center mb-1">
-                                {alert.type === "warning" && <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2" />}
-                                {alert.type === "success" && <TrendingUp className="w-4 h-4 text-green-600 mr-2" />}
-                                {alert.type === "info" && <BarChart3 className="w-4 h-4 text-blue-600 mr-2" />}
-                                <h4 className="font-semibold text-gray-900">{alert.title}</h4>
+                                {alert.type === "warning" && (
+                                  <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2" />
+                                )}
+                                {alert.type === "success" && (
+                                  <TrendingUp className="w-4 h-4 text-green-600 mr-2" />
+                                )}
+                                {alert.type === "info" && (
+                                  <BarChart3 className="w-4 h-4 text-blue-600 mr-2" />
+                                )}
+                                <h4 className="font-semibold text-gray-900">
+                                  {alert.title}
+                                </h4>
                               </div>
-                              <p className="text-sm text-gray-600 mb-2">{alert.message}</p>
+                              <p className="text-sm text-gray-600 mb-2">
+                                {alert.message}
+                              </p>
                               <Link
                                 href={alert.href}
                                 className={`text-xs font-medium hover:underline ${
@@ -1624,8 +1886,12 @@ export default function FinancialOverviewPage() {
             {/* Top Properties Performance */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Top Performing Properties</h3>
-                <div className="text-sm text-gray-600 mt-1">{propertySubtitle}</div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Top Performing Properties
+                </h3>
+                <div className="text-sm text-gray-600 mt-1">
+                  {propertySubtitle}
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -1652,56 +1918,68 @@ export default function FinancialOverviewPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {financialData.propertyBreakdown.slice(0, 10).map((property, index) => {
-                      const margin = property.revenue ? (property.netIncome / property.revenue) * 100 : 0
-                      return (
-                        <tr key={property.name} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div
-                                className={`w-3 h-3 rounded-full mr-3 ${
-                                  index === 0
-                                    ? "bg-yellow-400"
-                                    : index === 1
-                                      ? "bg-gray-400"
-                                      : index === 2
-                                        ? "bg-yellow-600"
-                                        : "bg-gray-300"
+                    {financialData.propertyBreakdown
+                      .slice(0, 10)
+                      .map((property, index) => {
+                        const margin = property.revenue
+                          ? (property.netIncome / property.revenue) * 100
+                          : 0;
+                        return (
+                          <tr key={property.name} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div
+                                  className={`w-3 h-3 rounded-full mr-3 ${
+                                    index === 0
+                                      ? "bg-yellow-400"
+                                      : index === 1
+                                        ? "bg-gray-400"
+                                        : index === 2
+                                          ? "bg-yellow-600"
+                                          : "bg-gray-300"
+                                  }`}
+                                ></div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {property.name}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatCurrency(property.revenue)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatCurrency(property.expenses)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span
+                                className={`text-sm font-medium ${
+                                  property.netIncome >= 0
+                                    ? "text-green-600"
+                                    : "text-red-600"
                                 }`}
-                              ></div>
-                              <div className="text-sm font-medium text-gray-900">{property.name}</div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(property.revenue)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(property.expenses)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`text-sm font-medium ${
-                                property.netIncome >= 0 ? "text-green-600" : "text-red-600"
-                              }`}
-                            >
-                              {formatCurrency(property.netIncome)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`text-sm ${
-                                margin >= 20 ? "text-green-600" : margin >= 10 ? "text-yellow-600" : "text-red-600"
-                              }`}
-                            >
-                              {margin.toFixed(1)}%
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {property.transactionCount}
-                          </td>
-                        </tr>
-                      )
-                    })}
+                              >
+                                {formatCurrency(property.netIncome)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span
+                                className={`text-sm ${
+                                  margin >= 20
+                                    ? "text-green-600"
+                                    : margin >= 10
+                                      ? "text-yellow-600"
+                                      : "text-red-600"
+                                }`}
+                              >
+                                {margin.toFixed(1)}%
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {property.transactionCount}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
@@ -1740,7 +2018,9 @@ export default function FinancialOverviewPage() {
         ) : (
           <div className="text-center py-12">
             <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Available</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No Data Available
+            </h3>
             <p className="text-gray-600">
               No financial data found for {selectedMonth} {selectedYear}.
             </p>
@@ -1748,5 +2028,5 @@ export default function FinancialOverviewPage() {
         )}
       </main>
     </div>
-  )
+  );
 }
