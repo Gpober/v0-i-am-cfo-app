@@ -48,6 +48,9 @@ interface Transaction {
   date: string;
   amount: number;
   running: number;
+  payee?: string | null;
+  memo?: string | null;
+  className?: string | null;
 }
 
 interface JournalRow {
@@ -59,6 +62,10 @@ interface JournalRow {
   report_category?: string | null;
   normal_balance?: number | null;
   date: string;
+  memo?: string | null;
+  customer?: string | null;
+  vendor?: string | null;
+  name?: string | null;
 }
 
 const getMonthName = (m: number) =>
@@ -118,6 +125,23 @@ export default function EnhancedMobileDashboard() {
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const transactionTotal = useMemo(
+    () => transactions.reduce((sum, t) => sum + t.amount, 0),
+    [transactions],
+  );
+
+  const plTotals = useMemo(() => {
+    const revenue = plData.revenue.reduce((sum, c) => sum + c.total, 0);
+    const expenses = plData.expenses.reduce((sum, c) => sum + c.total, 0);
+    return { revenue, expenses, net: revenue - expenses };
+  }, [plData]);
+
+  const cfTotals = useMemo(() => {
+    const operating = cfData.operating.reduce((sum, c) => sum + c.total, 0);
+    const financing = cfData.financing.reduce((sum, c) => sum + c.total, 0);
+    return { operating, financing, net: operating + financing };
+  }, [cfData]);
 
   const classifyTransaction = (
     accountType: string | null,
@@ -244,7 +268,11 @@ export default function EnhancedMobileDashboard() {
           ? (p.revenue || 0) !== 0 || (p.expenses || 0) !== 0 || (p.netIncome || 0) !== 0
           : (p.operating || 0) !== 0 || (p.financing || 0) !== 0;
       });
-      setProperties(list);
+      const finalList =
+        map["General"] && !list.find((p) => p.name === "General")
+          ? [...list, map["General"]]
+          : list;
+      setProperties(finalList);
     };
     load();
   }, [reportType, reportPeriod, month, year, customStart, customEnd, getDateRange]);
@@ -372,10 +400,13 @@ export default function EnhancedMobileDashboard() {
         fin[row.account] = (fin[row.account] || 0) + amount;
       }
     });
-    setCfData({
-      operating: Object.entries(op).map(([name, total]) => ({ name, total })),
-      financing: Object.entries(fin).map(([name, total]) => ({ name, total })),
-    });
+    const operatingArr = Object.entries(op)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+    const financingArr = Object.entries(fin)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+    setCfData({ operating: operatingArr, financing: financingArr });
   };
 
 
@@ -386,7 +417,9 @@ export default function EnhancedMobileDashboard() {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
-      .select("date, debit, credit, account, class, report_category")
+      .select(
+        "date, debit, credit, account, class, report_category, memo, customer, vendor, name",
+      )
       .eq("account", account)
       .gte("date", start)
       .lte("date", end);
@@ -409,7 +442,14 @@ export default function EnhancedMobileDashboard() {
           amount =
             row.report_category === "transfer" ? debit - credit : credit - debit;
         }
-        return { date: row.date, amount, running: 0 };
+        return {
+          date: row.date,
+          amount,
+          running: 0,
+          payee: row.customer || row.vendor || row.name,
+          memo: row.memo,
+          className: row.class,
+        };
       });
     let run = 0;
     list.forEach((t) => {
@@ -469,7 +509,12 @@ export default function EnhancedMobileDashboard() {
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>I AM CFO</span>
+          <span
+            onClick={() => handlePropertySelect(null)}
+            style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', cursor: 'pointer' }}
+          >
+            I AM CFO
+          </span>
         </div>
 
         {/* Dashboard Summary */}
@@ -1138,6 +1183,39 @@ export default function EnhancedMobileDashboard() {
               );
             })}
           </div>
+          <div
+            onClick={() => handlePropertySelect(null)}
+            style={{
+              marginTop: '24px',
+              background: 'white',
+              borderRadius: '16px',
+              padding: '18px',
+              cursor: 'pointer',
+              border: `2px solid ${BRAND_COLORS.gray[200]}`,
+              textAlign: 'center',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
+            }}
+          >
+            <span
+              style={{
+                fontWeight: '700',
+                fontSize: '15px',
+                color: BRAND_COLORS.accent
+              }}
+            >
+              Company Total Net {reportType === "pl" ? "Income" : "Cash"}
+            </span>
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: '800',
+                marginTop: '4px',
+                color: companyTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
+              }}
+            >
+              {formatCompactCurrency(companyTotals.net)}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1176,13 +1254,14 @@ export default function EnhancedMobileDashboard() {
           </div>
 
           {reportType === "pl" ? (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              <div style={{
-                background: 'white',
-                borderRadius: '12px',
-                padding: '20px',
-                border: `1px solid ${BRAND_COLORS.gray[200]}`
-              }}>
+            <>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`
+                }}>
                 <h3 style={{ 
                   fontSize: '18px', 
                   fontWeight: '600', 
@@ -1275,14 +1354,28 @@ export default function EnhancedMobileDashboard() {
                 ))}
               </div>
             </div>
+            <div
+              style={{
+                marginTop: '8px',
+                textAlign: 'right',
+                fontSize: '16px',
+                fontWeight: '600',
+                color:
+                  plTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+              }}
+            >
+              Net Income: {formatCurrency(plTotals.net)}
+            </div>
+            </>
           ) : (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              <div style={{
-                background: 'white',
-                borderRadius: '12px',
-                padding: '20px',
-                border: `1px solid ${BRAND_COLORS.gray[200]}`
-              }}>
+            <>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`
+                }}>
                 <h3 style={{ 
                   fontSize: '18px', 
                   fontWeight: '600', 
@@ -1383,6 +1476,19 @@ export default function EnhancedMobileDashboard() {
                 ))}
               </div>
             </div>
+            <div
+              style={{
+                marginTop: '8px',
+                textAlign: 'right',
+                fontSize: '16px',
+                fontWeight: '600',
+                color:
+                  cfTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+              }}
+            >
+              Net Cash Flow: {formatCurrency(cfTotals.net)}
+            </div>
+            </>
           )}
         </div>
       )}
@@ -1423,40 +1529,89 @@ export default function EnhancedMobileDashboard() {
 
           <div style={{ display: 'grid', gap: '12px' }}>
             {transactions.map((t, idx) => (
-              <div key={idx} style={{
-                background: 'white',
-                borderRadius: '8px',
-                padding: '16px',
-                border: `1px solid ${BRAND_COLORS.gray[200]}`,
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>
-                    {new Date(t.date).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </span>
-                  <span style={{ 
-                    fontSize: '16px', 
-                    fontWeight: '600',
-                    color: t.amount >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
-                  }}>
+              <div
+                key={idx}
+                style={{
+                  background: 'white',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>
+                      {new Date(t.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </div>
+                    {t.payee && (
+                      <div style={{ fontSize: '13px', color: '#475569' }}>{t.payee}</div>
+                    )}
+                    {t.className && (
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: BRAND_COLORS.accent,
+                          background: `${BRAND_COLORS.primary}20`,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          display: 'inline-block',
+                          marginTop: '2px',
+                        }}
+                      >
+                        {t.className}
+                      </div>
+                    )}
+                    {t.memo && (
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>{t.memo}</div>
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: t.amount >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+                    }}
+                  >
                     {formatCurrency(t.amount)}
                   </span>
                 </div>
-                <div style={{ 
-                  fontSize: '12px', 
-                  color: '#64748b', 
-                  textAlign: 'right',
-                  borderTop: `1px solid ${BRAND_COLORS.gray[100]}`,
-                  paddingTop: '8px'
-                }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#64748b',
+                    textAlign: 'right',
+                    borderTop: `1px solid ${BRAND_COLORS.gray[100]}`,
+                    paddingTop: '8px',
+                  }}
+                >
                   Running Total: {formatCurrency(t.running)}
                 </div>
               </div>
             ))}
+          </div>
+          <div
+            style={{
+              marginTop: '16px',
+              textAlign: 'right',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: transactionTotal >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+            }}
+          >
+            {reportType === "pl" ? "Total Net Income" : "Total Net Cash Flow"}: {formatCurrency(transactionTotal)}
           </div>
         </div>
       )}
