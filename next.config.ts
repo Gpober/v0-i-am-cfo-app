@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  outputFileTracingRoot: process.cwd(),
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -13,9 +14,6 @@ const nextConfig = {
   // Ensure build outputs go to correct locations
   distDir: ".next",
   // Prevent creation of root-level directories
-  experimental: {
-    outputFileTracingRoot: process.cwd(),
-  },
 }
 
 module.exports = nextConfig
