@@ -1,45 +1,19 @@
-useEffect(() => {
-    const load = async () => {
-      // TODO: Replace this with your actual Supabase query
-      // const { start, end } = getDateRange();
-      // const query = supabase
-      //   .from("journal_entry_lines")
-      //   .select("account_type, report_category, normal_balance, debit, credit, class, date")
-      //   .gte("date", start)
-      //   .lte("date", end);
-      // const { data } = await query;
-      
-      // Mock data for demonstration - replace with your actual data
-      const mockData: JournalRow[] = [
-        {
-          account: "Rental Revenue - Airbnb",
-          account_type: "Income",
-          debit: 0,
-          credit: 125000,
-          class: "Property A",
-          date: "2024-08-15"
-        },
-        {
-          account: "Property Management",
-          account_type: "Expense", 
-          debit: 25000,
-          credit: 0,
-          class: "Property A",
-          date: "2024-08-15"
-        },
-        {
-          account: "Rental Revenue - Direct",
-          account_type: "Income",
-          debit: 0,
-          credit: 180000,
-          class: "Property B",
-          date: "2024-08-15"
-        },
-        {
-          account: ""use client";
+"use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Menu, X, ChevronLeft, TrendingUp, TrendingDown, DollarSign, PieChart, Award, AlertTriangle, CheckCircle, Target } from "lucide-react";
+import {
+  Menu,
+  X,
+  ChevronLeft,
+  TrendingUp,
+  DollarSign,
+  Award,
+  AlertTriangle,
+  CheckCircle,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 // I AM CFO Brand Colors
 const BRAND_COLORS = {
@@ -88,19 +62,36 @@ interface JournalRow {
   date: string;
 }
 
-type PlSummary = {
-  revenue: number;
-  expenses: number;
-  net: number;
-  margin: number;
+const getMonthName = (m: number) =>
+  new Date(0, m - 1).toLocaleString("en-US", { month: "long" });
+
+type Insight = {
+  title: string;
+  message: string;
+  icon: LucideIcon;
+  type: "success" | "warning" | "info";
 };
 
-type CfSummary = {
-  operating: number;
-  financing: number;
-  net: number;
-  margin: number;
-};
+const insights: Insight[] = [
+  {
+    title: "Revenue trending up",
+    message: "Revenue increased compared to last period.",
+    icon: TrendingUp,
+    type: "success",
+  },
+  {
+    title: "Expense spike detected",
+    message: "Expenses rose faster than revenue this period.",
+    icon: AlertTriangle,
+    type: "warning",
+  },
+  {
+    title: "Stable cash position",
+    message: "Cash flow remains steady.",
+    icon: CheckCircle,
+    type: "info",
+  },
+];
 
 export default function EnhancedMobileDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -291,13 +282,6 @@ export default function EnhancedMobileDashboard() {
     { revenue: 0, expenses: 0, net: 0, operating: 0, financing: 0 },
   );
 
-  const margin = reportType === "pl"
-    ? companyTotals.revenue
-      ? (companyTotals.net / companyTotals.revenue) * 100
-      : 0
-    : companyTotals.operating
-    ? (companyTotals.net / companyTotals.operating) * 100
-    : 0;
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("en-US", {
@@ -315,23 +299,25 @@ export default function EnhancedMobileDashboard() {
     return formatCurrency(n);
   };
 
-  const handlePropertySelect = (name: string | null) => {
+  const handlePropertySelect = async (name: string | null) => {
     setSelectedProperty(name);
-    setView("report"); // Go directly to P&L/Cash Flow report
+    if (reportType === "pl") await loadPL(name);
+    else await loadCF(name);
+    setView("report");
   };
 
-  const loadPL = async () => {
+  const loadPL = async (propertyName: string | null = selectedProperty) => {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
       .select("account, account_type, debit, credit, class, date")
       .gte("date", start)
       .lte("date", end);
-    if (selectedProperty) {
+    if (propertyName) {
       query =
-        selectedProperty === "General"
+        propertyName === "General"
           ? query.is("class", null)
-          : query.eq("class", selectedProperty);
+          : query.eq("class", propertyName);
     }
     const { data } = await query;
     const rev: Record<string, number> = {};
@@ -354,7 +340,7 @@ export default function EnhancedMobileDashboard() {
     });
   };
 
-  const loadCF = async () => {
+  const loadCF = async (propertyName: string | null = selectedProperty) => {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
@@ -363,11 +349,11 @@ export default function EnhancedMobileDashboard() {
       )
       .gte("date", start)
       .lte("date", end);
-    if (selectedProperty) {
+    if (propertyName) {
       query =
-        selectedProperty === "General"
+        propertyName === "General"
           ? query.is("class", null)
-          : query.eq("class", selectedProperty);
+          : query.eq("class", propertyName);
     }
     const { data } = await query;
     const op: Record<string, number> = {};
@@ -393,11 +379,6 @@ export default function EnhancedMobileDashboard() {
     });
   };
 
-  const handleViewReport = async () => {
-    if (reportType === "pl") await loadPL();
-    else await loadCF();
-    setView("report");
-  };
 
   const handleCategory = async (
     account: string,
