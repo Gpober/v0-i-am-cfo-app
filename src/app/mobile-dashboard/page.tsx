@@ -1,8 +1,45 @@
-"use client";
+useEffect(() => {
+    const load = async () => {
+      // TODO: Replace this with your actual Supabase query
+      // const { start, end } = getDateRange();
+      // const query = supabase
+      //   .from("journal_entry_lines")
+      //   .select("account_type, report_category, normal_balance, debit, credit, class, date")
+      //   .gte("date", start)
+      //   .lte("date", end);
+      // const { data } = await query;
+      
+      // Mock data for demonstration - replace with your actual data
+      const mockData: JournalRow[] = [
+        {
+          account: "Rental Revenue - Airbnb",
+          account_type: "Income",
+          debit: 0,
+          credit: 125000,
+          class: "Property A",
+          date: "2024-08-15"
+        },
+        {
+          account: "Property Management",
+          account_type: "Expense", 
+          debit: 25000,
+          credit: 0,
+          class: "Property A",
+          date: "2024-08-15"
+        },
+        {
+          account: "Rental Revenue - Direct",
+          account_type: "Income",
+          debit: 0,
+          credit: 180000,
+          class: "Property B",
+          date: "2024-08-15"
+        },
+        {
+          account: ""use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Menu, X, ChevronLeft, TrendingUp, TrendingDown, DollarSign, PieChart, Award, AlertTriangle, CheckCircle, Target } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
 
 // I AM CFO Brand Colors
 const BRAND_COLORS = {
