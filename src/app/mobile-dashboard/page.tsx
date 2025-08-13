@@ -400,10 +400,13 @@ export default function EnhancedMobileDashboard() {
         fin[row.account] = (fin[row.account] || 0) + amount;
       }
     });
-    setCfData({
-      operating: Object.entries(op).map(([name, total]) => ({ name, total })),
-      financing: Object.entries(fin).map(([name, total]) => ({ name, total })),
-    });
+    const operatingArr = Object.entries(op)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+    const financingArr = Object.entries(fin)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+    setCfData({ operating: operatingArr, financing: financingArr });
   };
 
 
