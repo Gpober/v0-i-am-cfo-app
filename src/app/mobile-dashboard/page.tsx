@@ -61,6 +61,8 @@ interface JournalRow {
   class: string | null;
   report_category?: string | null;
   normal_balance?: number | null;
+  entry_bank_account?: string | null;
+  is_cash_account?: boolean | null;
   date: string;
   memo?: string | null;
   customer?: string | null;
@@ -226,7 +228,7 @@ export default function EnhancedMobileDashboard() {
       const query = supabase
         .from("journal_entry_lines")
         .select(
-          "account_type, report_category, normal_balance, debit, credit, class, date",
+          "account, account_type, report_category, normal_balance, debit, credit, class, date, entry_bank_account, is_cash_account",
         )
         .gte("date", start)
         .lte("date", end);
@@ -258,7 +260,11 @@ export default function EnhancedMobileDashboard() {
           );
           if (classification === "operating") {
             map[cls].operating = (map[cls].operating || 0) + amount;
-          } else if (classification === "financing") {
+          } else if (
+            classification === "financing" &&
+            (row.account_type || "").toLowerCase() === "credit card" &&
+            row.entry_bank_account
+          ) {
             map[cls].financing = (map[cls].financing || 0) + amount;
           }
         }
@@ -372,7 +378,7 @@ export default function EnhancedMobileDashboard() {
     let query = supabase
       .from("journal_entry_lines")
       .select(
-        "account, account_type, report_category, normal_balance, debit, credit, class, date",
+        "account, account_type, report_category, normal_balance, debit, credit, class, date, entry_bank_account, is_cash_account",
       )
       .gte("date", start)
       .lte("date", end);
@@ -386,6 +392,7 @@ export default function EnhancedMobileDashboard() {
     const op: Record<string, number> = {};
     const fin: Record<string, number> = {};
     ((data as JournalRow[]) || []).forEach((row) => {
+      if (!row.entry_bank_account) return;
       const debit = Number(row.debit) || 0;
       const credit = Number(row.credit) || 0;
       const amount =
@@ -396,8 +403,12 @@ export default function EnhancedMobileDashboard() {
       );
       if (classification === "operating") {
         op[row.account] = (op[row.account] || 0) + amount;
-      } else if (classification === "financing") {
-        fin[row.account] = (fin[row.account] || 0) + amount;
+      } else if (
+        classification === "financing" &&
+        (row.account_type || "").toLowerCase() === "credit card"
+      ) {
+        fin[row.entry_bank_account] =
+          (fin[row.entry_bank_account] || 0) + amount;
       }
     });
     const operatingArr = Object.entries(op)
@@ -418,11 +429,18 @@ export default function EnhancedMobileDashboard() {
     let query = supabase
       .from("journal_entry_lines")
       .select(
-        "date, debit, credit, account, class, report_category, memo, customer, vendor, name",
+        "date, debit, credit, account, class, report_category, memo, customer, vendor, name, entry_bank_account, account_type",
       )
-      .eq("account", account)
       .gte("date", start)
       .lte("date", end);
+
+    if (type === "financing") {
+      query = query
+        .eq("entry_bank_account", account)
+        .eq("account_type", "Credit Card");
+    } else {
+      query = query.eq("account", account);
+    }
     if (selectedProperty) {
       query =
         selectedProperty === "General"
