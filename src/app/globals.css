@@ -38,3 +38,132 @@ h6 + p {
 .sticky-first-col th:first-child {
   z-index: 20;
 }
+
+/* I AM CFO brand color variables */
+:root {
+  --primary: #56B6E9;
+  --secondary: #3A9BD1;
+  --tertiary: #7CC4ED;
+  --accent: #2E86C1;
+  --success: #27AE60;
+  --warning: #F39C12;
+  --danger: #E74C3C;
+
+  /* Gray Palette */
+  --gray-50: #F8FAFC;
+  --gray-100: #F1F5F9;
+  --gray-200: #E2E8F0;
+
+  /* Text Colors */
+  --text-dark: #1f2937;
+  --text-medium: #6b7280;
+  --text-light: #9ca3af;
+}
+
+/* Mobile dashboard layout */
+.dashboard-container {
+  background: var(--gray-50);
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.hamburger-menu {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.menu-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-item:hover {
+  background: rgba(86, 182, 233, 0.1);
+  color: var(--primary);
+}
+
+.company-total {
+  width: 100%;
+  height: 120px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(86, 182, 233, 0.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 16px;
+}
+
+.property-kpi {
+  width: calc(50% - 12px);
+  height: 100px;
+  background: white;
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 16px;
+}
+
+.property-kpi.active {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, #ffffff, #f0f9ff);
+  box-shadow: 0 4px 20px rgba(86, 182, 233, 0.15);
+}
+
+.property-kpi:hover {
+  border-color: var(--tertiary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(86, 182, 233, 0.1);
+}
+
+.summary-card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 16px;
+  border: 1px solid var(--gray-200);
+  transition: all 0.3s ease;
+}
+
+.summary-card:hover {
+  border-color: var(--tertiary);
+  box-shadow: 0 8px 32px rgba(86, 182, 233, 0.1);
+  transform: translateY(-2px);
+}
+
+.revenue-card {
+  border-left: 4px solid var(--success);
+}
+
+.expense-card {
+  border-left: 4px solid var(--warning);
+}
+
+.net-income-card {
+  border-left: 4px solid var(--primary);
+}
+
+.margin-card {
+  border-left: 4px solid var(--accent);
+}
+
+/* Text utility classes */
+.text-primary {
+  color: var(--primary);
+}
+
+.text-text-medium {
+  color: var(--text-medium);
+}
