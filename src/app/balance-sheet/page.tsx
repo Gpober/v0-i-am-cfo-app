@@ -449,8 +449,29 @@ export default function BalanceSheetPage() {
             const savedDate = parseDate(parsed.date)
             if (savedDate !== "N/A") {
               parsed.balances.forEach((b) => {
-                const acc = accountMap.get(b.account)
-                if (!acc) return
+                let acc = accountMap.get(b.account)
+                if (!acc) {
+                  const lower = b.account.toLowerCase()
+                  let inferredType = "Asset"
+                  if (
+                    lower.includes("cash") ||
+                    lower.includes("bank") ||
+                    lower.includes("checking") ||
+                    lower.includes("savings")
+                  ) {
+                    inferredType = "Bank"
+                  }
+                  acc = {
+                    account: b.account,
+                    accountType: inferredType,
+                    allTransactions: [],
+                    periodTransactions: [],
+                    balance: 0,
+                    beginningBalance: 0,
+                    periodActivity: 0,
+                  }
+                  accountMap.set(b.account, acc)
+                }
 
                 const computedBalanceAtSavedDate = acc.allTransactions
                   .filter((tx: any) => {

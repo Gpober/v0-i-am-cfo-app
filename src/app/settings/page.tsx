@@ -11,6 +11,11 @@ interface ManualBalance {
 // Map common account labels from CSVs to standardized account names
 const accountMappings: Record<string, string> = {
   cash: "Cash",
+  checking: "Checking",
+  "checking account": "Checking",
+  savings: "Savings",
+  "savings account": "Savings",
+  bank: "Bank",
   "accounts receivable": "Accounts Receivable",
   "accounts payable": "Accounts Payable",
   inventory: "Inventory",
@@ -38,6 +43,11 @@ export default function SettingsPage() {
   const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
+    if (!date) {
+      alert("Please select a balance date before uploading.")
+      e.target.value = ""
+      return
+    }
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -68,11 +78,20 @@ export default function SettingsPage() {
   }
 
   const handleSave = () => {
+    if (!date) {
+      alert("Please select a balance date before saving.")
+      return
+    }
+    const filtered = balances
+      .filter((b) => b.account && b.balance)
+      .map((b) => ({ account: b.account, balance: Number(b.balance) }))
+    if (!filtered.length) {
+      alert("Please enter at least one balance before saving.")
+      return
+    }
     const data = {
       date,
-      balances: balances
-        .filter((b) => b.account && b.balance)
-        .map((b) => ({ account: b.account, balance: Number(b.balance) })),
+      balances: filtered,
     }
     if (typeof window !== "undefined") {
       localStorage.setItem("beginningBalances", JSON.stringify(data))
