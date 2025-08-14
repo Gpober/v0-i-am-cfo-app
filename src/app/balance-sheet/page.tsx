@@ -516,7 +516,8 @@ export default function BalanceSheetPage() {
       console.error("❌ Error calculating current year net income:", err)
       return 0
     }
-  }
+  };
+
   const loadData = async () => {
     try {
       setIsLoading(true)
@@ -745,7 +746,7 @@ export default function BalanceSheetPage() {
       // Add Net Income to Equity if significant
       if (Math.abs(netIncome) > 0.01) {
         const netIncomeAccount: BalanceSheetAccount = {
-          account: timePeriod === "YTD" ? "Net Income (Year to Date)" : 
+          account: timePeriod === "YTD" ? "Net Income (Year to Date)" :
                    timePeriod === "Monthly" ? `Net Income (${selectedMonth} ${selectedYear})` :
                    `Net Income (${timePeriod})`,
           accountType: "Equity",
@@ -766,8 +767,10 @@ export default function BalanceSheetPage() {
             accountType: "Equity"
           }]
         }
-        
+
         equityAccounts.push(netIncomeAccount)
+      }
+
       // Add Retained Earnings account if this is not a YTD period
       // (For YTD, all prior year income is already in retained earnings)
       if (timePeriod !== "YTD") {
@@ -843,8 +846,7 @@ export default function BalanceSheetPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-  }
+  };
 
   // Show transaction details modal with different filter types
   const showTransactionDetails = (
