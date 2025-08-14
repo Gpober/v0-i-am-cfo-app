@@ -365,6 +365,78 @@ export default function BalanceSheetPage() {
         accountData.beginningBalance = accountData.balance - accountData.periodActivity
       })
 
+      // Override with manually stored beginning balances
+      const manualBalanceQuery = supabase
+        .from("balance_sheet_balances")
+        .select(
+          "balance_amount, balance_date, property_class, balance_sheet_accounts(account_name)",
+        )
+        .lte("balance_date", endDate)
+
+      if (selectedProperty !== "All Properties") {
+        manualBalanceQuery.eq("property_class", selectedProperty)
+      }
+
+      const { data: storedBeginningBalances, error: storedBeginningBalancesError } =
+        await manualBalanceQuery
+
+      if (storedBeginningBalancesError) {
+        smartLog("❌ Error fetching stored beginning balances", storedBeginningBalancesError)
+      } else if (storedBeginningBalances) {
+        storedBeginningBalances.forEach((row: any) => {
+          const accountName = row.balance_sheet_accounts?.account_name
+          const savedDate = parseDate(row.balance_date)
+          const storedBalance = Number.parseFloat(row.balance_amount) || 0
+
+          if (!accountName || savedDate === "N/A") return
+
+          const acc = accountMap.get(accountName)
+          if (!acc) return
+
+          // Compute balance as of saved date
+          const computedBalanceAtSavedDate = acc.allTransactions
+            .filter((tx: any) => {
+              const txDate = parseDate(tx.date)
+              return txDate !== "N/A" && txDate <= savedDate
+            })
+            .reduce((sum: number, tx: any) => sum + tx.impact, 0)
+
+          const delta = storedBalance - computedBalanceAtSavedDate
+          if (Math.abs(delta) < 0.01) return
+
+          // Apply delta to balances
+          acc.balance += delta
+          if (savedDate < periodStart) {
+            acc.beginningBalance += delta
+          } else {
+            acc.periodActivity += delta
+          }
+
+          // Preserve Beginning Balance transaction entry
+          const beginningEntry = {
+            date: savedDate,
+            account: accountName,
+            memo: "Beginning Balance",
+            debit: delta > 0 ? delta : 0,
+            credit: delta < 0 ? -delta : 0,
+            impact: delta,
+          }
+
+          acc.allTransactions.push(beginningEntry)
+          if (savedDate >= periodStart) {
+            acc.periodTransactions.push(beginningEntry)
+          }
+
+          // Keep transactions chronological
+          acc.allTransactions.sort((a, b) =>
+            parseDate(a.date).localeCompare(parseDate(b.date)),
+          )
+
+          // Recalculate beginning balance after adjustment
+          acc.beginningBalance = acc.balance - acc.periodActivity
+        })
+      }
+
       smartLog(`🎯 Processed accounts`, Array.from(accountMap.keys()))
 
       // Categorize accounts
