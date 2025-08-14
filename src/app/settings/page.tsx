@@ -20,7 +20,6 @@ export default function SettingsPage() {
   const [balances, setBalances] = useState<ManualBalance[]>([
     { account: "", balance: "" },
   ])
-  const [parsedBalances, setParsedBalances] = useState<ManualBalance[]>([])
 
   const handleBalanceChange = (
     index: number,
@@ -70,26 +69,15 @@ export default function SettingsPage() {
           entries.push({ account: mapped, balance: amt.toString() })
       }
     })
-    setParsedBalances(entries)
-  }
-
-  const handleParsedBalanceChange = (
-    index: number,
-    field: keyof ManualBalance,
-    value: string,
-  ) => {
-    const updated = [...parsedBalances]
-    updated[index] = { ...updated[index], [field]: value }
-    setParsedBalances(updated)
+    setBalances(entries.length ? entries : [{ account: "", balance: "" }])
   }
 
   const handleSave = () => {
     const data = {
       date,
-      balances: [
-        ...balances.filter((b) => b.account && b.balance),
-        ...parsedBalances.filter((b) => b.account && b.balance),
-      ].map((b) => ({ account: b.account, balance: Number(b.balance) })),
+      balances: balances
+        .filter((b) => b.account && b.balance)
+        .map((b) => ({ account: b.account, balance: Number(b.balance) })),
     }
     if (typeof window !== "undefined") {
       localStorage.setItem("beginningBalances", JSON.stringify(data))
@@ -115,7 +103,7 @@ export default function SettingsPage() {
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-2">Manual Beginning Balances</h2>
+        <h2 className="text-xl font-semibold mb-2">Beginning Balances</h2>
         {balances.map((row, idx) => (
           <div key={idx} className="flex space-x-2 mb-2">
             <input
@@ -145,30 +133,6 @@ export default function SettingsPage() {
       <div>
         <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet PDF</h2>
         <input type="file" accept="application/pdf" onChange={handleFileUpload} />
-        {parsedBalances.length > 0 && (
-          <div className="mt-4">
-            <h3 className="font-medium">Parsed Accounts</h3>
-            {parsedBalances.map((row, idx) => (
-              <div key={idx} className="flex space-x-2 mb-2">
-                <input
-                  className="flex-1 border rounded p-2"
-                  value={row.account}
-                  onChange={(e) =>
-                    handleParsedBalanceChange(idx, "account", e.target.value)
-                  }
-                />
-                <input
-                  className="w-40 border rounded p-2"
-                  type="number"
-                  value={row.balance}
-                  onChange={(e) =>
-                    handleParsedBalanceChange(idx, "balance", e.target.value)
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <button
