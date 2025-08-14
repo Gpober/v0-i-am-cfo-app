@@ -53,18 +53,8 @@ type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
 
 // Generate months and years lists
 const monthsList = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ]
 
 const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - 5 + i).toString())
@@ -92,26 +82,22 @@ export default function BalanceSheetPage() {
   const [modalTitle, setModalTitle] = useState("")
   const [asOfDate, setAsOfDate] = useState<string>("")
 
-  // Extract date parts directly from string
+  // Utility functions
   const getDateParts = (dateString: string) => {
     const datePart = dateString.split("T")[0]
     const [year, month, day] = datePart.split("-").map(Number)
     return { year, month, day }
   }
 
-  // Get month from date string
-  const getMonthFromDate = (dateString: string): number => {
-    const { month } = getDateParts(dateString)
-    return month
+  const parseDate = (dateString: string | null): string => {
+    if (!dateString) return "N/A"
+    try {
+      return dateString.split("T")[0]
+    } catch {
+      return "N/A"
+    }
   }
 
-  // Get year from date string
-  const getYearFromDate = (dateString: string): number => {
-    const { year } = getDateParts(dateString)
-    return year
-  }
-
-  // Format date for display
   const formatDateSafe = (dateString: string): string => {
     const { year, month, day } = getDateParts(dateString)
     const date = new Date(year, month - 1, day)
@@ -134,22 +120,12 @@ export default function BalanceSheetPage() {
     return formatDateSafe(dateString)
   }
 
-  const getMonthName = (month: number) => {
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ]
-    return monthNames[month - 1]
+  const smartLog = (message: string, data?: any) => {
+    if (data && typeof data === "object" && data.length !== undefined) {
+      console.log(`${message}: ${data.length} items`, data.slice(0, 3))
+    } else {
+      console.log(message, data)
+    }
   }
 
   // Calculate date range based on selected period
@@ -167,18 +143,16 @@ export default function BalanceSheetPage() {
     } else if (timePeriod === "Monthly") {
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
-
-      startDate = `${year}-01-01` // Start from beginning of year for beginning balance
       const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+      startDate = `${year}-01-01` // Always start from beginning of year for comprehensive data
       endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     } else if (timePeriod === "Quarterly") {
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
       const quarter = Math.floor(monthIndex / 3)
-      const quarterStartMonth = quarter * 3
-      startDate = `${year}-01-01` // Start from beginning of year for beginning balance
-      const quarterEndMonth = quarterStartMonth + 2
+      const quarterEndMonth = quarter * 3 + 2
       const lastDay = new Date(year, quarterEndMonth + 1, 0).getDate()
+      startDate = `${year}-01-01` // Always start from beginning of year for comprehensive data
       endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${lastDay}`
     } else {
       // Trailing 12
@@ -217,6 +191,144 @@ export default function BalanceSheetPage() {
     }
   }
 
+  // Helper function to apply manual beginning balances
+  const applyManualBeginningBalances = async (accountMap: Map<string, any>, endDate: string) => {
+    // Apply beginning balances from database
+    try {
+      let manualBalanceQuery = supabase
+        .from("balance_sheet_balances")
+        .select(
+          "balance_amount, balance_date, property_class, balance_sheet_accounts(account_name)",
+        )
+        .lte("balance_date", endDate)
+        .order("balance_date", { ascending: false })
+
+      if (selectedProperty !== "All Properties") {
+        manualBalanceQuery = manualBalanceQuery.eq("property_class", selectedProperty)
+      }
+
+      const { data: storedBeginningBalances, error: storedBeginningBalancesError } =
+        await manualBalanceQuery
+
+      if (storedBeginningBalancesError) {
+        smartLog("❌ Error fetching stored beginning balances", storedBeginningBalancesError)
+      } else if (storedBeginningBalances) {
+        // Group by account and take the most recent balance for each account
+        const latestBalancesByAccount = new Map<string, any>()
+        
+        storedBeginningBalances.forEach((row: any) => {
+          const accountName = row.balance_sheet_accounts?.account_name
+          if (accountName) {
+            const currentDate = parseDate(row.balance_date)
+            if (!latestBalancesByAccount.has(accountName) || 
+                currentDate > parseDate(latestBalancesByAccount.get(accountName).balance_date)) {
+              latestBalancesByAccount.set(accountName, row)
+            }
+          }
+        })
+
+        // Apply the latest balances
+        latestBalancesByAccount.forEach((row: any) => {
+          const accountName = row.balance_sheet_accounts?.account_name
+          const savedDate = parseDate(row.balance_date)
+          const storedBalance = Number.parseFloat(row.balance_amount) || 0
+
+          if (!accountName || savedDate === "N/A") return
+
+          let acc = accountMap.get(accountName)
+          if (!acc) {
+            // Create account if it doesn't exist
+            acc = {
+              account: accountName,
+              accountType: "Asset", // Default type
+              allTransactions: [],
+              manualBalanceApplied: false,
+            }
+            accountMap.set(accountName, acc)
+          }
+
+          // Insert beginning balance transaction at the saved date
+          const beginningEntry = {
+            date: savedDate,
+            account: accountName,
+            memo: "Manual Beginning Balance (Database)",
+            debit: storedBalance > 0 ? storedBalance : 0,
+            credit: storedBalance < 0 ? -storedBalance : 0,
+            impact: storedBalance,
+            entry_number: "MANUAL-DB",
+          }
+
+          acc.allTransactions.push(beginningEntry)
+          acc.manualBalanceApplied = true
+        })
+      }
+    } catch (err) {
+      smartLog("❌ Error applying database beginning balances", err)
+    }
+
+    // Apply beginning balances from localStorage
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("beginningBalances")
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as {
+            date: string
+            balances: {
+              account: string
+              balance: number
+              accountType?: string
+            }[]
+          }
+          const savedDate = parseDate(parsed.date)
+          
+          if (savedDate !== "N/A" && savedDate <= endDate) {
+            parsed.balances.forEach((b) => {
+              let acc = accountMap.get(b.account)
+              if (!acc) {
+                const lower = b.account.toLowerCase()
+                let inferredType = b.accountType || "Asset"
+                if (
+                  !b.accountType &&
+                  (lower.includes("cash") ||
+                    lower.includes("bank") ||
+                    lower.includes("checking") ||
+                    lower.includes("savings"))
+                ) {
+                  inferredType = "Bank"
+                }
+                acc = {
+                  account: b.account,
+                  accountType: inferredType,
+                  allTransactions: [],
+                  manualBalanceApplied: false,
+                }
+                accountMap.set(b.account, acc)
+              }
+
+              // Only apply if no database balance was already applied
+              if (!acc.manualBalanceApplied) {
+                // Insert beginning balance transaction
+                const beginningEntry = {
+                  date: savedDate,
+                  account: b.account,
+                  memo: "Manual Beginning Balance (Local)",
+                  debit: b.balance > 0 ? b.balance : 0,
+                  credit: b.balance < 0 ? -b.balance : 0,
+                  impact: b.balance,
+                  entry_number: "MANUAL-LOCAL",
+                }
+
+                acc.allTransactions.push(beginningEntry)
+              }
+            })
+          }
+        } catch (e) {
+          smartLog("❌ Error parsing local beginning balances", e)
+        }
+      }
+    }
+  }
+
   // Fetch available properties
   const fetchFilters = async () => {
     try {
@@ -238,38 +350,19 @@ export default function BalanceSheetPage() {
     }
   }
 
-  // Smart logging function
-  const smartLog = (message: string, data?: any) => {
-    if (data && typeof data === "object" && data.length !== undefined) {
-      console.log(`${message}: ${data.length} items`, data.slice(0, 3))
-    } else {
-      console.log(message, data)
-    }
-  }
-
-  // Parse date safely
-  const parseDate = (dateString: string | null): string => {
-    if (!dateString) return "N/A"
-    try {
-      return dateString.split("T")[0]
-    } catch {
-      return "N/A"
-    }
-  }
-
-  // Load balance sheet data
+  // Main data loading function
   const loadData = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      const { startDate, endDate } = calculateDateRange()
+      const { endDate } = calculateDateRange()
       const periodStart = calculatePeriodStart()
 
       setAsOfDate(endDate)
 
       smartLog(`🔍 BALANCE SHEET DATA LOAD`)
-      smartLog(`📅 Period: ${startDate} to ${endDate}`)
+      smartLog(`📅 As Of Date: ${endDate}`)
       smartLog(`📊 Period Activity From: ${periodStart}`)
       smartLog(`🏢 Property Filter: "${selectedProperty}"`)
 
@@ -290,11 +383,15 @@ export default function BalanceSheetPage() {
 
       if (error) throw error
 
-      smartLog(`📊 Found transactions`, allTransactions)
+      smartLog(`📊 Found ${allTransactions.length} transactions`)
 
-      // Process transactions by account
+      // Initialize account map
       const accountMap = new Map<string, any>()
 
+      // First, apply manual beginning balances
+      await applyManualBeginningBalances(accountMap, endDate)
+
+      // Process all transactions
       allTransactions.forEach((transaction: any) => {
         const account = transaction.account
         const accountType = transaction.account_type || "Unknown"
@@ -304,20 +401,16 @@ export default function BalanceSheetPage() {
             account,
             accountType,
             allTransactions: [],
-            periodTransactions: [],
-            balance: 0,
-            beginningBalance: 0,
-            periodActivity: 0,
+            manualBalanceApplied: false,
           })
         }
 
         const accountData = accountMap.get(account)!
 
-        // FIXED: Safe handling of normal_balance
-        const normalBalance = (transaction.normal_balance?.toString() || "").toLowerCase().trim()
+        // Calculate transaction impact
         let transactionImpact = 0
 
-        if (normalBalance) {
+        if (transaction.normal_balance !== null && transaction.normal_balance !== undefined) {
           // Use the pre-calculated normal_balance if available
           transactionImpact = Number.parseFloat(transaction.normal_balance) || 0
         } else {
@@ -330,7 +423,8 @@ export default function BalanceSheetPage() {
           if (
             accountTypeLower.includes("asset") ||
             accountTypeLower.includes("expense") ||
-            accountTypeLower.includes("cost")
+            accountTypeLower.includes("cost") ||
+            accountTypeLower.includes("bank")
           ) {
             // Assets and Expenses: Debit increases, Credit decreases
             transactionImpact = debit - credit
@@ -345,203 +439,79 @@ export default function BalanceSheetPage() {
           ...transaction,
           impact: transactionImpact,
         })
-
-        // Calculate running balance
-        accountData.balance += transactionImpact
-
-        // Check if transaction is in the current period for activity calculation
-        const transactionDate = parseDate(transaction.date)
-        if (transactionDate !== "N/A" && transactionDate >= periodStart) {
-          accountData.periodTransactions.push({
-            ...transaction,
-            impact: transactionImpact,
-          })
-          accountData.periodActivity += transactionImpact
-        }
       })
 
-      // Calculate beginning balances
+      // Sort all transactions by date for each account
       accountMap.forEach((accountData) => {
-        accountData.beginningBalance = accountData.balance - accountData.periodActivity
+        accountData.allTransactions.sort((a, b) =>
+          parseDate(a.date).localeCompare(parseDate(b.date))
+        )
       })
 
-      // Override with manually stored beginning balances
-      const manualBalanceQuery = supabase
-        .from("balance_sheet_balances")
-        .select(
-          "balance_amount, balance_date, property_class, balance_sheet_accounts(account_name)",
-        )
-        .lte("balance_date", endDate)
+      // Calculate balances for each account
+      accountMap.forEach((accountData) => {
+        let beginningBalance = 0
+        let periodActivity = 0
+        let endingBalance = 0
+        const periodTransactions: any[] = []
 
-      if (selectedProperty !== "All Properties") {
-        manualBalanceQuery.eq("property_class", selectedProperty)
-      }
-
-      const { data: storedBeginningBalances, error: storedBeginningBalancesError } =
-        await manualBalanceQuery
-
-      if (storedBeginningBalancesError) {
-        smartLog("❌ Error fetching stored beginning balances", storedBeginningBalancesError)
-      } else if (storedBeginningBalances) {
-        storedBeginningBalances.forEach((row: any) => {
-          const accountName = row.balance_sheet_accounts?.account_name
-          const savedDate = parseDate(row.balance_date)
-          const storedBalance = Number.parseFloat(row.balance_amount) || 0
-
-          if (!accountName || savedDate === "N/A") return
-
-          const acc = accountMap.get(accountName)
-          if (!acc) return
-
-          // Compute balance as of saved date
-          const computedBalanceAtSavedDate = acc.allTransactions
-            .filter((tx: any) => {
-              const txDate = parseDate(tx.date)
-              return txDate !== "N/A" && txDate <= savedDate
-            })
-            .reduce((sum: number, tx: any) => sum + tx.impact, 0)
-
-          const delta = storedBalance - computedBalanceAtSavedDate
-          if (Math.abs(delta) < 0.01) return
-
-          // Apply delta to balances
-          acc.balance += delta
-          if (savedDate < periodStart) {
-            acc.beginningBalance += delta
-          } else {
-            acc.periodActivity += delta
+        // Calculate balances chronologically
+        accountData.allTransactions.forEach((tx: any) => {
+          const transactionDate = parseDate(tx.date)
+          
+          if (transactionDate !== "N/A") {
+            // Add to ending balance
+            endingBalance += tx.impact
+            
+            if (transactionDate < periodStart) {
+              // This transaction contributes to beginning balance
+              beginningBalance += tx.impact
+            } else {
+              // This transaction is period activity
+              periodActivity += tx.impact
+              periodTransactions.push(tx)
+            }
           }
-
-          // Preserve Beginning Balance transaction entry
-          const beginningEntry = {
-            date: savedDate,
-            account: accountName,
-            memo: "Beginning Balance",
-            debit: delta > 0 ? delta : 0,
-            credit: delta < 0 ? -delta : 0,
-            impact: delta,
-          }
-
-          acc.allTransactions.push(beginningEntry)
-          if (savedDate >= periodStart) {
-            acc.periodTransactions.push(beginningEntry)
-          }
-
-          // Keep transactions chronological
-          acc.allTransactions.sort((a, b) =>
-            parseDate(a.date).localeCompare(parseDate(b.date)),
-          )
-
-          // Recalculate beginning balance after adjustment
-          acc.beginningBalance = acc.balance - acc.periodActivity
         })
-      }
 
-      // Apply beginning balances saved in localStorage
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("beginningBalances")
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved) as {
-              date: string
-              balances: {
-                account: string
-                balance: number
-                accountType?: string
-              }[]
-            }
-            const savedDate = parseDate(parsed.date)
-            if (savedDate !== "N/A") {
-              parsed.balances.forEach((b) => {
-                let acc = accountMap.get(b.account)
-                if (!acc) {
-                  const lower = b.account.toLowerCase()
-                  let inferredType = b.accountType || "Asset"
-                  if (
-                    !b.accountType &&
-                    (lower.includes("cash") ||
-                      lower.includes("bank") ||
-                      lower.includes("checking") ||
-                      lower.includes("savings"))
-                  ) {
-                    inferredType = "Bank"
-                  }
-                  acc = {
-                    account: b.account,
-                    accountType: inferredType,
-                    allTransactions: [],
-                    periodTransactions: [],
-                    balance: 0,
-                    beginningBalance: 0,
-                    periodActivity: 0,
-                  }
-                  accountMap.set(b.account, acc)
-                }
-
-                const computedBalanceAtSavedDate = acc.allTransactions
-                  .filter((tx: any) => {
-                    const txDate = parseDate(tx.date)
-                    return txDate !== "N/A" && txDate <= savedDate
-                  })
-                  .reduce((sum: number, tx: any) => sum + tx.impact, 0)
-
-                const delta = b.balance - computedBalanceAtSavedDate
-                if (Math.abs(delta) < 0.01) return
-
-                acc.balance += delta
-                if (savedDate < periodStart) {
-                  acc.beginningBalance += delta
-                } else {
-                  acc.periodActivity += delta
-                }
-
-                const beginningEntry = {
-                  date: savedDate,
-                  account: b.account,
-                  memo: "Beginning Balance",
-                  debit: delta > 0 ? delta : 0,
-                  credit: delta < 0 ? -delta : 0,
-                  impact: delta,
-                }
-
-                acc.allTransactions.push(beginningEntry)
-                if (savedDate >= periodStart) {
-                  acc.periodTransactions.push(beginningEntry)
-                }
-
-                acc.allTransactions.sort((a, b) =>
-                  parseDate(a.date).localeCompare(parseDate(b.date)),
-                )
-
-                acc.beginningBalance = acc.balance - acc.periodActivity
-              })
-            }
-          } catch (e) {
-            smartLog("❌ Error parsing local beginning balances", e)
-          }
+        // Verify: beginning balance + period activity should equal ending balance
+        const calculatedEnding = beginningBalance + periodActivity
+        if (Math.abs(calculatedEnding - endingBalance) > 0.01) {
+          smartLog(`⚠️ Balance calculation error for ${accountData.account}:
+            Beginning: ${beginningBalance}
+            Period Activity: ${periodActivity}
+            Calculated Ending: ${calculatedEnding}
+            Actual Ending: ${endingBalance}`)
         }
-      }
 
-      smartLog(`🎯 Processed accounts`, Array.from(accountMap.keys()))
+        // Store calculated values
+        accountData.beginningBalance = beginningBalance
+        accountData.periodActivity = periodActivity
+        accountData.endingBalance = endingBalance
+        accountData.periodTransactions = periodTransactions
+      })
 
-      // Categorize accounts
+      smartLog(`✅ Processed ${accountMap.size} accounts`)
+
+      // Categorize accounts and create balance sheet
       const assetAccounts: BalanceSheetAccount[] = []
       const liabilityAccounts: BalanceSheetAccount[] = []
       const equityAccounts: BalanceSheetAccount[] = []
 
       accountMap.forEach((accountData) => {
         const accountType = accountData.accountType.toLowerCase()
-        const balanceSheetAccount: BalanceSheetAccount = {
-          account: accountData.account,
-          accountType: accountData.accountType,
-          balance: accountData.balance,
-          beginningBalance: accountData.beginningBalance,
-          periodActivity: accountData.periodActivity,
-          transactions: accountData.allTransactions,
-        }
-
+        
         // Only include accounts with non-zero balances or activity
-        if (Math.abs(balanceSheetAccount.balance) > 0.01 || Math.abs(balanceSheetAccount.periodActivity) > 0.01) {
+        if (Math.abs(accountData.endingBalance) > 0.01 || Math.abs(accountData.periodActivity) > 0.01) {
+          const balanceSheetAccount: BalanceSheetAccount = {
+            account: accountData.account,
+            accountType: accountData.accountType,
+            balance: accountData.endingBalance,
+            beginningBalance: accountData.beginningBalance,
+            periodActivity: accountData.periodActivity,
+            transactions: accountData.allTransactions,
+          }
+
           if (
             accountType.includes("asset") ||
             accountType.includes("bank") ||
@@ -568,7 +538,7 @@ export default function BalanceSheetPage() {
         }
       })
 
-      // Sort accounts by balance (largest first)
+      // Sort accounts by absolute balance (largest first)
       const sortByBalance = (a: BalanceSheetAccount, b: BalanceSheetAccount) =>
         Math.abs(b.balance) - Math.abs(a.balance)
 
@@ -590,6 +560,7 @@ export default function BalanceSheetPage() {
       smartLog(`   Liabilities: ${liabilityAccounts.length} accounts, Total: ${formatCurrency(liabilityTotal)}`)
       smartLog(`   Equity: ${equityAccounts.length} accounts, Total: ${formatCurrency(equityTotal)}`)
       smartLog(`   Balance Check: ${formatCurrency(assetTotal - liabilityTotal - equityTotal)}`)
+      
     } catch (err) {
       smartLog("❌ Data load failed", err)
       setError(err instanceof Error ? err.message : "Unknown error")
@@ -598,7 +569,7 @@ export default function BalanceSheetPage() {
     }
   }
 
-  // Show transaction details
+  // Show transaction details modal
   const showTransactionDetails = (account: BalanceSheetAccount) => {
     setModalTitle(`${account.account} - Transaction Details`)
 
@@ -667,17 +638,15 @@ export default function BalanceSheetPage() {
         </div>
       </div>
 
-      {/* Mobile-Friendly Filters */}
+      {/* Filters */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
-          {/* Mobile: Horizontal scrollable filters */}
           <div className="flex gap-3 overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap sm:items-center scrollbar-hide">
             {/* Time Period */}
             <select
               value={timePeriod}
               onChange={(e) => setTimePeriod(e.target.value as TimePeriod)}
               className="flex-shrink-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-              style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" } as React.CSSProperties}
             >
               <option value="Monthly">Monthly</option>
               <option value="Quarterly">Quarterly</option>
@@ -686,39 +655,36 @@ export default function BalanceSheetPage() {
               <option value="Custom">Custom Date Range</option>
             </select>
 
-            {/* Month Dropdown - Show for Monthly and Quarterly */}
+            {/* Month/Year for Monthly and Quarterly */}
             {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="flex-shrink-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" } as React.CSSProperties}
-              >
-                {monthsList.map((month) => (
-                  <option key={month} value={month}>
-                    {month}
-                  </option>
-                ))}
-              </select>
+              <>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="flex-shrink-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                >
+                  {monthsList.map((month) => (
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="flex-shrink-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
+                >
+                  {yearsList.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
 
-            {/* Year Dropdown - Show for Monthly and Quarterly */}
-            {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="flex-shrink-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" } as React.CSSProperties}
-              >
-                {yearsList.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Custom Date Range - Show for Custom */}
+            {/* Custom Date Range */}
             {timePeriod === "Custom" && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 <input
@@ -726,7 +692,6 @@ export default function BalanceSheetPage() {
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
                   className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" } as React.CSSProperties}
                 />
                 <span className="text-gray-500 text-xs">to</span>
                 <input
@@ -734,7 +699,6 @@ export default function BalanceSheetPage() {
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
                   className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-                  style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" } as React.CSSProperties}
                 />
               </div>
             )}
@@ -744,7 +708,6 @@ export default function BalanceSheetPage() {
               value={selectedProperty}
               onChange={(e) => setSelectedProperty(e.target.value)}
               className="flex-shrink-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm hover:border-blue-500 focus:outline-none focus:ring-2 transition-all"
-              style={{ "--tw-ring-color": BRAND_COLORS.secondary + "33" } as React.CSSProperties}
             >
               {availableProperties.map((property) => (
                 <option key={property} value={property}>
@@ -866,7 +829,7 @@ export default function BalanceSheetPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {assets.accounts.map((account, index) => (
+                    {assets.accounts.map((account) => (
                       <tr key={account.account} className="hover:bg-gray-50">
                         <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
                           <button
@@ -940,7 +903,7 @@ export default function BalanceSheetPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {liabilities.accounts.map((account, index) => (
+                    {liabilities.accounts.map((account) => (
                       <tr key={account.account} className="hover:bg-gray-50">
                         <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
                           <button
@@ -1014,7 +977,7 @@ export default function BalanceSheetPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {equity.accounts.map((account, index) => (
+                    {equity.accounts.map((account) => (
                       <tr key={account.account} className="hover:bg-gray-50">
                         <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
                           <button
@@ -1064,7 +1027,7 @@ export default function BalanceSheetPage() {
         </div>
       </main>
 
-      {/* Mobile-Friendly Transaction Detail Modal */}
+      {/* Transaction Detail Modal */}
       {showTransactionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
