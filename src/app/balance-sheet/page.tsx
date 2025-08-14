@@ -410,11 +410,33 @@ export default function BalanceSheetPage() {
             accountTypeLower.includes("asset") ||
             accountTypeLower.includes("expense") ||
             accountTypeLower.includes("cost") ||
-            accountTypeLower.includes("bank")
+            accountTypeLower.includes("bank") ||
+            accountTypeLower.includes("cash") ||
+            accountTypeLower.includes("receivable") ||
+            accountTypeLower.includes("inventory") ||
+            accountTypeLower.includes("prepaid") ||
+            accountTypeLower.includes("fixed asset") ||
+            accountTypeLower.includes("other asset")
           ) {
+            // ASSETS: Debit increases, Credit decreases
             transactionImpact = debit - credit
-          } else {
+          } else if (
+            accountTypeLower.includes("liability") ||
+            accountTypeLower.includes("payable") ||
+            accountTypeLower.includes("credit card") ||
+            accountTypeLower.includes("loan") ||
+            accountTypeLower.includes("mortgage") ||
+            accountTypeLower.includes("line of credit") ||
+            accountTypeLower.includes("equity") ||
+            accountTypeLower.includes("retained earnings") ||
+            accountTypeLower.includes("revenue") ||
+            accountTypeLower.includes("income")
+          ) {
+            // LIABILITIES, EQUITY, REVENUE: Credit increases, Debit decreases
             transactionImpact = credit - debit
+          } else {
+            // Default fallback: treat as debit normal (like assets)
+            transactionImpact = debit - credit
           }
         }
 
