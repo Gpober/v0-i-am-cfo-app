@@ -396,51 +396,47 @@ export default function BalanceSheetPage() {
 
         const accountData = accountMap.get(account)!
 
-        // Calculate transaction impact with CORRECTED debit/credit logic
+        // Calculate transaction impact STRICTLY from debit/credit columns
+        // Ignore normal_balance field completely
+        const debit = Number.parseFloat(transaction.debit) || 0
+        const credit = Number.parseFloat(transaction.credit) || 0
         let transactionImpact = 0
 
-        if (transaction.normal_balance !== null && transaction.normal_balance !== undefined) {
-          transactionImpact = Number.parseFloat(transaction.normal_balance) || 0
-        } else {
-          const debit = Number.parseFloat(transaction.debit) || 0
-          const credit = Number.parseFloat(transaction.credit) || 0
-
-          const accountTypeLower = accountType.toLowerCase()
-          
-          // ASSETS AND EXPENSES: Debit increases, Credit decreases
-          if (
-            accountTypeLower.includes("asset") ||
-            accountTypeLower.includes("expense") ||
-            accountTypeLower.includes("cost") ||
-            accountTypeLower.includes("bank") ||
-            accountTypeLower.includes("cash") ||
-            accountTypeLower.includes("receivable") ||
-            accountTypeLower.includes("inventory") ||
-            accountTypeLower.includes("prepaid") ||
-            accountTypeLower.includes("fixed asset") ||
-            accountTypeLower.includes("other asset")
-          ) {
-            transactionImpact = debit - credit  // CORRECT: Debit increases assets
-          } 
-          // LIABILITIES, EQUITY, REVENUE: Credit increases, Debit decreases
-          else if (
-            accountTypeLower.includes("liability") ||
-            accountTypeLower.includes("payable") ||
-            accountTypeLower.includes("credit card") ||
-            accountTypeLower.includes("loan") ||
-            accountTypeLower.includes("mortgage") ||
-            accountTypeLower.includes("line of credit") ||
-            accountTypeLower.includes("equity") ||
-            accountTypeLower.includes("retained earnings") ||
-            accountTypeLower.includes("revenue") ||
-            accountTypeLower.includes("income")
-          ) {
-            transactionImpact = credit - debit  // CORRECT: Credit increases liabilities/equity/revenue
-          } 
-          // DEFAULT: Treat unknown accounts as assets (debit normal)
-          else {
-            transactionImpact = debit - credit
-          }
+        const accountTypeLower = accountType.toLowerCase()
+        
+        // ASSETS AND EXPENSES: DEBIT - CREDIT (Debit increases, Credit decreases)
+        if (
+          accountTypeLower.includes("asset") ||
+          accountTypeLower.includes("expense") ||
+          accountTypeLower.includes("cost") ||
+          accountTypeLower.includes("bank") ||
+          accountTypeLower.includes("cash") ||
+          accountTypeLower.includes("receivable") ||
+          accountTypeLower.includes("inventory") ||
+          accountTypeLower.includes("prepaid") ||
+          accountTypeLower.includes("fixed asset") ||
+          accountTypeLower.includes("other asset")
+        ) {
+          transactionImpact = debit - credit  // ASSETS: Debit increases balance
+        } 
+        // LIABILITIES AND EQUITY: CREDIT - DEBIT (Credit increases, Debit decreases)
+        else if (
+          accountTypeLower.includes("liability") ||
+          accountTypeLower.includes("payable") ||
+          accountTypeLower.includes("credit card") ||
+          accountTypeLower.includes("loan") ||
+          accountTypeLower.includes("mortgage") ||
+          accountTypeLower.includes("line of credit") ||
+          accountTypeLower.includes("equity") ||
+          accountTypeLower.includes("retained earnings") ||
+          accountTypeLower.includes("revenue") ||
+          accountTypeLower.includes("income")
+        ) {
+          transactionImpact = credit - debit  // LIABILITIES/EQUITY: Credit increases balance
+        } 
+        // DEFAULT: Treat unknown accounts as assets (DEBIT - CREDIT)
+        else {
+          transactionImpact = debit - credit
         }
 
         // Store ALL transactions - we'll classify them later for drill-down
