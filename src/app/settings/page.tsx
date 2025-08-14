@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Papa from "papaparse"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -23,25 +23,49 @@ const accountMappings: Record<string, string> = {
   inventory: "Inventory",
 }
 
-// Balance Sheet Account Types Only (no P&L accounts)
-const balanceSheetAccountTypes = [
-  "Bank",
-  "Accounts receivable (A/R)",
-  "Other Current Assets", 
-  "Fixed Assets",
-  "Other Assets",
-  "Accounts payable (A/P)",
-  "Credit Card",
-  "Other Current Liabilities",
-  "Long Term Liabilities", 
-  "Equity"
-]
-
 export default function SettingsPage() {
   const [date, setDate] = useState("")
   const [balances, setBalances] = useState<ManualBalance[]>([
     { account: "", accountType: "", balance: "" },
   ])
+  const [availableAccountTypes, setAvailableAccountTypes] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Load available account types from the database
+  useEffect(() => {
+    const loadAccountTypes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("balance_sheet_accounts")
+          .select("account_type")
+          .not("account_type", "is", null)
+
+        if (error) throw error
+
+        // Get unique account types and sort them
+        const uniqueTypes = [...new Set(data?.map(row => row.account_type).filter(Boolean))]
+        setAvailableAccountTypes(uniqueTypes.sort())
+      } catch (err) {
+        console.error("Error loading account types:", err)
+        // Fallback to some basic types if database query fails
+        setAvailableAccountTypes([
+          "Bank",
+          "Accounts Receivable", 
+          "Other Current Assets",
+          "Fixed Assets",
+          "Accounts Payable",
+          "Credit Card",
+          "Other Current Liabilities",
+          "Long Term Liabilities",
+          "Equity"
+        ])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadAccountTypes()
+  }, [])
 
   const applyAccountTypes = async (entries: ManualBalance[]) => {
     const accountNames = entries.map((e) => e.account)
@@ -56,21 +80,24 @@ export default function SettingsPage() {
       data?.forEach((row: any) => {
         const type = row.account_type
         if (type) {
-          typeMap[row.account] = type // Keep exact QB account type format
+          typeMap[row.account] = type
         }
       })
 
       entries.forEach((e) => {
         if (typeMap[e.account]) {
           e.accountType = typeMap[e.account]
-        } else if (!e.accountType) {
-          e.accountType = "Other Current Assets" // Default to a QB account type
+        } else if (!e.accountType && availableAccountTypes.length > 0) {
+          // Default to first available account type if none set
+          e.accountType = availableAccountTypes[0]
         }
       })
     } catch (err) {
       console.error("Error fetching account types", err)
       entries.forEach((e) => {
-        if (!e.accountType) e.accountType = "Other Current Assets"
+        if (!e.accountType && availableAccountTypes.length > 0) {
+          e.accountType = availableAccountTypes[0]
+        }
       })
     }
     return entries
@@ -160,6 +187,14 @@ export default function SettingsPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="text-center">Loading account types...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Settings</h1>
@@ -199,23 +234,12 @@ export default function SettingsPage() {
                 handleBalanceChange(idx, "accountType", e.target.value)
               }
             >
-              <option value="">Select Balance Sheet Account Type</option>
-              <optgroup label="Assets">
-                <option value="Bank">Bank</option>
-                <option value="Accounts receivable (A/R)">Accounts receivable (A/R)</option>
-                <option value="Other Current Assets">Other Current Assets</option>
-                <option value="Fixed Assets">Fixed Assets</option>
-                <option value="Other Assets">Other Assets</option>
-              </optgroup>
-              <optgroup label="Liabilities">
-                <option value="Accounts payable (A/P)">Accounts payable (A/P)</option>
-                <option value="Credit Card">Credit Card</option>
-                <option value="Other Current Liabilities">Other Current Liabilities</option>
-                <option value="Long Term Liabilities">Long Term Liabilities</option>
-              </optgroup>
-              <optgroup label="Equity">
-                <option value="Equity">Equity</option>
-              </optgroup>
+              <option value="">Select Account Type</option>
+              {availableAccountTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
             </select>
             <input
               className="w-32 border rounded p-2"
@@ -240,7 +264,7 @@ export default function SettingsPage() {
       <div>
         <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet CSV</h2>
         <div className="mb-2 text-sm text-gray-600">
-          CSV format: Account Name, Balance Sheet Account Type, Balance Amount
+          CSV format: Account Name, Account Type, Balance Amount
         </div>
         <input
           type="file"
@@ -258,39 +282,21 @@ export default function SettingsPage() {
         Save Beginning Balances
       </button>
 
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-lg font-medium mb-2">Balance Sheet Account Types Reference</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <h4 className="font-medium text-green-700 mb-1">Assets</h4>
-            <ul className="space-y-1 text-gray-600">
-              <li>• Bank</li>
-              <li>• Accounts receivable (A/R)</li>
-              <li>• Other Current Assets</li>
-              <li>• Fixed Assets</li>
-              <li>• Other Assets</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-medium text-red-700 mb-1">Liabilities</h4>
-            <ul className="space-y-1 text-gray-600">
-              <li>• Accounts payable (A/P)</li>
-              <li>• Credit Card</li>
-              <li>• Other Current Liabilities</li>
-              <li>• Long Term Liabilities</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-medium text-blue-700 mb-1">Equity</h4>
-            <ul className="space-y-1 text-gray-600">
-              <li>• Equity</li>
-            </ul>
-            <div className="mt-3 text-xs text-gray-500">
-              <strong>Note:</strong> Income and expense accounts are not included as they belong on the P&L statement, not the balance sheet.
+      {availableAccountTypes.length > 0 && (
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-lg font-medium mb-2">Available Account Types</h3>
+          <div className="text-sm text-gray-600">
+            <p className="mb-2">The following account types are available in your system:</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {availableAccountTypes.map((type) => (
+                <div key={type} className="bg-white px-2 py-1 rounded border">
+                  {type}
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
