@@ -1,9 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { getDocument, GlobalWorkerOptions, version } from "pdfjs-dist"
-
-GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`
 
 interface ManualBalance {
   account: string
@@ -40,13 +37,22 @@ export default function SettingsPage() {
   ) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore: pdfjs-dist legacy build lacks type definitions
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf")
+    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
+
     const buffer = await file.arrayBuffer()
-    const pdf = await getDocument({ data: buffer }).promise
+    const pdf = await pdfjs.getDocument({ data: buffer }).promise
     let text = ""
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i)
       const content = await page.getTextContent()
-      text += content.items.map((item: any) => item.str).join(" ") + "\n"
+      text +=
+        content.items
+          .map((item: { str: string }) => item.str)
+          .join(" ") + "\n"
     }
     const lines = text.split(/\r?\n/)
     const entries: ParsedBalance[] = []
