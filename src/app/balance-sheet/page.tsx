@@ -57,6 +57,10 @@ const monthsList = [
 
 const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - 5 + i).toString())
 
+// Account type ordering for balance sheet display
+const assetTypeOrder = ["Bank", "Accounts receivable (A/R)", "Other Current Assets", "Fixed Assets", "Other Assets"]
+const liabilityTypeOrder = ["Accounts payable (A/P)", "Credit Card", "Other Current Liabilities", "Long Term Liabilities"]
+
 export default function BalanceSheetPage() {
   // State variables
   const [selectedMonth, setSelectedMonth] = useState<string>("December")
@@ -120,6 +124,68 @@ export default function BalanceSheetPage() {
     } else {
       console.log(message, data)
     }
+  }
+
+  // Helper function to parse parent/sub-account relationships
+  const parseAccountHierarchy = (accountName: string) => {
+    if (accountName.includes(':')) {
+      const parts = accountName.split(':')
+      return {
+        fullName: accountName,
+        parentAccount: parts[0].trim(),
+        subAccount: parts[1].trim(),
+        isSubAccount: true,
+        displayName: `    ${parts[1].trim()}`, // Indented display name
+        sortKey: `${parts[0].trim()}_${parts[1].trim()}`, // For sorting sub-accounts under parents
+      }
+    }
+    return {
+      fullName: accountName,
+      parentAccount: accountName,
+      subAccount: null,
+      isSubAccount: false,
+      displayName: accountName,
+      sortKey: accountName,
+    }
+  }
+
+  // Enhanced sorting function that groups sub-accounts under parents and follows account type order
+  const sortAccountsWithHierarchy = (accounts: BalanceSheetAccount[], typeOrder: string[]) => {
+    // First, parse all account hierarchies
+    const accountsWithHierarchy = accounts.map(account => ({
+      ...account,
+      hierarchy: parseAccountHierarchy(account.account)
+    }))
+
+    // Sort by account type first (following the specified order), then by hierarchy
+    return accountsWithHierarchy.sort((a, b) => {
+      // First, sort by account type order
+      const aTypeIndex = typeOrder.indexOf(a.accountType)
+      const bTypeIndex = typeOrder.indexOf(b.accountType)
+      
+      const aTypeOrder = aTypeIndex === -1 ? 999 : aTypeIndex
+      const bTypeOrder = bTypeIndex === -1 ? 999 : bTypeIndex
+      
+      if (aTypeOrder !== bTypeOrder) {
+        return aTypeOrder - bTypeOrder
+      }
+
+      // Within same account type, sort by parent account name
+      const parentCompare = a.hierarchy.parentAccount.localeCompare(b.hierarchy.parentAccount)
+      if (parentCompare !== 0) return parentCompare
+
+      // If same parent, sort sub-accounts under parent
+      if (a.hierarchy.isSubAccount && !b.hierarchy.isSubAccount) return 1  // Sub-account after parent
+      if (!a.hierarchy.isSubAccount && b.hierarchy.isSubAccount) return -1 // Parent before sub-account
+      
+      // If both are sub-accounts of same parent, sort alphabetically
+      if (a.hierarchy.isSubAccount && b.hierarchy.isSubAccount) {
+        return (a.hierarchy.subAccount || '').localeCompare(b.hierarchy.subAccount || '')
+      }
+
+      // Both are parents of same type, sort by balance (largest first)
+      return Math.abs(b.balance) - Math.abs(a.balance)
+    })
   }
 
   // Calculate date range based on selected period
@@ -231,7 +297,7 @@ export default function BalanceSheetPage() {
           if (!acc) {
             acc = {
               account: accountName,
-              accountType: "Asset",
+              accountType: "Other Current Assets",
               allTransactions: [],
               manualBalanceApplied: false,
             }
@@ -276,7 +342,7 @@ export default function BalanceSheetPage() {
               let acc = accountMap.get(b.account)
               if (!acc) {
                 const lower = b.account.toLowerCase()
-                let inferredType = b.accountType || "Asset"
+                let inferredType = b.accountType || "Other Current Assets"
                 if (
                   !b.accountType &&
                   (lower.includes("cash") ||
@@ -359,7 +425,7 @@ export default function BalanceSheetPage() {
       let query = supabase
         .from("journal_entry_lines")
         .select(
-          "entry_number, class, date, account, account_type, debit, credit, memo, customer, vendor, name, normal_balance",
+          "entry_number, class, date, account, account_type, debit, credit, memo, customer, vendor, name",
         )
         .lte("date", endDate)
         .order("date", { ascending: true })
@@ -396,78 +462,41 @@ export default function BalanceSheetPage() {
 
         const accountData = accountMap.get(account)!
 
-        // Calculate transaction impact STRICTLY from debit/credit columns
-        // Ignore normal_balance field completely
+        // Calculate transaction impact using EXACT QuickBooks account types
         const debit = Number.parseFloat(transaction.debit) || 0
         const credit = Number.parseFloat(transaction.credit) || 0
         let transactionImpact = 0
 
-        const accountTypeLower = accountType.toLowerCase()
-        
-        // LIABILITIES AND EQUITY: CREDIT - DEBIT (Credit increases, Debit decreases)
+        // ASSETS: DEBIT - CREDIT (Debit increases, Credit decreases)
         if (
-          accountTypeLower.includes("liability") ||
-          accountTypeLower.includes("liabilities") ||
-          accountTypeLower.includes("payable") ||
-          accountTypeLower.includes("payables") ||
-          accountTypeLower.includes("credit card") ||
-          accountTypeLower.includes("loan") ||
-          accountTypeLower.includes("loans") ||
-          accountTypeLower.includes("mortgage") ||
-          accountTypeLower.includes("line of credit") ||
-          accountTypeLower.includes("debt") ||
-          accountTypeLower.includes("note payable") ||
-          accountTypeLower.includes("accrued") ||
-          accountTypeLower.includes("equity") ||
-          accountTypeLower.includes("retained earnings") ||
-          accountTypeLower.includes("revenue") ||
-          accountTypeLower.includes("income") ||
-          accountTypeLower.includes("capital") ||
-          accountTypeLower.includes("member") ||
-          accountTypeLower.includes("owner")
+          accountType === "Bank" ||
+          accountType === "Accounts receivable (A/R)" ||
+          accountType === "Other Current Assets" ||
+          accountType === "Fixed Assets" ||
+          accountType === "Other Assets" ||
+          accountType === "Cost of Goods Sold" ||
+          accountType === "Expenses" ||
+          accountType === "Other Expense"
         ) {
-          transactionImpact = credit - debit  // LIABILITIES/EQUITY: Credit increases balance
-          
-          // Debug logging for liability accounts
-          if (accountTypeLower.includes("liability") || accountTypeLower.includes("payable") || accountTypeLower.includes("loan")) {
-            console.log(`🔍 LIABILITY CALC: ${account} (${accountType}) - Debit: ${debit}, Credit: ${credit}, Impact: ${transactionImpact}`)
-          }
+          transactionImpact = debit - credit
         } 
-        // ASSETS AND EXPENSES: DEBIT - CREDIT (Debit increases, Credit decreases)
+        // LIABILITIES AND EQUITY: CREDIT - DEBIT (Credit increases, Debit decreases)
         else if (
-          accountTypeLower.includes("asset") ||
-          accountTypeLower.includes("expense") ||
-          accountTypeLower.includes("cost") ||
-          accountTypeLower.includes("bank") ||
-          accountTypeLower.includes("cash") ||
-          accountTypeLower.includes("receivable") ||
-          accountTypeLower.includes("inventory") ||
-          accountTypeLower.includes("prepaid") ||
-          accountTypeLower.includes("fixed asset") ||
-          accountTypeLower.includes("other asset")
+          accountType === "Accounts payable (A/P)" ||
+          accountType === "Credit Card" ||
+          accountType === "Other Current Liabilities" ||
+          accountType === "Long Term Liabilities" ||
+          accountType === "Equity" ||
+          accountType === "Income" ||
+          accountType === "Other Income"
         ) {
-          transactionImpact = debit - credit  // ASSETS: Debit increases balance
+          transactionImpact = credit - debit
+          console.log(`🔍 LIABILITY/EQUITY CALC: ${account} (${accountType}) - Debit: ${debit}, Credit: ${credit}, Impact: ${transactionImpact}`)
         } 
-        // DEFAULT: Check if it might be a liability by account name
+        // DEFAULT: If unknown account type, log it and treat as asset
         else {
-          // If account name suggests liability, use credit - debit
-          const accountNameLower = account.toLowerCase()
-          if (
-            accountNameLower.includes("payable") ||
-            accountNameLower.includes("loan") ||
-            accountNameLower.includes("debt") ||
-            accountNameLower.includes("liability") ||
-            accountNameLower.includes("mortgage") ||
-            accountNameLower.includes("credit card") ||
-            accountNameLower.includes("line of credit")
-          ) {
-            transactionImpact = credit - debit
-            console.log(`🔍 LIABILITY BY NAME: ${account} (${accountType}) - Using credit - debit = ${transactionImpact}`)
-          } else {
-            // Default to asset treatment
-            transactionImpact = debit - credit
-            console.log(`🔍 DEFAULT ASSET: ${account} (${accountType}) - Using debit - credit = ${transactionImpact}`)
-          }
+          transactionImpact = debit - credit
+          console.log(`⚠️ UNKNOWN ACCOUNT TYPE IN CALC: ${account} (${accountType}) - Using debit - credit = ${transactionImpact}`)
         }
 
         // Store ALL transactions - we'll classify them later for drill-down
@@ -524,13 +553,14 @@ export default function BalanceSheetPage() {
 
       smartLog(`✅ Processed ${accountMap.size} accounts with transaction classifications`)
 
-      // Rest of the categorization logic remains the same...
+      // Categorize accounts using EXACT QuickBooks account types
       const assetAccounts: BalanceSheetAccount[] = []
       const liabilityAccounts: BalanceSheetAccount[] = []
       const equityAccounts: BalanceSheetAccount[] = []
+      const uncategorizedAccounts: BalanceSheetAccount[] = []
 
       accountMap.forEach((accountData) => {
-        const accountType = accountData.accountType.toLowerCase()
+        const accountType = accountData.accountType // Keep original case for exact matching
         
         // Only include accounts with non-zero balances or activity
         if (Math.abs(accountData.endingBalance) > 0.01 || Math.abs(accountData.periodActivity) > 0.01) {
@@ -540,56 +570,91 @@ export default function BalanceSheetPage() {
             balance: accountData.endingBalance,
             beginningBalance: accountData.beginningBalance,
             periodActivity: accountData.periodActivity,
-            transactions: accountData.allTransactions, // ALL transactions available for drill-down
+            transactions: accountData.allTransactions,
           }
 
+          // ASSETS: Use exact QuickBooks account types
           if (
-            accountType.includes("asset") ||
-            accountType.includes("bank") ||
-            accountType.includes("cash") ||
-            accountType.includes("receivable") ||
-            accountType.includes("inventory") ||
-            accountType.includes("prepaid") ||
-            accountType.includes("fixed asset") ||
-            accountType.includes("other asset")
+            accountType === "Bank" ||
+            accountType === "Accounts receivable (A/R)" ||
+            accountType === "Other Current Assets" ||
+            accountType === "Fixed Assets" ||
+            accountType === "Other Assets"
           ) {
             assetAccounts.push(balanceSheetAccount)
-          } else if (
-            accountType.includes("liability") ||
-            accountType.includes("payable") ||
-            accountType.includes("credit card") ||
-            accountType.includes("loan") ||
-            accountType.includes("mortgage") ||
-            accountType.includes("line of credit")
+            console.log(`✅ ASSET: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
+          } 
+          // LIABILITIES: Use exact QuickBooks account types
+          else if (
+            accountType === "Accounts payable (A/P)" ||
+            accountType === "Credit Card" ||
+            accountType === "Other Current Liabilities" ||
+            accountType === "Long Term Liabilities"
           ) {
             liabilityAccounts.push(balanceSheetAccount)
-          } else if (accountType.includes("equity") || accountType.includes("retained earnings")) {
+            console.log(`✅ LIABILITY: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
+          } 
+          // EQUITY: Use exact QuickBooks account types
+          else if (
+            accountType === "Equity"
+          ) {
             equityAccounts.push(balanceSheetAccount)
+            console.log(`✅ EQUITY: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
+          } 
+          // NON-BALANCE SHEET ACCOUNTS (P&L accounts that shouldn't appear on balance sheet)
+          else if (
+            accountType === "Income" ||
+            accountType === "Cost of Goods Sold" ||
+            accountType === "Expenses" ||
+            accountType === "Other Income" ||
+            accountType === "Other Expense"
+          ) {
+            // These are P&L accounts - they shouldn't appear on the balance sheet
+            // (unless they have balances due to timing differences)
+            console.log(`⚠️ P&L ACCOUNT ON BALANCE SHEET: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
+            // You might want to exclude these or include them in a separate "Net Income" calculation
+          }
+          // TRULY UNCATEGORIZED
+          else {
+            uncategorizedAccounts.push(balanceSheetAccount)
+            console.log(`❓ UNKNOWN ACCOUNT TYPE: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
           }
         }
       })
 
-      // Sort accounts by absolute balance (largest first)
-      const sortByBalance = (a: BalanceSheetAccount, b: BalanceSheetAccount) =>
-        Math.abs(b.balance) - Math.abs(a.balance)
+      // Log summary of categorization
+      console.log(`📊 BALANCE SHEET CATEGORIZATION:`)
+      console.log(`   Assets: ${assetAccounts.length} accounts`)
+      console.log(`   Liabilities: ${liabilityAccounts.length} accounts`)
+      console.log(`   Equity: ${equityAccounts.length} accounts`)
+      console.log(`   Uncategorized: ${uncategorizedAccounts.length} accounts`)
+      
+      // If there are uncategorized accounts, log them for manual review
+      if (uncategorizedAccounts.length > 0) {
+        console.log(`❗ UNCATEGORIZED ACCOUNTS:`)
+        uncategorizedAccounts.forEach(acc => {
+          console.log(`   - ${acc.account} (${acc.accountType}): ${formatCurrency(acc.balance)}`)
+        })
+      }
 
-      assetAccounts.sort(sortByBalance)
-      liabilityAccounts.sort(sortByBalance)
-      equityAccounts.sort(sortByBalance)
+      // Sort accounts with proper parent/sub-account hierarchy and account type order
+      const sortedAssets = sortAccountsWithHierarchy(assetAccounts, assetTypeOrder)
+      const sortedLiabilities = sortAccountsWithHierarchy(liabilityAccounts, liabilityTypeOrder)
+      const sortedEquity = sortAccountsWithHierarchy(equityAccounts, ["Equity"])
 
       // Calculate totals
-      const assetTotal = assetAccounts.reduce((sum, acc) => sum + acc.balance, 0)
-      const liabilityTotal = liabilityAccounts.reduce((sum, acc) => sum + acc.balance, 0)
-      const equityTotal = equityAccounts.reduce((sum, acc) => sum + acc.balance, 0)
+      const assetTotal = sortedAssets.reduce((sum, acc) => sum + acc.balance, 0)
+      const liabilityTotal = sortedLiabilities.reduce((sum, acc) => sum + acc.balance, 0)
+      const equityTotal = sortedEquity.reduce((sum, acc) => sum + acc.balance, 0)
 
-      setAssets({ title: "Assets", accounts: assetAccounts, total: assetTotal })
-      setLiabilities({ title: "Liabilities", accounts: liabilityAccounts, total: liabilityTotal })
-      setEquity({ title: "Equity", accounts: equityAccounts, total: equityTotal })
+      setAssets({ title: "Assets", accounts: sortedAssets, total: assetTotal })
+      setLiabilities({ title: "Liabilities", accounts: sortedLiabilities, total: liabilityTotal })
+      setEquity({ title: "Equity", accounts: sortedEquity, total: equityTotal })
 
       smartLog(`✅ Balance Sheet Summary:`)
-      smartLog(`   Assets: ${assetAccounts.length} accounts, Total: ${formatCurrency(assetTotal)}`)
-      smartLog(`   Liabilities: ${liabilityAccounts.length} accounts, Total: ${formatCurrency(liabilityTotal)}`)
-      smartLog(`   Equity: ${equityAccounts.length} accounts, Total: ${formatCurrency(equityTotal)}`)
+      smartLog(`   Assets: ${sortedAssets.length} accounts, Total: ${formatCurrency(assetTotal)}`)
+      smartLog(`   Liabilities: ${sortedLiabilities.length} accounts, Total: ${formatCurrency(liabilityTotal)}`)
+      smartLog(`   Equity: ${sortedEquity.length} accounts, Total: ${formatCurrency(equityTotal)}`)
       smartLog(`   Balance Check: ${formatCurrency(assetTotal - liabilityTotal - equityTotal)}`)
       
     } catch (err) {
@@ -899,52 +964,55 @@ export default function BalanceSheetPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {assets.accounts.map((account) => (
-                      <tr key={account.account} className="hover:bg-gray-50">
-                        <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
-                          <button
-                            onClick={() => showTransactionDetails(account)}
-                            className="text-left hover:text-blue-600 hover:underline"
-                          >
-                            <div className="truncate max-w-[150px] sm:max-w-none" title={account.account}>
-                              {account.account}
-                            </div>
-                            <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
-                          </button>
-                        </td>
-                        <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'beginning')}
-                            className={`hover:underline ${account.beginningBalance >= 0 ? "text-green-600" : "text-red-600"} ${
-                              account.beginningBalance !== 0 ? "hover:bg-green-50" : "cursor-default"
-                            } px-2 py-1 rounded transition-colors`}
-                            disabled={account.beginningBalance === 0}
-                          >
-                            {formatCurrency(account.beginningBalance)}
-                          </button>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'period')}
-                            className={`hover:underline ${account.periodActivity >= 0 ? "text-green-600" : "text-red-600"} ${
-                              account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
-                            } px-2 py-1 rounded transition-colors`}
-                            disabled={account.periodActivity === 0}
-                          >
-                            {account.periodActivity !== 0 ? formatCurrency(account.periodActivity) : "-"}
-                          </button>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'ending')}
-                            className={`font-bold hover:underline ${account.balance >= 0 ? "text-green-600" : "text-red-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
-                          >
-                            {formatCurrency(account.balance)}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {assets.accounts.map((account) => {
+                      const hierarchy = parseAccountHierarchy(account.account)
+                      return (
+                        <tr key={account.account} className="hover:bg-gray-50">
+                          <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
+                            <button
+                              onClick={() => showTransactionDetails(account)}
+                              className="text-left hover:text-blue-600 hover:underline"
+                            >
+                              <div className={`truncate max-w-[150px] sm:max-w-none ${hierarchy.isSubAccount ? 'text-gray-700 text-sm' : ''}`} title={account.account}>
+                                {hierarchy.isSubAccount ? hierarchy.displayName : hierarchy.parentAccount}
+                              </div>
+                              <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
+                            </button>
+                          </td>
+                          <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'beginning')}
+                              className={`hover:underline ${account.beginningBalance >= 0 ? "text-green-600" : "text-red-600"} ${
+                                account.beginningBalance !== 0 ? "hover:bg-green-50" : "cursor-default"
+                              } px-2 py-1 rounded transition-colors`}
+                              disabled={account.beginningBalance === 0}
+                            >
+                              {formatCurrency(account.beginningBalance)}
+                            </button>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'period')}
+                              className={`hover:underline ${account.periodActivity >= 0 ? "text-green-600" : "text-red-600"} ${
+                                account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                              } px-2 py-1 rounded transition-colors`}
+                              disabled={account.periodActivity === 0}
+                            >
+                              {account.periodActivity !== 0 ? formatCurrency(account.periodActivity) : "-"}
+                            </button>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'ending')}
+                              className={`font-bold hover:underline ${account.balance >= 0 ? "text-green-600" : "text-red-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
+                            >
+                              {formatCurrency(account.balance)}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -988,52 +1056,55 @@ export default function BalanceSheetPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {liabilities.accounts.map((account) => (
-                      <tr key={account.account} className="hover:bg-gray-50">
-                        <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
-                          <button
-                            onClick={() => showTransactionDetails(account)}
-                            className="text-left hover:text-blue-600 hover:underline"
-                          >
-                            <div className="truncate max-w-[150px] sm:max-w-none" title={account.account}>
-                              {account.account}
-                            </div>
-                            <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
-                          </button>
-                        </td>
-                        <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'beginning')}
-                            className={`hover:underline ${account.beginningBalance <= 0 ? "text-red-600" : "text-green-600"} ${
-                              account.beginningBalance !== 0 ? "hover:bg-red-50" : "cursor-default"
-                            } px-2 py-1 rounded transition-colors`}
-                            disabled={account.beginningBalance === 0}
-                          >
-                            {formatCurrency(Math.abs(account.beginningBalance))}
-                          </button>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'period')}
-                            className={`hover:underline ${account.periodActivity <= 0 ? "text-red-600" : "text-green-600"} ${
-                              account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
-                            } px-2 py-1 rounded transition-colors`}
-                            disabled={account.periodActivity === 0}
-                          >
-                            {account.periodActivity !== 0 ? formatCurrency(Math.abs(account.periodActivity)) : "-"}
-                          </button>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'ending')}
-                            className={`font-bold hover:underline ${account.balance <= 0 ? "text-red-600" : "text-green-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
-                          >
-                            {formatCurrency(Math.abs(account.balance))}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {liabilities.accounts.map((account) => {
+                      const hierarchy = parseAccountHierarchy(account.account)
+                      return (
+                        <tr key={account.account} className="hover:bg-gray-50">
+                          <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
+                            <button
+                              onClick={() => showTransactionDetails(account)}
+                              className="text-left hover:text-blue-600 hover:underline"
+                            >
+                              <div className={`truncate max-w-[150px] sm:max-w-none ${hierarchy.isSubAccount ? 'text-gray-700 text-sm' : ''}`} title={account.account}>
+                                {hierarchy.isSubAccount ? hierarchy.displayName : hierarchy.parentAccount}
+                              </div>
+                              <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
+                            </button>
+                          </td>
+                          <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'beginning')}
+                              className={`hover:underline ${account.beginningBalance <= 0 ? "text-red-600" : "text-green-600"} ${
+                                account.beginningBalance !== 0 ? "hover:bg-red-50" : "cursor-default"
+                              } px-2 py-1 rounded transition-colors`}
+                              disabled={account.beginningBalance === 0}
+                            >
+                              {formatCurrency(Math.abs(account.beginningBalance))}
+                            </button>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'period')}
+                              className={`hover:underline ${account.periodActivity <= 0 ? "text-red-600" : "text-green-600"} ${
+                                account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                              } px-2 py-1 rounded transition-colors`}
+                              disabled={account.periodActivity === 0}
+                            >
+                              {account.periodActivity !== 0 ? formatCurrency(Math.abs(account.periodActivity)) : "-"}
+                            </button>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'ending')}
+                              className={`font-bold hover:underline ${account.balance <= 0 ? "text-red-600" : "text-green-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
+                            >
+                              {formatCurrency(Math.abs(account.balance))}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1077,52 +1148,55 @@ export default function BalanceSheetPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {equity.accounts.map((account) => (
-                      <tr key={account.account} className="hover:bg-gray-50">
-                        <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
-                          <button
-                            onClick={() => showTransactionDetails(account)}
-                            className="text-left hover:text-blue-600 hover:underline"
-                          >
-                            <div className="truncate max-w-[150px] sm:max-w-none" title={account.account}>
-                              {account.account}
-                            </div>
-                            <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
-                          </button>
-                        </td>
-                        <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'beginning')}
-                            className={`hover:underline ${account.beginningBalance >= 0 ? "text-blue-600" : "text-red-600"} ${
-                              account.beginningBalance !== 0 ? "hover:bg-blue-50" : "cursor-default"
-                            } px-2 py-1 rounded transition-colors`}
-                            disabled={account.beginningBalance === 0}
-                          >
-                            {formatCurrency(account.beginningBalance)}
-                          </button>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'period')}
-                            className={`hover:underline ${account.periodActivity >= 0 ? "text-blue-600" : "text-red-600"} ${
-                              account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
-                            } px-2 py-1 rounded transition-colors`}
-                            disabled={account.periodActivity === 0}
-                          >
-                            {account.periodActivity !== 0 ? formatCurrency(account.periodActivity) : "-"}
-                          </button>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <button
-                            onClick={() => showTransactionDetails(account, 'ending')}
-                            className={`font-bold hover:underline ${account.balance >= 0 ? "text-blue-600" : "text-red-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
-                          >
-                            {formatCurrency(account.balance)}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {equity.accounts.map((account) => {
+                      const hierarchy = parseAccountHierarchy(account.account)
+                      return (
+                        <tr key={account.account} className="hover:bg-gray-50">
+                          <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
+                            <button
+                              onClick={() => showTransactionDetails(account)}
+                              className="text-left hover:text-blue-600 hover:underline"
+                            >
+                              <div className={`truncate max-w-[150px] sm:max-w-none ${hierarchy.isSubAccount ? 'text-gray-700 text-sm' : ''}`} title={account.account}>
+                                {hierarchy.isSubAccount ? hierarchy.displayName : hierarchy.parentAccount}
+                              </div>
+                              <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
+                            </button>
+                          </td>
+                          <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'beginning')}
+                              className={`hover:underline ${account.beginningBalance >= 0 ? "text-blue-600" : "text-red-600"} ${
+                                account.beginningBalance !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                              } px-2 py-1 rounded transition-colors`}
+                              disabled={account.beginningBalance === 0}
+                            >
+                              {formatCurrency(account.beginningBalance)}
+                            </button>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'period')}
+                              className={`hover:underline ${account.periodActivity >= 0 ? "text-blue-600" : "text-red-600"} ${
+                                account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                              } px-2 py-1 rounded transition-colors`}
+                              disabled={account.periodActivity === 0}
+                            >
+                              {account.periodActivity !== 0 ? formatCurrency(account.periodActivity) : "-"}
+                            </button>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                            <button
+                              onClick={() => showTransactionDetails(account, 'ending')}
+                              className={`font-bold hover:underline ${account.balance >= 0 ? "text-blue-600" : "text-red-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
+                            >
+                              {formatCurrency(account.balance)}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
