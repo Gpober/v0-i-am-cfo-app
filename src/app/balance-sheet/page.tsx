@@ -448,7 +448,75 @@ export default function BalanceSheetPage() {
     }
   }
 
-  // Main data loading function with corrected balance calculation
+  // Calculate current year net income from P&L accounts using SQL
+  const calculateCurrentYearNetIncome = async () => {
+    try {
+      const currentYear = new Date().getFullYear()
+      const startOfYear = `${currentYear}-01-01`
+      const currentDate = new Date().toISOString().split('T')[0]
+      
+      console.log(`💰 CALCULATING CURRENT YEAR NET INCOME (${currentYear})`)
+      console.log(`   Period: ${startOfYear} to ${currentDate}`)
+      console.log(`   Property Filter: ${selectedProperty}`)
+
+      // Build the query with property filter if needed
+      let query = supabase
+        .from("journal_entry_lines")
+        .select("account_type, debit, credit")
+        .gte("date", startOfYear)
+        .lte("date", currentDate)
+        .in("account_type", [
+          "Income", 
+          "Other Income", 
+          "Cost of Goods Sold", 
+          "Expenses", 
+          "Other Expense"
+        ])
+
+      if (selectedProperty !== "All Properties") {
+        query = query.eq("class", selectedProperty)
+      }
+
+      const { data: plTransactions, error } = await query
+
+      if (error) {
+        console.error("❌ Error fetching P&L transactions:", error)
+        return 0
+      }
+
+      let totalIncome = 0
+      let totalExpenses = 0
+
+      plTransactions?.forEach((transaction: any) => {
+        const debit = Number.parseFloat(transaction.debit) || 0
+        const credit = Number.parseFloat(transaction.credit) || 0
+        const accountType = transaction.account_type
+
+        // INCOME ACCOUNTS: Credit increases income (normal balance is credit)
+        if (accountType === "Income" || accountType === "Other Income") {
+          totalIncome += (credit - debit) // Credit increases income
+        }
+        // EXPENSE ACCOUNTS: Debit increases expenses (normal balance is debit)  
+        else if (accountType === "Cost of Goods Sold" || accountType === "Expenses" || accountType === "Other Expense") {
+          totalExpenses += (debit - credit) // Debit increases expenses
+        }
+      })
+
+      const netIncome = totalIncome - totalExpenses
+
+      console.log(`💰 CURRENT YEAR NET INCOME CALCULATION:`)
+      console.log(`   Total Income: ${formatCurrency(totalIncome)}`)
+      console.log(`   Total Expenses: ${formatCurrency(totalExpenses)}`)
+      console.log(`   Net Income: ${formatCurrency(netIncome)}`)
+      console.log(`   Based on ${plTransactions?.length || 0} P&L transactions`)
+
+      return netIncome
+
+    } catch (err) {
+      console.error("❌ Error calculating current year net income:", err)
+      return 0
+    }
+  }
   const loadData = async () => {
     try {
       setIsLoading(true)
@@ -645,7 +713,7 @@ export default function BalanceSheetPage() {
             equityAccounts.push(balanceSheetAccount)
             console.log(`✅ EQUITY: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
           } 
-          // NON-BALANCE SHEET ACCOUNTS (P&L accounts that shouldn't appear on balance sheet)
+          // P&L ACCOUNTS: Don't show on balance sheet, but note them
           else if (
             accountType === "Income" ||
             accountType === "Cost of Goods Sold" ||
@@ -653,10 +721,8 @@ export default function BalanceSheetPage() {
             accountType === "Other Income" ||
             accountType === "Other Expense"
           ) {
-            // These are P&L accounts - they shouldn't appear on the balance sheet
-            // (unless they have balances due to timing differences)
-            console.log(`⚠️ P&L ACCOUNT ON BALANCE SHEET: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
-            // You might want to exclude these or include them in a separate "Net Income" calculation
+            // These are P&L accounts - they don't appear on the balance sheet
+            console.log(`📊 P&L ACCOUNT (not shown): ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
           }
           // TRULY UNCATEGORIZED
           else {
@@ -665,6 +731,76 @@ export default function BalanceSheetPage() {
           }
         }
       })
+
+      // Calculate Net Income for the period
+      const netIncome = totalRevenue + totalOtherIncome - totalExpenses - totalOtherExpenses
+      
+      console.log(`📊 NET INCOME CALCULATION:`)
+      console.log(`   Revenue: ${formatCurrency(totalRevenue)}`)
+      console.log(`   Other Income: ${formatCurrency(totalOtherIncome)}`)
+      console.log(`   Expenses: ${formatCurrency(totalExpenses)}`)
+      console.log(`   Other Expenses: ${formatCurrency(totalOtherExpenses)}`)
+      console.log(`   Net Income: ${formatCurrency(netIncome)}`)
+
+      // Add Net Income to Equity if significant
+      if (Math.abs(netIncome) > 0.01) {
+        const netIncomeAccount: BalanceSheetAccount = {
+          account: timePeriod === "YTD" ? "Net Income (Year to Date)" : 
+                   timePeriod === "Monthly" ? `Net Income (${selectedMonth} ${selectedYear})` :
+                   `Net Income (${timePeriod})`,
+          accountType: "Equity",
+          balance: netIncome,
+          beginningBalance: 0, // Net income starts at 0 each period
+          periodActivity: netIncome, // All of net income is period activity
+          transactions: [{
+            date: endDate,
+            payeeCustomer: "System Calculated",
+            memo: "Calculated Net Income from P&L accounts",
+            class: "All Properties",
+            amount: netIncome,
+            account: "Net Income",
+            debit: netIncome > 0 ? 0 : Math.abs(netIncome),
+            credit: netIncome > 0 ? netIncome : 0,
+            impact: netIncome,
+            entryNumber: "AUTO-NET-INCOME",
+            accountType: "Equity"
+          }]
+        }
+        
+        equityAccounts.push(netIncomeAccount)
+      // Add Retained Earnings account if this is not a YTD period
+      // (For YTD, all prior year income is already in retained earnings)
+      if (timePeriod !== "YTD") {
+        // You can manually set this or calculate it from prior periods
+        // For now, we'll add it as a placeholder that you can update
+        const retainedEarningsBalance = 0 // TODO: Calculate from prior year net income
+        
+        if (Math.abs(retainedEarningsBalance) > 0.01) {
+          const retainedEarningsAccount: BalanceSheetAccount = {
+            account: "Retained Earnings",
+            accountType: "Equity",
+            balance: retainedEarningsBalance,
+            beginningBalance: retainedEarningsBalance,
+            periodActivity: 0, // Retained earnings doesn't change during the period
+            transactions: [{
+              date: calculatePeriodStart(),
+              payeeCustomer: "System Calculated",
+              memo: "Prior period retained earnings",
+              class: "All Properties",
+              amount: retainedEarningsBalance,
+              account: "Retained Earnings",
+              debit: retainedEarningsBalance > 0 ? 0 : Math.abs(retainedEarningsBalance),
+              credit: retainedEarningsBalance > 0 ? retainedEarningsBalance : 0,
+              impact: retainedEarningsBalance,
+              entryNumber: "AUTO-RETAINED-EARNINGS",
+              accountType: "Equity"
+            }]
+          }
+          
+          equityAccounts.push(retainedEarningsAccount)
+          console.log(`✅ RETAINED EARNINGS: ${formatCurrency(retainedEarningsBalance)} added to equity`)
+        }
+      }
 
       // Log summary of categorization
       console.log(`📊 BALANCE SHEET CATEGORIZATION:`)
