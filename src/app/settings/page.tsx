@@ -7,7 +7,7 @@ interface ManualBalance {
   balance: string
 }
 
-// Map common account labels from PDFs to standardized account names
+// Map common account labels from CSVs to standardized account names
 const accountMappings: Record<string, string> = {
   cash: "Cash",
   "accounts receivable": "Accounts Receivable",
@@ -40,39 +40,27 @@ export default function SettingsPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore: pdfjs-dist legacy build lacks type definitions
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf")
-    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
-
-    const buffer = await file.arrayBuffer()
-    const pdf = await pdfjs.getDocument({ data: buffer }).promise
-    let text = ""
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i)
-      const content = await page.getTextContent()
-      text +=
-        content.items
-          .map((item: { str: string }) => item.str)
-          .join(" ") + "\n"
-    }
+    const text = await file.text()
     const lines = text.split(/\r?\n/)
     const entries: ManualBalance[] = []
     lines.forEach((line) => {
-      const match = line.trim().match(/^(.+?)\s+(-?\$?[0-9,().]+)$/)
-      if (!match) return
+      const parts = line.split(",")
+      if (parts.length < 2) return
 
-      const rawAccount = match[1].trim()
+      const rawAccount = parts[0].trim()
+      const amountStr = parts[1].trim()
+      if (!rawAccount || !amountStr) return
+
       const mapped =
         accountMappings[rawAccount.toLowerCase()] || rawAccount
 
-      let amt = parseFloat(match[2].replace(/[$,()]/g, ""))
-      if (match[2].includes("(") && match[2].includes(")")) amt *= -1
+      let amt = parseFloat(amountStr.replace(/[$,()]/g, ""))
+      if (amountStr.includes("(") && amountStr.includes(")")) amt *= -1
 
       if (!isNaN(amt)) entries.push({ account: mapped, balance: amt.toString() })
     })
     if (!entries.length)
-      alert("No balances found in uploaded PDF.")
+      alert("No balances found in uploaded CSV.")
     setBalances(entries.length ? entries : [{ account: "", balance: "" }])
   }
 
@@ -135,8 +123,12 @@ export default function SettingsPage() {
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet PDF</h2>
-        <input type="file" accept="application/pdf" onChange={handleFileUpload} />
+        <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet CSV</h2>
+        <input
+          type="file"
+          accept="text/csv,application/vnd.ms-excel"
+          onChange={handleFileUpload}
+        />
       </div>
 
       <button
