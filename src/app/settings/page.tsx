@@ -1,23 +1,66 @@
 "use client"
 
 import { useState } from "react"
+import Papa from "papaparse"
+import { supabase } from "@/lib/supabaseClient"
 
 interface ManualBalance {
   account: string
+  accountType: string
   balance: string
 }
 
-interface ParsedBalance {
-  account: string
-  balance: number
+// Map common account labels from CSVs to standardized account names
+const accountMappings: Record<string, string> = {
+  cash: "Cash",
+  checking: "Checking",
+  "checking account": "Checking",
+  savings: "Savings",
+  "savings account": "Savings",
+  bank: "Bank",
+  "accounts receivable": "Accounts Receivable",
+  "accounts payable": "Accounts Payable",
+  inventory: "Inventory",
 }
 
 export default function SettingsPage() {
   const [date, setDate] = useState("")
   const [balances, setBalances] = useState<ManualBalance[]>([
-    { account: "", balance: "" },
+    { account: "", accountType: "", balance: "" },
   ])
-  const [parsedBalances, setParsedBalances] = useState<ParsedBalance[]>([])
+
+  const applyAccountTypes = async (entries: ManualBalance[]) => {
+    const accountNames = entries.map((e) => e.account)
+    if (!accountNames.length) return entries
+    try {
+      const { data } = await supabase
+        .from("balance_sheet_accounts")
+        .select("account, account_type")
+        .in("account", accountNames)
+
+      const typeMap: Record<string, string> = {}
+      data?.forEach((row: any) => {
+        const type = row.account_type
+        if (type)
+          typeMap[row.account] =
+            type.charAt(0).toUpperCase() + type.slice(1)
+      })
+
+      entries.forEach((e) => {
+        if (typeMap[e.account]) {
+          e.accountType = typeMap[e.account]
+        } else if (!e.accountType) {
+          e.accountType = "Asset"
+        }
+      })
+    } catch (err) {
+      console.error("Error fetching account types", err)
+      entries.forEach((e) => {
+        if (!e.accountType) e.accountType = "Asset"
+      })
+    }
+    return entries
+  }
 
   const handleBalanceChange = (
     index: number,
@@ -30,50 +73,72 @@ export default function SettingsPage() {
   }
 
   const addBalanceRow = () =>
-    setBalances([...balances, { account: "", balance: "" }])
+    setBalances([...balances, { account: "", accountType: "", balance: "" }])
 
   const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
+    if (!date) {
+      alert("Please select a balance date before uploading.")
+      e.target.value = ""
+      return
+    }
     const file = e.target.files?.[0]
     if (!file) return
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore: pdfjs-dist legacy build lacks type definitions
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf")
-    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
-
-    const buffer = await file.arrayBuffer()
-    const pdf = await pdfjs.getDocument({ data: buffer }).promise
-    let text = ""
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i)
-      const content = await page.getTextContent()
-      text +=
-        content.items
-          .map((item: { str: string }) => item.str)
-          .join(" ") + "\n"
-    }
-    const lines = text.split(/\r?\n/)
-    const entries: ParsedBalance[] = []
-    lines.forEach((line) => {
-      const match = line.match(/(.+?)\s+(-?\$?[0-9,.,\-]+)/)
-      if (match) {
-        const account = match[1].trim()
-        const amt = parseFloat(match[2].replace(/[^0-9.-]/g, ""))
-        if (!isNaN(amt)) entries.push({ account, balance: amt })
-      }
+    const text = await file.text()
+    const parsed = Papa.parse(text, {
+      skipEmptyLines: true,
     })
-    setParsedBalances(entries)
+
+    const entries: ManualBalance[] = []
+    parsed.data.forEach((row: any) => {
+      const [rawAccount, rawType, rawAmount] = row
+      if (!rawAccount || !rawAmount) return
+
+      const cleanAccount = rawAccount.toString().replace(/^"|"$/g, "").trim()
+      const mapped =
+        accountMappings[cleanAccount.toLowerCase()] || cleanAccount
+
+      const cleanType = rawType?.toString().replace(/^"|"$/g, "").trim() || ""
+
+      const amountStr = rawAmount.toString().replace(/[$,()"\s]/g, "")
+      let amt = parseFloat(amountStr)
+      if (rawAmount.toString().includes("(") && rawAmount.toString().includes(")"))
+        amt *= -1
+
+      if (!isNaN(amt))
+        entries.push({ account: mapped, accountType: cleanType, balance: amt.toString() })
+    })
+
+    if (!entries.length) alert("No balances found in uploaded CSV.")
+    await applyAccountTypes(entries)
+
+    setBalances(
+      entries.length
+        ? entries
+        : [{ account: "", accountType: "", balance: "" }],
+    )
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!date) {
+      alert("Please select a balance date before saving.")
+      return
+    }
+    const filtered = balances.filter((b) => b.account && b.balance)
+    if (!filtered.length) {
+      alert("Please enter at least one balance before saving.")
+      return
+    }
+    await applyAccountTypes(filtered)
     const data = {
       date,
-      balances: [
-        ...balances.filter((b) => b.account && b.balance),
-        ...parsedBalances,
-      ].map((b) => ({ account: b.account, balance: Number(b.balance) })),
+      balances: filtered.map((b) => ({
+        account: b.account,
+        balance: Number(b.balance),
+        accountType: b.accountType,
+      })),
     }
     if (typeof window !== "undefined") {
       localStorage.setItem("beginningBalances", JSON.stringify(data))
@@ -99,21 +164,40 @@ export default function SettingsPage() {
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-2">Manual Beginning Balances</h2>
+        <h2 className="text-xl font-semibold mb-2">Beginning Balances</h2>
         {balances.map((row, idx) => (
           <div key={idx} className="flex space-x-2 mb-2">
             <input
               className="flex-1 border rounded p-2"
               placeholder="Account"
               value={row.account}
-              onChange={(e) => handleBalanceChange(idx, "account", e.target.value)}
+              onChange={(e) =>
+                handleBalanceChange(idx, "account", e.target.value)
+              }
             />
+            <select
+              className="w-40 border rounded p-2"
+              value={row.accountType}
+              onChange={(e) =>
+                handleBalanceChange(idx, "accountType", e.target.value)
+              }
+            >
+              <option value="">Type</option>
+              <option value="Asset">Asset</option>
+              <option value="Liability">Liability</option>
+              <option value="Equity">Equity</option>
+              <option value="Revenue">Revenue</option>
+              <option value="Expense">Expense</option>
+              <option value="Bank">Bank</option>
+            </select>
             <input
               className="w-40 border rounded p-2"
               placeholder="Balance"
               type="number"
               value={row.balance}
-              onChange={(e) => handleBalanceChange(idx, "balance", e.target.value)}
+              onChange={(e) =>
+                handleBalanceChange(idx, "balance", e.target.value)
+              }
             />
           </div>
         ))}
@@ -127,20 +211,12 @@ export default function SettingsPage() {
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet PDF</h2>
-        <input type="file" accept="application/pdf" onChange={handleFileUpload} />
-        {parsedBalances.length > 0 && (
-          <div className="mt-4">
-            <h3 className="font-medium">Parsed Accounts</h3>
-            <ul className="list-disc pl-5">
-              {parsedBalances.map((b, i) => (
-                <li key={i}>
-                  {b.account}: {b.balance.toLocaleString(undefined, { style: "currency", currency: "USD" })}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet CSV</h2>
+        <input
+          type="file"
+          accept="text/csv,application/vnd.ms-excel"
+          onChange={handleFileUpload}
+        />
       </div>
 
       <button
