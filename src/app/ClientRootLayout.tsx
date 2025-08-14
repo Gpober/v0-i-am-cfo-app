@@ -50,6 +50,7 @@ const IAMCFOLogo = ({ className = "w-auto h-14" }) => (
 
 const navigation = [
   { name: "Overview", href: "/", icon: BarChart3 },
+  { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
   { name: "P&L", href: "/financials", icon: TrendingUp },
   { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
   {
@@ -57,8 +58,7 @@ const navigation = [
     href: "/comparative-analysis",
     icon: BarChart2,
   },
-  { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
-  { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
+   { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
   { name: "A/P", href: "/accounts-payable", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
