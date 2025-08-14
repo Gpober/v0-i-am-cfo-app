@@ -444,7 +444,11 @@ export default function BalanceSheetPage() {
           try {
             const parsed = JSON.parse(saved) as {
               date: string
-              balances: { account: string; balance: number }[]
+              balances: {
+                account: string
+                balance: number
+                accountType?: string
+              }[]
             }
             const savedDate = parseDate(parsed.date)
             if (savedDate !== "N/A") {
@@ -452,12 +456,13 @@ export default function BalanceSheetPage() {
                 let acc = accountMap.get(b.account)
                 if (!acc) {
                   const lower = b.account.toLowerCase()
-                  let inferredType = "Asset"
+                  let inferredType = b.accountType || "Asset"
                   if (
-                    lower.includes("cash") ||
-                    lower.includes("bank") ||
-                    lower.includes("checking") ||
-                    lower.includes("savings")
+                    !b.accountType &&
+                    (lower.includes("cash") ||
+                      lower.includes("bank") ||
+                      lower.includes("checking") ||
+                      lower.includes("savings"))
                   ) {
                     inferredType = "Bank"
                   }

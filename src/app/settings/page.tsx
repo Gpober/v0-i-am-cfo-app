@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import Papa from "papaparse"
+import { supabase } from "@/lib/supabaseClient"
 
 interface ManualBalance {
   account: string
   balance: string
+  accountType?: string
 }
 
 // Map common account labels from CSVs to standardized account names
@@ -26,6 +28,35 @@ export default function SettingsPage() {
   const [balances, setBalances] = useState<ManualBalance[]>([
     { account: "", balance: "" },
   ])
+
+  const applyAccountTypes = async (entries: ManualBalance[]) => {
+    const accountNames = entries.map((e) => e.account)
+    if (!accountNames.length) return entries
+    try {
+      const { data } = await supabase
+        .from("balance_sheet_accounts")
+        .select("account_name, balance_sheet_categories(type)")
+        .in("account_name", accountNames)
+
+      const typeMap: Record<string, string> = {}
+      data?.forEach((row: any) => {
+        const type = row.balance_sheet_categories?.type
+        if (type)
+          typeMap[row.account_name] =
+            type.charAt(0).toUpperCase() + type.slice(1)
+      })
+
+      entries.forEach((e) => {
+        e.accountType = typeMap[e.account] || "Asset"
+      })
+    } catch (err) {
+      console.error("Error fetching account types", err)
+      entries.forEach((e) => {
+        if (!e.accountType) e.accountType = "Asset"
+      })
+    }
+    return entries
+  }
 
   const handleBalanceChange = (
     index: number,
@@ -74,24 +105,28 @@ export default function SettingsPage() {
     })
 
     if (!entries.length) alert("No balances found in uploaded CSV.")
+    await applyAccountTypes(entries)
     setBalances(entries.length ? entries : [{ account: "", balance: "" }])
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!date) {
       alert("Please select a balance date before saving.")
       return
     }
-    const filtered = balances
-      .filter((b) => b.account && b.balance)
-      .map((b) => ({ account: b.account, balance: Number(b.balance) }))
+    const filtered = balances.filter((b) => b.account && b.balance)
     if (!filtered.length) {
       alert("Please enter at least one balance before saving.")
       return
     }
+    await applyAccountTypes(filtered)
     const data = {
       date,
-      balances: filtered,
+      balances: filtered.map((b) => ({
+        account: b.account,
+        balance: Number(b.balance),
+        accountType: b.accountType,
+      })),
     }
     if (typeof window !== "undefined") {
       localStorage.setItem("beginningBalances", JSON.stringify(data))
