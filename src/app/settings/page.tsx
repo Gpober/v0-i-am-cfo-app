@@ -6,8 +6,8 @@ import { supabase } from "@/lib/supabaseClient"
 
 interface ManualBalance {
   account: string
+  accountType: string
   balance: string
-  accountType?: string
 }
 
 // Map common account labels from CSVs to standardized account names
@@ -26,7 +26,7 @@ const accountMappings: Record<string, string> = {
 export default function SettingsPage() {
   const [date, setDate] = useState("")
   const [balances, setBalances] = useState<ManualBalance[]>([
-    { account: "", balance: "" },
+    { account: "", accountType: "", balance: "" },
   ])
 
   const applyAccountTypes = async (entries: ManualBalance[]) => {
@@ -47,7 +47,11 @@ export default function SettingsPage() {
       })
 
       entries.forEach((e) => {
-        e.accountType = typeMap[e.account] || "Asset"
+        if (typeMap[e.account]) {
+          e.accountType = typeMap[e.account]
+        } else if (!e.accountType) {
+          e.accountType = "Asset"
+        }
       })
     } catch (err) {
       console.error("Error fetching account types", err)
@@ -69,7 +73,7 @@ export default function SettingsPage() {
   }
 
   const addBalanceRow = () =>
-    setBalances([...balances, { account: "", balance: "" }])
+    setBalances([...balances, { account: "", accountType: "", balance: "" }])
 
   const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -89,24 +93,37 @@ export default function SettingsPage() {
 
     const entries: ManualBalance[] = []
     parsed.data.forEach((row: any) => {
-      const [rawAccount, rawAmount] = row
+      const [rawAccount, rawType, rawAmount] = row
       if (!rawAccount || !rawAmount) return
 
       const cleanAccount = rawAccount.toString().replace(/^"|"$/g, "").trim()
       const mapped =
         accountMappings[cleanAccount.toLowerCase()] || cleanAccount
 
+      const cleanType = rawType?.toString().replace(/^"|"$/g, "").trim() || ""
+
       const amountStr = rawAmount.toString().replace(/[$,()"\s]/g, "")
       let amt = parseFloat(amountStr)
       if (rawAmount.toString().includes("(") && rawAmount.toString().includes(")"))
         amt *= -1
 
-      if (!isNaN(amt)) entries.push({ account: mapped, balance: amt.toString() })
+      if (!isNaN(amt))
+        entries.push({ account: mapped, accountType: cleanType, balance: amt.toString() })
     })
 
     if (!entries.length) alert("No balances found in uploaded CSV.")
     await applyAccountTypes(entries)
-    setBalances(entries.length ? entries : [{ account: "", balance: "" }])
+
+    const total = entries.reduce((sum, e) => sum + Number(e.balance || 0), 0)
+    if (Math.abs(total) > 0.001) {
+      alert(`Imported balances do not balance. Total: ${total}`)
+    }
+
+    setBalances(
+      entries.length
+        ? entries
+        : [{ account: "", accountType: "", balance: "" }],
+    )
   }
 
   const handleSave = async () => {
@@ -120,6 +137,11 @@ export default function SettingsPage() {
       return
     }
     await applyAccountTypes(filtered)
+    const total = filtered.reduce((sum, e) => sum + Number(e.balance || 0), 0)
+    if (Math.abs(total) > 0.001) {
+      alert(`Balances do not balance. Total: ${total}`)
+      return
+    }
     const data = {
       date,
       balances: filtered.map((b) => ({
@@ -159,14 +181,33 @@ export default function SettingsPage() {
               className="flex-1 border rounded p-2"
               placeholder="Account"
               value={row.account}
-              onChange={(e) => handleBalanceChange(idx, "account", e.target.value)}
+              onChange={(e) =>
+                handleBalanceChange(idx, "account", e.target.value)
+              }
             />
+            <select
+              className="w-40 border rounded p-2"
+              value={row.accountType}
+              onChange={(e) =>
+                handleBalanceChange(idx, "accountType", e.target.value)
+              }
+            >
+              <option value="">Type</option>
+              <option value="Asset">Asset</option>
+              <option value="Liability">Liability</option>
+              <option value="Equity">Equity</option>
+              <option value="Revenue">Revenue</option>
+              <option value="Expense">Expense</option>
+              <option value="Bank">Bank</option>
+            </select>
             <input
               className="w-40 border rounded p-2"
               placeholder="Balance"
               type="number"
               value={row.balance}
-              onChange={(e) => handleBalanceChange(idx, "balance", e.target.value)}
+              onChange={(e) =>
+                handleBalanceChange(idx, "balance", e.target.value)
+              }
             />
           </div>
         ))}
