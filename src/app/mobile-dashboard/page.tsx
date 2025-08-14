@@ -37,7 +37,7 @@ interface PropertySummary {
   netIncome?: number;
   operating?: number;
   financing?: number;
-  investing?: number; // Added investing
+  investing?: number;
 }
 
 interface Category {
@@ -120,11 +120,11 @@ export default function EnhancedMobileDashboard() {
   const [cfData, setCfData] = useState<{
     operating: Category[];
     financing: Category[];
-    investing: Category[]; // Added investing
+    investing: Category[];
   }>({
     operating: [],
     financing: [],
-    investing: [], // Added investing
+    investing: [],
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -143,28 +143,26 @@ export default function EnhancedMobileDashboard() {
   const cfTotals = useMemo(() => {
     const operating = cfData.operating.reduce((sum, c) => sum + c.total, 0);
     const financing = cfData.financing.reduce((sum, c) => sum + c.total, 0);
-    const investing = cfData.investing.reduce((sum, c) => sum + c.total, 0); // Added investing
+    const investing = cfData.investing.reduce((sum, c) => sum + c.total, 0);
     return { 
       operating, 
       financing, 
-      investing, // Added investing
-      net: operating + financing + investing // Updated to include investing
+      investing,
+      net: operating + financing + investing
     };
   }, [cfData]);
 
-  // Enhanced classification function with transfers as separate category
+  // Enhanced classification function
   const classifyTransaction = (
     accountType: string | null,
     reportCategory: string | null,
   ) => {
     const typeLower = accountType?.toLowerCase() || "";
     
-    // If this is a transfer, classify as transfer
     if (reportCategory === "transfer") {
       return "transfer";
     }
 
-    // Operating activities - Income and Expenses
     if (
       typeLower === "income" ||
       typeLower === "other income" ||
@@ -177,7 +175,6 @@ export default function EnhancedMobileDashboard() {
       return "operating";
     }
 
-    // Investing activities - Fixed Assets and Other Assets
     if (
       typeLower === "fixed assets" ||
       typeLower === "other assets" ||
@@ -186,7 +183,6 @@ export default function EnhancedMobileDashboard() {
       return "investing";
     }
 
-    // Financing activities - Liabilities, Equity, Credit Cards
     if (
       typeLower === "long term liabilities" ||
       typeLower === "equity" ||
@@ -266,7 +262,7 @@ export default function EnhancedMobileDashboard() {
             netIncome: 0, 
             operating: 0, 
             financing: 0,
-            investing: 0 // Added investing
+            investing: 0
           };
         }
         const debit = Number(row.debit) || 0;
@@ -285,8 +281,8 @@ export default function EnhancedMobileDashboard() {
         } else {
           // Enhanced cash flow calculation
           const cashImpact = row.report_category === "transfer" 
-            ? debit - credit // Reverse for transfers
-            : row.normal_balance || credit - debit; // Normal for others
+            ? debit - credit
+            : row.normal_balance || credit - debit;
             
           const classification = classifyTransaction(row.account_type, row.report_category);
           
@@ -356,12 +352,12 @@ export default function EnhancedMobileDashboard() {
       } else {
         acc.operating += p.operating || 0;
         acc.financing += p.financing || 0;
-        acc.investing += p.investing || 0; // Added investing
-        acc.net += (p.operating || 0) + (p.financing || 0) + (p.investing || 0); // Updated net calculation
+        acc.investing += p.investing || 0;
+        acc.net += (p.operating || 0) + (p.financing || 0) + (p.investing || 0);
       }
       return acc;
     },
-    { revenue: 0, expenses: 0, net: 0, operating: 0, financing: 0, investing: 0 }, // Added investing
+    { revenue: 0, expenses: 0, net: 0, operating: 0, financing: 0, investing: 0 },
   );
 
   const formatCurrency = (n: number) =>
@@ -439,7 +435,7 @@ export default function EnhancedMobileDashboard() {
     const { data } = await query;
     const op: Record<string, number> = {};
     const fin: Record<string, number> = {};
-    const inv: Record<string, number> = {}; // Added investing
+    const inv: Record<string, number> = {};
     
     ((data as JournalRow[]) || []).forEach((row) => {
       const debit = Number(row.debit) || 0;
@@ -447,8 +443,8 @@ export default function EnhancedMobileDashboard() {
       
       // Enhanced cash impact calculation
       const cashImpact = row.report_category === "transfer" 
-        ? debit - credit // Reverse for transfers
-        : row.normal_balance || credit - debit; // Normal for others
+        ? debit - credit
+        : row.normal_balance || credit - debit;
         
       const classification = classifyTransaction(row.account_type, row.report_category);
       
@@ -509,8 +505,8 @@ export default function EnhancedMobileDashboard() {
         } else {
           // Enhanced cash flow calculation for transactions
           amount = row.report_category === "transfer" 
-            ? debit - credit // Reverse for transfers
-            : row.normal_balance || credit - debit; // Normal for others
+            ? debit - credit
+            : row.normal_balance || credit - debit;
         }
         return {
           date: row.date,
@@ -1452,3 +1448,339 @@ export default function EnhancedMobileDashboard() {
                       cursor: 'pointer',
                       border: `1px solid ${BRAND_COLORS.gray[200]}`,
                       transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#fff7ed';
+                      e.currentTarget.style.borderColor = BRAND_COLORS.warning;
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = BRAND_COLORS.gray[50];
+                      e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: BRAND_COLORS.warning }}>
+                      {formatCurrency(cat.total)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: '8px',
+                textAlign: 'right',
+                fontSize: '16px',
+                fontWeight: '600',
+                color:
+                  plTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+              }}
+            >
+              Net Income: {formatCurrency(plTotals.net)}
+            </div>
+            </>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`
+                }}>
+                <h3 style={{ 
+                  fontSize: '18px', 
+                  fontWeight: '600', 
+                  marginBottom: '16px',
+                  color: BRAND_COLORS.primary,
+                  borderBottom: `2px solid ${BRAND_COLORS.primary}`,
+                  paddingBottom: '8px'
+                }}>
+                  Operating Activities
+                </h3>
+                {cfData.operating.map((cat) => (
+                  <div
+                    key={cat.name}
+                    onClick={() => handleCategory(cat.name, "operating")}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      marginBottom: '8px',
+                      background: BRAND_COLORS.gray[50],
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#f0f9ff';
+                      e.currentTarget.style.borderColor = BRAND_COLORS.primary;
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = BRAND_COLORS.gray[50];
+                      e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
+                    <span style={{ 
+                      fontSize: '14px', 
+                      fontWeight: '600', 
+                      color: cat.total >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
+                    }}>
+                      {formatCurrency(cat.total)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '20px',
+                border: `1px solid ${BRAND_COLORS.gray[200]}`
+              }}>
+                <h3 style={{ 
+                  fontSize: '18px', 
+                  fontWeight: '600', 
+                  marginBottom: '16px',
+                  color: BRAND_COLORS.secondary,
+                  borderBottom: `2px solid ${BRAND_COLORS.secondary}`,
+                  paddingBottom: '8px'
+                }}>
+                  Financing Activities
+                </h3>
+                {cfData.financing.map((cat) => (
+                  <div
+                    key={cat.name}
+                    onClick={() => handleCategory(cat.name, "financing")}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      marginBottom: '8px',
+                      background: BRAND_COLORS.gray[50],
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#f8fafc';
+                      e.currentTarget.style.borderColor = BRAND_COLORS.secondary;
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = BRAND_COLORS.gray[50];
+                      e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
+                    <span style={{ 
+                      fontSize: '14px', 
+                      fontWeight: '600', 
+                      color: cat.total >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
+                    }}>
+                      {formatCurrency(cat.total)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Investing Activities Section */}
+              <div style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '20px',
+                border: `1px solid ${BRAND_COLORS.gray[200]}`
+              }}>
+                <h3 style={{ 
+                  fontSize: '18px', 
+                  fontWeight: '600', 
+                  marginBottom: '16px',
+                  color: BRAND_COLORS.warning,
+                  borderBottom: `2px solid ${BRAND_COLORS.warning}`,
+                  paddingBottom: '8px'
+                }}>
+                  Investing Activities
+                </h3>
+                {cfData.investing.map((cat) => (
+                  <div
+                    key={cat.name}
+                    onClick={() => handleCategory(cat.name, "investing")}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      marginBottom: '8px',
+                      background: BRAND_COLORS.gray[50],
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#fff7ed';
+                      e.currentTarget.style.borderColor = BRAND_COLORS.warning;
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = BRAND_COLORS.gray[50];
+                      e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
+                    <span style={{ 
+                      fontSize: '14px', 
+                      fontWeight: '600', 
+                      color: cat.total >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
+                    }}>
+                      {formatCurrency(cat.total)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: '8px',
+                textAlign: 'right',
+                fontSize: '16px',
+                fontWeight: '600',
+                color:
+                  cfTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+              }}
+            >
+              Net Cash Flow: {formatCurrency(cfTotals.net)}
+            </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {view === "detail" && (
+        <div>
+          <button 
+            onClick={back}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: 'none',
+              border: 'none',
+              fontSize: '16px',
+              color: BRAND_COLORS.accent,
+              marginBottom: '20px',
+              cursor: 'pointer'
+            }}
+          >
+            <ChevronLeft size={20} style={{ marginRight: '4px' }} /> 
+            Back to {reportType === "pl" ? "P&L" : "Cash Flow"}
+          </button>
+          
+          <div style={{
+            background: `linear-gradient(135deg, ${BRAND_COLORS.accent}, ${BRAND_COLORS.secondary})`,
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '24px',
+            color: 'white'
+          }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>
+              {selectedCategory}
+            </h2>
+            <p style={{ fontSize: '14px', opacity: 0.9 }}>
+              Transaction Details • {getMonthName(month)} {year}
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {transactions.map((t, idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: 'white',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>
+                      {new Date(t.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </div>
+                    {t.payee && (
+                      <div style={{ fontSize: '13px', color: '#475569' }}>{t.payee}</div>
+                    )}
+                    {t.className && (
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: BRAND_COLORS.accent,
+                          background: `${BRAND_COLORS.primary}20`,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          display: 'inline-block',
+                          marginTop: '2px',
+                        }}
+                      >
+                        {t.className}
+                      </div>
+                    )}
+                    {t.memo && (
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>{t.memo}</div>
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: t.amount >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+                    }}
+                  >
+                    {formatCurrency(t.amount)}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#64748b',
+                    textAlign: 'right',
+                    borderTop: `1px solid ${BRAND_COLORS.gray[100]}`,
+                    paddingTop: '8px',
+                  }}
+                >
+                  Running Total: {formatCurrency(t.running)}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div
+            style={{
+              marginTop: '16px',
+              textAlign: 'right',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: transactionTotal >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+            }}
+          >
+            {reportType === "pl" ? "Total Net Income" : "Total Net Cash Flow"}: {formatCurrency(transactionTotal)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
