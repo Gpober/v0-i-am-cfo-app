@@ -28,19 +28,17 @@ interface BalanceSheetAccount {
 
 interface TransactionDetail {
   date: string
-  account: string
+  payeeCustomer: string | null
   memo: string | null
+  class: string | null
+  amount: number
+  // Keep some additional fields for reference
+  account: string
   debit: number
   credit: number
   impact: number
-  bankAccount?: string
   entryNumber?: string
-  customer?: string
-  vendor?: string
-  class?: string
-  name?: string
   accountType?: string
-  reportCategory?: string
 }
 
 interface BalanceSheetSection {
@@ -61,8 +59,8 @@ const yearsList = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear()
 
 export default function BalanceSheetPage() {
   // State variables
-  const [selectedMonth, setSelectedMonth] = useState<string>("June")
-  const [selectedYear, setSelectedYear] = useState<string>("2024")
+  const [selectedMonth, setSelectedMonth] = useState<string>("December")
+  const [selectedYear, setSelectedYear] = useState<string>("2023")
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("Monthly")
   const [selectedProperty, setSelectedProperty] = useState("All Properties")
   const [customStartDate, setCustomStartDate] = useState("")
@@ -83,12 +81,6 @@ export default function BalanceSheetPage() {
   const [asOfDate, setAsOfDate] = useState<string>("")
 
   // Utility functions
-  const getDateParts = (dateString: string) => {
-    const datePart = dateString.split("T")[0]
-    const [year, month, day] = datePart.split("-").map(Number)
-    return { year, month, day }
-  }
-
   const parseDate = (dateString: string | null): string => {
     if (!dateString) return "N/A"
     try {
@@ -96,16 +88,6 @@ export default function BalanceSheetPage() {
     } catch {
       return "N/A"
     }
-  }
-
-  const formatDateSafe = (dateString: string): string => {
-    const { year, month, day } = getDateParts(dateString)
-    const date = new Date(year, month - 1, day)
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
   }
 
   const formatCurrency = (value: number) => {
@@ -117,7 +99,19 @@ export default function BalanceSheetPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return formatDateSafe(dateString)
+    const { year, month, day } = getDateParts(dateString)
+    const date = new Date(year, month - 1, day)
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
+
+  const getDateParts = (dateString: string) => {
+    const datePart = dateString.split("T")[0]
+    const [year, month, day] = datePart.split("-").map(Number)
+    return { year, month, day }
   }
 
   const smartLog = (message: string, data?: any) => {
@@ -144,7 +138,7 @@ export default function BalanceSheetPage() {
       const monthIndex = monthsList.indexOf(selectedMonth)
       const year = Number.parseInt(selectedYear)
       const lastDay = new Date(year, monthIndex + 1, 0).getDate()
-      startDate = `${year}-01-01` // Always start from beginning of year for comprehensive data
+      startDate = `${year}-01-01`
       endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     } else if (timePeriod === "Quarterly") {
       const monthIndex = monthsList.indexOf(selectedMonth)
@@ -152,7 +146,7 @@ export default function BalanceSheetPage() {
       const quarter = Math.floor(monthIndex / 3)
       const quarterEndMonth = quarter * 3 + 2
       const lastDay = new Date(year, quarterEndMonth + 1, 0).getDate()
-      startDate = `${year}-01-01` // Always start from beginning of year for comprehensive data
+      startDate = `${year}-01-01`
       endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${lastDay}`
     } else {
       // Trailing 12
@@ -213,7 +207,6 @@ export default function BalanceSheetPage() {
       if (storedBeginningBalancesError) {
         smartLog("❌ Error fetching stored beginning balances", storedBeginningBalancesError)
       } else if (storedBeginningBalances) {
-        // Group by account and take the most recent balance for each account
         const latestBalancesByAccount = new Map<string, any>()
         
         storedBeginningBalances.forEach((row: any) => {
@@ -227,7 +220,6 @@ export default function BalanceSheetPage() {
           }
         })
 
-        // Apply the latest balances
         latestBalancesByAccount.forEach((row: any) => {
           const accountName = row.balance_sheet_accounts?.account_name
           const savedDate = parseDate(row.balance_date)
@@ -237,17 +229,15 @@ export default function BalanceSheetPage() {
 
           let acc = accountMap.get(accountName)
           if (!acc) {
-            // Create account if it doesn't exist
             acc = {
               account: accountName,
-              accountType: "Asset", // Default type
+              accountType: "Asset",
               allTransactions: [],
               manualBalanceApplied: false,
             }
             accountMap.set(accountName, acc)
           }
 
-          // Insert beginning balance transaction at the saved date
           const beginningEntry = {
             date: savedDate,
             account: accountName,
@@ -305,9 +295,7 @@ export default function BalanceSheetPage() {
                 accountMap.set(b.account, acc)
               }
 
-              // Only apply if no database balance was already applied
               if (!acc.manualBalanceApplied) {
-                // Insert beginning balance transaction
                 const beginningEntry = {
                   date: savedDate,
                   account: b.account,
@@ -350,7 +338,7 @@ export default function BalanceSheetPage() {
     }
   }
 
-  // Main data loading function
+  // Main data loading function with corrected balance calculation
   const loadData = async () => {
     try {
       setIsLoading(true)
@@ -411,14 +399,11 @@ export default function BalanceSheetPage() {
         let transactionImpact = 0
 
         if (transaction.normal_balance !== null && transaction.normal_balance !== undefined) {
-          // Use the pre-calculated normal_balance if available
           transactionImpact = Number.parseFloat(transaction.normal_balance) || 0
         } else {
-          // Fallback to debit/credit calculation
           const debit = Number.parseFloat(transaction.debit) || 0
           const credit = Number.parseFloat(transaction.credit) || 0
 
-          // Determine impact based on account type
           const accountTypeLower = accountType.toLowerCase()
           if (
             accountTypeLower.includes("asset") ||
@@ -426,15 +411,12 @@ export default function BalanceSheetPage() {
             accountTypeLower.includes("cost") ||
             accountTypeLower.includes("bank")
           ) {
-            // Assets and Expenses: Debit increases, Credit decreases
             transactionImpact = debit - credit
           } else {
-            // Liabilities, Equity, Income: Credit increases, Debit decreases
             transactionImpact = credit - debit
           }
         }
 
-        // Add to all transactions
         accountData.allTransactions.push({
           ...transaction,
           impact: transactionImpact,
@@ -448,47 +430,47 @@ export default function BalanceSheetPage() {
         )
       })
 
-      // Calculate balances for each account
+      // CORRECTED BALANCE CALCULATION
       accountMap.forEach((accountData) => {
         let beginningBalance = 0
         let periodActivity = 0
         let endingBalance = 0
         const periodTransactions: any[] = []
 
-        // Calculate balances chronologically
+        // First, calculate ending balance (sum of all transactions)
+        accountData.allTransactions.forEach((tx: any) => {
+          endingBalance += tx.impact
+        })
+
+        // Then, calculate period activity (transactions within the period)
         accountData.allTransactions.forEach((tx: any) => {
           const transactionDate = parseDate(tx.date)
           
-          if (transactionDate !== "N/A") {
-            // Add to ending balance
-            endingBalance += tx.impact
-            
-            if (transactionDate < periodStart) {
-              // This transaction contributes to beginning balance
-              beginningBalance += tx.impact
-            } else {
-              // This transaction is period activity
-              periodActivity += tx.impact
-              periodTransactions.push(tx)
-            }
+          if (transactionDate !== "N/A" && transactionDate >= periodStart) {
+            periodActivity += tx.impact
+            periodTransactions.push(tx)
           }
         })
 
-        // Verify: beginning balance + period activity should equal ending balance
-        const calculatedEnding = beginningBalance + periodActivity
-        if (Math.abs(calculatedEnding - endingBalance) > 0.01) {
-          smartLog(`⚠️ Balance calculation error for ${accountData.account}:
-            Beginning: ${beginningBalance}
-            Period Activity: ${periodActivity}
-            Calculated Ending: ${calculatedEnding}
-            Actual Ending: ${endingBalance}`)
-        }
+        // Beginning balance is ending balance minus period activity
+        beginningBalance = endingBalance - periodActivity
 
         // Store calculated values
         accountData.beginningBalance = beginningBalance
         accountData.periodActivity = periodActivity
         accountData.endingBalance = endingBalance
         accountData.periodTransactions = periodTransactions
+
+        // Debug logging for specific accounts
+        if (accountData.account.includes("Cerro Vista") || accountData.account.includes("Vista")) {
+          smartLog(`🔍 ${accountData.account} Debug:`, {
+            beginningBalance,
+            periodActivity,
+            endingBalance,
+            transactionCount: accountData.allTransactions.length,
+            periodTransactionCount: periodTransactions.length,
+          })
+        }
       })
 
       smartLog(`✅ Processed ${accountMap.size} accounts`)
@@ -569,26 +551,69 @@ export default function BalanceSheetPage() {
     }
   }
 
-  // Show transaction details modal
-  const showTransactionDetails = (account: BalanceSheetAccount) => {
-    setModalTitle(`${account.account} - Transaction Details`)
+  // Show transaction details modal with different filter types
+  const showTransactionDetails = (
+    account: BalanceSheetAccount, 
+    filterType: 'all' | 'beginning' | 'period' | 'ending' = 'all'
+  ) => {
+    let filteredTransactions: any[] = []
+    let title = ""
 
-    const transactionDetails: TransactionDetail[] = account.transactions.map((tx: any) => ({
-      date: tx.date,
-      account: tx.account,
-      memo: tx.memo,
-      debit: Number.parseFloat(tx.debit) || 0,
-      credit: Number.parseFloat(tx.credit) || 0,
-      impact: tx.impact,
-      entryNumber: tx.entry_number,
-      customer: tx.customer,
-      vendor: tx.vendor,
-      name: tx.name,
-      class: tx.class,
-      bankAccount: tx.entry_bank_account,
-      accountType: tx.account_type,
-      reportCategory: tx.report_category,
-    }))
+    switch (filterType) {
+      case 'beginning':
+        // Show transactions that contribute to beginning balance (before period start)
+        filteredTransactions = account.transactions.filter((tx: any) => {
+          const txDate = parseDate(tx.date)
+          return txDate !== "N/A" && txDate < calculatePeriodStart()
+        })
+        title = `${account.account} - Beginning Balance Transactions`
+        break
+      
+      case 'period':
+        // Show transactions within the current period
+        filteredTransactions = account.transactions.filter((tx: any) => {
+          const txDate = parseDate(tx.date)
+          const periodStart = calculatePeriodStart()
+          return txDate !== "N/A" && txDate >= periodStart
+        })
+        title = `${account.account} - Period Activity Transactions`
+        break
+      
+      case 'ending':
+        // Show all transactions up to as-of date
+        filteredTransactions = account.transactions
+        title = `${account.account} - All Transactions (Ending Balance)`
+        break
+      
+      default:
+        filteredTransactions = account.transactions
+        title = `${account.account} - All Transaction Details`
+        break
+    }
+
+    setModalTitle(title)
+
+    const transactionDetails: TransactionDetail[] = filteredTransactions.map((tx: any) => {
+      // Determine Payee/Customer - prioritize customer, then vendor, then name
+      const payeeCustomer = tx.customer || tx.vendor || tx.name || "N/A"
+      
+      // Calculate amount (positive for increases to the account, negative for decreases)
+      const amount = tx.impact || 0
+
+      return {
+        date: tx.date,
+        payeeCustomer,
+        memo: tx.memo,
+        class: tx.class,
+        amount,
+        account: tx.account,
+        debit: Number.parseFloat(tx.debit) || 0,
+        credit: Number.parseFloat(tx.credit) || 0,
+        impact: tx.impact,
+        entryNumber: tx.entry_number,
+        accountType: tx.account_type,
+      }
+    })
 
     setTransactionDetails(transactionDetails)
     setShowTransactionModal(true)
@@ -622,7 +647,7 @@ export default function BalanceSheetPage() {
                       : `${timePeriod} Period`}
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                💰 Enhanced with beginning balances and period activity tracking
+                💰 Enhanced with corrected beginning balance calculations
               </p>
             </div>
 
@@ -642,7 +667,6 @@ export default function BalanceSheetPage() {
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex gap-3 overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap sm:items-center scrollbar-hide">
-            {/* Time Period */}
             <select
               value={timePeriod}
               onChange={(e) => setTimePeriod(e.target.value as TimePeriod)}
@@ -655,7 +679,6 @@ export default function BalanceSheetPage() {
               <option value="Custom">Custom Date Range</option>
             </select>
 
-            {/* Month/Year for Monthly and Quarterly */}
             {(timePeriod === "Monthly" || timePeriod === "Quarterly") && (
               <>
                 <select
@@ -684,7 +707,6 @@ export default function BalanceSheetPage() {
               </>
             )}
 
-            {/* Custom Date Range */}
             {timePeriod === "Custom" && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 <input
@@ -703,7 +725,6 @@ export default function BalanceSheetPage() {
               </div>
             )}
 
-            {/* Property Filter */}
             <select
               value={selectedProperty}
               onChange={(e) => setSelectedProperty(e.target.value)}
@@ -844,19 +865,34 @@ export default function BalanceSheetPage() {
                         </td>
                         <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={account.beginningBalance >= 0 ? "text-green-600" : "text-red-600"}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'beginning')}
+                            className={`hover:underline ${account.beginningBalance >= 0 ? "text-green-600" : "text-red-600"} ${
+                              account.beginningBalance !== 0 ? "hover:bg-green-50" : "cursor-default"
+                            } px-2 py-1 rounded transition-colors`}
+                            disabled={account.beginningBalance === 0}
+                          >
                             {formatCurrency(account.beginningBalance)}
-                          </span>
+                          </button>
                         </td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={account.periodActivity >= 0 ? "text-green-600" : "text-red-600"}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'period')}
+                            className={`hover:underline ${account.periodActivity >= 0 ? "text-green-600" : "text-red-600"} ${
+                              account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                            } px-2 py-1 rounded transition-colors`}
+                            disabled={account.periodActivity === 0}
+                          >
                             {account.periodActivity !== 0 ? formatCurrency(account.periodActivity) : "-"}
-                          </span>
+                          </button>
                         </td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={`font-bold ${account.balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'ending')}
+                            className={`font-bold hover:underline ${account.balance >= 0 ? "text-green-600" : "text-red-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
+                          >
                             {formatCurrency(account.balance)}
-                          </span>
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -918,19 +954,34 @@ export default function BalanceSheetPage() {
                         </td>
                         <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={account.beginningBalance <= 0 ? "text-red-600" : "text-green-600"}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'beginning')}
+                            className={`hover:underline ${account.beginningBalance <= 0 ? "text-red-600" : "text-green-600"} ${
+                              account.beginningBalance !== 0 ? "hover:bg-red-50" : "cursor-default"
+                            } px-2 py-1 rounded transition-colors`}
+                            disabled={account.beginningBalance === 0}
+                          >
                             {formatCurrency(Math.abs(account.beginningBalance))}
-                          </span>
+                          </button>
                         </td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={account.periodActivity <= 0 ? "text-red-600" : "text-green-600"}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'period')}
+                            className={`hover:underline ${account.periodActivity <= 0 ? "text-red-600" : "text-green-600"} ${
+                              account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                            } px-2 py-1 rounded transition-colors`}
+                            disabled={account.periodActivity === 0}
+                          >
                             {account.periodActivity !== 0 ? formatCurrency(Math.abs(account.periodActivity)) : "-"}
-                          </span>
+                          </button>
                         </td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={`font-bold ${account.balance <= 0 ? "text-red-600" : "text-green-600"}`}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'ending')}
+                            className={`font-bold hover:underline ${account.balance <= 0 ? "text-red-600" : "text-green-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
+                          >
                             {formatCurrency(Math.abs(account.balance))}
-                          </span>
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -992,19 +1043,34 @@ export default function BalanceSheetPage() {
                         </td>
                         <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={account.beginningBalance >= 0 ? "text-blue-600" : "text-red-600"}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'beginning')}
+                            className={`hover:underline ${account.beginningBalance >= 0 ? "text-blue-600" : "text-red-600"} ${
+                              account.beginningBalance !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                            } px-2 py-1 rounded transition-colors`}
+                            disabled={account.beginningBalance === 0}
+                          >
                             {formatCurrency(account.beginningBalance)}
-                          </span>
+                          </button>
                         </td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={account.periodActivity >= 0 ? "text-blue-600" : "text-red-600"}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'period')}
+                            className={`hover:underline ${account.periodActivity >= 0 ? "text-blue-600" : "text-red-600"} ${
+                              account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                            } px-2 py-1 rounded transition-colors`}
+                            disabled={account.periodActivity === 0}
+                          >
                             {account.periodActivity !== 0 ? formatCurrency(account.periodActivity) : "-"}
-                          </span>
+                          </button>
                         </td>
                         <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                          <span className={`font-bold ${account.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
+                          <button
+                            onClick={() => showTransactionDetails(account, 'ending')}
+                            className={`font-bold hover:underline ${account.balance >= 0 ? "text-blue-600" : "text-red-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
+                          >
                             {formatCurrency(account.balance)}
-                          </span>
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1042,31 +1108,62 @@ export default function BalanceSheetPage() {
                 </button>
               </div>
 
-              {/* Transaction Totals */}
+              {/* Enhanced Transaction Summary with Period Info */}
               {transactionDetails.length > 0 && (
-                <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-xs text-gray-600">Total Debits</div>
-                    <div className="text-sm sm:text-lg font-semibold text-red-600">
-                      {formatCurrency(transactionDetails.reduce((sum, t) => sum + t.debit, 0))}
+                <div className="mt-4 space-y-3">
+                  {/* Main Totals */}
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                    <div className="text-center">
+                      <div className="text-xs text-gray-600">Total Amount</div>
+                      <div
+                        className={`text-sm sm:text-lg font-semibold ${
+                          transactionDetails.reduce((sum, t) => sum + t.amount, 0) >= 0
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {formatCurrency(transactionDetails.reduce((sum, t) => sum + t.amount, 0))}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-600">Transaction Count</div>
+                      <div className="text-sm sm:text-lg font-semibold text-blue-600">
+                        {transactionDetails.length}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-600">Total Credits</div>
-                    <div className="text-sm sm:text-lg font-semibold text-green-600">
-                      {formatCurrency(transactionDetails.reduce((sum, t) => sum + t.credit, 0))}
+
+                  {/* Period Breakdown */}
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4 p-3 sm:p-4 bg-blue-50 rounded-lg">
+                    <div className="text-center">
+                      <div className="text-xs text-blue-700 font-medium">
+                        Before {formatDate(calculatePeriodStart())}
+                      </div>
+                      <div className="text-sm sm:text-base font-semibold text-blue-800">
+                        {formatCurrency(
+                          transactionDetails
+                            .filter(t => parseDate(t.date) < calculatePeriodStart())
+                            .reduce((sum, t) => sum + t.amount, 0)
+                        )}
+                      </div>
+                      <div className="text-xs text-blue-600">
+                        ({transactionDetails.filter(t => parseDate(t.date) < calculatePeriodStart()).length} transactions)
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-600">Net Impact</div>
-                    <div
-                      className={`text-sm sm:text-lg font-semibold ${
-                        transactionDetails.reduce((sum, t) => sum + t.impact, 0) >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {formatCurrency(transactionDetails.reduce((sum, t) => sum + t.impact, 0))}
+                    <div className="text-center">
+                      <div className="text-xs text-blue-700 font-medium">
+                        From {formatDate(calculatePeriodStart())}
+                      </div>
+                      <div className="text-sm sm:text-base font-semibold text-blue-800">
+                        {formatCurrency(
+                          transactionDetails
+                            .filter(t => parseDate(t.date) >= calculatePeriodStart())
+                            .reduce((sum, t) => sum + t.amount, 0)
+                        )}
+                      </div>
+                      <div className="text-xs text-blue-600">
+                        ({transactionDetails.filter(t => parseDate(t.date) >= calculatePeriodStart()).length} transactions)
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1082,28 +1179,27 @@ export default function BalanceSheetPage() {
                       <div className="text-sm font-medium text-gray-900">{formatDate(transaction.date)}</div>
                       <div className="text-right">
                         <div
-                          className={`text-sm font-bold ${transaction.impact >= 0 ? "text-green-600" : "text-red-600"}`}
+                          className={`text-sm font-bold ${transaction.amount >= 0 ? "text-green-600" : "text-red-600"}`}
                         >
-                          {formatCurrency(transaction.impact)}
+                          {formatCurrency(transaction.amount)}
                         </div>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-700 mb-1">{transaction.account}</div>
-                    {transaction.memo && <div className="text-xs text-gray-500 mb-2 truncate">{transaction.memo}</div>}
-                    <div className="flex justify-between text-xs">
-                      <div className="text-red-600">
-                        {transaction.debit > 0 ? `Dr: ${formatCurrency(transaction.debit)}` : ""}
+                    <div className="space-y-1">
+                      <div className="text-sm text-gray-700">
+                        <span className="font-medium">Payee/Customer:</span> {transaction.payeeCustomer}
                       </div>
-                      <div className="text-green-600">
-                        {transaction.credit > 0 ? `Cr: ${formatCurrency(transaction.credit)}` : ""}
-                      </div>
+                      {transaction.memo && (
+                        <div className="text-sm text-gray-600">
+                          <span className="font-medium">Memo:</span> {transaction.memo}
+                        </div>
+                      )}
+                      {transaction.class && (
+                        <div className="text-sm text-blue-600">
+                          <span className="font-medium">Class:</span> {transaction.class}
+                        </div>
+                      )}
                     </div>
-                    {(transaction.entryNumber || transaction.bankAccount) && (
-                      <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
-                        {transaction.entryNumber && <div>Entry: {transaction.entryNumber}</div>}
-                        {transaction.bankAccount && <div>Bank: {transaction.bankAccount}</div>}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1117,25 +1213,16 @@ export default function BalanceSheetPage() {
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account
+                        Payee/Customer
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Memo
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Entry #
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Bank Account
+                        Class
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Debit
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Credit
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Impact
+                        Amount
                       </th>
                     </tr>
                   </thead>
@@ -1145,24 +1232,24 @@ export default function BalanceSheetPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(transaction.date)}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">{transaction.account}</td>
-                        <td
-                          className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate"
-                          title={transaction.memo || "N/A"}
-                        >
-                          {transaction.memo || "N/A"}
+                        <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                          <div className="truncate" title={transaction.payeeCustomer || "N/A"}>
+                            {transaction.payeeCustomer || "N/A"}
+                          </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{transaction.entryNumber || "N/A"}</td>
-                        <td className="px-6 py-4 text-sm text-blue-600">{transaction.bankAccount || "N/A"}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                          {transaction.debit > 0 ? formatCurrency(transaction.debit) : ""}
+                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                          <div className="truncate" title={transaction.memo || "N/A"}>
+                            {transaction.memo || "N/A"}
+                          </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                          {transaction.credit > 0 ? formatCurrency(transaction.credit) : ""}
+                        <td className="px-6 py-4 text-sm text-blue-600 max-w-xs">
+                          <div className="truncate" title={transaction.class || "N/A"}>
+                            {transaction.class || "N/A"}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                          <span className={transaction.impact >= 0 ? "text-green-600" : "text-red-600"}>
-                            {formatCurrency(transaction.impact)}
+                          <span className={transaction.amount >= 0 ? "text-green-600" : "text-red-600"}>
+                            {formatCurrency(transaction.amount)}
                           </span>
                         </td>
                       </tr>
