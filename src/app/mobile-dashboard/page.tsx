@@ -144,8 +144,8 @@ export default function EnhancedMobileDashboard() {
   }, [cfData]);
 
   const classifyTransaction = (
-    accountType: string | null,
-    reportCategory: string | null,
+    accountType: string | null | undefined,
+    reportCategory: string | null | undefined,
   ) => {
     const typeLower = accountType?.toLowerCase() || "";
     if (reportCategory === "transfer") return "transfer";
@@ -386,14 +386,32 @@ export default function EnhancedMobileDashboard() {
     const op: Record<string, number> = {};
     const fin: Record<string, number> = {};
     ((data as JournalRow[]) || []).forEach((row) => {
+      const typeLower = row.account_type?.toLowerCase() || "";
+
+      // Skip credit card purchases (non-transfer transactions)
+      if (typeLower === "credit card" && row.report_category !== "transfer") {
+        return;
+      }
+
       const debit = Number(row.debit) || 0;
       const credit = Number(row.credit) || 0;
       const amount =
-        row.report_category === "transfer" ? debit - credit : credit - debit;
-      const classification = classifyTransaction(
+        row.report_category === "transfer"
+          ? typeLower === "credit card"
+            ? credit - debit
+            : debit - credit
+          : credit - debit;
+
+      let classification = classifyTransaction(
         row.account_type,
         row.report_category,
       );
+
+      // Treat credit card payments as financing activities
+      if (typeLower === "credit card" && row.report_category === "transfer") {
+        classification = "financing";
+      }
+
       if (classification === "operating") {
         op[row.account] = (op[row.account] || 0) + amount;
       } else if (classification === "financing") {
@@ -418,7 +436,7 @@ export default function EnhancedMobileDashboard() {
     let query = supabase
       .from("journal_entry_lines")
       .select(
-        "date, debit, credit, account, class, report_category, memo, customer, vendor, name",
+        "date, debit, credit, account, account_type, class, report_category, memo, customer, vendor, name",
       )
       .eq("account", account)
       .gte("date", start)
@@ -431,8 +449,13 @@ export default function EnhancedMobileDashboard() {
     }
     const { data } = await query;
     const list: Transaction[] = ((data as JournalRow[]) || [])
+      .filter((row) => {
+        const typeLower = row.account_type?.toLowerCase() || "";
+        return !(typeLower === "credit card" && row.report_category !== "transfer");
+      })
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((row) => {
+        const typeLower = row.account_type?.toLowerCase() || "";
         const debit = Number(row.debit) || 0;
         const credit = Number(row.credit) || 0;
         let amount = 0;
@@ -440,7 +463,11 @@ export default function EnhancedMobileDashboard() {
           amount = type === "revenue" ? credit - debit : debit - credit;
         } else {
           amount =
-            row.report_category === "transfer" ? debit - credit : credit - debit;
+            row.report_category === "transfer"
+              ? typeLower === "credit card"
+                ? credit - debit
+                : debit - credit
+              : credit - debit;
         }
         return {
           date: row.date,
