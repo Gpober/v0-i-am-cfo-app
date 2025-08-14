@@ -3175,16 +3175,44 @@ export default function CashFlowPage() {
 
               {/* Transaction Totals */}
               {transactionDetails.length > 0 && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg text-center">
-                  <div className="text-sm text-gray-600">Cash Flow Impact</div>
-                  <div
-                    className={`text-xl font-bold ${
-                      transactionDetails.reduce((sum, t) => sum + t.impact, 0) >= 0 ? "text-green-600" : "text-red-600"
-                    }`}
-                  >
-                    {formatCurrency(transactionDetails.reduce((sum, t) => sum + t.impact, 0))}
+                <div className="mt-4 grid grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg text-center">
+                  <div>
+                    <div className="text-sm text-gray-600">Total Debits</div>
+                    <div className="text-lg font-semibold text-red-600">
+                      {formatCurrency(transactionDetails.reduce((sum, t) => sum + (t.debit || 0), 0))}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">{transactionDetails.length} transactions</div>
+                  <div>
+                    <div className="text-sm text-gray-600">Total Credits</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {formatCurrency(transactionDetails.reduce((sum, t) => sum + (t.credit || 0), 0))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">Net Impact</div>
+                    <div
+                      className={`text-lg font-semibold ${
+                        transactionDetails.reduce((sum, t) => sum + (t.credit || 0) - (t.debit || 0), 0) >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {formatCurrency(
+                        Math.abs(
+                          transactionDetails.reduce(
+                            (sum, t) => sum + (t.credit || 0) - (t.debit || 0),
+                            0,
+                          ),
+                        ),
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">Transactions</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {transactionDetails.length}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -3195,56 +3223,65 @@ export default function CashFlowPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Entry #
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Payee/Customer
+                        Account
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Memo
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
-                      </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Class
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Debit
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Credit
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {transactionDetails.map((transaction, index) => (
-                      <tr key={`${transaction.entryNumber}-${index}`} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(transaction.date)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {transaction.name ||
-                            transaction.vendor ||
-                            transaction.customer ||
-                            "N/A"}
-                        </td>
-                        <td
-                          className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate"
-                          title={transaction.memo || ""}
-                        >
-                          {transaction.memo || "-"}
-                        </td>
-                        <td
-                          className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
-                            transaction.impact >= 0 ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
-                          {formatCurrency(transaction.impact)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {transaction.class && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {transaction.class}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {transactionDetails.map((transaction, index) => {
+                      const debit = transaction.debit || 0
+                      const credit = transaction.credit || 0
+                      return (
+                        <tr key={`${transaction.entryNumber}-${index}`} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {transaction.entryNumber || "N/A"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(transaction.date)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {transaction.account}
+                          </td>
+                          <td
+                            className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate"
+                            title={transaction.memo || ""}
+                          >
+                            {transaction.memo || "-"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            {transaction.class && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {transaction.class}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                            {debit ? formatCurrency(debit) : "-"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                            {credit ? formatCurrency(credit) : "-"}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

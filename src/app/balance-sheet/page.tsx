@@ -1227,61 +1227,45 @@ export default function BalanceSheetPage() {
                 </button>
               </div>
 
-              {/* Enhanced Transaction Summary with Period Info */}
+              {/* Enhanced Transaction Summary */}
               {transactionDetails.length > 0 && (
-                <div className="mt-4 space-y-3">
-                  {/* Main Totals */}
-                  <div className="grid grid-cols-2 gap-2 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                <div className="mt-4">
+                  <div className="grid grid-cols-4 gap-2 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
                     <div className="text-center">
-                      <div className="text-xs text-gray-600">Total Amount</div>
+                      <div className="text-xs text-gray-600">Total Debits</div>
+                      <div className="text-sm sm:text-lg font-semibold text-red-600">
+                        {formatCurrency(transactionDetails.reduce((sum, t) => sum + (t.debit || 0), 0))}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-600">Total Credits</div>
+                      <div className="text-sm sm:text-lg font-semibold text-green-600">
+                        {formatCurrency(transactionDetails.reduce((sum, t) => sum + (t.credit || 0), 0))}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-600">Net Impact</div>
                       <div
                         className={`text-sm sm:text-lg font-semibold ${
-                          transactionDetails.reduce((sum, t) => sum + t.amount, 0) >= 0
+                          transactionDetails.reduce((sum, t) => sum + (t.credit || 0) - (t.debit || 0), 0) >= 0
                             ? "text-green-600"
                             : "text-red-600"
                         }`}
                       >
-                        {formatCurrency(transactionDetails.reduce((sum, t) => sum + t.amount, 0))}
+                        {formatCurrency(
+                          Math.abs(
+                            transactionDetails.reduce(
+                              (sum, t) => sum + (t.credit || 0) - (t.debit || 0),
+                              0,
+                            ),
+                          ),
+                        )}
                       </div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xs text-gray-600">Transaction Count</div>
+                      <div className="text-xs text-gray-600">Transactions</div>
                       <div className="text-sm sm:text-lg font-semibold text-blue-600">
                         {transactionDetails.length}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Period Breakdown */}
-                  <div className="grid grid-cols-2 gap-2 sm:gap-4 p-3 sm:p-4 bg-blue-50 rounded-lg">
-                    <div className="text-center">
-                      <div className="text-xs text-blue-700 font-medium">
-                        Before {formatDate(calculatePeriodStart())}
-                      </div>
-                      <div className="text-sm sm:text-base font-semibold text-blue-800">
-                        {formatCurrency(
-                          transactionDetails
-                            .filter(t => parseDate(t.date) < calculatePeriodStart())
-                            .reduce((sum, t) => sum + t.amount, 0)
-                        )}
-                      </div>
-                      <div className="text-xs text-blue-600">
-                        ({transactionDetails.filter(t => parseDate(t.date) < calculatePeriodStart()).length} transactions)
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-blue-700 font-medium">
-                        From {formatDate(calculatePeriodStart())}
-                      </div>
-                      <div className="text-sm sm:text-base font-semibold text-blue-800">
-                        {formatCurrency(
-                          transactionDetails
-                            .filter(t => parseDate(t.date) >= calculatePeriodStart())
-                            .reduce((sum, t) => sum + t.amount, 0)
-                        )}
-                      </div>
-                      <div className="text-xs text-blue-600">
-                        ({transactionDetails.filter(t => parseDate(t.date) >= calculatePeriodStart()).length} transactions)
                       </div>
                     </div>
                   </div>
@@ -1295,19 +1279,12 @@ export default function BalanceSheetPage() {
               <div className="sm:hidden space-y-3">
                 {transactionDetails.map((transaction, index) => (
                   <div key={index} className="bg-gray-50 rounded-lg p-3 border">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="text-sm font-medium text-gray-900">{formatDate(transaction.date)}</div>
-                      <div className="text-right">
-                        <div
-                          className={`text-sm font-bold ${transaction.amount >= 0 ? "text-green-600" : "text-red-600"}`}
-                        >
-                          {formatCurrency(transaction.amount)}
-                        </div>
-                      </div>
+                    <div className="text-sm font-medium text-gray-900 mb-2">
+                      {formatDate(transaction.date)}
                     </div>
                     <div className="space-y-1">
                       <div className="text-sm text-gray-700">
-                        <span className="font-medium">Payee/Customer:</span> {transaction.payeeCustomer}
+                        <span className="font-medium">Account:</span> {transaction.account}
                       </div>
                       {transaction.memo && (
                         <div className="text-sm text-gray-600">
@@ -1319,6 +1296,12 @@ export default function BalanceSheetPage() {
                           <span className="font-medium">Class:</span> {transaction.class}
                         </div>
                       )}
+                      <div className="text-sm text-red-600">
+                        <span className="font-medium">Debit:</span> {formatCurrency(transaction.debit || 0)}
+                      </div>
+                      <div className="text-sm text-green-600">
+                        <span className="font-medium">Credit:</span> {formatCurrency(transaction.credit || 0)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1330,10 +1313,13 @@ export default function BalanceSheetPage() {
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Entry #
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Payee/Customer
+                        Account
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Memo
@@ -1342,19 +1328,25 @@ export default function BalanceSheetPage() {
                         Class
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
+                        Debit
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Credit
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {transactionDetails.map((transaction, index) => (
                       <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {transaction.entryNumber || "N/A"}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(transaction.date)}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
-                          <div className="truncate" title={transaction.payeeCustomer || "N/A"}>
-                            {transaction.payeeCustomer || "N/A"}
+                          <div className="truncate" title={transaction.account}>
+                            {transaction.account}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
@@ -1367,10 +1359,11 @@ export default function BalanceSheetPage() {
                             {transaction.class || "N/A"}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                          <span className={transaction.amount >= 0 ? "text-green-600" : "text-red-600"}>
-                            {formatCurrency(transaction.amount)}
-                          </span>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                          {formatCurrency(transaction.debit || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                          {formatCurrency(transaction.credit || 0)}
                         </td>
                       </tr>
                     ))}
