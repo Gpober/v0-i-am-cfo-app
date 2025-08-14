@@ -7,9 +7,12 @@ interface ManualBalance {
   balance: string
 }
 
-interface ParsedBalance {
-  account: string
-  balance: number
+// Map common account labels from PDFs to standardized account names
+const accountMappings: Record<string, string> = {
+  cash: "Cash",
+  "accounts receivable": "Accounts Receivable",
+  "accounts payable": "Accounts Payable",
+  inventory: "Inventory",
 }
 
 export default function SettingsPage() {
@@ -17,7 +20,7 @@ export default function SettingsPage() {
   const [balances, setBalances] = useState<ManualBalance[]>([
     { account: "", balance: "" },
   ])
-  const [parsedBalances, setParsedBalances] = useState<ParsedBalance[]>([])
+  const [parsedBalances, setParsedBalances] = useState<ManualBalance[]>([])
 
   const handleBalanceChange = (
     index: number,
@@ -55,16 +58,29 @@ export default function SettingsPage() {
           .join(" ") + "\n"
     }
     const lines = text.split(/\r?\n/)
-    const entries: ParsedBalance[] = []
+    const entries: ManualBalance[] = []
     lines.forEach((line) => {
       const match = line.match(/(.+?)\s+(-?\$?[0-9,.,\-]+)/)
       if (match) {
-        const account = match[1].trim()
+        const rawAccount = match[1].trim()
+        const mapped =
+          accountMappings[rawAccount.toLowerCase()] || rawAccount
         const amt = parseFloat(match[2].replace(/[^0-9.-]/g, ""))
-        if (!isNaN(amt)) entries.push({ account, balance: amt })
+        if (!isNaN(amt))
+          entries.push({ account: mapped, balance: amt.toString() })
       }
     })
     setParsedBalances(entries)
+  }
+
+  const handleParsedBalanceChange = (
+    index: number,
+    field: keyof ManualBalance,
+    value: string,
+  ) => {
+    const updated = [...parsedBalances]
+    updated[index] = { ...updated[index], [field]: value }
+    setParsedBalances(updated)
   }
 
   const handleSave = () => {
@@ -72,7 +88,7 @@ export default function SettingsPage() {
       date,
       balances: [
         ...balances.filter((b) => b.account && b.balance),
-        ...parsedBalances,
+        ...parsedBalances.filter((b) => b.account && b.balance),
       ].map((b) => ({ account: b.account, balance: Number(b.balance) })),
     }
     if (typeof window !== "undefined") {
@@ -132,13 +148,25 @@ export default function SettingsPage() {
         {parsedBalances.length > 0 && (
           <div className="mt-4">
             <h3 className="font-medium">Parsed Accounts</h3>
-            <ul className="list-disc pl-5">
-              {parsedBalances.map((b, i) => (
-                <li key={i}>
-                  {b.account}: {b.balance.toLocaleString(undefined, { style: "currency", currency: "USD" })}
-                </li>
-              ))}
-            </ul>
+            {parsedBalances.map((row, idx) => (
+              <div key={idx} className="flex space-x-2 mb-2">
+                <input
+                  className="flex-1 border rounded p-2"
+                  value={row.account}
+                  onChange={(e) =>
+                    handleParsedBalanceChange(idx, "account", e.target.value)
+                  }
+                />
+                <input
+                  className="w-40 border rounded p-2"
+                  type="number"
+                  value={row.balance}
+                  onChange={(e) =>
+                    handleParsedBalanceChange(idx, "balance", e.target.value)
+                  }
+                />
+              </div>
+            ))}
           </div>
         )}
       </div>
