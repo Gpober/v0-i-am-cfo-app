@@ -37,6 +37,7 @@ interface PropertySummary {
   netIncome?: number;
   operating?: number;
   financing?: number;
+  investing?: number; // Added investing
 }
 
 interface Category {
@@ -119,9 +120,11 @@ export default function EnhancedMobileDashboard() {
   const [cfData, setCfData] = useState<{
     operating: Category[];
     financing: Category[];
+    investing: Category[]; // Added investing
   }>({
     operating: [],
     financing: [],
+    investing: [], // Added investing
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -140,15 +143,28 @@ export default function EnhancedMobileDashboard() {
   const cfTotals = useMemo(() => {
     const operating = cfData.operating.reduce((sum, c) => sum + c.total, 0);
     const financing = cfData.financing.reduce((sum, c) => sum + c.total, 0);
-    return { operating, financing, net: operating + financing };
+    const investing = cfData.investing.reduce((sum, c) => sum + c.total, 0); // Added investing
+    return { 
+      operating, 
+      financing, 
+      investing, // Added investing
+      net: operating + financing + investing // Updated to include investing
+    };
   }, [cfData]);
 
+  // Enhanced classification function with transfers as separate category
   const classifyTransaction = (
     accountType: string | null,
     reportCategory: string | null,
   ) => {
     const typeLower = accountType?.toLowerCase() || "";
-    if (reportCategory === "transfer") return "transfer";
+    
+    // If this is a transfer, classify as transfer
+    if (reportCategory === "transfer") {
+      return "transfer";
+    }
+
+    // Operating activities - Income and Expenses
     if (
       typeLower === "income" ||
       typeLower === "other income" ||
@@ -157,22 +173,30 @@ export default function EnhancedMobileDashboard() {
       typeLower === "cost of goods sold" ||
       typeLower === "accounts receivable" ||
       typeLower === "accounts payable"
-    )
+    ) {
       return "operating";
+    }
+
+    // Investing activities - Fixed Assets and Other Assets
     if (
       typeLower === "fixed assets" ||
       typeLower === "other assets" ||
       typeLower === "property, plant & equipment"
-    )
+    ) {
       return "investing";
+    }
+
+    // Financing activities - Liabilities, Equity, Credit Cards
     if (
       typeLower === "long term liabilities" ||
       typeLower === "equity" ||
       typeLower === "credit card" ||
       typeLower === "other current liabilities" ||
       typeLower === "line of credit"
-    )
+    ) {
       return "financing";
+    }
+
     return "other";
   };
 
@@ -235,10 +259,19 @@ export default function EnhancedMobileDashboard() {
       ((data as JournalRow[]) || []).forEach((row) => {
         const cls = row.class || "General";
         if (!map[cls]) {
-          map[cls] = { name: cls, revenue: 0, expenses: 0, netIncome: 0, operating: 0, financing: 0 };
+          map[cls] = { 
+            name: cls, 
+            revenue: 0, 
+            expenses: 0, 
+            netIncome: 0, 
+            operating: 0, 
+            financing: 0,
+            investing: 0 // Added investing
+          };
         }
         const debit = Number(row.debit) || 0;
         const credit = Number(row.credit) || 0;
+        
         if (reportType === "pl") {
           const t = (row.account_type || "").toLowerCase();
           if (t.includes("income") || t.includes("revenue")) {
@@ -250,24 +283,29 @@ export default function EnhancedMobileDashboard() {
             map[cls].netIncome = (map[cls].netIncome || 0) - amt;
           }
         } else {
-          const amount =
-            row.report_category === "transfer" ? debit - credit : credit - debit;
-          const classification = classifyTransaction(
-            row.account_type,
-            row.report_category,
-          );
+          // Enhanced cash flow calculation
+          const cashImpact = row.report_category === "transfer" 
+            ? debit - credit // Reverse for transfers
+            : row.normal_balance || credit - debit; // Normal for others
+            
+          const classification = classifyTransaction(row.account_type, row.report_category);
+          
           if (classification === "operating") {
-            map[cls].operating = (map[cls].operating || 0) + amount;
+            map[cls].operating = (map[cls].operating || 0) + cashImpact;
           } else if (classification === "financing") {
-            map[cls].financing = (map[cls].financing || 0) + amount;
+            map[cls].financing = (map[cls].financing || 0) + cashImpact;
+          } else if (classification === "investing") {
+            map[cls].investing = (map[cls].investing || 0) + cashImpact;
           }
         }
       });
+      
       const list = Object.values(map).filter((p) => {
         return reportType === "pl"
           ? (p.revenue || 0) !== 0 || (p.expenses || 0) !== 0 || (p.netIncome || 0) !== 0
-          : (p.operating || 0) !== 0 || (p.financing || 0) !== 0;
+          : (p.operating || 0) !== 0 || (p.financing || 0) !== 0 || (p.investing || 0) !== 0;
       });
+      
       const finalList =
         map["General"] && !list.find((p) => p.name === "General")
           ? [...list, map["General"]]
@@ -293,6 +331,22 @@ export default function EnhancedMobileDashboard() {
     }, properties[0]).name;
   }, [properties, reportType]);
 
+  const cashKing = useMemo(() => {
+    if (reportType !== "cf" || !properties.length) return null;
+    return properties.reduce((max, p) =>
+      (p.operating || 0) > (max.operating || 0) ? p : max,
+    properties[0]).name;
+  }, [properties, reportType]);
+
+  const flowMaster = useMemo(() => {
+    if (reportType !== "cf" || !properties.length) return null;
+    return properties.reduce((max, p) => {
+      const netP = (p.operating || 0) + (p.financing || 0) + (p.investing || 0);
+      const netM = (max.operating || 0) + (max.financing || 0) + (max.investing || 0);
+      return netP > netM ? p : max;
+    }, properties[0]).name;
+  }, [properties, reportType]);
+
   const companyTotals = properties.reduce(
     (acc, p) => {
       if (reportType === "pl") {
@@ -302,13 +356,13 @@ export default function EnhancedMobileDashboard() {
       } else {
         acc.operating += p.operating || 0;
         acc.financing += p.financing || 0;
-        acc.net += (p.operating || 0) + (p.financing || 0);
+        acc.investing += p.investing || 0; // Added investing
+        acc.net += (p.operating || 0) + (p.financing || 0) + (p.investing || 0); // Updated net calculation
       }
       return acc;
     },
-    { revenue: 0, expenses: 0, net: 0, operating: 0, financing: 0 },
+    { revenue: 0, expenses: 0, net: 0, operating: 0, financing: 0, investing: 0 }, // Added investing
   );
-
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("en-US", {
@@ -385,40 +439,54 @@ export default function EnhancedMobileDashboard() {
     const { data } = await query;
     const op: Record<string, number> = {};
     const fin: Record<string, number> = {};
+    const inv: Record<string, number> = {}; // Added investing
+    
     ((data as JournalRow[]) || []).forEach((row) => {
       const debit = Number(row.debit) || 0;
       const credit = Number(row.credit) || 0;
-      const amount =
-        row.report_category === "transfer" ? debit - credit : credit - debit;
-      const classification = classifyTransaction(
-        row.account_type,
-        row.report_category,
-      );
+      
+      // Enhanced cash impact calculation
+      const cashImpact = row.report_category === "transfer" 
+        ? debit - credit // Reverse for transfers
+        : row.normal_balance || credit - debit; // Normal for others
+        
+      const classification = classifyTransaction(row.account_type, row.report_category);
+      
       if (classification === "operating") {
-        op[row.account] = (op[row.account] || 0) + amount;
+        op[row.account] = (op[row.account] || 0) + cashImpact;
       } else if (classification === "financing") {
-        fin[row.account] = (fin[row.account] || 0) + amount;
+        fin[row.account] = (fin[row.account] || 0) + cashImpact;
+      } else if (classification === "investing") {
+        inv[row.account] = (inv[row.account] || 0) + cashImpact;
       }
     });
+    
     const operatingArr = Object.entries(op)
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => b.total - a.total);
     const financingArr = Object.entries(fin)
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => b.total - a.total);
-    setCfData({ operating: operatingArr, financing: financingArr });
+    const investingArr = Object.entries(inv)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+      
+    setCfData({ 
+      operating: operatingArr, 
+      financing: financingArr,
+      investing: investingArr 
+    });
   };
-
 
   const handleCategory = async (
     account: string,
-    type: "revenue" | "expense" | "operating" | "financing",
+    type: "revenue" | "expense" | "operating" | "financing" | "investing",
   ) => {
     const { start, end } = getDateRange();
     let query = supabase
       .from("journal_entry_lines")
       .select(
-        "date, debit, credit, account, class, report_category, memo, customer, vendor, name",
+        "date, debit, credit, account, class, report_category, normal_balance, memo, customer, vendor, name",
       )
       .eq("account", account)
       .gte("date", start)
@@ -439,8 +507,10 @@ export default function EnhancedMobileDashboard() {
         if (reportType === "pl") {
           amount = type === "revenue" ? credit - debit : debit - credit;
         } else {
-          amount =
-            row.report_category === "transfer" ? debit - credit : credit - debit;
+          // Enhanced cash flow calculation for transactions
+          amount = row.report_category === "transfer" 
+            ? debit - credit // Reverse for transfers
+            : row.normal_balance || credit - debit; // Normal for others
         }
         return {
           date: row.date,
@@ -577,24 +647,30 @@ export default function EnhancedMobileDashboard() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', textAlign: 'center' }}>
               <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
                   {formatCompactCurrency(companyTotals.operating)}
                 </div>
-                <div style={{ fontSize: '12px', opacity: 0.8 }}>Operating</div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Operating</div>
               </div>
               <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
                   {formatCompactCurrency(companyTotals.financing)}
                 </div>
-                <div style={{ fontSize: '12px', opacity: 0.8 }}>Financing</div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Financing</div>
               </div>
               <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                  {formatCompactCurrency(companyTotals.investing)}
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Investing</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
                   {formatCompactCurrency(companyTotals.net)}
                 </div>
-                <div style={{ fontSize: '12px', opacity: 0.8 }}>Net Cash</div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Net Cash</div>
               </div>
             </div>
           )}
@@ -875,7 +951,7 @@ export default function EnhancedMobileDashboard() {
                           CASH KING
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties.find(p => (p.operating || 0) === Math.max(...properties.map(prop => prop.operating || 0)))?.name}
+                          {cashKing}
                         </div>
                       </div>
                     </div>
@@ -894,7 +970,7 @@ export default function EnhancedMobileDashboard() {
                           FLOW MASTER
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties.find(p => ((p.operating || 0) + (p.financing || 0)) === Math.max(...properties.map(prop => (prop.operating || 0) + (prop.financing || 0))))?.name}
+                          {flowMaster}
                         </div>
                       </div>
                     </div>
@@ -913,7 +989,7 @@ export default function EnhancedMobileDashboard() {
                           EFFICIENCY ACE
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
+                          {properties.find(p => (p.investing || 0) === Math.min(...properties.map(prop => prop.investing || 0)))?.name}
                         </div>
                       </div>
                     </div>
@@ -978,6 +1054,8 @@ export default function EnhancedMobileDashboard() {
             {properties.map((p) => {
               const isRevenueKing = p.name === revenueKing;
               const isMarginMaster = p.name === marginMaster;
+              const isCashKing = p.name === cashKing;
+              const isFlowMaster = p.name === flowMaster;
               
               return (
                 <div
@@ -1057,6 +1135,26 @@ export default function EnhancedMobileDashboard() {
                           <span style={{ fontSize: '16px' }}>🏅</span>
                         </div>
                       )}
+                      {reportType === "cf" && isCashKing && (
+                        <div style={{
+                          background: `linear-gradient(135deg, ${BRAND_COLORS.primary}, #0ea5e9)`,
+                          borderRadius: '12px',
+                          padding: '4px 6px',
+                          boxShadow: '0 2px 8px rgba(14, 165, 233, 0.3)'
+                        }}>
+                          <span style={{ fontSize: '16px' }}>💰</span>
+                        </div>
+                      )}
+                      {reportType === "cf" && isFlowMaster && (
+                        <div style={{
+                          background: `linear-gradient(135deg, ${BRAND_COLORS.success}, #22c55e)`,
+                          borderRadius: '12px',
+                          padding: '4px 6px',
+                          boxShadow: '0 2px 8px rgba(34, 197, 94, 0.3)'
+                        }}>
+                          <span style={{ fontSize: '16px' }}>⚡</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
@@ -1121,18 +1219,18 @@ export default function EnhancedMobileDashboard() {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gap: '10px' }}>
+                    <div style={{ display: 'grid', gap: '8px' }}>
                       <div style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between',
-                        padding: '8px 12px',
+                        padding: '6px 10px',
                         background: `${BRAND_COLORS.primary}08`,
-                        borderRadius: '8px',
+                        borderRadius: '6px',
                         border: `1px solid ${BRAND_COLORS.primary}20`
                       }}>
-                        <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Operating</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Operating</span>
                         <span style={{ 
-                          fontSize: '13px', 
+                          fontSize: '12px', 
                           fontWeight: '700',
                           color: BRAND_COLORS.primary,
                           textShadow: '0 1px 2px rgba(0,0,0,0.1)'
@@ -1143,14 +1241,14 @@ export default function EnhancedMobileDashboard() {
                       <div style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between',
-                        padding: '8px 12px',
+                        padding: '6px 10px',
                         background: `${BRAND_COLORS.secondary}08`,
-                        borderRadius: '8px',
+                        borderRadius: '6px',
                         border: `1px solid ${BRAND_COLORS.secondary}20`
                       }}>
-                        <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Financing</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Financing</span>
                         <span style={{ 
-                          fontSize: '13px', 
+                          fontSize: '12px', 
                           fontWeight: '700',
                           color: BRAND_COLORS.secondary,
                           textShadow: '0 1px 2px rgba(0,0,0,0.1)'
@@ -1161,20 +1259,38 @@ export default function EnhancedMobileDashboard() {
                       <div style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between',
-                        padding: '12px',
+                        padding: '6px 10px',
+                        background: `${BRAND_COLORS.warning}08`,
+                        borderRadius: '6px',
+                        border: `1px solid ${BRAND_COLORS.warning}20`
+                      }}>
+                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Investing</span>
+                        <span style={{ 
+                          fontSize: '12px', 
+                          fontWeight: '700',
+                          color: BRAND_COLORS.warning,
+                          textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                        }}>
+                          {formatCompactCurrency(p.investing || 0)}
+                        </span>
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        padding: '10px',
                         background: `linear-gradient(135deg, ${BRAND_COLORS.accent}10, ${BRAND_COLORS.primary}05)`,
-                        borderRadius: '10px',
+                        borderRadius: '8px',
                         border: `2px solid ${BRAND_COLORS.accent}30`,
                         boxShadow: `0 4px 12px ${BRAND_COLORS.accent}20`
                       }}>
-                        <span style={{ fontSize: '14px', fontWeight: '700', color: BRAND_COLORS.accent }}>Net Cash</span>
+                        <span style={{ fontSize: '12px', fontWeight: '700', color: BRAND_COLORS.accent }}>Net Cash</span>
                         <span style={{ 
-                          fontSize: '16px', 
+                          fontSize: '14px', 
                           fontWeight: '800',
-                          color: ((p.operating || 0) + (p.financing || 0)) >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+                          color: ((p.operating || 0) + (p.financing || 0) + (p.investing || 0)) >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
                           textShadow: '0 1px 3px rgba(0,0,0,0.2)'
                         }}>
-                          {formatCompactCurrency((p.operating || 0) + (p.financing || 0))}
+                          {formatCompactCurrency((p.operating || 0) + (p.financing || 0) + (p.investing || 0))}
                         </span>
                       </div>
                     </div>
@@ -1336,285 +1452,3 @@ export default function EnhancedMobileDashboard() {
                       cursor: 'pointer',
                       border: `1px solid ${BRAND_COLORS.gray[200]}`,
                       transition: 'all 0.2s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#fff7ed';
-                      e.currentTarget.style.borderColor = BRAND_COLORS.warning;
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = BRAND_COLORS.gray[50];
-                      e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: BRAND_COLORS.warning }}>
-                      {formatCurrency(cat.total)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div
-              style={{
-                marginTop: '8px',
-                textAlign: 'right',
-                fontSize: '16px',
-                fontWeight: '600',
-                color:
-                  plTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
-              }}
-            >
-              Net Income: {formatCurrency(plTotals.net)}
-            </div>
-            </>
-          ) : (
-            <>
-              <div style={{ display: 'grid', gap: '16px' }}>
-                <div style={{
-                  background: 'white',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: `1px solid ${BRAND_COLORS.gray[200]}`
-                }}>
-                <h3 style={{ 
-                  fontSize: '18px', 
-                  fontWeight: '600', 
-                  marginBottom: '16px',
-                  color: BRAND_COLORS.primary,
-                  borderBottom: `2px solid ${BRAND_COLORS.primary}`,
-                  paddingBottom: '8px'
-                }}>
-                  Operating Activities
-                </h3>
-                {cfData.operating.map((cat) => (
-                  <div
-                    key={cat.name}
-                    onClick={() => handleCategory(cat.name, "operating")}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px',
-                      marginBottom: '8px',
-                      background: BRAND_COLORS.gray[50],
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      border: `1px solid ${BRAND_COLORS.gray[200]}`,
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#f0f9ff';
-                      e.currentTarget.style.borderColor = BRAND_COLORS.primary;
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = BRAND_COLORS.gray[50];
-                      e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
-                    <span style={{ 
-                      fontSize: '14px', 
-                      fontWeight: '600', 
-                      color: cat.total >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
-                    }}>
-                      {formatCurrency(cat.total)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{
-                background: 'white',
-                borderRadius: '12px',
-                padding: '20px',
-                border: `1px solid ${BRAND_COLORS.gray[200]}`
-              }}>
-                <h3 style={{ 
-                  fontSize: '18px', 
-                  fontWeight: '600', 
-                  marginBottom: '16px',
-                  color: BRAND_COLORS.secondary,
-                  borderBottom: `2px solid ${BRAND_COLORS.secondary}`,
-                  paddingBottom: '8px'
-                }}>
-                  Financing Activities
-                </h3>
-                {cfData.financing.map((cat) => (
-                  <div
-                    key={cat.name}
-                    onClick={() => handleCategory(cat.name, "financing")}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px',
-                      marginBottom: '8px',
-                      background: BRAND_COLORS.gray[50],
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      border: `1px solid ${BRAND_COLORS.gray[200]}`,
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#f8fafc';
-                      e.currentTarget.style.borderColor = BRAND_COLORS.secondary;
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = BRAND_COLORS.gray[50];
-                      e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
-                    <span style={{ 
-                      fontSize: '14px', 
-                      fontWeight: '600', 
-                      color: cat.total >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
-                    }}>
-                      {formatCurrency(cat.total)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div
-              style={{
-                marginTop: '8px',
-                textAlign: 'right',
-                fontSize: '16px',
-                fontWeight: '600',
-                color:
-                  cfTotals.net >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
-              }}
-            >
-              Net Cash Flow: {formatCurrency(cfTotals.net)}
-            </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {view === "detail" && (
-        <div>
-          <button 
-            onClick={back}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: 'none',
-              border: 'none',
-              fontSize: '16px',
-              color: BRAND_COLORS.accent,
-              marginBottom: '20px',
-              cursor: 'pointer'
-            }}
-          >
-            <ChevronLeft size={20} style={{ marginRight: '4px' }} /> 
-            Back to {reportType === "pl" ? "P&L" : "Cash Flow"}
-          </button>
-          
-          <div style={{
-            background: `linear-gradient(135deg, ${BRAND_COLORS.accent}, ${BRAND_COLORS.secondary})`,
-            borderRadius: '12px',
-            padding: '20px',
-            marginBottom: '24px',
-            color: 'white'
-          }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>
-              {selectedCategory}
-            </h2>
-            <p style={{ fontSize: '14px', opacity: 0.9 }}>
-              Transaction Details • {getMonthName(month)} {year}
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gap: '12px' }}>
-            {transactions.map((t, idx) => (
-              <div
-                key={idx}
-                style={{
-                  background: 'white',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  border: `1px solid ${BRAND_COLORS.gray[200]}`,
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: '8px',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: '500' }}>
-                      {new Date(t.date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </div>
-                    {t.payee && (
-                      <div style={{ fontSize: '13px', color: '#475569' }}>{t.payee}</div>
-                    )}
-                    {t.className && (
-                      <div
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          color: BRAND_COLORS.accent,
-                          background: `${BRAND_COLORS.primary}20`,
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          display: 'inline-block',
-                          marginTop: '2px',
-                        }}
-                      >
-                        {t.className}
-                      </div>
-                    )}
-                    {t.memo && (
-                      <div style={{ fontSize: '12px', color: '#64748b' }}>{t.memo}</div>
-                    )}
-                  </div>
-                  <span
-                    style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: t.amount >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
-                    }}
-                  >
-                    {formatCurrency(t.amount)}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    fontSize: '12px',
-                    color: '#64748b',
-                    textAlign: 'right',
-                    borderTop: `1px solid ${BRAND_COLORS.gray[100]}`,
-                    paddingTop: '8px',
-                  }}
-                >
-                  Running Total: {formatCurrency(t.running)}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div
-            style={{
-              marginTop: '16px',
-              textAlign: 'right',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: transactionTotal >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
-            }}
-          >
-            {reportType === "pl" ? "Total Net Income" : "Total Net Cash Flow"}: {formatCurrency(transactionTotal)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
