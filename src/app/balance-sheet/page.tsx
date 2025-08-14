@@ -448,76 +448,6 @@ export default function BalanceSheetPage() {
     }
   }
 
-  // Calculate current year net income from P&L accounts using SQL
-  const calculateCurrentYearNetIncome = async () => {
-    try {
-      const currentYear = new Date().getFullYear()
-      const startOfYear = `${currentYear}-01-01`
-      const currentDate = new Date().toISOString().split('T')[0]
-      
-      console.log(`💰 CALCULATING CURRENT YEAR NET INCOME (${currentYear})`)
-      console.log(`   Period: ${startOfYear} to ${currentDate}`)
-      console.log(`   Property Filter: ${selectedProperty}`)
-
-      // Build the query with property filter if needed
-      let query = supabase
-        .from("journal_entry_lines")
-        .select("account_type, debit, credit")
-        .gte("date", startOfYear)
-        .lte("date", currentDate)
-        .in("account_type", [
-          "Income", 
-          "Other Income", 
-          "Cost of Goods Sold", 
-          "Expenses", 
-          "Other Expense"
-        ])
-
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
-      }
-
-      const { data: plTransactions, error } = await query
-
-      if (error) {
-        console.error("❌ Error fetching P&L transactions:", error)
-        return 0
-      }
-
-      let totalIncome = 0
-      let totalExpenses = 0
-
-      plTransactions?.forEach((transaction: any) => {
-        const debit = Number.parseFloat(transaction.debit) || 0
-        const credit = Number.parseFloat(transaction.credit) || 0
-        const accountType = transaction.account_type
-
-        // INCOME ACCOUNTS: Credit increases income (normal balance is credit)
-        if (accountType === "Income" || accountType === "Other Income") {
-          totalIncome += (credit - debit) // Credit increases income
-        }
-        // EXPENSE ACCOUNTS: Debit increases expenses (normal balance is debit)  
-        else if (accountType === "Cost of Goods Sold" || accountType === "Expenses" || accountType === "Other Expense") {
-          totalExpenses += (debit - credit) // Debit increases expenses
-        }
-      })
-
-      const netIncome = totalIncome - totalExpenses
-
-      console.log(`💰 CURRENT YEAR NET INCOME CALCULATION:`)
-      console.log(`   Total Income: ${formatCurrency(totalIncome)}`)
-      console.log(`   Total Expenses: ${formatCurrency(totalExpenses)}`)
-      console.log(`   Net Income: ${formatCurrency(netIncome)}`)
-      console.log(`   Based on ${plTransactions?.length || 0} P&L transactions`)
-
-      return netIncome
-
-    } catch (err) {
-      console.error("❌ Error calculating current year net income:", err)
-      return 0
-    }
-  };
-
   const loadData = async () => {
     try {
       setIsLoading(true)
@@ -534,7 +464,6 @@ export default function BalanceSheetPage() {
       smartLog(`🏢 Property Filter: "${selectedProperty}"`)
 
       // SINGLE QUERY: Get ALL balance sheet transactions up to as-of date
-      // We'll classify them in memory rather than multiple queries
       let query = supabase
         .from("journal_entry_lines")
         .select(
@@ -568,7 +497,7 @@ export default function BalanceSheetPage() {
           accountMap.set(account, {
             account,
             accountType,
-            allTransactions: [], // ALL transactions for this account
+            allTransactions: [],
             manualBalanceApplied: false,
           })
         }
@@ -586,10 +515,7 @@ export default function BalanceSheetPage() {
           accountType === "Accounts receivable (A/R)" ||
           accountType === "Other Current Assets" ||
           accountType === "Fixed Assets" ||
-          accountType === "Other Assets" ||
-          accountType === "Cost of Goods Sold" ||
-          accountType === "Expenses" ||
-          accountType === "Other Expense"
+          accountType === "Other Assets"
         ) {
           transactionImpact = debit - credit
         } 
@@ -599,20 +525,31 @@ export default function BalanceSheetPage() {
           accountType === "Credit Card" ||
           accountType === "Other Current Liabilities" ||
           accountType === "Long Term Liabilities" ||
-          accountType === "Equity" ||
+          accountType === "Equity"
+        ) {
+          transactionImpact = credit - debit
+        } 
+        // P&L ACCOUNTS: Track but don't show on balance sheet directly
+        else if (
           accountType === "Income" ||
           accountType === "Other Income"
         ) {
-          transactionImpact = credit - debit
-          console.log(`🔍 LIABILITY/EQUITY CALC: ${account} (${accountType}) - Debit: ${debit}, Credit: ${credit}, Impact: ${transactionImpact}`)
-        } 
+          transactionImpact = credit - debit // Income increases with credits
+        }
+        else if (
+          accountType === "Cost of Goods Sold" ||
+          accountType === "Expenses" ||
+          accountType === "Other Expense"
+        ) {
+          transactionImpact = debit - credit // Expenses increase with debits
+        }
         // DEFAULT: If unknown account type, log it and treat as asset
         else {
           transactionImpact = debit - credit
           console.log(`⚠️ UNKNOWN ACCOUNT TYPE IN CALC: ${account} (${accountType}) - Using debit - credit = ${transactionImpact}`)
         }
 
-        // Store ALL transactions - we'll classify them later for drill-down
+        // Store ALL transactions
         accountData.allTransactions.push({
           ...transaction,
           impact: transactionImpact,
@@ -626,7 +563,7 @@ export default function BalanceSheetPage() {
         )
       })
 
-      // CLASSIFICATION: Now calculate balances by classifying the transactions
+      // CLASSIFICATION: Calculate balances by classifying the transactions
       accountMap.forEach((accountData) => {
         let beginningBalance = 0
         let periodActivity = 0
@@ -651,18 +588,59 @@ export default function BalanceSheetPage() {
         accountData.beginningBalance = beginningBalance
         accountData.periodActivity = periodActivity
         accountData.endingBalance = endingBalance
+      })
 
-        // Debug logging for specific accounts
-        if (accountData.account.includes("Cerro Vista") || accountData.account.includes("Vista")) {
-          smartLog(`🔍 ${accountData.account} Classifications:`, {
-            totalTransactions: accountData.allTransactions.length,
-            beginningBalance: `${formatCurrency(beginningBalance)} (${accountData.allTransactions.filter(tx => parseDate(tx.date) < periodStart).length} txns)`,
-            periodActivity: `${formatCurrency(periodActivity)} (${accountData.allTransactions.filter(tx => parseDate(tx.date) >= periodStart).length} txns)`,
-            endingBalance: `${formatCurrency(endingBalance)} (all ${accountData.allTransactions.length} txns)`,
-            periodStart,
-          })
+      // Calculate P&L totals for Net Income calculation BEFORE categorization
+      let totalIncome = 0 // Renamed from totalRevenue for clarity
+      let totalOtherIncome = 0
+      let totalExpenses = 0
+      let totalOtherExpenses = 0
+
+      console.log(`💰 CALCULATING P&L TOTALS FOR NET INCOME`)
+
+      accountMap.forEach((accountData) => {
+        const accountType = accountData.accountType
+        const endingBalance = accountData.endingBalance
+
+        // INCOME ACCOUNTS: Credit balance is positive income
+        if (accountType === "Income") {
+          totalIncome += endingBalance
+          console.log(`📈 INCOME: ${accountData.account} = ${formatCurrency(endingBalance)}`)
+        }
+        else if (accountType === "Other Income") {
+          totalOtherIncome += endingBalance
+          console.log(`📈 OTHER INCOME: ${accountData.account} = ${formatCurrency(endingBalance)}`)
+        }
+        // EXPENSE ACCOUNTS: Debit balance is positive expense (but we need positive values for subtraction)
+        else if (accountType === "Cost of Goods Sold") {
+          totalExpenses += Math.abs(endingBalance) // Convert to positive for subtraction
+          console.log(`📉 COGS: ${accountData.account} = ${formatCurrency(Math.abs(endingBalance))}`)
+        }
+        else if (accountType === "Expenses") {
+          totalExpenses += Math.abs(endingBalance) // Convert to positive for subtraction
+          console.log(`📉 EXPENSES: ${accountData.account} = ${formatCurrency(Math.abs(endingBalance))}`)
+        }
+        else if (accountType === "Other Expense") {
+          totalOtherExpenses += Math.abs(endingBalance) // Convert to positive for subtraction
+          console.log(`📉 OTHER EXPENSE: ${accountData.account} = ${formatCurrency(Math.abs(endingBalance))}`)
         }
       })
+
+      console.log(`💰 P&L TOTALS SUMMARY:`)
+      console.log(`   Total Income: ${formatCurrency(totalIncome)}`)
+      console.log(`   Total Other Income: ${formatCurrency(totalOtherIncome)}`)
+      console.log(`   Total Expenses: ${formatCurrency(totalExpenses)}`)
+      console.log(`   Total Other Expenses: ${formatCurrency(totalOtherExpenses)}`)
+
+      // Now calculate Net Income
+      const netIncome = totalIncome + totalOtherIncome - totalExpenses - totalOtherExpenses
+
+      console.log(`💰 NET INCOME CALCULATION:`)
+      console.log(`   Income: ${formatCurrency(totalIncome)}`)
+      console.log(`   Other Income: ${formatCurrency(totalOtherIncome)}`)
+      console.log(`   Expenses: ${formatCurrency(totalExpenses)}`)
+      console.log(`   Other Expenses: ${formatCurrency(totalOtherExpenses)}`)
+      console.log(`   Net Income: ${formatCurrency(netIncome)}`)
 
       smartLog(`✅ Processed ${accountMap.size} accounts with transaction classifications`)
 
@@ -670,10 +648,9 @@ export default function BalanceSheetPage() {
       const assetAccounts: BalanceSheetAccount[] = []
       const liabilityAccounts: BalanceSheetAccount[] = []
       const equityAccounts: BalanceSheetAccount[] = []
-      const uncategorizedAccounts: BalanceSheetAccount[] = []
 
       accountMap.forEach((accountData) => {
-        const accountType = accountData.accountType // Keep original case for exact matching
+        const accountType = accountData.accountType
         
         // Only include accounts with non-zero balances or activity
         if (Math.abs(accountData.endingBalance) > 0.01 || Math.abs(accountData.periodActivity) > 0.01) {
@@ -686,7 +663,7 @@ export default function BalanceSheetPage() {
             transactions: accountData.allTransactions,
           }
 
-          // ASSETS: Use exact QuickBooks account types
+          // ASSETS
           if (
             accountType === "Bank" ||
             accountType === "Accounts receivable (A/R)" ||
@@ -695,9 +672,8 @@ export default function BalanceSheetPage() {
             accountType === "Other Assets"
           ) {
             assetAccounts.push(balanceSheetAccount)
-            console.log(`✅ ASSET: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
           } 
-          // LIABILITIES: Use exact QuickBooks account types
+          // LIABILITIES
           else if (
             accountType === "Accounts payable (A/P)" ||
             accountType === "Credit Card" ||
@@ -705,14 +681,10 @@ export default function BalanceSheetPage() {
             accountType === "Long Term Liabilities"
           ) {
             liabilityAccounts.push(balanceSheetAccount)
-            console.log(`✅ LIABILITY: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
           } 
-          // EQUITY: Use exact QuickBooks account types
-          else if (
-            accountType === "Equity"
-          ) {
+          // EQUITY
+          else if (accountType === "Equity") {
             equityAccounts.push(balanceSheetAccount)
-            console.log(`✅ EQUITY: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
           } 
           // P&L ACCOUNTS: Don't show on balance sheet, but note them
           else if (
@@ -722,26 +694,10 @@ export default function BalanceSheetPage() {
             accountType === "Other Income" ||
             accountType === "Other Expense"
           ) {
-            // These are P&L accounts - they don't appear on the balance sheet
             console.log(`📊 P&L ACCOUNT (not shown): ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
-          }
-          // TRULY UNCATEGORIZED
-          else {
-            uncategorizedAccounts.push(balanceSheetAccount)
-            console.log(`❓ UNKNOWN ACCOUNT TYPE: ${accountData.account} (${accountType}) - Balance: ${formatCurrency(accountData.endingBalance)}`)
           }
         }
       })
-
-      // Calculate Net Income for the period
-      const netIncome = totalRevenue + totalOtherIncome - totalExpenses - totalOtherExpenses
-      
-      console.log(`📊 NET INCOME CALCULATION:`)
-      console.log(`   Revenue: ${formatCurrency(totalRevenue)}`)
-      console.log(`   Other Income: ${formatCurrency(totalOtherIncome)}`)
-      console.log(`   Expenses: ${formatCurrency(totalExpenses)}`)
-      console.log(`   Other Expenses: ${formatCurrency(totalOtherExpenses)}`)
-      console.log(`   Net Income: ${formatCurrency(netIncome)}`)
 
       // Add Net Income to Equity if significant
       if (Math.abs(netIncome) > 0.01) {
@@ -771,56 +727,7 @@ export default function BalanceSheetPage() {
         equityAccounts.push(netIncomeAccount)
       }
 
-      // Add Retained Earnings account if this is not a YTD period
-      // (For YTD, all prior year income is already in retained earnings)
-      if (timePeriod !== "YTD") {
-        // You can manually set this or calculate it from prior periods
-        // For now, we'll add it as a placeholder that you can update
-        const retainedEarningsBalance = 0 // TODO: Calculate from prior year net income
-        
-        if (Math.abs(retainedEarningsBalance) > 0.01) {
-          const retainedEarningsAccount: BalanceSheetAccount = {
-            account: "Retained Earnings",
-            accountType: "Equity",
-            balance: retainedEarningsBalance,
-            beginningBalance: retainedEarningsBalance,
-            periodActivity: 0, // Retained earnings doesn't change during the period
-            transactions: [{
-              date: calculatePeriodStart(),
-              payeeCustomer: "System Calculated",
-              memo: "Prior period retained earnings",
-              class: "All Properties",
-              amount: retainedEarningsBalance,
-              account: "Retained Earnings",
-              debit: retainedEarningsBalance > 0 ? 0 : Math.abs(retainedEarningsBalance),
-              credit: retainedEarningsBalance > 0 ? retainedEarningsBalance : 0,
-              impact: retainedEarningsBalance,
-              entryNumber: "AUTO-RETAINED-EARNINGS",
-              accountType: "Equity"
-            }]
-          }
-          
-          equityAccounts.push(retainedEarningsAccount)
-          console.log(`✅ RETAINED EARNINGS: ${formatCurrency(retainedEarningsBalance)} added to equity`)
-        }
-      }
-
-      // Log summary of categorization
-      console.log(`📊 BALANCE SHEET CATEGORIZATION:`)
-      console.log(`   Assets: ${assetAccounts.length} accounts`)
-      console.log(`   Liabilities: ${liabilityAccounts.length} accounts`)
-      console.log(`   Equity: ${equityAccounts.length} accounts`)
-      console.log(`   Uncategorized: ${uncategorizedAccounts.length} accounts`)
-      
-      // If there are uncategorized accounts, log them for manual review
-      if (uncategorizedAccounts.length > 0) {
-        console.log(`❗ UNCATEGORIZED ACCOUNTS:`)
-        uncategorizedAccounts.forEach(acc => {
-          console.log(`   - ${acc.account} (${acc.accountType}): ${formatCurrency(acc.balance)}`)
-        })
-      }
-
-      // Sort accounts with proper parent/sub-account hierarchy and account type order
+      // Sort accounts with proper hierarchy
       const sortedAssets = sortAccountsWithHierarchy(assetAccounts, assetTypeOrder)
       const sortedLiabilities = sortAccountsWithHierarchy(liabilityAccounts, liabilityTypeOrder)
       const sortedEquity = sortAccountsWithHierarchy(equityAccounts, ["Equity"])
