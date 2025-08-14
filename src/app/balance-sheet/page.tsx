@@ -437,6 +437,65 @@ export default function BalanceSheetPage() {
         })
       }
 
+      // Apply beginning balances saved in localStorage
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("beginningBalances")
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved) as {
+              date: string
+              balances: { account: string; balance: number }[]
+            }
+            const savedDate = parseDate(parsed.date)
+            if (savedDate !== "N/A") {
+              parsed.balances.forEach((b) => {
+                const acc = accountMap.get(b.account)
+                if (!acc) return
+
+                const computedBalanceAtSavedDate = acc.allTransactions
+                  .filter((tx: any) => {
+                    const txDate = parseDate(tx.date)
+                    return txDate !== "N/A" && txDate <= savedDate
+                  })
+                  .reduce((sum: number, tx: any) => sum + tx.impact, 0)
+
+                const delta = b.balance - computedBalanceAtSavedDate
+                if (Math.abs(delta) < 0.01) return
+
+                acc.balance += delta
+                if (savedDate < periodStart) {
+                  acc.beginningBalance += delta
+                } else {
+                  acc.periodActivity += delta
+                }
+
+                const beginningEntry = {
+                  date: savedDate,
+                  account: b.account,
+                  memo: "Beginning Balance",
+                  debit: delta > 0 ? delta : 0,
+                  credit: delta < 0 ? -delta : 0,
+                  impact: delta,
+                }
+
+                acc.allTransactions.push(beginningEntry)
+                if (savedDate >= periodStart) {
+                  acc.periodTransactions.push(beginningEntry)
+                }
+
+                acc.allTransactions.sort((a, b) =>
+                  parseDate(a.date).localeCompare(parseDate(b.date)),
+                )
+
+                acc.beginningBalance = acc.balance - acc.periodActivity
+              })
+            }
+          } catch (e) {
+            smartLog("❌ Error parsing local beginning balances", e)
+          }
+        }
+      }
+
       smartLog(`🎯 Processed accounts`, Array.from(accountMap.keys()))
 
       // Categorize accounts

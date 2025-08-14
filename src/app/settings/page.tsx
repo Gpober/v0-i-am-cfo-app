@@ -1,15 +1,19 @@
 "use client"
 
 import { useState } from "react"
+import Papa from "papaparse"
 
 interface ManualBalance {
   account: string
   balance: string
 }
 
-interface ParsedBalance {
-  account: string
-  balance: number
+// Map common account labels from CSVs to standardized account names
+const accountMappings: Record<string, string> = {
+  cash: "Cash",
+  "accounts receivable": "Accounts Receivable",
+  "accounts payable": "Accounts Payable",
+  inventory: "Inventory",
 }
 
 export default function SettingsPage() {
@@ -17,7 +21,6 @@ export default function SettingsPage() {
   const [balances, setBalances] = useState<ManualBalance[]>([
     { account: "", balance: "" },
   ])
-  const [parsedBalances, setParsedBalances] = useState<ParsedBalance[]>([])
 
   const handleBalanceChange = (
     index: number,
@@ -38,42 +41,38 @@ export default function SettingsPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore: pdfjs-dist legacy build lacks type definitions
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf")
-    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
-
-    const buffer = await file.arrayBuffer()
-    const pdf = await pdfjs.getDocument({ data: buffer }).promise
-    let text = ""
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i)
-      const content = await page.getTextContent()
-      text +=
-        content.items
-          .map((item: { str: string }) => item.str)
-          .join(" ") + "\n"
-    }
-    const lines = text.split(/\r?\n/)
-    const entries: ParsedBalance[] = []
-    lines.forEach((line) => {
-      const match = line.match(/(.+?)\s+(-?\$?[0-9,.,\-]+)/)
-      if (match) {
-        const account = match[1].trim()
-        const amt = parseFloat(match[2].replace(/[^0-9.-]/g, ""))
-        if (!isNaN(amt)) entries.push({ account, balance: amt })
-      }
+    const text = await file.text()
+    const parsed = Papa.parse(text, {
+      skipEmptyLines: true,
     })
-    setParsedBalances(entries)
+
+    const entries: ManualBalance[] = []
+    parsed.data.forEach((row: any) => {
+      const [rawAccount, rawAmount] = row
+      if (!rawAccount || !rawAmount) return
+
+      const cleanAccount = rawAccount.toString().replace(/^"|"$/g, "").trim()
+      const mapped =
+        accountMappings[cleanAccount.toLowerCase()] || cleanAccount
+
+      const amountStr = rawAmount.toString().replace(/[$,()"\s]/g, "")
+      let amt = parseFloat(amountStr)
+      if (rawAmount.toString().includes("(") && rawAmount.toString().includes(")"))
+        amt *= -1
+
+      if (!isNaN(amt)) entries.push({ account: mapped, balance: amt.toString() })
+    })
+
+    if (!entries.length) alert("No balances found in uploaded CSV.")
+    setBalances(entries.length ? entries : [{ account: "", balance: "" }])
   }
 
   const handleSave = () => {
     const data = {
       date,
-      balances: [
-        ...balances.filter((b) => b.account && b.balance),
-        ...parsedBalances,
-      ].map((b) => ({ account: b.account, balance: Number(b.balance) })),
+      balances: balances
+        .filter((b) => b.account && b.balance)
+        .map((b) => ({ account: b.account, balance: Number(b.balance) })),
     }
     if (typeof window !== "undefined") {
       localStorage.setItem("beginningBalances", JSON.stringify(data))
@@ -99,7 +98,7 @@ export default function SettingsPage() {
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-2">Manual Beginning Balances</h2>
+        <h2 className="text-xl font-semibold mb-2">Beginning Balances</h2>
         {balances.map((row, idx) => (
           <div key={idx} className="flex space-x-2 mb-2">
             <input
@@ -127,20 +126,12 @@ export default function SettingsPage() {
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet PDF</h2>
-        <input type="file" accept="application/pdf" onChange={handleFileUpload} />
-        {parsedBalances.length > 0 && (
-          <div className="mt-4">
-            <h3 className="font-medium">Parsed Accounts</h3>
-            <ul className="list-disc pl-5">
-              {parsedBalances.map((b, i) => (
-                <li key={i}>
-                  {b.account}: {b.balance.toLocaleString(undefined, { style: "currency", currency: "USD" })}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet CSV</h2>
+        <input
+          type="file"
+          accept="text/csv,application/vnd.ms-excel"
+          onChange={handleFileUpload}
+        />
       </div>
 
       <button
