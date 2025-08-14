@@ -404,8 +404,37 @@ export default function BalanceSheetPage() {
 
         const accountTypeLower = accountType.toLowerCase()
         
-        // ASSETS AND EXPENSES: DEBIT - CREDIT (Debit increases, Credit decreases)
+        // LIABILITIES AND EQUITY: CREDIT - DEBIT (Credit increases, Debit decreases)
         if (
+          accountTypeLower.includes("liability") ||
+          accountTypeLower.includes("liabilities") ||
+          accountTypeLower.includes("payable") ||
+          accountTypeLower.includes("payables") ||
+          accountTypeLower.includes("credit card") ||
+          accountTypeLower.includes("loan") ||
+          accountTypeLower.includes("loans") ||
+          accountTypeLower.includes("mortgage") ||
+          accountTypeLower.includes("line of credit") ||
+          accountTypeLower.includes("debt") ||
+          accountTypeLower.includes("note payable") ||
+          accountTypeLower.includes("accrued") ||
+          accountTypeLower.includes("equity") ||
+          accountTypeLower.includes("retained earnings") ||
+          accountTypeLower.includes("revenue") ||
+          accountTypeLower.includes("income") ||
+          accountTypeLower.includes("capital") ||
+          accountTypeLower.includes("member") ||
+          accountTypeLower.includes("owner")
+        ) {
+          transactionImpact = credit - debit  // LIABILITIES/EQUITY: Credit increases balance
+          
+          // Debug logging for liability accounts
+          if (accountTypeLower.includes("liability") || accountTypeLower.includes("payable") || accountTypeLower.includes("loan")) {
+            console.log(`🔍 LIABILITY CALC: ${account} (${accountType}) - Debit: ${debit}, Credit: ${credit}, Impact: ${transactionImpact}`)
+          }
+        } 
+        // ASSETS AND EXPENSES: DEBIT - CREDIT (Debit increases, Credit decreases)
+        else if (
           accountTypeLower.includes("asset") ||
           accountTypeLower.includes("expense") ||
           accountTypeLower.includes("cost") ||
@@ -419,24 +448,26 @@ export default function BalanceSheetPage() {
         ) {
           transactionImpact = debit - credit  // ASSETS: Debit increases balance
         } 
-        // LIABILITIES AND EQUITY: CREDIT - DEBIT (Credit increases, Debit decreases)
-        else if (
-          accountTypeLower.includes("liability") ||
-          accountTypeLower.includes("payable") ||
-          accountTypeLower.includes("credit card") ||
-          accountTypeLower.includes("loan") ||
-          accountTypeLower.includes("mortgage") ||
-          accountTypeLower.includes("line of credit") ||
-          accountTypeLower.includes("equity") ||
-          accountTypeLower.includes("retained earnings") ||
-          accountTypeLower.includes("revenue") ||
-          accountTypeLower.includes("income")
-        ) {
-          transactionImpact = credit - debit  // LIABILITIES/EQUITY: Credit increases balance
-        } 
-        // DEFAULT: Treat unknown accounts as assets (DEBIT - CREDIT)
+        // DEFAULT: Check if it might be a liability by account name
         else {
-          transactionImpact = debit - credit
+          // If account name suggests liability, use credit - debit
+          const accountNameLower = account.toLowerCase()
+          if (
+            accountNameLower.includes("payable") ||
+            accountNameLower.includes("loan") ||
+            accountNameLower.includes("debt") ||
+            accountNameLower.includes("liability") ||
+            accountNameLower.includes("mortgage") ||
+            accountNameLower.includes("credit card") ||
+            accountNameLower.includes("line of credit")
+          ) {
+            transactionImpact = credit - debit
+            console.log(`🔍 LIABILITY BY NAME: ${account} (${accountType}) - Using credit - debit = ${transactionImpact}`)
+          } else {
+            // Default to asset treatment
+            transactionImpact = debit - credit
+            console.log(`🔍 DEFAULT ASSET: ${account} (${accountType}) - Using debit - credit = ${transactionImpact}`)
+          }
         }
 
         // Store ALL transactions - we'll classify them later for drill-down
@@ -1111,11 +1142,12 @@ export default function BalanceSheetPage() {
         </div>
       </main>
 
-      {/* Transaction Detail Modal */}
+      {/* Transaction Detail Modal - Fixed Sizing */}
       {showTransactionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-4 sm:p-6 border-b border-gray-200">
+          <div className="bg-white rounded-lg w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
+            {/* Fixed Header */}
+            <div className="flex-shrink-0 p-4 sm:p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900">{modalTitle}</h3>
@@ -1188,7 +1220,8 @@ export default function BalanceSheetPage() {
               )}
             </div>
 
-            <div className="p-3 sm:p-6 overflow-auto max-h-[70vh]">
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-auto p-3 sm:p-6">
               {/* Mobile: Card List */}
               <div className="sm:hidden space-y-3">
                 {transactionDetails.map((transaction, index) => (
@@ -1225,7 +1258,7 @@ export default function BalanceSheetPage() {
               {/* Desktop: Table */}
               <div className="hidden sm:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 sticky top-0">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date
