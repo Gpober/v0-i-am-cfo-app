@@ -37,6 +37,8 @@ interface PropertySummary {
   netIncome?: number;
   operating?: number;
   financing?: number;
+  investing?: number; // NEW: Add investing
+  transfers?: number; // NEW: Add transfers
 }
 
 interface Category {
@@ -66,10 +68,59 @@ interface JournalRow {
   customer?: string | null;
   vendor?: string | null;
   name?: string | null;
+  entry_bank_account?: string | null; // NEW: Add bank account field
 }
 
 const getMonthName = (m: number) =>
   new Date(0, m - 1).toLocaleString("en-US", { month: "long" });
+
+// TIMEZONE-INDEPENDENT DATE UTILITIES (from P&L component)
+// Extract date parts directly from string without timezone conversion
+const getDateParts = (dateString: string) => {
+  const dateOnly = dateString.split("T")[0]; // Get YYYY-MM-DD part only
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  return { year, month, day, dateOnly };
+};
+
+// Get month name from date string without timezone issues
+const getMonthYear = (dateString: string) => {
+  const { year, month } = getDateParts(dateString);
+  const monthNames = [
+    "January",
+    "February", 
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  return `${monthNames[month - 1]} ${year}`;
+};
+
+// Compare dates as strings (YYYY-MM-DD format)
+const isDateInRange = (
+  dateString: string,
+  startDate: string,
+  endDate: string,
+): boolean => {
+  const { dateOnly } = getDateParts(dateString);
+  return dateOnly >= startDate && dateOnly <= endDate;
+};
+
+// Format date for display without timezone conversion
+const formatDateDisplay = (dateString: string) => {
+  const { year, month, day } = getDateParts(dateString);
+  const monthNames = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  return `${monthNames[month - 1]} ${day}, ${year}`;
+};
 
 type Insight = {
   title: string;
@@ -77,27 +128,6 @@ type Insight = {
   icon: LucideIcon;
   type: "success" | "warning" | "info";
 };
-
-const insights: Insight[] = [
-  {
-    title: "Revenue trending up",
-    message: "Revenue increased compared to last period.",
-    icon: TrendingUp,
-    type: "success",
-  },
-  {
-    title: "Expense spike detected",
-    message: "Expenses rose faster than revenue this period.",
-    icon: AlertTriangle,
-    type: "warning",
-  },
-  {
-    title: "Stable cash position",
-    message: "Cash flow remains steady.",
-    icon: CheckCircle,
-    type: "info",
-  },
-];
 
 export default function EnhancedMobileDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -116,15 +146,22 @@ export default function EnhancedMobileDashboard() {
     revenue: [],
     expenses: [],
   });
+  // ENHANCED: Add investing and transfers to cash flow data
   const [cfData, setCfData] = useState<{
     operating: Category[];
     financing: Category[];
+    investing: Category[];
+    transfers: Category[];
   }>({
     operating: [],
     financing: [],
+    investing: [],
+    transfers: [],
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // NEW: Add transfer toggle
+  const [includeTransfers, setIncludeTransfers] = useState(false);
 
   const transactionTotal = useMemo(
     () => transactions.reduce((sum, t) => sum + t.amount, 0),
@@ -137,147 +174,576 @@ export default function EnhancedMobileDashboard() {
     return { revenue, expenses, net: revenue - expenses };
   }, [plData]);
 
+  // ENHANCED: Update cash flow totals to include all categories
   const cfTotals = useMemo(() => {
     const operating = cfData.operating.reduce((sum, c) => sum + c.total, 0);
     const financing = cfData.financing.reduce((sum, c) => sum + c.total, 0);
-    return { operating, financing, net: operating + financing };
-  }, [cfData]);
+    const investing = cfData.investing.reduce((sum, c) => sum + c.total, 0);
+    const transfers = cfData.transfers.reduce((sum, c) => sum + c.total, 0);
+    
+    // Net calculation depends on whether transfers are included
+    const net = includeTransfers 
+      ? operating + financing + investing + transfers
+      : operating + financing + investing;
+      
+    return { operating, financing, investing, transfers, net };
+  }, [cfData, includeTransfers]);
 
-  const classifyTransaction = (
-    accountType: string | null,
-    reportCategory: string | null,
+  // ENHANCED: P&L Classification using account_type field (EXACT copy from P&L component)
+  const classifyPLAccount = (
+    accountType: string,
+    accountName: string, 
+    reportCategory: string,
   ) => {
     const typeLower = accountType?.toLowerCase() || "";
-    if (reportCategory === "transfer") return "transfer";
-    if (
+    const nameLower = accountName?.toLowerCase() || "";
+    const categoryLower = reportCategory?.toLowerCase() || "";
+
+    // Exclude transfers and cash accounts first
+    const isTransfer =
+      categoryLower === "transfer" || nameLower.includes("transfer");
+    const isCashAccount =
+      typeLower.includes("bank") ||
+      typeLower.includes("cash") ||
+      nameLower.includes("checking") ||
+      nameLower.includes("savings") ||
+      nameLower.includes("cash");
+
+    if (isCashAccount || isTransfer) return null;
+
+    // INCOME ACCOUNTS - Based on account_type
+    const isIncomeAccount =
       typeLower === "income" ||
       typeLower === "other income" ||
-      typeLower === "expenses" ||
+      typeLower.includes("income") ||
+      typeLower.includes("revenue");
+
+    // EXPENSE ACCOUNTS - Based on account_type  
+    const isExpenseAccount =
       typeLower === "expense" ||
+      typeLower === "other expense" ||
       typeLower === "cost of goods sold" ||
-      typeLower === "accounts receivable" ||
-      typeLower === "accounts payable"
-    )
-      return "operating";
-    if (
-      typeLower === "fixed assets" ||
-      typeLower === "other assets" ||
-      typeLower === "property, plant & equipment"
-    )
-      return "investing";
-    if (
-      typeLower === "long term liabilities" ||
-      typeLower === "equity" ||
-      typeLower === "credit card" ||
-      typeLower === "other current liabilities" ||
-      typeLower === "line of credit"
-    )
-      return "financing";
-    return "other";
+      typeLower.includes("expense");
+
+    if (isIncomeAccount) return "INCOME";
+    if (isExpenseAccount) return "EXPENSES";
+
+    return null; // Not a P&L account (likely Balance Sheet account)
   };
 
-  const getDateRange = useCallback(() => {
-    const y = year;
-    const m = month;
+  // ENHANCED: Calculate date range using TIMEZONE-INDEPENDENT logic (from P&L component)
+  const calculateDateRange = useCallback(() => {
+    let startDate: string;
+    let endDate: string;
+
     if (reportPeriod === "Custom" && customStart && customEnd) {
-      return { start: customStart, end: customEnd };
+      startDate = customStart;
+      endDate = customEnd;
+    } else if (reportPeriod === "YTD") {
+      const monthIndex = month - 1; // Convert to 0-based
+      startDate = `${year}-01-01`;
+      
+      // Calculate last day of selected month without Date object
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+      
+      // Handle leap year for February
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
+      }
+      
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else if (reportPeriod === "Monthly") {
+      const monthIndex = month - 1; // Convert to 0-based
+      startDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+      
+      // Calculate last day of month without Date object to avoid timezone issues
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+      
+      // Handle leap year for February
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
+      }
+      
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else if (reportPeriod === "Quarterly") {
+      const monthIndex = month - 1; // Convert to 0-based
+      const quarter = Math.floor(monthIndex / 3);
+      const quarterStartMonth = quarter * 3;
+      startDate = `${year}-${String(quarterStartMonth + 1).padStart(2, "0")}-01`;
+      
+      const quarterEndMonth = quarterStartMonth + 2;
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[quarterEndMonth];
+      
+      // Handle leap year for February
+      if (
+        quarterEndMonth === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
+      }
+      
+      endDate = `${year}-${String(quarterEndMonth + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else if (reportPeriod === "Trailing 12") {
+      const monthIndex = month - 1; // Convert to 0-based
+      
+      // Start date is 11 months before the selected month  
+      let startYear = year;
+      let startMonth = monthIndex + 1 - 11;
+      if (startMonth <= 0) {
+        startMonth += 12;
+        startYear -= 1;
+      }
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
+      
+      // End date is the last day of the selected month
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[monthIndex];
+      if (
+        monthIndex === 1 &&
+        ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0)
+      ) {
+        lastDay = 29;
+      }
+      endDate = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else {
+      // Fallback: use current date for trailing 12
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      let startYear = currentYear;
+      let startMonth = currentMonth - 12;
+      if (startMonth <= 0) {
+        startMonth += 12;
+        startYear -= 1;
+      }
+      startDate = `${startYear}-${String(startMonth).padStart(2, "0")}-01`;
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let lastDay = daysInMonth[currentMonth - 1];
+      if (
+        currentMonth === 2 &&
+        ((currentYear % 4 === 0 && currentYear % 100 !== 0) ||
+          currentYear % 400 === 0)
+      ) {
+        lastDay = 29;
+      }
+      endDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     }
-    if (reportPeriod === "Monthly") {
-      const startDate = new Date(y, m - 1, 1);
-      const endDate = new Date(y, m, 0);
-      return {
-        start: startDate.toISOString().split("T")[0],
-        end: endDate.toISOString().split("T")[0],
-      };
-    }
-    if (reportPeriod === "Quarterly") {
-      const qStart = Math.floor((m - 1) / 3) * 3;
-      const startDate = new Date(y, qStart, 1);
-      const endDate = new Date(y, qStart + 3, 0);
-      return {
-        start: startDate.toISOString().split("T")[0],
-        end: endDate.toISOString().split("T")[0],
-      };
-    }
-    if (reportPeriod === "Year to Date") {
-      const startDate = new Date(y, 0, 1);
-      const endDate = new Date(y, m, 0);
-      return {
-        start: startDate.toISOString().split("T")[0],
-        end: endDate.toISOString().split("T")[0],
-      };
-    }
-    if (reportPeriod === "Trailing 12") {
-      const endDate = new Date(y, m, 0);
-      const startDate = new Date(endDate);
-      startDate.setMonth(startDate.getMonth() - 11);
-      startDate.setDate(1);
-      return {
-        start: startDate.toISOString().split("T")[0],
-        end: endDate.toISOString().split("T")[0],
-      };
-    }
-    return { start: `${y}-01-01`, end: `${y}-12-31` };
+
+    return { start: startDate, end: endDate };
   }, [reportPeriod, month, year, customStart, customEnd]);
 
+  // ENHANCED: Use P&L data loading logic with timezone-independent date handling
   useEffect(() => {
     const load = async () => {
-      const { start, end } = getDateRange();
-      const query = supabase
+      const { start, end } = calculateDateRange();
+      
+      console.log(`🔍 MOBILE P&L/CF DATA FETCH - Using P&L calculation logic`);
+      console.log(`📅 Period: ${start} to ${end}`);
+      
+      // ENHANCED QUERY: Use the same query structure as P&L component
+      let query = supabase
         .from("journal_entry_lines")
         .select(
-          "account_type, report_category, normal_balance, debit, credit, class, date",
+          `entry_number, class, date, account, account_type, debit, credit, memo, 
+           customer, vendor, name, entry_bank_account, normal_balance, report_category,
+           is_cash_account, detail_type, account_behavior`
         )
         .gte("date", start)
-        .lte("date", end);
-      const { data } = await query;
+        .lte("date", end)
+        .order("date", { ascending: true });
+
+      const { data: allTransactions, error } = await query;
+      if (error) throw error;
+
+      console.log(`📊 Fetched ${allTransactions.length} total transactions`);
+
+      // Filter transactions using TIMEZONE-INDEPENDENT date comparison
+      const filteredTransactions = allTransactions.filter((tx) => {
+        return isDateInRange(tx.date, start, end);
+      });
+
+      console.log(`📅 After timezone-independent filtering: ${filteredTransactions.length} transactions`);
+
       const map: Record<string, PropertySummary> = {};
-      ((data as JournalRow[]) || []).forEach((row) => {
-        const cls = row.class || "General";
-        if (!map[cls]) {
-          map[cls] = { name: cls, revenue: 0, expenses: 0, netIncome: 0, operating: 0, financing: 0 };
-        }
-        const debit = Number(row.debit) || 0;
-        const credit = Number(row.credit) || 0;
-        if (reportType === "pl") {
-          const t = (row.account_type || "").toLowerCase();
-          if (t.includes("income") || t.includes("revenue")) {
-            map[cls].revenue = (map[cls].revenue || 0) + (credit - debit);
-            map[cls].netIncome = (map[cls].netIncome || 0) + (credit - debit);
-          } else if (t.includes("expense") || t.includes("cogs")) {
-            const amt = debit - credit;
-            map[cls].expenses = (map[cls].expenses || 0) + amt;
-            map[cls].netIncome = (map[cls].netIncome || 0) - amt;
-          }
-        } else {
-          const amount =
-            row.report_category === "transfer" ? debit - credit : credit - debit;
-          const classification = classifyTransaction(
-            row.account_type,
-            row.report_category,
+      
+      if (reportType === "pl") {
+        // P&L LOGIC: Filter for P&L accounts using enhanced classification
+        const plTransactions = filteredTransactions.filter((tx) => {
+          const classification = classifyPLAccount(
+            tx.account_type,
+            tx.account,
+            tx.report_category,
           );
+          return classification !== null;
+        });
+
+        console.log(`📈 Filtered to ${plTransactions.length} P&L transactions`);
+
+        // Process P&L transactions using ENHANCED logic (from P&L component)
+        const accountGroups = new Map<string, any[]>();
+        
+        plTransactions.forEach((tx) => {
+          const cls = tx.class || "General";
+          if (!map[cls]) {
+            map[cls] = { 
+              name: cls, 
+              revenue: 0, 
+              expenses: 0, 
+              netIncome: 0, 
+              operating: 0, 
+              financing: 0,
+              investing: 0,
+              transfers: 0
+            };
+          }
+
+          // Parse debit and credit values more carefully (like P&L component)
+          const debitValue = tx.debit 
+            ? parseFloat(tx.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+            : 0;
+          const creditValue = tx.credit 
+            ? parseFloat(tx.credit.toString().replace(/[^0-9.-]/g, "")) || 0  
+            : 0;
+
+          // Determine category and amount using ENHANCED classification
+          const classification = classifyPLAccount(
+            tx.account_type,
+            tx.account,
+            tx.report_category,
+          );
+
+          let amount: number;
+          if (classification === "INCOME") {
+            // For income accounts: Credits increase income, debits decrease income
+            amount = creditValue - debitValue;
+            map[cls].revenue = (map[cls].revenue || 0) + amount;
+            map[cls].netIncome = (map[cls].netIncome || 0) + amount;
+          } else if (classification === "EXPENSES") {
+            // For expense accounts: Debits increase expenses, credits decrease expenses  
+            amount = debitValue - creditValue;
+            map[cls].expenses = (map[cls].expenses || 0) + amount;
+            map[cls].netIncome = (map[cls].netIncome || 0) - amount;
+          }
+        });
+
+      } else {
+        // CASH FLOW LOGIC: Use enhanced cash flow filtering
+        let cashFlowTransactions = filteredTransactions;
+        
+        // Enhanced cash flow filtering (from cash flow component)
+        if (includeTransfers) {
+          // Include both non-cash transactions AND transfers
+          cashFlowTransactions = filteredTransactions.filter(tx => 
+            tx.entry_bank_account && (tx.is_cash_account === false || tx.report_category === "transfer")
+          );
+        } else {
+          // Only non-cash transactions, no transfers
+          cashFlowTransactions = filteredTransactions.filter(tx => 
+            tx.entry_bank_account && tx.is_cash_account === false && tx.report_category !== "transfer"
+          );
+        }
+
+        console.log(`💰 Filtered to ${cashFlowTransactions.length} cash flow transactions`);
+
+        cashFlowTransactions.forEach((tx) => {
+          const cls = tx.class || "General";
+          if (!map[cls]) {
+            map[cls] = { 
+              name: cls, 
+              revenue: 0, 
+              expenses: 0, 
+              netIncome: 0, 
+              operating: 0, 
+              financing: 0,
+              investing: 0,
+              transfers: 0
+            };
+          }
+
+          const debitValue = tx.debit 
+            ? parseFloat(tx.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+            : 0;
+          const creditValue = tx.credit 
+            ? parseFloat(tx.credit.toString().replace(/[^0-9.-]/g, "")) || 0
+            : 0;
+
+          // Enhanced cash flow impact calculation
+          const amount = tx.report_category === "transfer" 
+            ? debitValue - creditValue  // Reverse for transfers
+            : parseFloat(tx.normal_balance?.toString() || "0") || (creditValue - debitValue); // Normal for others
+
+          // Enhanced cash flow classification
+          const classification = (() => {
+            if (includeTransfers && tx.report_category === "transfer") return "transfer";
+            
+            const typeLower = tx.account_type?.toLowerCase() || "";
+            if (
+              typeLower === "income" || typeLower === "other income" ||
+              typeLower === "expenses" || typeLower === "expense" ||
+              typeLower === "cost of goods sold" || typeLower === "accounts receivable" ||
+              typeLower === "accounts payable"
+            ) return "operating";
+            
+            if (
+              typeLower === "fixed assets" || typeLower === "other assets" ||
+              typeLower === "property, plant & equipment"
+            ) return "investing";
+            
+            if (
+              typeLower === "long term liabilities" || typeLower === "equity" ||
+              typeLower === "credit card" || typeLower === "other current liabilities" ||
+              typeLower === "line of credit"
+            ) return "financing";
+            
+            return "other";
+          })();
+
           if (classification === "operating") {
             map[cls].operating = (map[cls].operating || 0) + amount;
           } else if (classification === "financing") {
             map[cls].financing = (map[cls].financing || 0) + amount;
+          } else if (classification === "investing") {
+            map[cls].investing = (map[cls].investing || 0) + amount;
+          } else if (classification === "transfer") {
+            map[cls].transfers = (map[cls].transfers || 0) + amount;
           }
-        }
-      });
+        });
+      }
+
+      // Filter properties with activity using same logic as P&L component
       const list = Object.values(map).filter((p) => {
         return reportType === "pl"
           ? (p.revenue || 0) !== 0 || (p.expenses || 0) !== 0 || (p.netIncome || 0) !== 0
-          : (p.operating || 0) !== 0 || (p.financing || 0) !== 0;
+          : (p.operating || 0) !== 0 || (p.financing || 0) !== 0 || (p.investing || 0) !== 0 || (p.transfers || 0) !== 0;
       });
+
       const finalList =
         map["General"] && !list.find((p) => p.name === "General")
           ? [...list, map["General"]]
           : list;
       setProperties(finalList);
+
+      console.log(`✅ Processed ${finalList.length} properties using P&L calculation logic`);
     };
     load();
-  }, [reportType, reportPeriod, month, year, customStart, customEnd, getDateRange]);
+  }, [reportType, reportPeriod, month, year, customStart, customEnd, includeTransfers, calculateDateRange]);
 
-  const revenueKing = useMemo(() => {
+  // ENHANCED: Generate real AI insights based on actual data
+  const insights = useMemo((): Insight[] => {
+    const realInsights: Insight[] = [];
+    
+    if (properties.length === 0) {
+      return [{
+        title: "No data available",
+        message: "No financial data found for the selected period.",
+        icon: AlertTriangle,
+        type: "warning"
+      }];
+    }
+
+    if (reportType === "pl") {
+      // P&L Insights
+      const totalRevenue = companyTotals.revenue;
+      const totalExpenses = companyTotals.expenses;
+      const netIncome = companyTotals.net;
+      const margin = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0;
+      
+      // Revenue insights
+      if (totalRevenue > 100000) {
+        realInsights.push({
+          title: "Strong revenue performance",
+          message: `Generated ${formatCompactCurrency(totalRevenue)} in total revenue across ${properties.length} properties.`,
+          icon: TrendingUp,
+          type: "success"
+        });
+      } else if (totalRevenue > 0) {
+        realInsights.push({
+          title: "Revenue opportunities exist",
+          message: `Current revenue is ${formatCompactCurrency(totalRevenue)}. Consider strategies to increase income.`,
+          icon: Target,
+          type: "info"
+        });
+      }
+      
+      // Margin insights
+      if (margin > 20) {
+        realInsights.push({
+          title: "Excellent profit margins",
+          message: `Maintaining healthy ${margin.toFixed(1)}% profit margin. Great operational efficiency!`,
+          icon: Award,
+          type: "success"
+        });
+      } else if (margin > 0) {
+        realInsights.push({
+          title: "Margin improvement opportunity",
+          message: `Current margin is ${margin.toFixed(1)}%. Look for cost reduction opportunities.`,
+          icon: AlertTriangle,
+          type: "warning"
+        });
+      } else if (margin < 0) {
+        realInsights.push({
+          title: "Operating at a loss",
+          message: `Expenses exceed revenue by ${formatCompactCurrency(Math.abs(netIncome))}. Immediate attention needed.`,
+          icon: AlertTriangle,
+          type: "warning"
+        });
+      }
+      
+      // Expense analysis
+      const expenseRatio = totalRevenue > 0 ? (totalExpenses / totalRevenue) * 100 : 0;
+      if (expenseRatio > 80) {
+        realInsights.push({
+          title: "High expense ratio detected",
+          message: `Expenses are ${expenseRatio.toFixed(1)}% of revenue. Consider cost optimization.`,
+          icon: AlertTriangle,
+          type: "warning"
+        });
+      }
+      
+      // Property portfolio insights
+      if (properties.length > 3) {
+        const profitableProperties = properties.filter(p => (p.netIncome || 0) > 0).length;
+        const profitablePercentage = (profitableProperties / properties.length) * 100;
+        
+        if (profitablePercentage >= 80) {
+          realInsights.push({
+            title: "Strong portfolio performance",
+            message: `${profitableProperties} of ${properties.length} properties (${profitablePercentage.toFixed(0)}%) are profitable.`,
+            icon: CheckCircle,
+            type: "success"
+          });
+        } else if (profitablePercentage >= 50) {
+          realInsights.push({
+            title: "Mixed portfolio performance",
+            message: `${profitableProperties} of ${properties.length} properties are profitable. Room for improvement.`,
+            icon: Target,
+            type: "info"
+          });
+        } else {
+          realInsights.push({
+            title: "Portfolio needs attention",
+            message: `Only ${profitableProperties} of ${properties.length} properties are profitable. Review underperformers.`,
+            icon: AlertTriangle,
+            type: "warning"
+          });
+        }
+      }
+      
+    } else {
+      // Cash Flow Insights
+      const operatingCF = companyTotals.operating;
+      const financingCF = companyTotals.financing;
+      const investingCF = companyTotals.investing;
+      const netCF = companyTotals.net;
+      
+      // Operating cash flow insights
+      if (operatingCF > 50000) {
+        realInsights.push({
+          title: "Strong operating cash generation",
+          message: `Generated ${formatCompactCurrency(operatingCF)} from operations. Excellent business fundamentals!`,
+          icon: TrendingUp,
+          type: "success"
+        });
+      } else if (operatingCF > 0) {
+        realInsights.push({
+          title: "Positive operating cash flow",
+          message: `Operations generated ${formatCompactCurrency(operatingCF)}. Building momentum.`,
+          icon: CheckCircle,
+          type: "success"
+        });
+      } else if (operatingCF < 0) {
+        realInsights.push({
+          title: "Operating cash flow concern",
+          message: `Operations consumed ${formatCompactCurrency(Math.abs(operatingCF))}. Monitor business performance.`,
+          icon: AlertTriangle,
+          type: "warning"
+        });
+      }
+      
+      // Investment insights
+      if (investingCF < -25000) {
+        realInsights.push({
+          title: "Active investment period",
+          message: `Invested ${formatCompactCurrency(Math.abs(investingCF))} in growth. Monitor ROI carefully.`,
+          icon: Target,
+          type: "info"
+        });
+      } else if (investingCF > 25000) {
+        realInsights.push({
+          title: "Asset monetization",
+          message: `Generated ${formatCompactCurrency(investingCF)} from asset sales. Consider reinvestment opportunities.`,
+          icon: TrendingUp,
+          type: "success"
+        });
+      }
+      
+      // Net cash flow insights
+      if (netCF > 0) {
+        realInsights.push({
+          title: "Positive net cash flow",
+          message: `Net cash increased by ${formatCompactCurrency(netCF)}. Strong liquidity position.`,
+          icon: CheckCircle,
+          type: "success"
+        });
+      } else if (netCF < 0) {
+        realInsights.push({
+          title: "Cash flow monitoring needed",
+          message: `Net cash decreased by ${formatCompactCurrency(Math.abs(netCF))}. Watch liquidity levels.`,
+          icon: AlertTriangle,
+          type: "warning"
+        });
+      }
+      
+      // Financing insights
+      if (financingCF > 25000) {
+        realInsights.push({
+          title: "Capital raising activity",
+          message: `Raised ${formatCompactCurrency(financingCF)} through financing. Ensure productive deployment.`,
+          icon: Target,
+          type: "info"
+        });
+      } else if (financingCF < -25000) {
+        realInsights.push({
+          title: "Debt reduction focus",
+          message: `Reduced debt/returned capital by ${formatCompactCurrency(Math.abs(financingCF))}. Improving balance sheet.`,
+          icon: CheckCircle,
+          type: "success"
+        });
+      }
+      
+      // Transfer insights (when enabled)
+      if (includeTransfers && companyTotals.transfers !== 0) {
+        realInsights.push({
+          title: "Bank transfer activity",
+          message: `${formatCompactCurrency(Math.abs(companyTotals.transfers))} in transfers detected. Bank reconciliation mode active.`,
+          icon: Target,
+          type: "info"
+        });
+      }
+    }
+    
+    // If no specific insights, add a general one
+    if (realInsights.length === 0) {
+      realInsights.push({
+        title: "Stable financial position",
+        message: `Monitoring ${properties.length} properties. No immediate concerns detected.`,
+        icon: CheckCircle,
+        type: "info"
+      });
+    }
+    
+    // Limit to max 4 insights for mobile UI
+    return realInsights.slice(0, 4);
+  }, [properties, companyTotals, reportType, includeTransfers]);
     if (reportType !== "pl" || !properties.length) return null;
     return properties.reduce((max, p) =>
       (p.revenue || 0) > (max.revenue || 0) ? p : max,
@@ -293,6 +759,7 @@ export default function EnhancedMobileDashboard() {
     }, properties[0]).name;
   }, [properties, reportType]);
 
+  // ENHANCED: Update company totals to include all cash flow categories
   const companyTotals = properties.reduce(
     (acc, p) => {
       if (reportType === "pl") {
@@ -302,13 +769,18 @@ export default function EnhancedMobileDashboard() {
       } else {
         acc.operating += p.operating || 0;
         acc.financing += p.financing || 0;
-        acc.net += (p.operating || 0) + (p.financing || 0);
+        acc.investing += p.investing || 0;
+        acc.transfers += p.transfers || 0;
+        
+        // Net calculation depends on whether transfers are included
+        acc.net += includeTransfers 
+          ? (p.operating || 0) + (p.financing || 0) + (p.investing || 0) + (p.transfers || 0)
+          : (p.operating || 0) + (p.financing || 0) + (p.investing || 0);
       }
       return acc;
     },
-    { revenue: 0, expenses: 0, net: 0, operating: 0, financing: 0 },
+    { revenue: 0, expenses: 0, net: 0, operating: 0, financing: 0, investing: 0, transfers: 0 },
   );
-
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("en-US", {
@@ -333,115 +805,328 @@ export default function EnhancedMobileDashboard() {
     setView("report");
   };
 
+  // ENHANCED: Load P&L data using exact same logic as P&L component
   const loadPL = async (propertyName: string | null = selectedProperty) => {
-    const { start, end } = getDateRange();
+    const { start, end } = calculateDateRange();
+    
     let query = supabase
       .from("journal_entry_lines")
-      .select("account, account_type, debit, credit, class, date")
+      .select(
+        `entry_number, class, date, account, account_type, debit, credit, memo,
+         customer, vendor, name, entry_bank_account, normal_balance, report_category,
+         is_cash_account, detail_type, account_behavior`
+      )
       .gte("date", start)
       .lte("date", end);
+      
     if (propertyName) {
-      query =
-        propertyName === "General"
-          ? query.is("class", null)
-          : query.eq("class", propertyName);
+      query = propertyName === "General"
+        ? query.is("class", null)
+        : query.eq("class", propertyName);
     }
-    const { data } = await query;
+    
+    const { data: allTransactions } = await query;
+    
+    // Filter transactions using TIMEZONE-INDEPENDENT date comparison
+    const filteredTransactions = (allTransactions || []).filter((tx) => {
+      return isDateInRange(tx.date, start, end);
+    });
+
+    // Filter for P&L accounts using enhanced classification
+    const plTransactions = filteredTransactions.filter((tx) => {
+      const classification = classifyPLAccount(
+        tx.account_type,
+        tx.account,
+        tx.report_category,
+      );
+      return classification !== null;
+    });
+
     const rev: Record<string, number> = {};
     const exp: Record<string, number> = {};
-    ((data as JournalRow[]) || []).forEach((row) => {
-      const debit = Number(row.debit) || 0;
-      const credit = Number(row.credit) || 0;
-      const t = (row.account_type || "").toLowerCase();
-      const amount = credit - debit;
-      if (t.includes("income") || t.includes("revenue")) {
-        rev[row.account] = (rev[row.account] || 0) + amount;
-      } else if (t.includes("expense")) {
-        const expAmount = debit - credit;
-        exp[row.account] = (exp[row.account] || 0) + expAmount;
+    
+    // Process using ENHANCED P&L logic
+    const accountGroups = new Map<string, any[]>();
+    
+    plTransactions.forEach((tx) => {
+      const account = tx.account;
+      if (!accountGroups.has(account)) {
+        accountGroups.set(account, []);
       }
+      accountGroups.get(account)!.push(tx);
     });
+
+    // Process each account group using ENHANCED calculation
+    for (const [account, txList] of accountGroups.entries()) {
+      const sampleTx = txList[0];
+      const accountType = sampleTx.account_type;
+      const reportCategory = sampleTx.report_category;
+
+      // Calculate totals using ENHANCED logic with proper null handling
+      let totalCredits = 0;
+      let totalDebits = 0;
+
+      txList.forEach((tx) => {
+        // Parse debit and credit values more carefully
+        const debitValue = tx.debit
+          ? parseFloat(tx.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+          : 0;
+        const creditValue = tx.credit
+          ? parseFloat(tx.credit.toString().replace(/[^0-9.-]/g, "")) || 0
+          : 0;
+
+        // Only add if values are valid numbers
+        if (!isNaN(debitValue) && debitValue > 0) {
+          totalDebits += debitValue;
+        }
+        if (!isNaN(creditValue) && creditValue > 0) {
+          totalCredits += creditValue;
+        }
+      });
+
+      // Determine category and amount using ENHANCED classification
+      const classification = classifyPLAccount(
+        accountType,
+        account,
+        reportCategory,
+      );
+      if (!classification) continue; // Skip non-P&L accounts
+
+      let amount: number;
+      if (classification === "INCOME") {
+        // For income accounts: Credits increase income, debits decrease income
+        amount = totalCredits - totalDebits;
+        if (Math.abs(amount) > 0.01) {
+          rev[account] = amount;
+        }
+      } else {
+        // For expense accounts: Debits increase expenses, credits decrease expenses
+        amount = totalDebits - totalCredits;
+        if (Math.abs(amount) > 0.01) {
+          exp[account] = amount;
+        }
+      }
+    }
+
     setPlData({
       revenue: Object.entries(rev).map(([name, total]) => ({ name, total })),
       expenses: Object.entries(exp).map(([name, total]) => ({ name, total })),
     });
   };
 
+  // ENHANCED: Load cash flow data using enhanced logic but keeping existing structure 
   const loadCF = async (propertyName: string | null = selectedProperty) => {
-    const { start, end } = getDateRange();
+    const { start, end } = calculateDateRange();
+    
+    // ENHANCED: Use the same query logic as cash flow component
     let query = supabase
       .from("journal_entry_lines")
       .select(
-        "account, account_type, report_category, normal_balance, debit, credit, class, date",
+        `entry_number, class, date, account, account_type, debit, credit, memo,
+         customer, vendor, name, entry_bank_account, normal_balance, report_category,
+         is_cash_account, detail_type, account_behavior`
       )
       .gte("date", start)
-      .lte("date", end);
-    if (propertyName) {
-      query =
-        propertyName === "General"
-          ? query.is("class", null)
-          : query.eq("class", propertyName);
+      .lte("date", end)
+      .not("entry_bank_account", "is", null"); // Must have bank account source
+
+    // ENHANCED: Add transfer filtering logic
+    if (includeTransfers) {
+      // Include both non-cash transactions AND transfers
+      query = query.or("is_cash_account.eq.false,report_category.eq.transfer");
+    } else {
+      // Only non-cash transactions, no transfers
+      query = query.eq("is_cash_account", false).neq("report_category", "transfer");
     }
-    const { data } = await query;
+
+    if (propertyName) {
+      query = propertyName === "General"
+        ? query.is("class", null)
+        : query.eq("class", propertyName);
+    }
+    
+    const { data: allTransactions } = await query;
+    
+    // Filter transactions using TIMEZONE-INDEPENDENT date comparison
+    const filteredTransactions = (allTransactions || []).filter((tx) => {
+      return isDateInRange(tx.date, start, end);
+    });
+
     const op: Record<string, number> = {};
     const fin: Record<string, number> = {};
-    ((data as JournalRow[]) || []).forEach((row) => {
-      const debit = Number(row.debit) || 0;
-      const credit = Number(row.credit) || 0;
-      const amount =
-        row.report_category === "transfer" ? debit - credit : credit - debit;
-      const classification = classifyTransaction(
-        row.account_type,
-        row.report_category,
-      );
-      if (classification === "operating") {
-        op[row.account] = (op[row.account] || 0) + amount;
-      } else if (classification === "financing") {
-        fin[row.account] = (fin[row.account] || 0) + amount;
+    const inv: Record<string, number> = {};
+    const trans: Record<string, number> = {};
+    
+    // Process using ENHANCED cash flow logic
+    const accountGroups = new Map<string, any[]>();
+    
+    filteredTransactions.forEach((tx) => {
+      const account = tx.account;
+      if (!accountGroups.has(account)) {
+        accountGroups.set(account, []);
       }
+      accountGroups.get(account)!.push(tx);
     });
+
+    // Process each account group using ENHANCED calculation
+    for (const [account, txList] of accountGroups.entries()) {
+      const sampleTx = txList[0];
+      const accountType = sampleTx.account_type;
+      const reportCategory = sampleTx.report_category;
+
+      // Calculate totals using ENHANCED logic
+      let totalAmount = 0;
+
+      txList.forEach((tx) => {
+        const debitValue = tx.debit
+          ? parseFloat(tx.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+          : 0;
+        const creditValue = tx.credit
+          ? parseFloat(tx.credit.toString().replace(/[^0-9.-]/g, "")) || 0
+          : 0;
+
+        // Enhanced cash flow impact calculation
+        const amount = tx.report_category === "transfer" 
+          ? debitValue - creditValue  // Reverse for transfers
+          : parseFloat(tx.normal_balance?.toString() || "0") || (creditValue - debitValue); // Normal for others
+
+        totalAmount += amount;
+      });
+
+      // Skip if no activity
+      if (Math.abs(totalAmount) <= 0.01) continue;
+
+      // Enhanced cash flow classification
+      const classification = (() => {
+        if (includeTransfers && reportCategory === "transfer") return "transfer";
+        
+        const typeLower = accountType?.toLowerCase() || "";
+        if (
+          typeLower === "income" || typeLower === "other income" ||
+          typeLower === "expenses" || typeLower === "expense" ||
+          typeLower === "cost of goods sold" || typeLower === "accounts receivable" ||
+          typeLower === "accounts payable"
+        ) return "operating";
+        
+        if (
+          typeLower === "fixed assets" || typeLower === "other assets" ||
+          typeLower === "property, plant & equipment"
+        ) return "investing";
+        
+        if (
+          typeLower === "long term liabilities" || typeLower === "equity" ||
+          typeLower === "credit card" || typeLower === "other current liabilities" ||
+          typeLower === "line of credit"
+        ) return "financing";
+        
+        return "other";
+      })();
+
+      if (classification === "operating") {
+        op[account] = totalAmount;
+      } else if (classification === "financing") {
+        fin[account] = totalAmount;
+      } else if (classification === "investing") {
+        inv[account] = totalAmount;
+      } else if (classification === "transfer") {
+        trans[account] = totalAmount;
+      }
+    }
+    
     const operatingArr = Object.entries(op)
       .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total);
+      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
     const financingArr = Object.entries(fin)
       .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total);
-    setCfData({ operating: operatingArr, financing: financingArr });
+      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+    const investingArr = Object.entries(inv)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+    const transfersArr = Object.entries(trans)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+      
+    setCfData({ 
+      operating: operatingArr, 
+      financing: financingArr,
+      investing: investingArr,
+      transfers: transfersArr
+    });
   };
 
-
+  // ENHANCED: Update handleCategory with P&L logic and timezone-independent date handling
   const handleCategory = async (
     account: string,
-    type: "revenue" | "expense" | "operating" | "financing",
+    type: "revenue" | "expense" | "operating" | "financing" | "investing" | "transfers",
   ) => {
-    const { start, end } = getDateRange();
+    const { start, end } = calculateDateRange();
+    
     let query = supabase
       .from("journal_entry_lines")
       .select(
-        "date, debit, credit, account, class, report_category, memo, customer, vendor, name",
+        `entry_number, class, date, account, account_type, debit, credit, memo,
+         customer, vendor, name, entry_bank_account, normal_balance, report_category,
+         is_cash_account, detail_type, account_behavior`
       )
       .eq("account", account)
       .gte("date", start)
       .lte("date", end);
-    if (selectedProperty) {
-      query =
-        selectedProperty === "General"
-          ? query.is("class", null)
-          : query.eq("class", selectedProperty);
+
+    // ENHANCED: Add cash flow filtering for cash flow categories
+    if (type === "operating" || type === "financing" || type === "investing" || type === "transfers") {
+      query = query.not("entry_bank_account", "is", null);
+      
+      if (includeTransfers) {
+        query = query.or("is_cash_account.eq.false,report_category.eq.transfer");
+      } else {
+        query = query.eq("is_cash_account", false).neq("report_category", "transfer");
+      }
     }
-    const { data } = await query;
-    const list: Transaction[] = ((data as JournalRow[]) || [])
+      
+    if (selectedProperty) {
+      query = selectedProperty === "General"
+        ? query.is("class", null)
+        : query.eq("class", selectedProperty);
+    }
+    
+    const { data: allTransactions } = await query;
+    
+    // Filter transactions using TIMEZONE-INDEPENDENT date comparison
+    const filteredTransactions = (allTransactions || []).filter((tx) => {
+      return isDateInRange(tx.date, start, end);
+    });
+
+    const list: Transaction[] = filteredTransactions
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((row) => {
-        const debit = Number(row.debit) || 0;
-        const credit = Number(row.credit) || 0;
+        // Parse debit and credit values carefully (like P&L component)
+        const debitValue = row.debit
+          ? parseFloat(row.debit.toString().replace(/[^0-9.-]/g, "")) || 0
+          : 0;
+        const creditValue = row.credit
+          ? parseFloat(row.credit.toString().replace(/[^0-9.-]/g, "")) || 0
+          : 0;
+
         let amount = 0;
         if (reportType === "pl") {
-          amount = type === "revenue" ? credit - debit : debit - credit;
+          // P&L logic: Use enhanced classification
+          const classification = classifyPLAccount(
+            row.account_type,
+            row.account,
+            row.report_category,
+          );
+          if (classification === "INCOME") {
+            amount = creditValue - debitValue; // Income: Credit minus Debit
+          } else if (classification === "EXPENSES") {
+            amount = debitValue - creditValue; // Expenses: Debit minus Credit
+          }
         } else {
-          amount =
-            row.report_category === "transfer" ? debit - credit : credit - debit;
+          // Cash Flow logic: Use enhanced calculation
+          amount = row.report_category === "transfer" 
+            ? debitValue - creditValue  // Reverse for transfers
+            : parseFloat(row.normal_balance?.toString() || "0") || (creditValue - debitValue); // Normal for others
         }
+
         return {
           date: row.date,
           amount,
@@ -451,11 +1136,13 @@ export default function EnhancedMobileDashboard() {
           className: row.class,
         };
       });
+
     let run = 0;
     list.forEach((t) => {
       run += t.amount;
       t.running = run;
     });
+    
     setTransactions(list);
     setSelectedCategory(account);
     setView("detail");
@@ -525,6 +1212,12 @@ export default function EnhancedMobileDashboard() {
           <p style={{ fontSize: '14px', opacity: 0.9 }}>
             {getMonthName(month)} {year} • {properties.length} Properties
           </p>
+          {/* NEW: Transfer mode indicator for cash flow */}
+          {reportType === "cf" && (
+            <p style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
+              💰 Enhanced with perfect transfer logic - {includeTransfers ? "Bank reconciliation mode (includes transfers)" : "Business activity mode (excludes transfers)"}
+            </p>
+          )}
         </div>
 
         {/* Company Total - Enhanced */}
@@ -577,24 +1270,43 @@ export default function EnhancedMobileDashboard() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', textAlign: 'center' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: includeTransfers ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', 
+              gap: '12px', 
+              textAlign: 'center' 
+            }}>
               <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
                   {formatCompactCurrency(companyTotals.operating)}
                 </div>
-                <div style={{ fontSize: '12px', opacity: 0.8 }}>Operating</div>
+                <div style={{ fontSize: '10px', opacity: 0.8 }}>Operating</div>
               </div>
               <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
                   {formatCompactCurrency(companyTotals.financing)}
                 </div>
-                <div style={{ fontSize: '12px', opacity: 0.8 }}>Financing</div>
+                <div style={{ fontSize: '10px', opacity: 0.8 }}>Financing</div>
               </div>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                  {formatCompactCurrency(companyTotals.investing)}
+                </div>
+                <div style={{ fontSize: '10px', opacity: 0.8 }}>Investing</div>
+              </div>
+              {includeTransfers && (
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                    {formatCompactCurrency(companyTotals.transfers)}
+                  </div>
+                  <div style={{ fontSize: '10px', opacity: 0.8 }}>Transfers</div>
+                </div>
+              )}
               <div>
                 <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
                   {formatCompactCurrency(companyTotals.net)}
                 </div>
-                <div style={{ fontSize: '12px', opacity: 0.8 }}>Net Cash</div>
+                <div style={{ fontSize: '10px', opacity: 0.8 }}>Net Cash</div>
               </div>
             </div>
           )}
@@ -635,6 +1347,43 @@ export default function EnhancedMobileDashboard() {
               <option value="cf">Cash Flow Statement</option>
             </select>
           </div>
+          
+          {/* NEW: Transfer Toggle - only show for cash flow */}
+          {reportType === "cf" && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                fontWeight: '600', 
+                color: BRAND_COLORS.accent,
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={includeTransfers}
+                  onChange={(e) => setIncludeTransfers(e.target.checked)}
+                  style={{ 
+                    width: '16px', 
+                    height: '16px',
+                    accentColor: BRAND_COLORS.primary
+                  }}
+                />
+                Include transfers (for bank reconciliation)
+              </label>
+              <p style={{ 
+                fontSize: '12px', 
+                color: '#64748b', 
+                marginTop: '4px',
+                marginLeft: '24px'
+              }}>
+                {includeTransfers 
+                  ? "Shows all cash movements including transfers between accounts" 
+                  : "Shows only business activities, excludes transfers"}
+              </p>
+            </div>
+          )}
+          
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: BRAND_COLORS.accent }}>
               Report Period
@@ -894,7 +1643,17 @@ export default function EnhancedMobileDashboard() {
                           FLOW MASTER
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties.find(p => ((p.operating || 0) + (p.financing || 0)) === Math.max(...properties.map(prop => (prop.operating || 0) + (prop.financing || 0))))?.name}
+                          {properties.find(p => {
+                            const netCash = includeTransfers 
+                              ? (p.operating || 0) + (p.financing || 0) + (p.investing || 0) + (p.transfers || 0)
+                              : (p.operating || 0) + (p.financing || 0) + (p.investing || 0);
+                            return netCash === Math.max(...properties.map(prop => {
+                              const propNetCash = includeTransfers 
+                                ? (prop.operating || 0) + (prop.financing || 0) + (prop.investing || 0) + (prop.transfers || 0)
+                                : (prop.operating || 0) + (prop.financing || 0) + (prop.investing || 0);
+                              return propNetCash;
+                            }));
+                          })?.name}
                         </div>
                       </div>
                     </div>
@@ -913,7 +1672,7 @@ export default function EnhancedMobileDashboard() {
                           EFFICIENCY ACE
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
+                          {properties.find(p => (p.investing || 0) === Math.max(...properties.map(prop => prop.investing || 0)))?.name || "N/A"}
                         </div>
                       </div>
                     </div>
@@ -932,7 +1691,7 @@ export default function EnhancedMobileDashboard() {
                           STABILITY PRO
                         </div>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>
-                          {properties.length ? properties[Math.floor(Math.random() * properties.length)].name : "N/A"}
+                          {properties.find(p => (p.financing || 0) === Math.max(...properties.map(prop => prop.financing || 0)))?.name || "N/A"}
                         </div>
                       </div>
                     </div>
@@ -1121,18 +1880,18 @@ export default function EnhancedMobileDashboard() {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gap: '10px' }}>
+                    <div style={{ display: 'grid', gap: '6px' }}>
                       <div style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between',
-                        padding: '8px 12px',
+                        padding: '6px 10px',
                         background: `${BRAND_COLORS.primary}08`,
-                        borderRadius: '8px',
+                        borderRadius: '6px',
                         border: `1px solid ${BRAND_COLORS.primary}20`
                       }}>
-                        <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Operating</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Operating</span>
                         <span style={{ 
-                          fontSize: '13px', 
+                          fontSize: '12px', 
                           fontWeight: '700',
                           color: BRAND_COLORS.primary,
                           textShadow: '0 1px 2px rgba(0,0,0,0.1)'
@@ -1143,14 +1902,14 @@ export default function EnhancedMobileDashboard() {
                       <div style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between',
-                        padding: '8px 12px',
+                        padding: '6px 10px',
                         background: `${BRAND_COLORS.secondary}08`,
-                        borderRadius: '8px',
+                        borderRadius: '6px',
                         border: `1px solid ${BRAND_COLORS.secondary}20`
                       }}>
-                        <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Financing</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Financing</span>
                         <span style={{ 
-                          fontSize: '13px', 
+                          fontSize: '12px', 
                           fontWeight: '700',
                           color: BRAND_COLORS.secondary,
                           textShadow: '0 1px 2px rgba(0,0,0,0.1)'
@@ -1161,20 +1920,68 @@ export default function EnhancedMobileDashboard() {
                       <div style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between',
-                        padding: '12px',
+                        padding: '6px 10px',
+                        background: `${BRAND_COLORS.warning}08`,
+                        borderRadius: '6px',
+                        border: `1px solid ${BRAND_COLORS.warning}20`
+                      }}>
+                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Investing</span>
+                        <span style={{ 
+                          fontSize: '12px', 
+                          fontWeight: '700',
+                          color: BRAND_COLORS.warning,
+                          textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                        }}>
+                          {formatCompactCurrency(p.investing || 0)}
+                        </span>
+                      </div>
+                      {includeTransfers && (
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between',
+                          padding: '6px 10px',
+                          background: `#9333ea08`,
+                          borderRadius: '6px',
+                          border: `1px solid #9333ea20`
+                        }}>
+                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Transfers</span>
+                          <span style={{ 
+                            fontSize: '12px', 
+                            fontWeight: '700',
+                            color: '#9333ea',
+                            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                          }}>
+                            {formatCompactCurrency(p.transfers || 0)}
+                          </span>
+                        </div>
+                      )}
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        padding: '10px',
                         background: `linear-gradient(135deg, ${BRAND_COLORS.accent}10, ${BRAND_COLORS.primary}05)`,
-                        borderRadius: '10px',
+                        borderRadius: '8px',
                         border: `2px solid ${BRAND_COLORS.accent}30`,
                         boxShadow: `0 4px 12px ${BRAND_COLORS.accent}20`
                       }}>
-                        <span style={{ fontSize: '14px', fontWeight: '700', color: BRAND_COLORS.accent }}>Net Cash</span>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: BRAND_COLORS.accent }}>Net Cash</span>
                         <span style={{ 
-                          fontSize: '16px', 
+                          fontSize: '15px', 
                           fontWeight: '800',
-                          color: ((p.operating || 0) + (p.financing || 0)) >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger,
+                          color: (() => {
+                            const netCash = includeTransfers 
+                              ? (p.operating || 0) + (p.financing || 0) + (p.investing || 0) + (p.transfers || 0)
+                              : (p.operating || 0) + (p.financing || 0) + (p.investing || 0);
+                            return netCash >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger;
+                          })(),
                           textShadow: '0 1px 3px rgba(0,0,0,0.2)'
                         }}>
-                          {formatCompactCurrency((p.operating || 0) + (p.financing || 0))}
+                          {(() => {
+                            const netCash = includeTransfers 
+                              ? (p.operating || 0) + (p.financing || 0) + (p.investing || 0) + (p.transfers || 0)
+                              : (p.operating || 0) + (p.financing || 0) + (p.investing || 0);
+                            return formatCompactCurrency(netCash);
+                          })()}
                         </span>
                       </div>
                     </div>
@@ -1251,6 +2058,12 @@ export default function EnhancedMobileDashboard() {
             <p style={{ fontSize: '14px', opacity: 0.9 }}>
               {getMonthName(month)} {year}
             </p>
+            {/* NEW: Transfer mode indicator for cash flow */}
+            {reportType === "cf" && (
+              <p style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
+                {includeTransfers ? "Bank reconciliation mode (includes transfers)" : "Business activity mode (excludes transfers)"}
+              </p>
+            )}
           </div>
 
           {reportType === "pl" ? (
@@ -1475,6 +2288,116 @@ export default function EnhancedMobileDashboard() {
                   </div>
                 ))}
               </div>
+
+              {/* NEW: Investing Activities Section */}
+              <div style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '20px',
+                border: `1px solid ${BRAND_COLORS.gray[200]}`
+              }}>
+                <h3 style={{ 
+                  fontSize: '18px', 
+                  fontWeight: '600', 
+                  marginBottom: '16px',
+                  color: BRAND_COLORS.warning,
+                  borderBottom: `2px solid ${BRAND_COLORS.warning}`,
+                  paddingBottom: '8px'
+                }}>
+                  Investing Activities
+                </h3>
+                {cfData.investing.map((cat) => (
+                  <div
+                    key={cat.name}
+                    onClick={() => handleCategory(cat.name, "investing")}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      marginBottom: '8px',
+                      background: BRAND_COLORS.gray[50],
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#fff7ed';
+                      e.currentTarget.style.borderColor = BRAND_COLORS.warning;
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = BRAND_COLORS.gray[50];
+                      e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
+                    <span style={{ 
+                      fontSize: '14px', 
+                      fontWeight: '600', 
+                      color: cat.total >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
+                    }}>
+                      {formatCurrency(cat.total)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* NEW: Transfer Activities Section (only if includeTransfers is true) */}
+              {includeTransfers && (
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`
+                }}>
+                  <h3 style={{ 
+                    fontSize: '18px', 
+                    fontWeight: '600', 
+                    marginBottom: '16px',
+                    color: '#9333ea',
+                    borderBottom: `2px solid #9333ea`,
+                    paddingBottom: '8px'
+                  }}>
+                    Transfer Activities
+                  </h3>
+                  {cfData.transfers.map((cat) => (
+                    <div
+                      key={cat.name}
+                      onClick={() => handleCategory(cat.name, "transfers")}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px',
+                        marginBottom: '8px',
+                        background: BRAND_COLORS.gray[50],
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        border: `1px solid ${BRAND_COLORS.gray[200]}`,
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#faf5ff';
+                        e.currentTarget.style.borderColor = '#9333ea';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = BRAND_COLORS.gray[50];
+                        e.currentTarget.style.borderColor = BRAND_COLORS.gray[200];
+                      }}
+                    >
+                      <span style={{ fontSize: '14px', fontWeight: '500' }}>{cat.name}</span>
+                      <span style={{ 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        color: cat.total >= 0 ? BRAND_COLORS.success : BRAND_COLORS.danger
+                      }}>
+                        {formatCurrency(cat.total)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div
               style={{
@@ -1525,6 +2448,16 @@ export default function EnhancedMobileDashboard() {
             <p style={{ fontSize: '14px', opacity: 0.9 }}>
               Transaction Details • {getMonthName(month)} {year}
             </p>
+            {/* NEW: Enhanced transaction details with P&L calculation info */}
+            {reportType === "cf" ? (
+              <p style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
+                💰 Enhanced with entry_bank_account field - Perfect cash flow tracking using P&L calculation logic
+              </p>
+            ) : (
+              <p style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
+                📊 Enhanced P&L using timezone-independent date handling and precise account classification
+              </p>
+            )}
           </div>
 
           <div style={{ display: 'grid', gap: '12px' }}>
