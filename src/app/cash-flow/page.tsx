@@ -46,6 +46,15 @@ interface TransactionDetail {
   reportCategory?: string
 }
 
+interface JournalEntryLine {
+  date: string
+  account: string
+  memo: string | null
+  class: string | null
+  debit: string | number | null
+  credit: string | number | null
+}
+
 interface CashFlowBreakdown {
   operating: {
     rentalIncome: number
@@ -174,6 +183,9 @@ export default function CashFlowPage() {
   const [transactionDetails, setTransactionDetails] = useState<TransactionDetail[]>([])
   const [modalTitle, setModalTitle] = useState("")
   const [cashTransactions, setCashTransactions] = useState<any[]>([])
+  const [journalEntryLines, setJournalEntryLines] = useState<JournalEntryLine[]>([])
+  const [showJournalModal, setShowJournalModal] = useState(false)
+  const [journalTitle, setJournalTitle] = useState("")
 
   // Store detailed transaction data for reuse
   const [transactionData, setTransactionData] = useState<Map<string, any[]>>(new Map())
@@ -1391,6 +1403,22 @@ export default function CashFlowPage() {
     } catch (err) {
       console.error("Error fetching cash flow transaction details:", err)
     }
+  }
+
+  const openJournalEntry = async (entryNumber?: string) => {
+    if (!entryNumber) return
+    const { data, error } = await supabase
+      .from("journal_entry_lines")
+      .select("date, account, memo, class, debit, credit")
+      .eq("entry_number", entryNumber)
+      .order("line_sequence")
+    if (error) {
+      console.error("Error fetching journal entry lines:", error)
+      return
+    }
+    setJournalEntryLines(data || [])
+    setJournalTitle(`Journal Entry ${entryNumber}`)
+    setShowJournalModal(true)
   }
 
   // Toggle row expansion
@@ -3212,8 +3240,12 @@ export default function CashFlowPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {transactionDetails.map((transaction, index) => (
-                      <tr key={`${transaction.entryNumber}-${index}`} className="hover:bg-gray-50">
+                  {transactionDetails.map((transaction, index) => (
+                      <tr
+                        key={`${transaction.entryNumber}-${index}`}
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => openJournalEntry(transaction.entryNumber)}
+                      >
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(transaction.date)}
                         </td>
@@ -3248,6 +3280,65 @@ export default function CashFlowPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showJournalModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
+              <h3 className="text-lg font-semibold text-gray-900">{journalTitle}</h3>
+              <button
+                onClick={() => setShowJournalModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Memo
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Class
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Debit
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Credit
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {journalEntryLines.map((line, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                        {formatDate(line.date)}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{line.account}</td>
+                      <td className="px-4 py-2 text-sm text-gray-500">{line.memo || ""}</td>
+                      <td className="px-4 py-2 text-sm text-gray-500">{line.class || ""}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-red-600">
+                        {formatCurrency(Number.parseFloat(line.debit?.toString() || "0"))}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-green-600">
+                        {formatCurrency(Number.parseFloat(line.credit?.toString() || "0"))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
