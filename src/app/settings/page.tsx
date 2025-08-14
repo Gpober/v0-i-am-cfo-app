@@ -59,16 +59,20 @@ export default function SettingsPage() {
     const lines = text.split(/\r?\n/)
     const entries: ManualBalance[] = []
     lines.forEach((line) => {
-      const match = line.match(/(.+?)\s+(-?\$?[0-9,.,\-]+)/)
-      if (match) {
-        const rawAccount = match[1].trim()
-        const mapped =
-          accountMappings[rawAccount.toLowerCase()] || rawAccount
-        const amt = parseFloat(match[2].replace(/[^0-9.-]/g, ""))
-        if (!isNaN(amt))
-          entries.push({ account: mapped, balance: amt.toString() })
-      }
+      const match = line.trim().match(/^(.+?)\s+(-?\$?[0-9,().]+)$/)
+      if (!match) return
+
+      const rawAccount = match[1].trim()
+      const mapped =
+        accountMappings[rawAccount.toLowerCase()] || rawAccount
+
+      let amt = parseFloat(match[2].replace(/[$,()]/g, ""))
+      if (match[2].includes("(") && match[2].includes(")")) amt *= -1
+
+      if (!isNaN(amt)) entries.push({ account: mapped, balance: amt.toString() })
     })
+    if (!entries.length)
+      alert("No balances found in uploaded PDF.")
     setBalances(entries.length ? entries : [{ account: "", balance: "" }])
   }
 
