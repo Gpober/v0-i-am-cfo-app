@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Papa from "papaparse"
 
 interface ManualBalance {
   account: string
@@ -41,26 +42,28 @@ export default function SettingsPage() {
     if (!file) return
 
     const text = await file.text()
-    const lines = text.split(/\r?\n/)
+    const parsed = Papa.parse(text, {
+      skipEmptyLines: true,
+    })
+
     const entries: ManualBalance[] = []
-    lines.forEach((line) => {
-      const parts = line.split(",")
-      if (parts.length < 2) return
+    parsed.data.forEach((row: any) => {
+      const [rawAccount, rawAmount] = row
+      if (!rawAccount || !rawAmount) return
 
-      const rawAccount = parts[0].trim()
-      const amountStr = parts[1].trim()
-      if (!rawAccount || !amountStr) return
-
+      const cleanAccount = rawAccount.toString().replace(/^"|"$/g, "").trim()
       const mapped =
-        accountMappings[rawAccount.toLowerCase()] || rawAccount
+        accountMappings[cleanAccount.toLowerCase()] || cleanAccount
 
-      let amt = parseFloat(amountStr.replace(/[$,()]/g, ""))
-      if (amountStr.includes("(") && amountStr.includes(")")) amt *= -1
+      const amountStr = rawAmount.toString().replace(/[$,()"\s]/g, "")
+      let amt = parseFloat(amountStr)
+      if (rawAmount.toString().includes("(") && rawAmount.toString().includes(")"))
+        amt *= -1
 
       if (!isNaN(amt)) entries.push({ account: mapped, balance: amt.toString() })
     })
-    if (!entries.length)
-      alert("No balances found in uploaded CSV.")
+
+    if (!entries.length) alert("No balances found in uploaded CSV.")
     setBalances(entries.length ? entries : [{ account: "", balance: "" }])
   }
 
