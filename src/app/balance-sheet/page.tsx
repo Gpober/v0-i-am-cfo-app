@@ -396,7 +396,7 @@ export default function BalanceSheetPage() {
 
         const accountData = accountMap.get(account)!
 
-        // Calculate transaction impact
+        // Calculate transaction impact with CORRECTED debit/credit logic
         let transactionImpact = 0
 
         if (transaction.normal_balance !== null && transaction.normal_balance !== undefined) {
@@ -406,6 +406,8 @@ export default function BalanceSheetPage() {
           const credit = Number.parseFloat(transaction.credit) || 0
 
           const accountTypeLower = accountType.toLowerCase()
+          
+          // ASSETS AND EXPENSES: Debit increases, Credit decreases
           if (
             accountTypeLower.includes("asset") ||
             accountTypeLower.includes("expense") ||
@@ -418,9 +420,10 @@ export default function BalanceSheetPage() {
             accountTypeLower.includes("fixed asset") ||
             accountTypeLower.includes("other asset")
           ) {
-            // ASSETS: Debit increases, Credit decreases
-            transactionImpact = debit - credit
-          } else if (
+            transactionImpact = debit - credit  // CORRECT: Debit increases assets
+          } 
+          // LIABILITIES, EQUITY, REVENUE: Credit increases, Debit decreases
+          else if (
             accountTypeLower.includes("liability") ||
             accountTypeLower.includes("payable") ||
             accountTypeLower.includes("credit card") ||
@@ -432,10 +435,10 @@ export default function BalanceSheetPage() {
             accountTypeLower.includes("revenue") ||
             accountTypeLower.includes("income")
           ) {
-            // LIABILITIES, EQUITY, REVENUE: Credit increases, Debit decreases
-            transactionImpact = credit - debit
-          } else {
-            // Default fallback: treat as debit normal (like assets)
+            transactionImpact = credit - debit  // CORRECT: Credit increases liabilities/equity/revenue
+          } 
+          // DEFAULT: Treat unknown accounts as assets (debit normal)
+          else {
             transactionImpact = debit - credit
           }
         }
