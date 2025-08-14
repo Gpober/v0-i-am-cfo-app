@@ -844,6 +844,7 @@ export default function BalanceSheetPage() {
       setIsLoading(false)
     }
   }
+  }
 
   // Show transaction details modal with different filter types
   const showTransactionDetails = (
