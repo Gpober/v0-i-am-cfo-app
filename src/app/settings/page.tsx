@@ -23,6 +23,20 @@ const accountMappings: Record<string, string> = {
   inventory: "Inventory",
 }
 
+// Balance Sheet Account Types Only (no P&L accounts)
+const balanceSheetAccountTypes = [
+  "Bank",
+  "Accounts receivable (A/R)",
+  "Other Current Assets", 
+  "Fixed Assets",
+  "Other Assets",
+  "Accounts payable (A/P)",
+  "Credit Card",
+  "Other Current Liabilities",
+  "Long Term Liabilities", 
+  "Equity"
+]
+
 export default function SettingsPage() {
   const [date, setDate] = useState("")
   const [balances, setBalances] = useState<ManualBalance[]>([
@@ -41,22 +55,22 @@ export default function SettingsPage() {
       const typeMap: Record<string, string> = {}
       data?.forEach((row: any) => {
         const type = row.account_type
-        if (type)
-          typeMap[row.account] =
-            type.charAt(0).toUpperCase() + type.slice(1)
+        if (type) {
+          typeMap[row.account] = type // Keep exact QB account type format
+        }
       })
 
       entries.forEach((e) => {
         if (typeMap[e.account]) {
           e.accountType = typeMap[e.account]
         } else if (!e.accountType) {
-          e.accountType = "Asset"
+          e.accountType = "Other Current Assets" // Default to a QB account type
         }
       })
     } catch (err) {
       console.error("Error fetching account types", err)
       entries.forEach((e) => {
-        if (!e.accountType) e.accountType = "Asset"
+        if (!e.accountType) e.accountType = "Other Current Assets"
       })
     }
     return entries
@@ -164,34 +178,47 @@ export default function SettingsPage() {
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-2">Beginning Balances</h2>
+        <h2 className="text-xl font-semibold mb-2">Beginning Balance Sheet Balances</h2>
+        <div className="mb-3 text-sm text-gray-600">
+          Enter beginning balances for balance sheet accounts only (Assets, Liabilities, Equity)
+        </div>
         {balances.map((row, idx) => (
           <div key={idx} className="flex space-x-2 mb-2">
             <input
               className="flex-1 border rounded p-2"
-              placeholder="Account"
+              placeholder="Account Name"
               value={row.account}
               onChange={(e) =>
                 handleBalanceChange(idx, "account", e.target.value)
               }
             />
             <select
-              className="w-40 border rounded p-2"
+              className="w-60 border rounded p-2 text-sm"
               value={row.accountType}
               onChange={(e) =>
                 handleBalanceChange(idx, "accountType", e.target.value)
               }
             >
-              <option value="">Type</option>
-              <option value="Asset">Asset</option>
-              <option value="Liability">Liability</option>
-              <option value="Equity">Equity</option>
-              <option value="Revenue">Revenue</option>
-              <option value="Expense">Expense</option>
-              <option value="Bank">Bank</option>
+              <option value="">Select Balance Sheet Account Type</option>
+              <optgroup label="Assets">
+                <option value="Bank">Bank</option>
+                <option value="Accounts receivable (A/R)">Accounts receivable (A/R)</option>
+                <option value="Other Current Assets">Other Current Assets</option>
+                <option value="Fixed Assets">Fixed Assets</option>
+                <option value="Other Assets">Other Assets</option>
+              </optgroup>
+              <optgroup label="Liabilities">
+                <option value="Accounts payable (A/P)">Accounts payable (A/P)</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Other Current Liabilities">Other Current Liabilities</option>
+                <option value="Long Term Liabilities">Long Term Liabilities</option>
+              </optgroup>
+              <optgroup label="Equity">
+                <option value="Equity">Equity</option>
+              </optgroup>
             </select>
             <input
-              className="w-40 border rounded p-2"
+              className="w-32 border rounded p-2"
               placeholder="Balance"
               type="number"
               value={row.balance}
@@ -203,7 +230,7 @@ export default function SettingsPage() {
         ))}
         <button
           onClick={addBalanceRow}
-          className="text-sm text-blue-600"
+          className="text-sm text-blue-600 hover:text-blue-800"
           type="button"
         >
           + Add account
@@ -212,20 +239,58 @@ export default function SettingsPage() {
 
       <div>
         <h2 className="text-xl font-semibold mb-2">Upload Balance Sheet CSV</h2>
+        <div className="mb-2 text-sm text-gray-600">
+          CSV format: Account Name, Balance Sheet Account Type, Balance Amount
+        </div>
         <input
           type="file"
           accept="text/csv,application/vnd.ms-excel"
           onChange={handleFileUpload}
+          className="border rounded p-2"
         />
       </div>
 
       <button
         onClick={handleSave}
-        className="px-4 py-2 bg-blue-600 text-white rounded"
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         type="button"
       >
-        Save Balances
+        Save Beginning Balances
       </button>
+
+      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+        <h3 className="text-lg font-medium mb-2">Balance Sheet Account Types Reference</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div>
+            <h4 className="font-medium text-green-700 mb-1">Assets</h4>
+            <ul className="space-y-1 text-gray-600">
+              <li>• Bank</li>
+              <li>• Accounts receivable (A/R)</li>
+              <li>• Other Current Assets</li>
+              <li>• Fixed Assets</li>
+              <li>• Other Assets</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-red-700 mb-1">Liabilities</h4>
+            <ul className="space-y-1 text-gray-600">
+              <li>• Accounts payable (A/P)</li>
+              <li>• Credit Card</li>
+              <li>• Other Current Liabilities</li>
+              <li>• Long Term Liabilities</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-blue-700 mb-1">Equity</h4>
+            <ul className="space-y-1 text-gray-600">
+              <li>• Equity</li>
+            </ul>
+            <div className="mt-3 text-xs text-gray-500">
+              <strong>Note:</strong> Income and expense accounts are not included as they belong on the P&L statement, not the balance sheet.
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
