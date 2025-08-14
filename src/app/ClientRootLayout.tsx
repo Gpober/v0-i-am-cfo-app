@@ -52,12 +52,12 @@ const navigation = [
   { name: "Overview", href: "/", icon: BarChart3 },
   { name: "P&L", href: "/financials", icon: TrendingUp },
   { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
+  { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
   {
     name: "Comparative Analysis",
     href: "/comparative-analysis",
     icon: BarChart2,
   },
-  { name: "Balance Sheet", href: "/balance-sheet", icon: FileText },
   { name: "A/R", href: "/accounts-receivable", icon: CreditCard },
   { name: "A/P", href: "/accounts-payable", icon: Users },
   { name: "Settings", href: "/settings", icon: Settings },
