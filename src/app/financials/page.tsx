@@ -2890,22 +2890,24 @@ export default function FinancialsPage() {
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Payee/Customer
+                        Account
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Memo
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
-                      </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Class
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Debit
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Credit
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {modalTransactionDetails.map((transaction, index) => {
-                      // Calculate the net amount for this transaction
                       const debitValue = transaction.debit
                         ? Number.parseFloat(
                             transaction.debit
@@ -2920,7 +2922,6 @@ export default function FinancialsPage() {
                               .replace(/[^0-9.-]/g, ""),
                           ) || 0
                         : 0;
-                      const netAmount = creditValue - debitValue;
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
@@ -2928,20 +2929,10 @@ export default function FinancialsPage() {
                             {formatDateDisplay(transaction.date)}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-900">
-                            {transaction.name ||
-                              transaction.vendor ||
-                              transaction.customer ||
-                              "N/A"}
+                            {transaction.account || "N/A"}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {transaction.memo || "N/A"}
-                          </td>
-                          <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${
-                              netAmount >= 0 ? "text-green-600" : "text-red-600"
-                            }`}
-                          >
-                            {formatCurrency(Math.abs(netAmount))}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             {transaction.class && (
@@ -2949,6 +2940,12 @@ export default function FinancialsPage() {
                                 {transaction.class}
                               </span>
                             )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                            {debitValue ? formatCurrency(debitValue) : "-"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                            {creditValue ? formatCurrency(creditValue) : "-"}
                           </td>
                         </tr>
                       );
