@@ -354,11 +354,12 @@ export default function BalanceSheetPage() {
       smartLog(`📊 Period Activity From: ${periodStart}`)
       smartLog(`🏢 Property Filter: "${selectedProperty}"`)
 
-      // Build query for all transactions up to the as-of date
+      // SINGLE QUERY: Get ALL balance sheet transactions up to as-of date
+      // We'll classify them in memory rather than multiple queries
       let query = supabase
         .from("journal_entry_lines")
         .select(
-          "entry_number, class, date, account, account_type, debit, credit, memo, customer, vendor, name, entry_bank_account, normal_balance, report_category",
+          "entry_number, class, date, account, account_type, debit, credit, memo, customer, vendor, name, normal_balance",
         )
         .lte("date", endDate)
         .order("date", { ascending: true })
@@ -371,7 +372,7 @@ export default function BalanceSheetPage() {
 
       if (error) throw error
 
-      smartLog(`📊 Found ${allTransactions.length} transactions`)
+      smartLog(`📊 Found ${allTransactions.length} total balance sheet transactions`)
 
       // Initialize account map
       const accountMap = new Map<string, any>()
@@ -379,7 +380,7 @@ export default function BalanceSheetPage() {
       // First, apply manual beginning balances
       await applyManualBeginningBalances(accountMap, endDate)
 
-      // Process all transactions
+      // Process ALL transactions and store them by account
       allTransactions.forEach((transaction: any) => {
         const account = transaction.account
         const accountType = transaction.account_type || "Unknown"
@@ -388,7 +389,7 @@ export default function BalanceSheetPage() {
           accountMap.set(account, {
             account,
             accountType,
-            allTransactions: [],
+            allTransactions: [], // ALL transactions for this account
             manualBalanceApplied: false,
           })
         }
@@ -417,6 +418,7 @@ export default function BalanceSheetPage() {
           }
         }
 
+        // Store ALL transactions - we'll classify them later for drill-down
         accountData.allTransactions.push({
           ...transaction,
           impact: transactionImpact,
@@ -430,52 +432,47 @@ export default function BalanceSheetPage() {
         )
       })
 
-      // CORRECTED BALANCE CALCULATION
+      // CLASSIFICATION: Now calculate balances by classifying the transactions
       accountMap.forEach((accountData) => {
         let beginningBalance = 0
         let periodActivity = 0
         let endingBalance = 0
-        const periodTransactions: any[] = []
 
-        // First, calculate ending balance (sum of all transactions)
-        accountData.allTransactions.forEach((tx: any) => {
-          endingBalance += tx.impact
-        })
-
-        // Then, calculate period activity (transactions within the period)
+        // Classify each transaction and calculate running balances
         accountData.allTransactions.forEach((tx: any) => {
           const transactionDate = parseDate(tx.date)
           
-          if (transactionDate !== "N/A" && transactionDate >= periodStart) {
+          // Add to ending balance (all transactions)
+          endingBalance += tx.impact
+          
+          // Classify: before period = beginning, during period = activity
+          if (transactionDate !== "N/A" && transactionDate < periodStart) {
+            beginningBalance += tx.impact
+          } else if (transactionDate !== "N/A" && transactionDate >= periodStart) {
             periodActivity += tx.impact
-            periodTransactions.push(tx)
           }
         })
 
-        // Beginning balance is ending balance minus period activity
-        beginningBalance = endingBalance - periodActivity
-
-        // Store calculated values
+        // Store classifications
         accountData.beginningBalance = beginningBalance
         accountData.periodActivity = periodActivity
         accountData.endingBalance = endingBalance
-        accountData.periodTransactions = periodTransactions
 
         // Debug logging for specific accounts
         if (accountData.account.includes("Cerro Vista") || accountData.account.includes("Vista")) {
-          smartLog(`🔍 ${accountData.account} Debug:`, {
-            beginningBalance,
-            periodActivity,
-            endingBalance,
-            transactionCount: accountData.allTransactions.length,
-            periodTransactionCount: periodTransactions.length,
+          smartLog(`🔍 ${accountData.account} Classifications:`, {
+            totalTransactions: accountData.allTransactions.length,
+            beginningBalance: `${formatCurrency(beginningBalance)} (${accountData.allTransactions.filter(tx => parseDate(tx.date) < periodStart).length} txns)`,
+            periodActivity: `${formatCurrency(periodActivity)} (${accountData.allTransactions.filter(tx => parseDate(tx.date) >= periodStart).length} txns)`,
+            endingBalance: `${formatCurrency(endingBalance)} (all ${accountData.allTransactions.length} txns)`,
+            periodStart,
           })
         }
       })
 
-      smartLog(`✅ Processed ${accountMap.size} accounts`)
+      smartLog(`✅ Processed ${accountMap.size} accounts with transaction classifications`)
 
-      // Categorize accounts and create balance sheet
+      // Rest of the categorization logic remains the same...
       const assetAccounts: BalanceSheetAccount[] = []
       const liabilityAccounts: BalanceSheetAccount[] = []
       const equityAccounts: BalanceSheetAccount[] = []
@@ -491,7 +488,7 @@ export default function BalanceSheetPage() {
             balance: accountData.endingBalance,
             beginningBalance: accountData.beginningBalance,
             periodActivity: accountData.periodActivity,
-            transactions: accountData.allTransactions,
+            transactions: accountData.allTransactions, // ALL transactions available for drill-down
           }
 
           if (
