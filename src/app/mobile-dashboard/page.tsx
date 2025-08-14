@@ -52,6 +52,7 @@ interface Transaction {
   payee?: string | null;
   memo?: string | null;
   className?: string | null;
+  entryNumber?: string;
 }
 
 interface JournalRow {
@@ -67,6 +68,16 @@ interface JournalRow {
   customer?: string | null;
   vendor?: string | null;
   name?: string | null;
+  entry_number?: string;
+}
+
+interface JournalEntryLine {
+  date: string;
+  account: string;
+  memo: string | null;
+  class: string | null;
+  debit: number | null;
+  credit: number | null;
 }
 
 const getMonthName = (m: number) =>
@@ -139,6 +150,9 @@ export default function EnhancedMobileDashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [rankingMetric, setRankingMetric] = useState<RankingMetric | null>(null);
+  const [journalEntryLines, setJournalEntryLines] = useState<JournalEntryLine[]>([]);
+  const [showJournalModal, setShowJournalModal] = useState(false);
+  const [journalTitle, setJournalTitle] = useState("");
 
   const transactionTotal = useMemo(
     () => transactions.reduce((sum, t) => sum + t.amount, 0),
@@ -563,7 +577,7 @@ export default function EnhancedMobileDashboard() {
     let query = supabase
       .from("journal_entry_lines")
       .select(
-        "date, debit, credit, account, class, report_category, normal_balance, memo, customer, vendor, name",
+        "date, debit, credit, account, class, report_category, normal_balance, memo, customer, vendor, name, entry_number",
       )
       .eq("account", account)
       .gte("date", start)
@@ -596,6 +610,7 @@ export default function EnhancedMobileDashboard() {
           payee: row.customer || row.vendor || row.name,
           memo: row.memo,
           className: row.class,
+          entryNumber: row.entry_number,
         };
       });
     let run = 0;
@@ -606,6 +621,22 @@ export default function EnhancedMobileDashboard() {
     setTransactions(list);
     setSelectedCategory(account);
     setView("detail");
+  };
+
+  const openJournalEntry = async (entryNumber?: string) => {
+    if (!entryNumber) return;
+    const { data, error } = await supabase
+      .from("journal_entry_lines")
+      .select("date, account, memo, class, debit, credit")
+      .eq("entry_number", entryNumber)
+      .order("line_sequence");
+    if (error) {
+      console.error("Error fetching journal entry lines:", error);
+      return;
+    }
+    setJournalEntryLines(data || []);
+    setJournalTitle(`Journal Entry ${entryNumber}`);
+    setShowJournalModal(true);
   };
 
   const back = () => {
@@ -1813,7 +1844,7 @@ export default function EnhancedMobileDashboard() {
 
       {view === "detail" && (
         <div>
-          <button 
+          <button
             onClick={back}
             style={{
               display: 'flex',
@@ -1855,7 +1886,9 @@ export default function EnhancedMobileDashboard() {
                   padding: '16px',
                   border: `1px solid ${BRAND_COLORS.gray[200]}`,
                   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                  cursor: 'pointer',
                 }}
+                onClick={() => openJournalEntry(t.entryNumber)}
               >
                 <div
                   style={{
@@ -1930,6 +1963,91 @@ export default function EnhancedMobileDashboard() {
             }}
           >
             {reportType === "pl" ? "Total Net Income" : "Total Net Cash Flow"}: {formatCurrency(transactionTotal)}
+          </div>
+        </div>
+      )}
+      {showJournalModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '8px',
+              width: '90%',
+              maxWidth: '600px',
+              maxHeight: '80vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 16px',
+                borderBottom: `1px solid ${BRAND_COLORS.gray[200]}`,
+              }}
+            >
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#0f172a' }}>
+                {journalTitle}
+              </h3>
+              <button
+                onClick={() => setShowJournalModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <X />
+              </button>
+            </div>
+            <div style={{ overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px', color: '#475569' }}>Date</th>
+                    <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px', color: '#475569' }}>Account</th>
+                    <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px', color: '#475569' }}>Memo</th>
+                    <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px', color: '#475569' }}>Class</th>
+                    <th style={{ textAlign: 'right', padding: '8px', fontSize: '12px', color: '#475569' }}>Debit</th>
+                    <th style={{ textAlign: 'right', padding: '8px', fontSize: '12px', color: '#475569' }}>Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {journalEntryLines.map((line, idx) => (
+                    <tr key={idx} style={{ borderTop: `1px solid ${BRAND_COLORS.gray[100]}` }}>
+                      <td style={{ padding: '8px', fontSize: '12px', color: '#0f172a' }}>
+                        {new Date(line.date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </td>
+                      <td style={{ padding: '8px', fontSize: '12px', color: '#0f172a' }}>{line.account}</td>
+                      <td style={{ padding: '8px', fontSize: '12px', color: '#475569' }}>{line.memo || ''}</td>
+                      <td style={{ padding: '8px', fontSize: '12px', color: '#475569' }}>{line.class || ''}</td>
+                      <td style={{ padding: '8px', textAlign: 'right', fontSize: '12px', color: BRAND_COLORS.danger }}>
+                        {formatCurrency(Number(line.debit || 0))}
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'right', fontSize: '12px', color: BRAND_COLORS.success }}>
+                        {formatCurrency(Number(line.credit || 0))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
