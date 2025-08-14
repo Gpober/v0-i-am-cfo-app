@@ -389,7 +389,9 @@ export default function EnhancedMobileDashboard() {
       const debit = Number(row.debit) || 0;
       const credit = Number(row.credit) || 0;
       const amount =
-        row.report_category === "transfer" ? debit - credit : credit - debit;
+        row.report_category === "transfer"
+          ? debit - credit
+          : row.normal_balance || credit - debit;
       const classification = classifyTransaction(
         row.account_type,
         row.report_category,
@@ -440,7 +442,9 @@ export default function EnhancedMobileDashboard() {
           amount = type === "revenue" ? credit - debit : debit - credit;
         } else {
           amount =
-            row.report_category === "transfer" ? debit - credit : credit - debit;
+            row.report_category === "transfer"
+              ? debit - credit
+              : row.normal_balance || credit - debit;
         }
         return {
           date: row.date,
