@@ -35,14 +35,14 @@ export default function SettingsPage() {
     try {
       const { data } = await supabase
         .from("balance_sheet_accounts")
-        .select("account_name, balance_sheet_categories(type)")
-        .in("account_name", accountNames)
+        .select("account, account_type")
+        .in("account", accountNames)
 
       const typeMap: Record<string, string> = {}
       data?.forEach((row: any) => {
-        const type = row.balance_sheet_categories?.type
+        const type = row.account_type
         if (type)
-          typeMap[row.account_name] =
+          typeMap[row.account] =
             type.charAt(0).toUpperCase() + type.slice(1)
       })
 
