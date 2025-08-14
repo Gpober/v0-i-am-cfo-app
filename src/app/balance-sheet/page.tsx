@@ -47,6 +47,12 @@ interface BalanceSheetSection {
   total: number
 }
 
+interface AccountTypeGroup {
+  accountType: string
+  accounts: BalanceSheetAccount[]
+  total: number
+}
+
 type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
 
 // Generate months and years lists
@@ -186,6 +192,47 @@ export default function BalanceSheetPage() {
       // Both are parents of same type, sort by balance (largest first)
       return Math.abs(b.balance) - Math.abs(a.balance)
     })
+  }
+
+  // Group accounts by account type for subtotals
+  const groupAccountsByType = (accounts: BalanceSheetAccount[], typeOrder: string[]): AccountTypeGroup[] => {
+    const groups = new Map<string, BalanceSheetAccount[]>()
+    
+    // Group accounts by type
+    accounts.forEach(account => {
+      if (!groups.has(account.accountType)) {
+        groups.set(account.accountType, [])
+      }
+      groups.get(account.accountType)!.push(account)
+    })
+
+    // Convert to ordered array with totals
+    const orderedGroups: AccountTypeGroup[] = []
+    typeOrder.forEach(accountType => {
+      if (groups.has(accountType)) {
+        const typeAccounts = groups.get(accountType)!
+        const total = typeAccounts.reduce((sum, acc) => sum + acc.balance, 0)
+        orderedGroups.push({
+          accountType,
+          accounts: typeAccounts,
+          total
+        })
+      }
+    })
+
+    // Add any remaining account types not in the predefined order
+    groups.forEach((typeAccounts, accountType) => {
+      if (!typeOrder.includes(accountType)) {
+        const total = typeAccounts.reduce((sum, acc) => sum + acc.balance, 0)
+        orderedGroups.push({
+          accountType,
+          accounts: typeAccounts,
+          total
+        })
+      }
+    })
+
+    return orderedGroups
   }
 
   // Calculate date range based on selected period
@@ -733,6 +780,169 @@ export default function BalanceSheetPage() {
     setShowTransactionModal(true)
   }
 
+  // Render enhanced balance sheet section with account type subtotals
+  const renderBalanceSheetSection = (
+    section: BalanceSheetSection,
+    colorTheme: 'green' | 'red' | 'blue',
+    typeOrder: string[],
+    showSubtotals: boolean = true
+  ) => {
+    const groups = groupAccountsByType(section.accounts, typeOrder)
+    
+    const colorClasses = {
+      green: {
+        header: 'bg-green-50 text-green-800',
+        subtotal: 'bg-green-100 text-green-800',
+        total: 'text-green-700',
+        dot: 'bg-green-500'
+      },
+      red: {
+        header: 'bg-red-50 text-red-800',
+        subtotal: 'bg-red-100 text-red-800',
+        total: 'text-red-700',
+        dot: 'bg-red-500'
+      },
+      blue: {
+        header: 'bg-blue-50 text-blue-800',
+        subtotal: 'bg-blue-100 text-blue-800',
+        total: 'text-blue-700',
+        dot: 'bg-blue-500'
+      }
+    }
+
+    const colors = colorClasses[colorTheme]
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className={`p-4 sm:p-6 border-b border-gray-200 ${colors.header}`}>
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold flex items-center">
+              <span className={`w-4 h-4 ${colors.dot} rounded-full mr-3`}></span>
+              {section.title}
+            </h3>
+            <span className={`text-xl font-bold ${colors.total}`}>
+              {formatCurrency(section.title === 'Liabilities' ? Math.abs(section.total) : section.total)}
+            </span>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Account
+                </th>
+                <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Type
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Beginning
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Activity
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ending Balance
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {groups.map((group, groupIndex) => (
+                <React.Fragment key={group.accountType}>
+                  {/* Individual accounts in this type */}
+                  {group.accounts.map((account) => {
+                    const hierarchy = parseAccountHierarchy(account.account)
+                    return (
+                      <tr key={account.account} className="hover:bg-gray-50">
+                        <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
+                          <button
+                            onClick={() => showTransactionDetails(account)}
+                            className="text-left hover:text-blue-600 hover:underline"
+                          >
+                            <div className={`truncate max-w-[150px] sm:max-w-none ${hierarchy.isSubAccount ? 'text-gray-700 text-sm' : ''}`} title={account.account}>
+                              {hierarchy.isSubAccount ? hierarchy.displayName : hierarchy.parentAccount}
+                            </div>
+                            <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
+                          </button>
+                        </td>
+                        <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
+                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                          <button
+                            onClick={() => showTransactionDetails(account, 'beginning')}
+                            className={`hover:underline ${section.title === 'Liabilities' 
+                              ? (account.beginningBalance <= 0 ? "text-red-600" : "text-green-600")
+                              : (account.beginningBalance >= 0 ? "text-green-600" : "text-red-600")
+                            } ${
+                              account.beginningBalance !== 0 ? "hover:bg-green-50" : "cursor-default"
+                            } px-2 py-1 rounded transition-colors`}
+                            disabled={account.beginningBalance === 0}
+                          >
+                            {formatCurrency(section.title === 'Liabilities' ? Math.abs(account.beginningBalance) : account.beginningBalance)}
+                          </button>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                          <button
+                            onClick={() => showTransactionDetails(account, 'period')}
+                            className={`hover:underline ${section.title === 'Liabilities'
+                              ? (account.periodActivity <= 0 ? "text-red-600" : "text-green-600")
+                              : (account.periodActivity >= 0 ? "text-green-600" : "text-red-600")
+                            } ${
+                              account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
+                            } px-2 py-1 rounded transition-colors`}
+                            disabled={account.periodActivity === 0}
+                          >
+                            {account.periodActivity !== 0 
+                              ? formatCurrency(section.title === 'Liabilities' ? Math.abs(account.periodActivity) : account.periodActivity) 
+                              : "-"}
+                          </button>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 text-sm text-right">
+                          <button
+                            onClick={() => showTransactionDetails(account, 'ending')}
+                            className={`font-bold hover:underline ${section.title === 'Liabilities'
+                              ? (account.balance <= 0 ? "text-red-600" : "text-green-600")
+                              : (account.balance >= 0 ? "text-green-600" : "text-red-600")
+                            } hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
+                          >
+                            {formatCurrency(section.title === 'Liabilities' ? Math.abs(account.balance) : account.balance)}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  
+                  {/* Subtotal for this account type - but not for Equity as requested */}
+                  {showSubtotals && section.title !== 'Equity' && group.accounts.length > 1 && (
+                    <tr className={`${colors.subtotal} border-t border-gray-200`}>
+                      <td className="px-3 sm:px-6 py-2 text-sm font-semibold">
+                        Total {group.accountType}
+                      </td>
+                      <td className="hidden sm:table-cell px-6 py-2"></td>
+                      <td className="px-3 sm:px-6 py-2 text-sm font-semibold text-right">
+                        {formatCurrency(section.title === 'Liabilities' 
+                          ? Math.abs(group.accounts.reduce((sum, acc) => sum + acc.beginningBalance, 0))
+                          : group.accounts.reduce((sum, acc) => sum + acc.beginningBalance, 0))}
+                      </td>
+                      <td className="px-3 sm:px-6 py-2 text-sm font-semibold text-right">
+                        {formatCurrency(section.title === 'Liabilities'
+                          ? Math.abs(group.accounts.reduce((sum, acc) => sum + acc.periodActivity, 0))
+                          : group.accounts.reduce((sum, acc) => sum + acc.periodActivity, 0))}
+                      </td>
+                      <td className="px-3 sm:px-6 py-2 text-sm font-semibold text-right">
+                        {formatCurrency(section.title === 'Liabilities' ? Math.abs(group.total) : group.total)}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchFilters()
@@ -761,7 +971,7 @@ export default function BalanceSheetPage() {
                       : `${timePeriod} Period`}
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                💰 Enhanced with corrected beginning balance calculations
+                💰 Enhanced with account type subtotals and corrected balance calculations
               </p>
             </div>
 
@@ -927,281 +1137,20 @@ export default function BalanceSheetPage() {
               </div>
             )}
 
-          {/* Assets Section */}
-          {!isLoading && assets.accounts.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-gray-200 bg-green-50">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-green-800 flex items-center">
-                    <span className="w-4 h-4 bg-green-500 rounded-full mr-3"></span>
-                    Assets
-                  </h3>
-                  <span className={`text-xl font-bold ${assets.total >= 0 ? "text-green-700" : "text-red-700"}`}>
-                    {formatCurrency(assets.total)}
-                  </span>
-                </div>
-              </div>
+          {/* Assets Section with Subtotals */}
+          {!isLoading && assets.accounts.length > 0 && 
+            renderBalanceSheetSection(assets, 'green', assetTypeOrder, true)
+          }
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account
-                      </th>
-                      <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Beginning
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Activity
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ending Balance
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {assets.accounts.map((account) => {
-                      const hierarchy = parseAccountHierarchy(account.account)
-                      return (
-                        <tr key={account.account} className="hover:bg-gray-50">
-                          <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
-                            <button
-                              onClick={() => showTransactionDetails(account)}
-                              className="text-left hover:text-blue-600 hover:underline"
-                            >
-                              <div className={`truncate max-w-[150px] sm:max-w-none ${hierarchy.isSubAccount ? 'text-gray-700 text-sm' : ''}`} title={account.account}>
-                                {hierarchy.isSubAccount ? hierarchy.displayName : hierarchy.parentAccount}
-                              </div>
-                              <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
-                            </button>
-                          </td>
-                          <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'beginning')}
-                              className={`hover:underline ${account.beginningBalance >= 0 ? "text-green-600" : "text-red-600"} ${
-                                account.beginningBalance !== 0 ? "hover:bg-green-50" : "cursor-default"
-                              } px-2 py-1 rounded transition-colors`}
-                              disabled={account.beginningBalance === 0}
-                            >
-                              {formatCurrency(account.beginningBalance)}
-                            </button>
-                          </td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'period')}
-                              className={`hover:underline ${account.periodActivity >= 0 ? "text-green-600" : "text-red-600"} ${
-                                account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
-                              } px-2 py-1 rounded transition-colors`}
-                              disabled={account.periodActivity === 0}
-                            >
-                              {account.periodActivity !== 0 ? formatCurrency(account.periodActivity) : "-"}
-                            </button>
-                          </td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'ending')}
-                              className={`font-bold hover:underline ${account.balance >= 0 ? "text-green-600" : "text-red-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
-                            >
-                              {formatCurrency(account.balance)}
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          {/* Liabilities Section with Subtotals */}
+          {!isLoading && liabilities.accounts.length > 0 && 
+            renderBalanceSheetSection(liabilities, 'red', liabilityTypeOrder, true)
+          }
 
-          {/* Liabilities Section */}
-          {!isLoading && liabilities.accounts.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-gray-200 bg-red-50">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-red-800 flex items-center">
-                    <span className="w-4 h-4 bg-red-500 rounded-full mr-3"></span>
-                    Liabilities
-                  </h3>
-                  <span className={`text-xl font-bold ${liabilities.total >= 0 ? "text-red-700" : "text-green-700"}`}>
-                    {formatCurrency(Math.abs(liabilities.total))}
-                  </span>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account
-                      </th>
-                      <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Beginning
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Activity
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ending Balance
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {liabilities.accounts.map((account) => {
-                      const hierarchy = parseAccountHierarchy(account.account)
-                      return (
-                        <tr key={account.account} className="hover:bg-gray-50">
-                          <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
-                            <button
-                              onClick={() => showTransactionDetails(account)}
-                              className="text-left hover:text-blue-600 hover:underline"
-                            >
-                              <div className={`truncate max-w-[150px] sm:max-w-none ${hierarchy.isSubAccount ? 'text-gray-700 text-sm' : ''}`} title={account.account}>
-                                {hierarchy.isSubAccount ? hierarchy.displayName : hierarchy.parentAccount}
-                              </div>
-                              <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
-                            </button>
-                          </td>
-                          <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'beginning')}
-                              className={`hover:underline ${account.beginningBalance <= 0 ? "text-red-600" : "text-green-600"} ${
-                                account.beginningBalance !== 0 ? "hover:bg-red-50" : "cursor-default"
-                              } px-2 py-1 rounded transition-colors`}
-                              disabled={account.beginningBalance === 0}
-                            >
-                              {formatCurrency(Math.abs(account.beginningBalance))}
-                            </button>
-                          </td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'period')}
-                              className={`hover:underline ${account.periodActivity <= 0 ? "text-red-600" : "text-green-600"} ${
-                                account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
-                              } px-2 py-1 rounded transition-colors`}
-                              disabled={account.periodActivity === 0}
-                            >
-                              {account.periodActivity !== 0 ? formatCurrency(Math.abs(account.periodActivity)) : "-"}
-                            </button>
-                          </td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'ending')}
-                              className={`font-bold hover:underline ${account.balance <= 0 ? "text-red-600" : "text-green-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
-                            >
-                              {formatCurrency(Math.abs(account.balance))}
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Equity Section */}
-          {!isLoading && equity.accounts.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-gray-200 bg-blue-50">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-blue-800 flex items-center">
-                    <span className="w-4 h-4 bg-blue-500 rounded-full mr-3"></span>
-                    Equity
-                  </h3>
-                  <span className={`text-xl font-bold ${equity.total >= 0 ? "text-blue-700" : "text-red-700"}`}>
-                    {formatCurrency(equity.total)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Account
-                      </th>
-                      <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Beginning
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Activity
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ending Balance
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {equity.accounts.map((account) => {
-                      const hierarchy = parseAccountHierarchy(account.account)
-                      return (
-                        <tr key={account.account} className="hover:bg-gray-50">
-                          <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900">
-                            <button
-                              onClick={() => showTransactionDetails(account)}
-                              className="text-left hover:text-blue-600 hover:underline"
-                            >
-                              <div className={`truncate max-w-[150px] sm:max-w-none ${hierarchy.isSubAccount ? 'text-gray-700 text-sm' : ''}`} title={account.account}>
-                                {hierarchy.isSubAccount ? hierarchy.displayName : hierarchy.parentAccount}
-                              </div>
-                              <div className="sm:hidden text-xs text-gray-500 mt-1">{account.accountType}</div>
-                            </button>
-                          </td>
-                          <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">{account.accountType}</td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'beginning')}
-                              className={`hover:underline ${account.beginningBalance >= 0 ? "text-blue-600" : "text-red-600"} ${
-                                account.beginningBalance !== 0 ? "hover:bg-blue-50" : "cursor-default"
-                              } px-2 py-1 rounded transition-colors`}
-                              disabled={account.beginningBalance === 0}
-                            >
-                              {formatCurrency(account.beginningBalance)}
-                            </button>
-                          </td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'period')}
-                              className={`hover:underline ${account.periodActivity >= 0 ? "text-blue-600" : "text-red-600"} ${
-                                account.periodActivity !== 0 ? "hover:bg-blue-50" : "cursor-default"
-                              } px-2 py-1 rounded transition-colors`}
-                              disabled={account.periodActivity === 0}
-                            >
-                              {account.periodActivity !== 0 ? formatCurrency(account.periodActivity) : "-"}
-                            </button>
-                          </td>
-                          <td className="px-3 sm:px-6 py-4 text-sm text-right">
-                            <button
-                              onClick={() => showTransactionDetails(account, 'ending')}
-                              className={`font-bold hover:underline ${account.balance >= 0 ? "text-blue-600" : "text-red-600"} hover:bg-gray-50 px-2 py-1 rounded transition-colors`}
-                            >
-                              {formatCurrency(account.balance)}
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          {/* Equity Section without Subtotals (as requested) */}
+          {!isLoading && equity.accounts.length > 0 && 
+            renderBalanceSheetSection(equity, 'blue', ["Equity"], false)
+          }
 
           {/* No Data State */}
           {!isLoading &&
