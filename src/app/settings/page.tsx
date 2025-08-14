@@ -114,11 +114,6 @@ export default function SettingsPage() {
     if (!entries.length) alert("No balances found in uploaded CSV.")
     await applyAccountTypes(entries)
 
-    const total = entries.reduce((sum, e) => sum + Number(e.balance || 0), 0)
-    if (Math.abs(total) > 0.001) {
-      alert(`Imported balances do not balance. Total: ${total}`)
-    }
-
     setBalances(
       entries.length
         ? entries
@@ -137,11 +132,6 @@ export default function SettingsPage() {
       return
     }
     await applyAccountTypes(filtered)
-    const total = filtered.reduce((sum, e) => sum + Number(e.balance || 0), 0)
-    if (Math.abs(total) > 0.001) {
-      alert(`Balances do not balance. Total: ${total}`)
-      return
-    }
     const data = {
       date,
       balances: filtered.map((b) => ({
