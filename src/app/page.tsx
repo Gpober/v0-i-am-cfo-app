@@ -10,6 +10,9 @@ import {
   CreditCard,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
   RefreshCw,
   BarChart3,
   AlertTriangle,
@@ -183,6 +186,14 @@ export default function FinancialOverviewPage() {
   ]);
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  type SortColumn =
+    | "revenue"
+    | "expenses"
+    | "netIncome"
+    | "margin"
+    | "transactionCount";
+  const [sortColumn, setSortColumn] = useState<SortColumn>("netIncome");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const orgId = "1";
 
   useEffect(() => {
@@ -1068,17 +1079,37 @@ export default function FinancialOverviewPage() {
 
   const { startDate: propertyStart, endDate: propertyEnd } =
     calculateDateRange();
+  const sortLabels = {
+    revenue: "revenue",
+    expenses: "expenses",
+    netIncome: "net income",
+    margin: "margin",
+    transactionCount: "transactions",
+  } as const;
   const propertySubtitle =
     timePeriod === "Monthly"
-      ? `Ranked by net income for ${selectedMonth} ${selectedYear}`
-      : `Ranked by net income for ${formatDate(propertyStart)} - ${formatDate(propertyEnd)}`;
+      ? `Top 10 properties sorted by ${sortLabels[sortColumn]} for ${selectedMonth} ${selectedYear}`
+      : `Top 10 properties sorted by ${sortLabels[sortColumn]} for ${formatDate(propertyStart)} - ${formatDate(propertyEnd)}`;
+
+  const sortedProperties = useMemo(() => {
+    if (!financialData?.propertyBreakdown) return [];
+    return [...financialData.propertyBreakdown]
+      .map((p) => ({
+        ...p,
+        margin: p.revenue ? (p.netIncome / p.revenue) * 100 : 0,
+      }))
+      .sort((a, b) => {
+        const aVal =
+          sortColumn === "margin" ? a.margin : (a as any)[sortColumn];
+        const bVal =
+          sortColumn === "margin" ? b.margin : (b as any)[sortColumn];
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      })
+      .slice(0, 10);
+  }, [financialData, sortColumn, sortDirection]);
 
   const topPropertyTotals = useMemo(() => {
-    if (!financialData?.propertyBreakdown) {
-      return { revenue: 0, expenses: 0, netIncome: 0, margin: 0 };
-    }
-    const top = financialData.propertyBreakdown.slice(0, 10);
-    const totals = top.reduce(
+    const totals = sortedProperties.reduce(
       (acc, p) => {
         acc.revenue += p.revenue || 0;
         acc.expenses += p.expenses || 0;
@@ -1091,7 +1122,16 @@ export default function FinancialOverviewPage() {
       ...totals,
       margin: totals.revenue ? (totals.netIncome / totals.revenue) * 100 : 0,
     };
-  }, [financialData]);
+  }, [sortedProperties]);
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
 
   const TrendTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -1901,31 +1941,102 @@ export default function FinancialOverviewPage() {
                         Property
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Revenue
+                        <button
+                          type="button"
+                          onClick={() => handleSort("revenue")}
+                          className="flex items-center"
+                        >
+                          Revenue
+                          {sortColumn === "revenue" ? (
+                            sortDirection === "asc" ? (
+                              <ArrowUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ArrowDown className="ml-1 h-4 w-4" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Expenses
+                        <button
+                          type="button"
+                          onClick={() => handleSort("expenses")}
+                          className="flex items-center"
+                        >
+                          Expenses
+                          {sortColumn === "expenses" ? (
+                            sortDirection === "asc" ? (
+                              <ArrowUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ArrowDown className="ml-1 h-4 w-4" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Net Income
+                        <button
+                          type="button"
+                          onClick={() => handleSort("netIncome")}
+                          className="flex items-center"
+                        >
+                          Net Income
+                          {sortColumn === "netIncome" ? (
+                            sortDirection === "asc" ? (
+                              <ArrowUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ArrowDown className="ml-1 h-4 w-4" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Margin
+                        <button
+                          type="button"
+                          onClick={() => handleSort("margin")}
+                          className="flex items-center"
+                        >
+                          Margin
+                          {sortColumn === "margin" ? (
+                            sortDirection === "asc" ? (
+                              <ArrowUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ArrowDown className="ml-1 h-4 w-4" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Transactions
+                        <button
+                          type="button"
+                          onClick={() => handleSort("transactionCount")}
+                          className="flex items-center"
+                        >
+                          Transactions
+                          {sortColumn === "transactionCount" ? (
+                            sortDirection === "asc" ? (
+                              <ArrowUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ArrowDown className="ml-1 h-4 w-4" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          )}
+                        </button>
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {financialData.propertyBreakdown
-                      .slice(0, 10)
-                      .map((property, index) => {
-                        const margin = property.revenue
-                          ? (property.netIncome / property.revenue) * 100
-                          : 0;
-                        return (
-                          <tr key={property.name} className="hover:bg-gray-50">
+                    {sortedProperties.map((property, index) => {
+                      const margin = property.margin;
+                      return (
+                        <tr key={property.name} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
                                 <div
