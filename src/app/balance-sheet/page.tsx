@@ -602,27 +602,30 @@ export default function BalanceSheetPage() {
         const accountType = accountData.accountType
         const endingBalance = accountData.endingBalance
 
-        // INCOME ACCOUNTS: Credit balance is positive income
+        // INCOME ACCOUNTS: Already calculated as Credit - Debit, so positive balance = income
         if (accountType === "Income") {
-          totalIncome += endingBalance
+          totalIncome += endingBalance // endingBalance is already Credit - Debit
           console.log(`📈 INCOME: ${accountData.account} = ${formatCurrency(endingBalance)}`)
         }
         else if (accountType === "Other Income") {
-          totalOtherIncome += endingBalance
+          totalOtherIncome += endingBalance // endingBalance is already Credit - Debit
           console.log(`📈 OTHER INCOME: ${accountData.account} = ${formatCurrency(endingBalance)}`)
         }
-        // EXPENSE ACCOUNTS: Debit balance is positive expense (but we need positive values for subtraction)
+        // EXPENSE ACCOUNTS: Already calculated as Debit - Credit, so positive balance = expense
         else if (accountType === "Cost of Goods Sold") {
-          totalExpenses += Math.abs(endingBalance) // Convert to positive for subtraction
-          console.log(`📉 COGS: ${accountData.account} = ${formatCurrency(Math.abs(endingBalance))}`)
+          // For expenses: positive endingBalance = expense amount to subtract from income
+          totalExpenses += endingBalance > 0 ? endingBalance : 0
+          console.log(`📉 COGS: ${accountData.account} = ${formatCurrency(endingBalance > 0 ? endingBalance : 0)}`)
         }
         else if (accountType === "Expenses") {
-          totalExpenses += Math.abs(endingBalance) // Convert to positive for subtraction
-          console.log(`📉 EXPENSES: ${accountData.account} = ${formatCurrency(Math.abs(endingBalance))}`)
+          // For expenses: positive endingBalance = expense amount to subtract from income
+          totalExpenses += endingBalance > 0 ? endingBalance : 0
+          console.log(`📉 EXPENSES: ${accountData.account} = ${formatCurrency(endingBalance > 0 ? endingBalance : 0)}`)
         }
         else if (accountType === "Other Expense") {
-          totalOtherExpenses += Math.abs(endingBalance) // Convert to positive for subtraction
-          console.log(`📉 OTHER EXPENSE: ${accountData.account} = ${formatCurrency(Math.abs(endingBalance))}`)
+          // For expenses: positive endingBalance = expense amount to subtract from income
+          totalOtherExpenses += endingBalance > 0 ? endingBalance : 0
+          console.log(`📉 OTHER EXPENSE: ${accountData.account} = ${formatCurrency(endingBalance > 0 ? endingBalance : 0)}`)
         }
       })
 
