@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { RefreshCw, X } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -304,9 +303,7 @@ export default function BalanceSheetPage() {
     try {
       let manualBalanceQuery = supabase
         .from("balance_sheet_balances")
-        .select(
-          "balance_amount, balance_date, property_class, balance_sheet_accounts(account_name)",
-        )
+        .select("balance_amount, balance_date, property_class, balance_sheet_accounts!inner(account_name)")
         .lte("balance_date", endDate)
         .order("balance_date", { ascending: false })
 
