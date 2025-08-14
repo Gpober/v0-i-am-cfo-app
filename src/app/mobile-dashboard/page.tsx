@@ -79,6 +79,16 @@ type Insight = {
   type: "success" | "warning" | "info";
 };
 
+type RankingMetric =
+  | "revenue"
+  | "margin"
+  | "netIncome"
+  | "growth"
+  | "operating"
+  | "netCash"
+  | "investing"
+  | "stability";
+
 const insights: Insight[] = [
   {
     title: "Revenue trending up",
@@ -128,6 +138,7 @@ export default function EnhancedMobileDashboard() {
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [rankingMetric, setRankingMetric] = useState<RankingMetric | null>(null);
 
   const transactionTotal = useMemo(
     () => transactions.reduce((sum, t) => sum + t.amount, 0),
@@ -376,6 +387,76 @@ export default function EnhancedMobileDashboard() {
     return formatCurrency(n);
   };
 
+  const rankingLabels: Record<RankingMetric, string> = {
+    revenue: "Revenue",
+    margin: "Margin",
+    netIncome: "Net Income",
+    growth: "Revenue",
+    operating: "Operating Cash",
+    netCash: "Net Cash",
+    investing: "Investing",
+    stability: "Net Cash",
+  };
+
+  const rankedProperties = useMemo(() => {
+    if (!rankingMetric) return [];
+    const arr = [...properties];
+    switch (rankingMetric) {
+      case "revenue":
+        return arr.sort((a, b) => (b.revenue || 0) - (a.revenue || 0));
+      case "margin":
+        return arr.sort((a, b) => {
+          const mA = a.revenue ? (a.netIncome || 0) / (a.revenue || 1) : -Infinity;
+          const mB = b.revenue ? (b.netIncome || 0) / (b.revenue || 1) : -Infinity;
+          return mB - mA;
+        });
+      case "netIncome":
+        return arr.sort((a, b) => (b.netIncome || 0) - (a.netIncome || 0));
+      case "growth":
+        return arr.sort((a, b) => (b.revenue || 0) - (a.revenue || 0));
+      case "operating":
+        return arr.sort((a, b) => (b.operating || 0) - (a.operating || 0));
+      case "netCash":
+        return arr.sort(
+          (a, b) =>
+            (b.operating || 0) + (b.financing || 0) + (b.investing || 0) -
+            ((a.operating || 0) + (a.financing || 0) + (a.investing || 0)),
+        );
+      case "investing":
+        return arr.sort((a, b) => (a.investing || 0) - (b.investing || 0));
+      default:
+        return arr;
+    }
+  }, [properties, rankingMetric]);
+
+  const formatRankingValue = (p: PropertySummary) => {
+    switch (rankingMetric) {
+      case "margin":
+        const m = p.revenue ? (p.netIncome || 0) / (p.revenue || 1) : 0;
+        return `${(m * 100).toFixed(1)}%`;
+      case "netCash":
+        return formatCompactCurrency(
+          (p.operating || 0) + (p.financing || 0) + (p.investing || 0),
+        );
+      case "operating":
+        return formatCompactCurrency(p.operating || 0);
+      case "investing":
+        return formatCompactCurrency(p.investing || 0);
+      case "revenue":
+        return formatCompactCurrency(p.revenue || 0);
+      case "growth":
+        return formatCompactCurrency(p.revenue || 0);
+      case "netIncome":
+      default:
+        return formatCompactCurrency(p.netIncome || 0);
+    }
+  };
+
+  const showRanking = (metric: RankingMetric) => {
+    setRankingMetric(metric);
+    setView("summary");
+  };
+
   const handlePropertySelect = async (name: string | null) => {
     setSelectedProperty(name);
     if (reportType === "pl") await loadPL(name);
@@ -530,7 +611,10 @@ export default function EnhancedMobileDashboard() {
   const back = () => {
     if (view === "detail") setView("report");
     else if (view === "report") setView("overview");
-    else if (view === "summary") setView("overview");
+    else if (view === "summary") {
+      setRankingMetric(null);
+      setView("overview");
+    }
   };
 
   return (
@@ -853,14 +937,15 @@ export default function EnhancedMobileDashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                 {reportType === "pl" ? (
                   <>
-                    <div style={{
+                    <div onClick={() => showRanking("revenue")} style={{
                       background: 'white',
                       borderRadius: '8px',
                       padding: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: `1px solid ${BRAND_COLORS.warning}33`
+                      border: `1px solid ${BRAND_COLORS.warning}33`,
+                      cursor: 'pointer'
                     }}>
                       <span style={{ fontSize: '20px' }}>👑</span>
                       <div>
@@ -872,14 +957,15 @@ export default function EnhancedMobileDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div style={{
+                    <div onClick={() => showRanking("margin")} style={{
                       background: 'white',
                       borderRadius: '8px',
                       padding: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: `1px solid ${BRAND_COLORS.success}33`
+                      border: `1px solid ${BRAND_COLORS.success}33`,
+                      cursor: 'pointer'
                     }}>
                       <span style={{ fontSize: '20px' }}>🏅</span>
                       <div>
@@ -891,14 +977,15 @@ export default function EnhancedMobileDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div style={{
+                    <div onClick={() => showRanking("netIncome")} style={{
                       background: 'white',
                       borderRadius: '8px',
                       padding: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: `1px solid ${BRAND_COLORS.primary}33`
+                      border: `1px solid ${BRAND_COLORS.primary}33`,
+                      cursor: 'pointer'
                     }}>
                       <span style={{ fontSize: '20px' }}>💎</span>
                       <div>
@@ -910,14 +997,15 @@ export default function EnhancedMobileDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div style={{
+                    <div onClick={() => showRanking("growth")} style={{
                       background: 'white',
                       borderRadius: '8px',
                       padding: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: `1px solid ${BRAND_COLORS.tertiary}33`
+                      border: `1px solid ${BRAND_COLORS.tertiary}33`,
+                      cursor: 'pointer'
                     }}>
                       <span style={{ fontSize: '20px' }}>🚀</span>
                       <div>
@@ -932,14 +1020,15 @@ export default function EnhancedMobileDashboard() {
                   </>
                 ) : (
                   <>
-                    <div style={{
+                    <div onClick={() => showRanking("operating")} style={{
                       background: 'white',
                       borderRadius: '8px',
                       padding: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: `1px solid ${BRAND_COLORS.primary}33`
+                      border: `1px solid ${BRAND_COLORS.primary}33`,
+                      cursor: 'pointer'
                     }}>
                       <span style={{ fontSize: '20px' }}>💰</span>
                       <div>
@@ -951,14 +1040,15 @@ export default function EnhancedMobileDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div style={{
+                    <div onClick={() => showRanking("netCash")} style={{
                       background: 'white',
                       borderRadius: '8px',
                       padding: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: `1px solid ${BRAND_COLORS.success}33`
+                      border: `1px solid ${BRAND_COLORS.success}33`,
+                      cursor: 'pointer'
                     }}>
                       <span style={{ fontSize: '20px' }}>⚡</span>
                       <div>
@@ -970,14 +1060,15 @@ export default function EnhancedMobileDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div style={{
+                    <div onClick={() => showRanking("investing")} style={{
                       background: 'white',
                       borderRadius: '8px',
                       padding: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: `1px solid ${BRAND_COLORS.warning}33`
+                      border: `1px solid ${BRAND_COLORS.warning}33`,
+                      cursor: 'pointer'
                     }}>
                       <span style={{ fontSize: '20px' }}>🎯</span>
                       <div>
@@ -989,14 +1080,15 @@ export default function EnhancedMobileDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div style={{
+                    <div onClick={() => showRanking("stability")} style={{
                       background: 'white',
                       borderRadius: '8px',
                       padding: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: `1px solid ${BRAND_COLORS.secondary}33`
+                      border: `1px solid ${BRAND_COLORS.secondary}33`,
+                      cursor: 'pointer'
                     }}>
                       <span style={{ fontSize: '20px' }}>💪</span>
                       <div>
@@ -1328,6 +1420,66 @@ export default function EnhancedMobileDashboard() {
               {formatCompactCurrency(companyTotals.net)}
             </div>
           </div>
+        </div>
+      )}
+
+      {view === "summary" && rankingMetric && (
+        <div>
+          <button
+            onClick={back}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: 'none',
+              border: 'none',
+              fontSize: '16px',
+              color: BRAND_COLORS.accent,
+              marginBottom: '20px',
+              cursor: 'pointer'
+            }}
+          >
+            <ChevronLeft size={20} style={{ marginRight: '4px' }} />
+            Back to Overview
+          </button>
+
+          <div
+            style={{
+              background: `linear-gradient(135deg, ${BRAND_COLORS.tertiary}, ${BRAND_COLORS.primary})`,
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '24px',
+              color: 'white'
+            }}
+          >
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
+              Top Properties by {rankingLabels[rankingMetric]}
+            </h2>
+            <p style={{ fontSize: '14px', opacity: 0.9 }}>
+              {getMonthName(month)} {year}
+            </p>
+          </div>
+
+          <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '12px' }}>
+            {rankedProperties.map((p, idx) => (
+              <li
+                key={p.name}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'white',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: `1px solid ${BRAND_COLORS.gray[200]}`
+                }}
+              >
+                <span style={{ fontWeight: '600' }}>{idx + 1}. {p.name}</span>
+                <span style={{ fontWeight: '600', color: BRAND_COLORS.accent }}>
+                  {formatRankingValue(p)}
+                </span>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
