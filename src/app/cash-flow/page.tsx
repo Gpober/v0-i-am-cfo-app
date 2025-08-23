@@ -838,9 +838,82 @@ export default function CashFlowPage() {
     } catch (err) {
       console.error("❌ Error fetching bank account cash flow data:", err)
       setError(err instanceof Error ? err.message : "Unknown error")
-    } finally {
+  } finally {
       setIsLoading(false)
     }
+  }
+
+  // Helper: fetch offset lines via view if available, otherwise fall back to two-step query
+  const fetchOffsets = async (startDate: string, endDate: string) => {
+    // Attempt to use the cash_related_offsets view
+    let viewQuery = supabase
+      .from("cash_related_offsets")
+      .select("entry_number,date,class,account,account_type,report_category,debit,credit,cash_effect,cash_bank_account")
+      .gte("date", startDate)
+      .lte("date", endDate)
+
+    if (selectedProperty !== "All Properties") {
+      viewQuery = viewQuery.eq("class", selectedProperty)
+    }
+    if (selectedBankAccount !== "All Bank Accounts") {
+      viewQuery = viewQuery.eq("cash_bank_account", selectedBankAccount)
+    }
+    if (!includeTransfers) {
+      viewQuery = viewQuery.not("report_category", "ilike", "transfer")
+    }
+
+    const { data: viewData, error: viewError } = await viewQuery
+    if (!viewError && viewData) return viewData
+
+    console.warn("cash_related_offsets view unavailable, falling back to manual query", viewError)
+
+    // Option B fallback: first fetch cash lines
+    let cashQuery = supabase
+      .from("journal_entry_lines")
+      .select("entry_number,entry_bank_account")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .eq("is_cash_account", true)
+
+    if (selectedProperty !== "All Properties") {
+      cashQuery = cashQuery.eq("class", selectedProperty)
+    }
+    if (selectedBankAccount !== "All Bank Accounts") {
+      cashQuery = cashQuery.eq("entry_bank_account", selectedBankAccount)
+    }
+    if (!includeTransfers) {
+      cashQuery = cashQuery.not("report_category", "ilike", "transfer")
+    }
+
+    const { data: cashLines, error: cashError } = await cashQuery
+    if (cashError) throw cashError
+
+    const entryBankMap = new Map<string, string>()
+    const entryNumbers: string[] = []
+    cashLines.forEach((l: any) => {
+      const entry = l.entry_number
+      if (!entryBankMap.has(entry)) {
+        entryBankMap.set(entry, l.entry_bank_account)
+        entryNumbers.push(entry)
+      }
+    })
+
+    if (entryNumbers.length === 0) return []
+
+    let offsetQuery = supabase
+      .from("journal_entry_lines")
+      .select("entry_number,date,class,account,account_type,report_category,debit,credit")
+      .in("entry_number", entryNumbers)
+      .eq("is_cash_account", false)
+
+    const { data: offsetLines, error: offsetError } = await offsetQuery
+    if (offsetError) throw offsetError
+
+    return offsetLines.map((o: any) => ({
+        ...o,
+        cash_bank_account: entryBankMap.get(o.entry_number) || null,
+        cash_effect: toNum(o.credit) - toNum(o.debit),
+      }))
   }
 
   // FIXED: Fetch offset account data with corrected transfer toggle logic
@@ -851,24 +924,7 @@ export default function CashFlowPage() {
 
       const { startDate, endDate } = calculateDateRange()
 
-      let query = supabase
-        .from("cash_related_offsets")
-        .select("entry_number,date,class,account,account_type,report_category,debit,credit,cash_effect,cash_bank_account")
-        .gte("date", startDate)
-        .lte("date", endDate)
-
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
-      }
-      if (selectedBankAccount !== "All Bank Accounts") {
-        query = query.eq("cash_bank_account", selectedBankAccount)
-      }
-      if (!includeTransfers) {
-        query = query.not("report_category", "ilike", "transfer")
-      }
-
-      const { data: offsets, error } = await query
-      if (error) throw error
+      const offsets = await fetchOffsets(startDate, endDate)
 
       const offsetAccountMap = new Map<string, Record<string, number>>()
       const periodSet = new Set<string>()
@@ -944,24 +1000,7 @@ export default function CashFlowPage() {
 
       const { startDate, endDate } = calculateDateRange()
 
-      let query = supabase
-        .from("cash_related_offsets")
-        .select("entry_number,date,class,account,account_type,report_category,debit,credit,cash_effect,cash_bank_account")
-        .gte("date", startDate)
-        .lte("date", endDate)
-
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
-      }
-      if (selectedBankAccount !== "All Bank Accounts") {
-        query = query.eq("cash_bank_account", selectedBankAccount)
-      }
-      if (!includeTransfers) {
-        query = query.not("report_category", "ilike", "transfer")
-      }
-
-      const { data: offsets, error } = await query
-      if (error) throw error
+      const offsets = await fetchOffsets(startDate, endDate)
 
       const propertyTransactions = new Map<string, any[]>()
       offsets.forEach((row: any) => {
