@@ -187,6 +187,10 @@ export default function CashFlowPage() {
   const [showJournalModal, setShowJournalModal] = useState(false)
   const [journalTitle, setJournalTitle] = useState("")
 
+  // Data quality reconciliation state
+  const [badEntries, setBadEntries] = useState<{ entry: string; delta: number }[]>([])
+  const [showDataQuality, setShowDataQuality] = useState(false)
+
   // Store detailed transaction data for reuse
   const [transactionData, setTransactionData] = useState<Map<string, any[]>>(new Map())
 
@@ -210,6 +214,9 @@ export default function CashFlowPage() {
   }
 
   const sum = (values: number[]) => values.reduce((acc, val) => acc + val, 0)
+
+  // Convert any value to a number, treating null/undefined as 0
+  const toNum = (v: any) => Number(v ?? 0)
 
   // Format date for display
   const formatDateSafe = (dateString: string): string => {
@@ -257,6 +264,27 @@ export default function CashFlowPage() {
     const month = Math.ceil(week / 4.33)
     const weekInMonth = week - Math.floor((month - 1) * 4.33)
     return `${monthNames[Math.min(month - 1, 11)]} W${Math.max(1, Math.ceil(weekInMonth))}`
+  }
+
+  // Determine period key based on current periodType
+  const getPeriodKey = (dateString: string): string => {
+    if (periodType === "monthly") {
+      const month = getMonthFromDate(dateString)
+      const year = getYearFromDate(dateString)
+      return `${year}-${month.toString().padStart(2, "0")}`
+    }
+    if (periodType === "weekly") {
+      const date = getDateParts(dateString)
+      const year = date.year
+      const startOfYear = new Date(year, 0, 1)
+      const dayOfYear =
+        Math.floor(
+          (new Date(date.year, date.month - 1, date.day).getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000),
+        ) + 1
+      const week = Math.ceil(dayOfYear / 7)
+      return `${year}-W${week.toString().padStart(2, "0")}`
+    }
+    return "total"
   }
 
   const handleExportCashFlowExcel = () => {
@@ -569,14 +597,13 @@ export default function CashFlowPage() {
 
   // ENHANCED: Classification function with transfers as separate category
   const classifyTransaction = (accountType: string, reportCategory: string) => {
-    // If transfers are included and this is a transfer, classify as transfer
-    if (includeTransfers && reportCategory === "transfer") {
+    const typeLower = accountType?.toLowerCase() || ""
+    const categoryLower = reportCategory?.toLowerCase() || ""
+
+    if (includeTransfers && categoryLower === "transfer") {
       return "transfer"
     }
 
-    const typeLower = accountType?.toLowerCase() || ""
-
-    // Operating activities - Income and Expenses
     if (
       typeLower === "income" ||
       typeLower === "other income" ||
@@ -589,12 +616,10 @@ export default function CashFlowPage() {
       return "operating"
     }
 
-    // Investing activities - Fixed Assets and Other Assets
     if (typeLower === "fixed assets" || typeLower === "other assets" || typeLower === "property, plant & equipment") {
       return "investing"
     }
 
-    // Financing activities - Liabilities, Equity, Credit Cards
     if (
       typeLower === "long term liabilities" ||
       typeLower === "equity" ||
@@ -714,6 +739,7 @@ export default function CashFlowPage() {
       const { data: bankData, error: bankError } = await supabase
         .from("journal_entry_lines")
         .select("entry_bank_account")
+        .eq("is_cash_account", true)
         .not("entry_bank_account", "is", null)
 
       if (bankError) throw bankError
@@ -744,104 +770,48 @@ export default function CashFlowPage() {
 
       const { startDate, endDate } = calculateDateRange()
 
-      console.log(`🔍 CASH FLOW BY BANK ACCOUNT - Using Enhanced Database`)
-      console.log(`📅 Period: ${startDate} to ${endDate}`)
-      console.log(`🏢 Property Filter: "${selectedProperty}"`)
-      console.log(`🔄 Include Transfers: ${includeTransfers}`)
-
-      // FIXED QUERY: Corrected transfer toggle logic
       let query = supabase
         .from("journal_entry_lines")
-        .select(
-          "entry_number, class, date, account, account_type, debit, credit, memo, customer, vendor, name, entry_bank_account, normal_balance, report_category",
-        )
+        .select("entry_number,date,entry_bank_account,debit,credit,report_category,class")
         .gte("date", startDate)
         .lte("date", endDate)
-        .not("entry_bank_account", "is", null) // Must have bank account source
-        .order("date", { ascending: true })
-
-      if (includeTransfers) {
-        // Include both non-cash transactions AND transfers
-        query = query.or("is_cash_account.eq.false,report_category.eq.transfer")
-      } else {
-        // Only non-cash transactions, no transfers
-        query = query.eq("is_cash_account", false).neq("report_category", "transfer")
-      }
+        .eq("is_cash_account", true)
+        .not("entry_bank_account", "is", null)
 
       if (selectedProperty !== "All Properties") {
         query = query.eq("class", selectedProperty)
       }
+      if (selectedBankAccount !== "All Bank Accounts") {
+        query = query.eq("entry_bank_account", selectedBankAccount)
+      }
+      if (!includeTransfers) {
+        query = query.not("report_category", "ilike", "transfer")
+      }
 
-      const { data: cashFlowTransactions, error } = await query
-
+      const { data: cashLines, error } = await query
       if (error) throw error
 
-      console.log(`📊 Found ${cashFlowTransactions.length} cash flow transactions for bank account view`)
-
-      // Process cash flows by bank account using the enhanced structure
       const bankAccountMap = new Map<string, Record<string, number>>()
       const periodSet = new Set<string>()
       const cashTransactionsList: any[] = []
 
-      cashFlowTransactions.forEach((tx: any) => {
-        // Calculate period key
-        let periodKey: string
-        if (periodType === "monthly") {
-          const month = getMonthFromDate(tx.date)
-          const year = getYearFromDate(tx.date)
-          periodKey = `${year}-${month.toString().padStart(2, "0")}`
-        } else if (periodType === "weekly") {
-          const date = getDateParts(tx.date)
-          const year = date.year
-          const startOfYear = new Date(year, 0, 1)
-          const dayOfYear =
-            Math.floor(
-              (new Date(date.year, date.month - 1, date.day).getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000),
-            ) + 1
-          const week = Math.ceil(dayOfYear / 7)
-          periodKey = `${year}-W${week.toString().padStart(2, "0")}`
-        } else {
-          periodKey = "total"
-        }
-
+      cashLines.forEach((line: any) => {
+        const periodKey = getPeriodKey(line.date)
         periodSet.add(periodKey)
-
-        const bankAccount = tx.entry_bank_account
-        // FIXED: Transfer amounts work in reverse - debits are positive, credits are negative
-        const cashImpact =
-          tx.report_category === "transfer"
-            ? Number.parseFloat(tx.debit) - Number.parseFloat(tx.credit) // Reverse for transfers
-            : tx.normal_balance || Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit) // Normal for others
-
-        // Initialize bank account data
-        if (!bankAccountMap.has(bankAccount)) {
-          bankAccountMap.set(bankAccount, {})
-        }
-
-        const bankData = bankAccountMap.get(bankAccount)!
-        bankData[periodKey] = (bankData[periodKey] || 0) + cashImpact
-
-        // Store transaction for drill-down
-        cashTransactionsList.push({
-          ...tx,
-          cashFlowImpact: cashImpact,
-          periodKey,
-        })
+        const bank = line.entry_bank_account || "Unspecified"
+        const cashDelta = toNum(line.credit) - toNum(line.debit)
+        if (!bankAccountMap.has(bank)) bankAccountMap.set(bank, {})
+        const bankData = bankAccountMap.get(bank)!
+        bankData[periodKey] = toNum(bankData[periodKey]) + cashDelta
+        cashTransactionsList.push({ ...line, cashDelta, periodKey })
       })
 
-      console.log(`📅 Periods found: ${periodSet.size}`, Array.from(periodSet).sort())
-      console.log(`🏦 Bank accounts with activity: ${bankAccountMap.size}`)
-
-      setCashTransactions(cashTransactionsList)
-
-      // Create periods array
       const periodsArray = Array.from(periodSet)
         .sort()
         .map((key) => {
-          let label: string
+          let label: string = "Total"
           let month: number | undefined
           let week: number | undefined
-
           if (periodType === "monthly") {
             const [year, monthStr] = key.split("-")
             const monthNum = Number.parseInt(monthStr)
@@ -852,36 +822,98 @@ export default function CashFlowPage() {
             const weekNum = Number.parseInt(weekStr.replace("W", ""))
             label = getWeekLabel(Number.parseInt(year), weekNum)
             week = weekNum
-          } else {
-            label = "Total"
           }
-
           return { key, label, month, week }
         })
-
       setPeriods(periodsArray)
 
-      // Create final bank account data
       const bankData: BankAccountData[] = Array.from(bankAccountMap.entries()).map(([bankAccount, periods]) => {
         const total = Object.values(periods).reduce((sum, val) => sum + val, 0)
-        return {
-          bankAccount,
-          periods,
-          total,
-          offsetAccounts: {},
-        }
+        return { bankAccount, periods, total, offsetAccounts: {} }
       })
 
-      // Sort by total activity (largest first)
       bankData.sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
-
       setBankAccountData(bankData)
+      setCashTransactions(cashTransactionsList)
     } catch (err) {
       console.error("❌ Error fetching bank account cash flow data:", err)
       setError(err instanceof Error ? err.message : "Unknown error")
-    } finally {
+  } finally {
       setIsLoading(false)
     }
+  }
+
+  // Helper: fetch offset lines via view if available, otherwise fall back to two-step query
+  const fetchOffsets = async (startDate: string, endDate: string) => {
+    // Attempt to use the cash_related_offsets view
+    let viewQuery = supabase
+      .from("cash_related_offsets")
+      .select("entry_number,date,class,account,account_type,report_category,debit,credit,cash_effect,cash_bank_account")
+      .gte("date", startDate)
+      .lte("date", endDate)
+
+    if (selectedProperty !== "All Properties") {
+      viewQuery = viewQuery.eq("class", selectedProperty)
+    }
+    if (selectedBankAccount !== "All Bank Accounts") {
+      viewQuery = viewQuery.eq("cash_bank_account", selectedBankAccount)
+    }
+    if (!includeTransfers) {
+      viewQuery = viewQuery.not("report_category", "ilike", "transfer")
+    }
+
+    const { data: viewData, error: viewError } = await viewQuery
+    if (!viewError && viewData) return viewData
+
+    console.warn("cash_related_offsets view unavailable, falling back to manual query", viewError)
+
+    // Option B fallback: first fetch cash lines
+    let cashQuery = supabase
+      .from("journal_entry_lines")
+      .select("entry_number,entry_bank_account")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .eq("is_cash_account", true)
+
+    if (selectedProperty !== "All Properties") {
+      cashQuery = cashQuery.eq("class", selectedProperty)
+    }
+    if (selectedBankAccount !== "All Bank Accounts") {
+      cashQuery = cashQuery.eq("entry_bank_account", selectedBankAccount)
+    }
+    if (!includeTransfers) {
+      cashQuery = cashQuery.not("report_category", "ilike", "transfer")
+    }
+
+    const { data: cashLines, error: cashError } = await cashQuery
+    if (cashError) throw cashError
+
+    const entryBankMap = new Map<string, string>()
+    const entryNumbers: string[] = []
+    cashLines.forEach((l: any) => {
+      const entry = l.entry_number
+      if (!entryBankMap.has(entry)) {
+        entryBankMap.set(entry, l.entry_bank_account)
+        entryNumbers.push(entry)
+      }
+    })
+
+    if (entryNumbers.length === 0) return []
+
+    let offsetQuery = supabase
+      .from("journal_entry_lines")
+      .select("entry_number,date,class,account,account_type,report_category,debit,credit")
+      .in("entry_number", entryNumbers)
+      .eq("is_cash_account", false)
+
+    const { data: offsetLines, error: offsetError } = await offsetQuery
+    if (offsetError) throw offsetError
+
+    return offsetLines.map((o: any) => ({
+        ...o,
+        cash_bank_account: entryBankMap.get(o.entry_number) || null,
+        cash_effect: toNum(o.credit) - toNum(o.debit),
+      }))
   }
 
   // FIXED: Fetch offset account data with corrected transfer toggle logic
@@ -892,109 +924,29 @@ export default function CashFlowPage() {
 
       const { startDate, endDate } = calculateDateRange()
 
-      console.log(`🔍 CASH FLOW OFFSET VIEW - Using Enhanced Database`)
-      console.log(`📅 Period: ${startDate} to ${endDate}`)
-      console.log(`🏢 Property Filter: "${selectedProperty}"`)
-      console.log(`🏦 Bank Account Filter: "${selectedBankAccount}"`)
-      console.log(`🔄 Include Transfers: ${includeTransfers}`)
+      const offsets = await fetchOffsets(startDate, endDate)
 
-      // FIXED QUERY: Corrected transfer toggle logic
-      let query = supabase
-        .from("journal_entry_lines")
-        .select(
-          "entry_number, class, date, account, account_type, debit, credit, memo, customer, vendor, name, entry_bank_account, normal_balance, report_category",
-        )
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .not("entry_bank_account", "is", null) // Must have bank account source
-        .order("date", { ascending: true })
-
-      if (includeTransfers) {
-        // Include both non-cash transactions AND transfers
-        query = query.or("is_cash_account.eq.false,report_category.eq.transfer")
-      } else {
-        // Only non-cash transactions, no transfers
-        query = query.eq("is_cash_account", false).neq("report_category", "transfer")
-      }
-
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
-      }
-
-      if (selectedBankAccount !== "All Bank Accounts") {
-        query = query.eq("entry_bank_account", selectedBankAccount)
-      }
-
-      const { data: cashFlowTransactions, error } = await query
-
-      if (error) throw error
-
-      console.log(`📊 Found ${cashFlowTransactions.length} cash flow transactions`)
-
-      // Process cash flows by offset account using the enhanced structure
       const offsetAccountMap = new Map<string, Record<string, number>>()
       const periodSet = new Set<string>()
-      const cashTransactionsList: any[] = []
+      const transactionsList: any[] = []
 
-      cashFlowTransactions.forEach((tx: any) => {
-        // Calculate period key
-        let periodKey: string
-        if (periodType === "monthly") {
-          const month = getMonthFromDate(tx.date)
-          const year = getYearFromDate(tx.date)
-          periodKey = `${year}-${month.toString().padStart(2, "0")}`
-        } else if (periodType === "weekly") {
-          const date = getDateParts(tx.date)
-          const year = date.year
-          const startOfYear = new Date(year, 0, 1)
-          const dayOfYear =
-            Math.floor(
-              (new Date(date.year, date.month - 1, date.day).getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000),
-            ) + 1
-          const week = Math.ceil(dayOfYear / 7)
-          periodKey = `${year}-W${week.toString().padStart(2, "0")}`
-        } else {
-          periodKey = "total"
-        }
-
+      offsets.forEach((row: any) => {
+        const periodKey = getPeriodKey(row.date)
         periodSet.add(periodKey)
-
-        const account = tx.account
-        // FIXED: Transfer amounts work in reverse - debits are positive, credits are negative
-        const cashImpact =
-          tx.report_category === "transfer"
-            ? Number.parseFloat(tx.debit) - Number.parseFloat(tx.credit) // Reverse for transfers
-            : tx.normal_balance || Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit) // Normal for others
-
-        // Initialize account data
-        if (!offsetAccountMap.has(account)) {
-          offsetAccountMap.set(account, {})
-        }
-
-        const accountData = offsetAccountMap.get(account)!
-        accountData[periodKey] = (accountData[periodKey] || 0) + cashImpact
-
-        // Store transaction for drill-down
-        cashTransactionsList.push({
-          ...tx,
-          cashFlowImpact: cashImpact,
-          periodKey,
-        })
+        const account = row.account || "Unspecified"
+        const cashEffect = toNum(row.credit) - toNum(row.debit)
+        if (!offsetAccountMap.has(account)) offsetAccountMap.set(account, {})
+        const accountPeriods = offsetAccountMap.get(account)!
+        accountPeriods[periodKey] = toNum(accountPeriods[periodKey]) + cashEffect
+        transactionsList.push({ ...row, cashFlowImpact: cashEffect, periodKey })
       })
 
-      console.log(`📅 Periods found: ${periodSet.size}`, Array.from(periodSet).sort())
-      console.log(`🎯 Unique offset accounts: ${offsetAccountMap.size}`)
-
-      setCashTransactions(cashTransactionsList)
-
-      // Create periods array
       const periodsArray = Array.from(periodSet)
         .sort()
         .map((key) => {
-          let label: string
+          let label: string = "Total"
           let month: number | undefined
           let week: number | undefined
-
           if (periodType === "monthly") {
             const [year, monthStr] = key.split("-")
             const monthNum = Number.parseInt(monthStr)
@@ -1005,50 +957,34 @@ export default function CashFlowPage() {
             const weekNum = Number.parseInt(weekStr.replace("W", ""))
             label = getWeekLabel(Number.parseInt(year), weekNum)
             week = weekNum
-          } else {
-            label = "Total"
           }
-
           return { key, label, month, week }
         })
-
       setPeriods(periodsArray)
 
-      // Create final offset account data with enhanced sorting
       const offsetData: OffsetAccountData[] = Array.from(offsetAccountMap.entries()).map(([account, periods]) => {
         const total = Object.values(periods).reduce((sum, val) => sum + val, 0)
-        return {
-          offsetAccount: account,
-          periods,
-          total,
-        }
+        return { offsetAccount: account, periods, total }
       })
 
-      // Enhanced sorting by classification and impact
       offsetData.sort((a, b) => {
-        const classA = classifyTransaction(
-          cashTransactionsList.find((tx) => tx.account === a.offsetAccount)?.account_type || "",
-          cashTransactionsList.find((tx) => tx.account === a.offsetAccount)?.report_category || "",
-        )
-        const classB = classifyTransaction(
-          cashTransactionsList.find((tx) => tx.account === b.offsetAccount)?.account_type || "",
-          cashTransactionsList.find((tx) => tx.account === b.offsetAccount)?.report_category || "",
-        )
-
-        const classOrder = { operating: 1, financing: 2, investing: 3, transfer: 4, other: 5 }
-        const orderA = classOrder[classA as keyof typeof classOrder] || 6
-        const orderB = classOrder[classB as keyof typeof classOrder] || 6
-
-        if (orderA !== orderB) {
-          return orderA - orderB
-        }
-
+        const sampleA = transactionsList.find((tx) => tx.account === a.offsetAccount)
+        const sampleB = transactionsList.find((tx) => tx.account === b.offsetAccount)
+        const classA = classifyTransaction(sampleA?.account_type || "", sampleA?.report_category || "")
+        const classB = classifyTransaction(sampleB?.account_type || "", sampleB?.report_category || "")
+        const classOrder: Record<string, number> = { operating: 1, financing: 2, investing: 3, transfer: 4, other: 5 }
+        const orderA = classOrder[classA] || 6
+        const orderB = classOrder[classB] || 6
+        if (orderA !== orderB) return orderA - orderB
         return Math.abs(b.total) - Math.abs(a.total)
       })
 
-      console.log(`✅ Final result: ${offsetData.length} accounts sorted by classification`)
-
       setOffsetAccountData(offsetData)
+      setCashTransactions(transactionsList)
+
+      if (process.env.NODE_ENV === "development") {
+        await checkDataQuality(offsets, startDate, endDate)
+      }
     } catch (err) {
       console.error("❌ Error fetching cash flow offset account data:", err)
       setError(err instanceof Error ? err.message : "Unknown error")
@@ -1057,7 +993,6 @@ export default function CashFlowPage() {
     }
   }
 
-  // FIXED: Traditional cash flow with corrected transfer toggle logic
   const fetchCashFlowData = async () => {
     try {
       setIsLoading(true)
@@ -1065,91 +1000,30 @@ export default function CashFlowPage() {
 
       const { startDate, endDate } = calculateDateRange()
 
-      console.log(`🔍 CASH FLOW TRADITIONAL VIEW - Using Enhanced Database`)
-      console.log(`📅 Period: ${startDate} to ${endDate}`)
-      console.log(`🏢 Property Filter: "${selectedProperty}"`)
-      console.log(`🏦 Bank Account Filter: "${selectedBankAccount}"`)
-      console.log(`🔄 Include Transfers: ${includeTransfers}`)
+      const offsets = await fetchOffsets(startDate, endDate)
 
-      // FIXED QUERY: Corrected transfer toggle logic
-      let query = supabase
-        .from("journal_entry_lines")
-        .select(
-          "entry_number, class, date, account, account_type, debit, credit, memo, entry_bank_account, normal_balance, report_category",
-        )
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .not("entry_bank_account", "is", null) // Must have bank account source
-        .order("date", { ascending: true })
-
-      if (includeTransfers) {
-        // Include both non-cash transactions AND transfers
-        query = query.or("is_cash_account.eq.false,report_category.eq.transfer")
-      } else {
-        // Only non-cash transactions, no transfers
-        query = query.eq("is_cash_account", false).neq("report_category", "transfer")
-      }
-
-      if (selectedProperty !== "All Properties") {
-        query = query.eq("class", selectedProperty)
-      }
-
-      if (selectedBankAccount !== "All Bank Accounts") {
-        query = query.eq("entry_bank_account", selectedBankAccount)
-      }
-
-      const { data: cashFlowTransactions, error } = await query
-
-      if (error) throw error
-
-      console.log(`📊 Found ${cashFlowTransactions.length} cash flow transactions for traditional view`)
-
-      // Process cash flows by property for the selected period
       const propertyTransactions = new Map<string, any[]>()
-
-      cashFlowTransactions.forEach((tx: any) => {
-        const property = tx.class || "Unclassified"
-        if (!propertyTransactions.has(property)) {
-          propertyTransactions.set(property, [])
-        }
-
-        // FIXED: Transfer amounts work in reverse - debits are positive, credits are negative
-        const cashImpact =
-          tx.report_category === "transfer"
-            ? Number.parseFloat(tx.debit) - Number.parseFloat(tx.credit) // Reverse for transfers
-            : tx.normal_balance || Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit) // Normal for others
-
-        propertyTransactions.get(property)!.push({
-          ...tx,
-          cashFlowImpact: cashImpact,
-        })
+      offsets.forEach((row: any) => {
+        const property = row.class || "Unclassified"
+        if (!propertyTransactions.has(property)) propertyTransactions.set(property, [])
+        const cashEffect = toNum(row.credit) - toNum(row.debit)
+        propertyTransactions.get(property)!.push({ ...row, cashFlowImpact: cashEffect })
       })
-
-      // Store for reuse
       setTransactionData(propertyTransactions)
 
-      // Calculate cash flows with enhanced classification
       const cashFlowArray: CashFlowRow[] = []
       const periodLabel = getPeriodLabel()
-
       for (const [property, transactions] of propertyTransactions.entries()) {
         let operatingTotal = 0
         let financingTotal = 0
         let investingTotal = 0
-
         transactions.forEach((row: any) => {
           const classification = classifyTransaction(row.account_type, row.report_category)
-          const impact = row.cashFlowImpact || 0
-
-          if (classification === "operating") {
-            operatingTotal += impact
-          } else if (classification === "financing") {
-            financingTotal += impact
-          } else if (classification === "investing") {
-            investingTotal += impact
-          }
+          const impact = row.cashFlowImpact
+          if (classification === "operating") operatingTotal += impact
+          else if (classification === "financing") financingTotal += impact
+          else if (classification === "investing") investingTotal += impact
         })
-
         if (operatingTotal !== 0 || financingTotal !== 0 || investingTotal !== 0) {
           cashFlowArray.push({
             property,
@@ -1162,12 +1036,12 @@ export default function CashFlowPage() {
         }
       }
 
-      // Sort by property
       cashFlowArray.sort((a, b) => (a.property || "").localeCompare(b.property || ""))
-
-      console.log(`✅ Created ${cashFlowArray.length} cash flow rows for traditional view`)
-
       setCashFlowData(cashFlowArray)
+
+      if (process.env.NODE_ENV === "development") {
+        await checkDataQuality(offsets, startDate, endDate)
+      }
     } catch (err) {
       console.error("❌ Error fetching traditional cash flow data:", err)
       setError(err instanceof Error ? err.message : "Unknown error")
@@ -1175,6 +1049,65 @@ export default function CashFlowPage() {
       setIsLoading(false)
     }
   }
+
+  // Dev-only reconciliation between cash and offset lines
+  const checkDataQuality = async (offsets: any[], startDate: string, endDate: string) => {
+    let cashQuery = supabase
+      .from("journal_entry_lines")
+      .select("entry_number,debit,credit,entry_bank_account,report_category,class,date")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .eq("is_cash_account", true)
+
+    if (selectedProperty !== "All Properties") {
+      cashQuery = cashQuery.eq("class", selectedProperty)
+    }
+    if (selectedBankAccount !== "All Bank Accounts") {
+      cashQuery = cashQuery.eq("entry_bank_account", selectedBankAccount)
+    }
+    if (!includeTransfers) {
+      cashQuery = cashQuery.not("report_category", "ilike", "transfer")
+    }
+
+    const { data: cashLines, error } = await cashQuery
+    if (error) {
+      console.error("Data quality cash line fetch error:", error)
+      return
+    }
+
+    const cashSum = new Map<string, number>()
+    cashLines.forEach((l: any) => {
+      const entry = l.entry_number
+      const delta = toNum(l.credit) - toNum(l.debit)
+      cashSum.set(entry, toNum(cashSum.get(entry)) + delta)
+    })
+
+    const offsetSum = new Map<string, number>()
+    offsets.forEach((o: any) => {
+      const entry = o.entry_number
+      const delta = toNum(o.credit) - toNum(o.debit)
+      offsetSum.set(entry, toNum(offsetSum.get(entry)) + delta)
+    })
+
+    const issues: { entry: string; delta: number }[] = []
+    const entries = new Set([...cashSum.keys(), ...offsetSum.keys()])
+    entries.forEach((e) => {
+      const diff = toNum(offsetSum.get(e)) - toNum(cashSum.get(e))
+      if (Math.abs(diff) > 0.005) {
+        console.warn(`Data quality issue entry ${e}: ${diff}`)
+        issues.push({ entry: e, delta: diff })
+      }
+    })
+    setBadEntries(issues)
+  }
+
+  /*
+   Fixture:
+   JE-001:
+   Cash: Debit Checking 100
+   Offsets: Credit Airbnb Rev 50, Credit Guesty Rev 50
+   Expect: offset cash_effects [+50, +50], sum +100; cashSum -100; reconciliation OK.
+  */
 
   // Show transaction drill-down for bank account view
   const openBankAccountDrillDown = async (bankAccount: string, periodKey: string) => {
@@ -1783,6 +1716,37 @@ export default function CashFlowPage() {
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="w-6 h-6 animate-spin mr-2" />
               <span>Loading cash flow data...</span>
+            </div>
+          )}
+
+          {process.env.NODE_ENV === "development" && !isLoading && (
+            <div className="mb-4">
+              <button
+                onClick={() => setShowDataQuality((s) => !s)}
+                className="text-sm text-blue-600 flex items-center"
+              >
+                {showDataQuality ? (
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 mr-1" />
+                )}
+                Data Quality ({badEntries.length})
+              </button>
+              {showDataQuality && (
+                <div className="mt-2">
+                  {badEntries.length === 0 ? (
+                    <div className="text-sm text-green-700">No discrepancies</div>
+                  ) : (
+                    <ul className="text-sm text-red-700 list-disc list-inside">
+                      {badEntries.map((b) => (
+                        <li key={b.entry}>
+                          {b.entry}: {b.delta.toFixed(2)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
