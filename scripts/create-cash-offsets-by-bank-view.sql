@@ -34,8 +34,10 @@ SELECT
     NULL
   ) AS entry_bank_account
 FROM public.journal_entry_lines o
-JOIN cash_banks cb USING (entry_number)
-WHERE o.is_cash_account = false;
+  JOIN cash_banks cb USING (entry_number)
+  WHERE o.is_cash_account = false;
 
-COMMENT ON VIEW public.cash_offsets_by_bank IS
-'Offset lines from entries that touched cash, attributed to a bank (primary bank if multiple cash lines). cash_effect = credit - debit.';
+  COMMENT ON VIEW public.cash_offsets_by_bank IS
+  'Offset lines from entries that touched cash, attributed to a bank (primary bank if multiple cash lines). cash_effect = credit - debit.';
+
+  GRANT SELECT ON public.cash_offsets_by_bank TO authenticated, anon, service_role;
