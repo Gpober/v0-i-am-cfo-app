@@ -465,26 +465,28 @@ export default function FinancialOverviewPage() {
         `📊 Current period: ${filteredCurrentTransactions.length} transactions`,
       );
 
-      // Fetch cash offset lines for current period
-      let currentCashQuery = supabase
+      // Fetch offset lines for current period to compute net cash
+      let cashQuery = supabase
         .from("cash_offsets_by_bank")
         .select(
-          `date, class, account_type, report_category, debit, credit, cash_effect, entry_bank_account`,
+          `date, class, account_type, report_category, debit, credit, cash_effect`,
         )
         .gte("date", startDate)
         .lte("date", endDate)
         .order("date", { ascending: true });
 
       if (selectedClassList.length > 0) {
-        currentCashQuery = currentCashQuery.in("class", selectedClassList);
+        cashQuery = cashQuery.in("class", selectedClassList);
       }
-      currentCashQuery = currentCashQuery.neq("report_category", "transfer");
+      cashQuery = cashQuery.neq("report_category", "transfer");
 
-      const { data: currentCash, error: currentCashError } = await currentCashQuery;
-      if (currentCashError) throw currentCashError;
-      const filteredCurrentCash = currentCash.filter((tx) =>
+      const { data: cashOffsets, error: cashError } = await cashQuery;
+      if (cashError) throw cashError;
+      const filteredCashOffsets = cashOffsets.filter((tx) =>
         isDateInRange(tx.date, startDate, endDate),
       );
+
+      const cashFlowOverride = processCashFlowTransactions(filteredCashOffsets);
 
       // Fetch previous period for comparison
       const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1;
@@ -545,29 +547,8 @@ export default function FinancialOverviewPage() {
         `📊 Previous period: ${filteredPrevTransactions.length} transactions`,
       );
 
-      // Fetch cash offset lines for previous period
-      let prevCashQuery = supabase
-        .from("cash_offsets_by_bank")
-        .select(
-          `date, class, account_type, report_category, debit, credit, cash_effect, entry_bank_account`,
-        )
-        .gte("date", prevStartDate)
-        .lte("date", prevEndDate)
-        .order("date", { ascending: true });
-
-      if (selectedClassList.length > 0) {
-        prevCashQuery = prevCashQuery.in("class", selectedClassList);
-      }
-      prevCashQuery = prevCashQuery.neq("report_category", "transfer");
-
-      const { data: prevCash } = await prevCashQuery;
-      const filteredPrevCash = prevCash
-        ? prevCash.filter((tx) => isDateInRange(tx.date, prevStartDate, prevEndDate))
-        : [];
-
       // Fetch last 12 months for trend analysis
       const trendData = [];
-      const trendCashData = [];
       for (let i = 11; i >= 0; i--) {
         const trendMonthIndex = (monthIndex - i + 12) % 12;
         const trendYear = monthIndex - i < 0 ? year - 1 : year;
@@ -625,36 +606,10 @@ export default function FinancialOverviewPage() {
             )
           : [];
 
-        let monthCashQuery = supabase
-          .from("cash_offsets_by_bank")
-          .select(
-            `date, class, account_type, report_category, debit, credit, cash_effect, entry_bank_account`,
-          )
-          .gte("date", trendStartDate)
-          .lte("date", trendEndDate)
-          .order("date", { ascending: true });
-
-        if (selectedClassList.length > 0) {
-          monthCashQuery = monthCashQuery.in("class", selectedClassList);
-        }
-        monthCashQuery = monthCashQuery.neq("report_category", "transfer");
-
-        const { data: monthCash } = await monthCashQuery;
-        const filteredMonthCash = monthCash
-          ? monthCash.filter((tx) =>
-              isDateInRange(tx.date, trendStartDate, trendEndDate),
-            )
-          : [];
-
         const monthName = monthsList[trendMonthIndex];
-        const monthLabel = `${monthName.substring(0, 3)} ${trendYear}`;
         trendData.push({
-          month: monthLabel,
+          month: `${monthName.substring(0, 3)} ${trendYear}`,
           data: filteredMonthData,
-        });
-        trendCashData.push({
-          month: monthLabel,
-          data: filteredMonthCash,
         });
       }
 
@@ -665,9 +620,7 @@ export default function FinancialOverviewPage() {
         filteredCurrentTransactions,
         filteredPrevTransactions,
         trendData,
-        filteredCurrentCash,
-        filteredPrevCash,
-        trendCashData,
+        cashFlowOverride,
       );
       setFinancialData(processedData);
       setLastUpdated(new Date());
@@ -684,23 +637,22 @@ export default function FinancialOverviewPage() {
     currentData,
     prevData,
     trendData,
-    currentCash,
-    prevCash,
-    trendCash,
+    currentCashFlowOverride,
   ) => {
     // Process P&L data (same as financials page)
     const current = processPLTransactions(currentData);
     const previous = processPLTransactions(prevData);
 
-    // Process cash flow data (using cash offsets)
-    const currentCashFlow = processCashFlowTransactions(currentCash);
-    const previousCashFlow = processCashFlowTransactions(prevCash);
+    // Process cash flow data
+    const currentCashFlow =
+      currentCashFlowOverride ?? processCashFlowTransactions(currentData);
+    const previousCashFlow = processCashFlowTransactions(prevData);
 
     // Process trend data
-    const trends = trendData.map(({ month, data }, idx) => ({
+    const trends = trendData.map(({ month, data }) => ({
       month,
       ...processPLTransactions(data),
-      ...processCashFlowTransactions(trendCash[idx].data),
+      ...processCashFlowTransactions(data),
     }));
 
     // Calculate growth rates
@@ -835,7 +787,11 @@ export default function FinancialOverviewPage() {
         tx.report_category,
       );
       const cashImpact = Number(
-        tx.cash_effect ?? Number(tx.credit ?? 0) - Number(tx.debit ?? 0),
+        tx.cash_effect ??
+          (tx.report_category === "transfer"
+            ? Number(tx.debit ?? 0) - Number(tx.credit ?? 0)
+            : tx.normal_balance ??
+              Number(tx.credit ?? 0) - Number(tx.debit ?? 0)),
       );
 
       if (classification === "operating") {
