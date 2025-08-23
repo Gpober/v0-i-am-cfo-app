@@ -106,7 +106,23 @@ interface BankAccountData {
   offsetAccounts: Record<string, number>
 }
 
-type ViewMode = "offset" | "traditional" | "bybank"
+// Offset lines attributed to banks
+type OffsetByBankRow = {
+  entry_number: string
+  line_sequence: number
+  date: string
+  class: string | null
+  account: string | null
+  account_type: string | null
+  detail_type: string | null
+  debit: number | null
+  credit: number | null
+  report_category: string | null
+  cash_effect: number
+  entry_bank_account: string | null
+}
+
+type ViewMode = "offset" | "traditional" | "bybank" | "bankoffsets"
 type PeriodType = "monthly" | "weekly" | "total"
 type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
 
@@ -175,6 +191,9 @@ export default function CashFlowPage() {
   // Bank account view state
   const [bankAccountData, setBankAccountData] = useState<BankAccountData[]>([])
 
+  // Offset transactions attributed to bank
+  const [bankOffsetRows, setBankOffsetRows] = useState<OffsetByBankRow[]>([])
+
   // Common state
   const [availableProperties, setAvailableProperties] = useState<string[]>(["All Properties"])
   const [availableBankAccounts, setAvailableBankAccounts] = useState<string[]>(["All Bank Accounts"])
@@ -217,6 +236,106 @@ export default function CashFlowPage() {
 
   // Convert any value to a number, treating null/undefined as 0
   const toNum = (v: any) => Number(v ?? 0)
+
+  const monthKey = (d: string) => d.slice(0, 7)
+  const isTransfer = (rc?: string | null) => (rc ?? "").toLowerCase() === "transfer"
+
+  const atInflow = new Set([
+    "income",
+    "other income",
+    "accounts receivable (a/r)",
+  ])
+  const atOutflow = new Set([
+    "expenses",
+    "other expense",
+    "cost of goods sold",
+    "accounts payable (a/p)",
+  ])
+
+  async function fetchOffsetTransactionsByBank({
+    supabase,
+    from,
+    toExclusive,
+    includeTransfers,
+    selectedClass,
+    selectedBank,
+  }: {
+    supabase: any
+    from: string
+    toExclusive: string
+    includeTransfers: boolean
+    selectedClass: string
+    selectedBank: string
+  }): Promise<OffsetByBankRow[]> {
+    let q = supabase
+      .from("cash_offsets_by_bank")
+      .select("*")
+      .gte("date", from)
+      .lt("date", toExclusive)
+
+    if (!includeTransfers) q = q.neq("report_category", "transfer")
+    if (selectedClass && selectedClass !== "All Properties")
+      q = q.eq("class", selectedClass)
+    if (selectedBank && selectedBank !== "All Bank Accounts")
+      q = q.eq("entry_bank_account", selectedBank)
+
+    const { data, error } = await q
+      .order("date", { ascending: true })
+      .order("entry_number", { ascending: true })
+      .order("line_sequence", { ascending: true })
+    if (error) throw error
+    return (data ?? []) as OffsetByBankRow[]
+  }
+
+  function rollupByBankByMonth(rows: OffsetByBankRow[]) {
+    const map = new Map<
+      string,
+      Map<string, { inflow: number; outflow: number; net: number }>
+    >()
+
+    for (const r of rows) {
+      if (isTransfer(r.report_category)) continue
+      const bank = r.entry_bank_account ?? "Unspecified"
+      const m = monthKey(r.date)
+      const at = (r.account_type ?? "").toLowerCase()
+      const ce = toNum(r.cash_effect)
+
+      if (!map.has(bank)) map.set(bank, new Map())
+      const inner = map.get(bank)!
+      if (!inner.has(m)) inner.set(m, { inflow: 0, outflow: 0, net: 0 })
+      const bucket = inner.get(m)!
+
+      if (atInflow.has(at) && ce > 0) bucket.inflow += ce
+      if (atOutflow.has(at) && ce < 0) bucket.outflow += -ce
+      bucket.net += ce
+    }
+
+    const out: Array<{
+      bank: string
+      month: string
+      inflow: number
+      outflow: number
+      net: number
+    }> = []
+    for (const [bank, byMonth] of map) {
+      for (const [month, vals] of byMonth) {
+        out.push({
+          bank,
+          month,
+          inflow: round2(vals.inflow),
+          outflow: round2(vals.outflow),
+          net: round2(vals.net),
+        })
+      }
+    }
+    return out.sort(
+      (a, b) => a.bank.localeCompare(b.bank) || a.month.localeCompare(b.month),
+    )
+  }
+
+  function round2(n: number) {
+    return Math.round((n + Number.EPSILON) * 100) / 100
+  }
 
   // Format date for display
   const formatDateSafe = (dateString: string): string => {
@@ -759,6 +878,32 @@ export default function CashFlowPage() {
       setAvailableBankAccounts(["All Bank Accounts", ...Array.from(bankAccounts).sort()])
     } catch (err) {
       console.error("Error fetching filters:", err)
+    }
+  }
+
+  const fetchBankOffsetData = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const { startDate, endDate } = calculateDateRange()
+      const toExclusiveDate = new Date(endDate)
+      toExclusiveDate.setDate(toExclusiveDate.getDate() + 1)
+
+      const rows = await fetchOffsetTransactionsByBank({
+        supabase,
+        from: startDate,
+        toExclusive: toExclusiveDate.toISOString().slice(0, 10),
+        includeTransfers,
+        selectedClass: selectedProperty,
+        selectedBank: selectedBankAccount,
+      })
+      setBankOffsetRows(rows)
+    } catch (err) {
+      console.error("Error fetching offset transactions by bank:", err)
+      setError("Failed to load transactions")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -1420,6 +1565,8 @@ export default function CashFlowPage() {
   useEffect(() => {
     if (viewMode === "offset") {
       fetchOffsetAccountData()
+    } else if (viewMode === "bankoffsets") {
+      fetchBankOffsetData()
     } else if (viewMode === "bybank") {
       fetchBankAccountData()
     } else {
@@ -1437,6 +1584,8 @@ export default function CashFlowPage() {
     periodType,
     includeTransfers, // NEW: Added to dependency array
   ])
+
+  const perBankMonthly = rollupByBankByMonth(bankOffsetRows)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1480,12 +1629,20 @@ export default function CashFlowPage() {
                   📊 By Offset Account
                 </button>
                 <button
+                  onClick={() => setViewMode("bankoffsets")}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                    viewMode === "bankoffsets" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  🧾 Transactions by Bank
+                </button>
+                <button
                   onClick={() => setViewMode("bybank")}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${
                     viewMode === "bybank" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
-                  🏦 By Bank Account
+                  🏦 By Bank (Cash lines)
                 </button>
                 <button
                   onClick={() => setViewMode("traditional")}
@@ -1500,7 +1657,7 @@ export default function CashFlowPage() {
               </div>
 
               {/* Period Type Toggle (only for offset and bank views) */}
-              {(viewMode === "offset" || viewMode === "bybank") && (
+              {(viewMode === "offset" || viewMode === "bybank" || viewMode === "bankoffsets") && (
                 <div className="flex bg-gray-100 rounded-lg p-1">
                   <button
                     onClick={() => setPeriodType("monthly")}
@@ -1560,6 +1717,8 @@ export default function CashFlowPage() {
                 onClick={() => {
                   if (viewMode === "offset") {
                     fetchOffsetAccountData()
+                  } else if (viewMode === "bankoffsets") {
+                    fetchBankOffsetData()
                   } else if (viewMode === "bybank") {
                     fetchBankAccountData()
                   } else {
@@ -1668,8 +1827,11 @@ export default function CashFlowPage() {
               ))}
             </select>
 
-            {/* Bank Account Filter - Show for offset and traditional views */}
-            {(viewMode === "offset" || viewMode === "traditional") && (
+            {/* Bank Account Filter */}
+            {(viewMode === "offset" ||
+              viewMode === "traditional" ||
+              viewMode === "bybank" ||
+              viewMode === "bankoffsets") && (
               <select
                 value={selectedBankAccount}
                 onChange={(e) => setSelectedBankAccount(e.target.value)}
@@ -1750,11 +1912,159 @@ export default function CashFlowPage() {
             </div>
           )}
 
+          {/* Transactions by Bank (Offsets) */}
+          {viewMode === "bankoffsets" && !isLoading && (
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Transactions by Bank (Offsets)
+                </h3>
+                <div className="text-sm text-gray-600 mt-1">
+                  {timePeriod === "Custom"
+                    ? `For the period ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                    : timePeriod === "Monthly"
+                      ? `For ${selectedMonth} ${selectedYear}`
+                      : timePeriod === "Quarterly"
+                        ? `For Q${Math.floor(monthsList.indexOf(selectedMonth) / 3) + 1} ${selectedYear}`
+                        : timePeriod === "YTD"
+                          ? `For January - ${selectedMonth} ${selectedYear}`
+                          : timePeriod === "Trailing 12"
+                            ? `For ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
+                            : `For ${timePeriod} Period`}
+                  {selectedProperty !== "All Properties" && (
+                    <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                      Property: {selectedProperty}
+                    </span>
+                  )}
+                  {selectedBankAccount !== "All Bank Accounts" && (
+                    <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                      Bank: {selectedBankAccount}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {bankOffsetRows.length > 0 ? (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Bank
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Entry
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Account
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Type
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Debit
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Credit
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Cash Effect
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {bankOffsetRows.map((row) => (
+                          <tr key={`${row.entry_number}-${row.line_sequence}`}>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-900">
+                              {row.entry_bank_account || "Unspecified"}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-900">
+                              {formatDate(row.date)}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-900">
+                              {row.entry_number}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-900">
+                              {row.account}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-900">
+                              {row.account_type}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-900">
+                              {formatCurrency(toNum(row.debit))}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-900">
+                              {formatCurrency(toNum(row.credit))}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-900">
+                              {formatCurrency(toNum(row.cash_effect))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="overflow-x-auto mt-6">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Bank
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Month
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Inflow
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Outflow
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Net
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {perBankMonthly.map((row) => (
+                          <tr key={`${row.bank}-${row.month}`}>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-900">{row.bank}</td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-900">{row.month}</td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-900">
+                              {formatCurrency(row.inflow)}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-900">
+                              {formatCurrency(row.outflow)}
+                            </td>
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-900">
+                              {formatCurrency(row.net)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="p-8 text-center">
+                  <p className="text-gray-500">
+                    No offset transactions found for the selected filters.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Bank Account View */}
           {viewMode === "bybank" && !isLoading && (
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Cash Flow by Bank Account</h3>
+                <h3 className="text-lg font-semibold text-gray-900">By Bank (Cash lines)</h3>
                 <div className="text-sm text-gray-600 mt-1">
                   {timePeriod === "Custom"
                     ? `For the period ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
@@ -3141,6 +3451,7 @@ export default function CashFlowPage() {
           {!isLoading &&
             ((viewMode === "offset" && offsetAccountData.length === 0) ||
               (viewMode === "bybank" && bankAccountData.length === 0) ||
+              (viewMode === "bankoffsets" && bankOffsetRows.length === 0) ||
               (viewMode === "traditional" && cashFlowData.length === 0)) && (
               <div className="bg-white rounded-lg shadow-sm p-8 text-center">
                 <p className="text-gray-500">No cash flow data found for the selected period and filters.</p>
