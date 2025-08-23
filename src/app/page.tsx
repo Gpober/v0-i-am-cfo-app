@@ -465,6 +465,29 @@ export default function FinancialOverviewPage() {
         `📊 Current period: ${filteredCurrentTransactions.length} transactions`,
       );
 
+      // Fetch offset lines for current period to compute net cash
+      let cashQuery = supabase
+        .from("cash_offsets_by_bank")
+        .select(
+          `date, class, account_type, report_category, debit, credit, cash_effect`,
+        )
+        .gte("date", startDate)
+        .lte("date", endDate)
+        .order("date", { ascending: true });
+
+      if (selectedClassList.length > 0) {
+        cashQuery = cashQuery.in("class", selectedClassList);
+      }
+      cashQuery = cashQuery.neq("report_category", "transfer");
+
+      const { data: cashOffsets, error: cashError } = await cashQuery;
+      if (cashError) throw cashError;
+      const filteredCashOffsets = cashOffsets.filter((tx) =>
+        isDateInRange(tx.date, startDate, endDate),
+      );
+
+      const cashFlowOverride = processCashFlowTransactions(filteredCashOffsets);
+
       // Fetch previous period for comparison
       const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1;
       const prevYear = monthIndex === 0 ? year - 1 : year;
@@ -597,6 +620,7 @@ export default function FinancialOverviewPage() {
         filteredCurrentTransactions,
         filteredPrevTransactions,
         trendData,
+        cashFlowOverride,
       );
       setFinancialData(processedData);
       setLastUpdated(new Date());
@@ -609,13 +633,19 @@ export default function FinancialOverviewPage() {
   };
 
   // Process financial data using same logic as P&L and Cash Flow pages
-  const processFinancialData = (currentData, prevData, trendData) => {
+  const processFinancialData = (
+    currentData,
+    prevData,
+    trendData,
+    currentCashFlowOverride,
+  ) => {
     // Process P&L data (same as financials page)
     const current = processPLTransactions(currentData);
     const previous = processPLTransactions(prevData);
 
-    // Process cash flow data (same as cash-flow page)
-    const currentCashFlow = processCashFlowTransactions(currentData);
+    // Process cash flow data
+    const currentCashFlow =
+      currentCashFlowOverride ?? processCashFlowTransactions(currentData);
     const previousCashFlow = processCashFlowTransactions(prevData);
 
     // Process trend data
@@ -752,17 +782,17 @@ export default function FinancialOverviewPage() {
     let investingCashFlow = 0;
 
     transactions.forEach((tx) => {
-      if (!tx.entry_bank_account) return; // Must have bank account source
-
       const classification = classifyCashFlowTransaction(
         tx.account_type,
         tx.report_category,
       );
-      const cashImpact =
-        tx.report_category === "transfer"
-          ? Number.parseFloat(tx.debit) - Number.parseFloat(tx.credit) // Reverse for transfers
-          : tx.normal_balance ||
-            Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit); // Normal for others
+      const cashImpact = Number(
+        tx.cash_effect ??
+          (tx.report_category === "transfer"
+            ? Number(tx.debit ?? 0) - Number(tx.credit ?? 0)
+            : tx.normal_balance ??
+              Number(tx.credit ?? 0) - Number(tx.debit ?? 0)),
+      );
 
       if (classification === "operating") {
         operatingCashFlow += cashImpact;

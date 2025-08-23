@@ -105,7 +105,6 @@ interface BankAccountData {
   total: number
   offsetAccounts: Record<string, number>
 }
-
 type ViewMode = "offset" | "traditional" | "bybank"
 type PeriodType = "monthly" | "weekly" | "total"
 type TimePeriod = "Monthly" | "Quarterly" | "YTD" | "Trailing 12" | "Custom"
@@ -217,6 +216,7 @@ export default function CashFlowPage() {
 
   // Convert any value to a number, treating null/undefined as 0
   const toNum = (v: any) => Number(v ?? 0)
+
 
   // Format date for display
   const formatDateSafe = (dateString: string): string => {
@@ -761,6 +761,7 @@ export default function CashFlowPage() {
       console.error("Error fetching filters:", err)
     }
   }
+
 
   // FIXED: Fetch bank account view data with corrected transfer toggle logic
   const fetchBankAccountData = async () => {
@@ -1485,7 +1486,7 @@ export default function CashFlowPage() {
                     viewMode === "bybank" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
-                  🏦 By Bank Account
+                  🏦 By Bank (Cash lines)
                 </button>
                 <button
                   onClick={() => setViewMode("traditional")}
@@ -1668,8 +1669,10 @@ export default function CashFlowPage() {
               ))}
             </select>
 
-            {/* Bank Account Filter - Show for offset and traditional views */}
-            {(viewMode === "offset" || viewMode === "traditional") && (
+            {/* Bank Account Filter */}
+            {(viewMode === "offset" ||
+              viewMode === "traditional" ||
+              viewMode === "bybank") && (
               <select
                 value={selectedBankAccount}
                 onChange={(e) => setSelectedBankAccount(e.target.value)}
@@ -1754,7 +1757,7 @@ export default function CashFlowPage() {
           {viewMode === "bybank" && !isLoading && (
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Cash Flow by Bank Account</h3>
+                <h3 className="text-lg font-semibold text-gray-900">By Bank (Cash lines)</h3>
                 <div className="text-sm text-gray-600 mt-1">
                   {timePeriod === "Custom"
                     ? `For the period ${formatDate(calculateDateRange().startDate)} - ${formatDate(calculateDateRange().endDate)}`
