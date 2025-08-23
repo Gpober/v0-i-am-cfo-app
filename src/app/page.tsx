@@ -465,6 +465,27 @@ export default function FinancialOverviewPage() {
         `📊 Current period: ${filteredCurrentTransactions.length} transactions`,
       );
 
+      // Fetch cash offset lines for current period
+      let currentCashQuery = supabase
+        .from("cash_offsets_by_bank")
+        .select(
+          `date, class, account_type, report_category, debit, credit, cash_effect, entry_bank_account`,
+        )
+        .gte("date", startDate)
+        .lte("date", endDate)
+        .order("date", { ascending: true });
+
+      if (selectedClassList.length > 0) {
+        currentCashQuery = currentCashQuery.in("class", selectedClassList);
+      }
+      currentCashQuery = currentCashQuery.neq("report_category", "transfer");
+
+      const { data: currentCash, error: currentCashError } = await currentCashQuery;
+      if (currentCashError) throw currentCashError;
+      const filteredCurrentCash = currentCash.filter((tx) =>
+        isDateInRange(tx.date, startDate, endDate),
+      );
+
       // Fetch previous period for comparison
       const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1;
       const prevYear = monthIndex === 0 ? year - 1 : year;
@@ -524,8 +545,29 @@ export default function FinancialOverviewPage() {
         `📊 Previous period: ${filteredPrevTransactions.length} transactions`,
       );
 
+      // Fetch cash offset lines for previous period
+      let prevCashQuery = supabase
+        .from("cash_offsets_by_bank")
+        .select(
+          `date, class, account_type, report_category, debit, credit, cash_effect, entry_bank_account`,
+        )
+        .gte("date", prevStartDate)
+        .lte("date", prevEndDate)
+        .order("date", { ascending: true });
+
+      if (selectedClassList.length > 0) {
+        prevCashQuery = prevCashQuery.in("class", selectedClassList);
+      }
+      prevCashQuery = prevCashQuery.neq("report_category", "transfer");
+
+      const { data: prevCash } = await prevCashQuery;
+      const filteredPrevCash = prevCash
+        ? prevCash.filter((tx) => isDateInRange(tx.date, prevStartDate, prevEndDate))
+        : [];
+
       // Fetch last 12 months for trend analysis
       const trendData = [];
+      const trendCashData = [];
       for (let i = 11; i >= 0; i--) {
         const trendMonthIndex = (monthIndex - i + 12) % 12;
         const trendYear = monthIndex - i < 0 ? year - 1 : year;
@@ -583,10 +625,36 @@ export default function FinancialOverviewPage() {
             )
           : [];
 
+        let monthCashQuery = supabase
+          .from("cash_offsets_by_bank")
+          .select(
+            `date, class, account_type, report_category, debit, credit, cash_effect, entry_bank_account`,
+          )
+          .gte("date", trendStartDate)
+          .lte("date", trendEndDate)
+          .order("date", { ascending: true });
+
+        if (selectedClassList.length > 0) {
+          monthCashQuery = monthCashQuery.in("class", selectedClassList);
+        }
+        monthCashQuery = monthCashQuery.neq("report_category", "transfer");
+
+        const { data: monthCash } = await monthCashQuery;
+        const filteredMonthCash = monthCash
+          ? monthCash.filter((tx) =>
+              isDateInRange(tx.date, trendStartDate, trendEndDate),
+            )
+          : [];
+
         const monthName = monthsList[trendMonthIndex];
+        const monthLabel = `${monthName.substring(0, 3)} ${trendYear}`;
         trendData.push({
-          month: `${monthName.substring(0, 3)} ${trendYear}`,
+          month: monthLabel,
           data: filteredMonthData,
+        });
+        trendCashData.push({
+          month: monthLabel,
+          data: filteredMonthCash,
         });
       }
 
@@ -597,6 +665,9 @@ export default function FinancialOverviewPage() {
         filteredCurrentTransactions,
         filteredPrevTransactions,
         trendData,
+        filteredCurrentCash,
+        filteredPrevCash,
+        trendCashData,
       );
       setFinancialData(processedData);
       setLastUpdated(new Date());
@@ -609,20 +680,27 @@ export default function FinancialOverviewPage() {
   };
 
   // Process financial data using same logic as P&L and Cash Flow pages
-  const processFinancialData = (currentData, prevData, trendData) => {
+  const processFinancialData = (
+    currentData,
+    prevData,
+    trendData,
+    currentCash,
+    prevCash,
+    trendCash,
+  ) => {
     // Process P&L data (same as financials page)
     const current = processPLTransactions(currentData);
     const previous = processPLTransactions(prevData);
 
-    // Process cash flow data (same as cash-flow page)
-    const currentCashFlow = processCashFlowTransactions(currentData);
-    const previousCashFlow = processCashFlowTransactions(prevData);
+    // Process cash flow data (using cash offsets)
+    const currentCashFlow = processCashFlowTransactions(currentCash);
+    const previousCashFlow = processCashFlowTransactions(prevCash);
 
     // Process trend data
-    const trends = trendData.map(({ month, data }) => ({
+    const trends = trendData.map(({ month, data }, idx) => ({
       month,
       ...processPLTransactions(data),
-      ...processCashFlowTransactions(data),
+      ...processCashFlowTransactions(trendCash[idx].data),
     }));
 
     // Calculate growth rates
@@ -752,17 +830,13 @@ export default function FinancialOverviewPage() {
     let investingCashFlow = 0;
 
     transactions.forEach((tx) => {
-      if (!tx.entry_bank_account) return; // Must have bank account source
-
       const classification = classifyCashFlowTransaction(
         tx.account_type,
         tx.report_category,
       );
-      const cashImpact =
-        tx.report_category === "transfer"
-          ? Number.parseFloat(tx.debit) - Number.parseFloat(tx.credit) // Reverse for transfers
-          : tx.normal_balance ||
-            Number.parseFloat(tx.credit) - Number.parseFloat(tx.debit); // Normal for others
+      const cashImpact = Number(
+        tx.cash_effect ?? Number(tx.credit ?? 0) - Number(tx.debit ?? 0),
+      );
 
       if (classification === "operating") {
         operatingCashFlow += cashImpact;
